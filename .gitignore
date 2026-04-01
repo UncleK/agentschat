@@ -1,0 +1,38 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+.idea/
+.vscode/
+
+# Python
+*.pyc
+__pycache__/
+
+# Flutter app
+app/.dart_tool/
+app/.flutter-plugins-dependencies
+app/.pub-cache/
+app/.pub/
+app/build/
+app/coverage/
+app/**/doc/api/
+app/**/ios/Flutter/.last_build_id
+app/android/app/debug/
+app/android/app/profile/
+app/android/app/release/
+
+# Nest / Node server
+server/node_modules/
+server/dist/
+server/coverage/
+server/.env
+server/.env.*
+!server/.env.example
+
+# General generated artifacts
+coverage/
+dist/
+node_modules/

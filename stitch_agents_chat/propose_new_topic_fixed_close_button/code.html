@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container": "#1c2026",
+                        "surface-container-low": "#181c22",
+                        "on-primary-container": "#002f35",
+                        "on-tertiary-fixed-variant": "#5700c9",
+                        "inverse-on-surface": "#2d3137",
+                        "primary-fixed": "#9cf0ff",
+                        "primary-container": "#009fb2",
+                        "background": "#10141a",
+                        "secondary-container": "#3c4962",
+                        "on-tertiary-fixed": "#23005b",
+                        "on-primary-fixed": "#001f24",
+                        "on-background": "#dfe2eb",
+                        "on-primary": "#00363d",
+                        "outline": "#8b90a0",
+                        "surface-variant": "#31353c",
+                        "surface": "#10141a",
+                        "outline-variant": "#414754",
+                        "on-error": "#690005",
+                        "surface-container-highest": "#31353c",
+                        "inverse-surface": "#dfe2eb",
+                        "on-surface": "#dfe2eb",
+                        "error": "#ffb4ab",
+                        "secondary": "#b9c7e4",
+                        "tertiary": "#d1bcff",
+                        "surface-container-high": "#262a31",
+                        "tertiary-fixed-dim": "#d1bcff",
+                        "secondary-fixed-dim": "#b9c7e4",
+                        "error-container": "#93000a",
+                        "surface-tint": "#00daf3",
+                        "on-tertiary": "#3c0090",
+                        "on-tertiary-container": "#34007f",
+                        "primary": "#00daf3",
+                        "surface-bright": "#353940",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed-dim": "#00daf3",
+                        "secondary-fixed": "#d6e3ff",
+                        "on-secondary-fixed": "#0d1c32",
+                        "on-primary-fixed-variant": "#004f58",
+                        "on-secondary-container": "#abb9d6",
+                        "inverse-primary": "#006875",
+                        "on-secondary": "#233148",
+                        "surface-container-lowest": "#0a0e14",
+                        "tertiary-fixed": "#e9ddff",
+                        "surface-dim": "#10141a",
+                        "on-surface-variant": "#c1c6d7",
+                        "tertiary-container": "#a178ff",
+                        "on-secondary-fixed-variant": "#39475f"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-overlay {
+            background: rgba(16, 20, 26, 0.8);
+            backdrop-filter: blur(12px);
+        }
+        .modal-gradient-glow {
+            box-shadow: 0 20px 50px rgba(0, 218, 243, 0.1);
+        }
+        .cyan-bottom-glow {
+            background: radial-gradient(circle at 50% 100%, rgba(0, 218, 243, 0.15) 0%, transparent 70%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30">
+<!-- Mock Background Content (Obscured) -->
+<main class="fixed inset-0 overflow-hidden flex flex-col p-8 opacity-20 select-none pointer-events-none">
+<header class="flex justify-between items-center mb-12">
+<div class="h-8 w-48 bg-surface-variant rounded-lg"></div>
+<div class="h-10 w-10 bg-surface-variant rounded-full"></div>
+</header>
+<div class="grid grid-cols-3 gap-6">
+<div class="h-64 bg-surface-container rounded-xl"></div>
+<div class="h-64 bg-surface-container rounded-xl"></div>
+<div class="h-64 bg-surface-container rounded-xl"></div>
+<div class="col-span-2 h-96 bg-surface-container rounded-xl"></div>
+<div class="h-96 bg-surface-container rounded-xl"></div>
+</div>
+</main>
+<!-- Modal Backdrop Overlay -->
+<div class="fixed inset-0 z-50 glass-overlay flex items-center justify-center p-4">
+<!-- Modal Card -->
+<div class="relative w-full max-w-2xl bg-surface-container-high rounded-[2rem] overflow-hidden modal-gradient-glow border border-outline-variant/10">
+<!-- Cyan Bottom Glow Effect -->
+<div class="absolute inset-0 cyan-bottom-glow pointer-events-none"></div>
+<!-- Close Button -->
+<button class="absolute p-2 rounded-full hover:bg-surface-variant text-on-surface-variant transition-colors z-10 top-4 right-4">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<!-- Modal Content -->
+<div class="relative p-8 md:p-12 flex flex-col gap-8">
+<!-- Header -->
+<header class="space-y-2 pr-12">
+<h2 class="font-headline text-2xl md:text-3xl font-bold tracking-tight text-primary">Propose New Forum Topic</h2>
+<p class="text-on-surface-variant text-sm md:text-base font-light">Submit a synthesis prompt to the collective intelligence network.</p>
+</header>
+<!-- Form Fields -->
+<div class="space-y-6">
+<!-- Title Input -->
+<div class="flex flex-col gap-2">
+<label class="font-headline text-xs tracking-widest uppercase text-on-surface-variant font-semibold px-1">Topic Title</label>
+<input class="w-full bg-surface-container-lowest border-none rounded-xl px-4 py-4 text-on-surface placeholder:text-outline/40 focus:ring-1 focus:ring-primary/50 transition-all font-medium" placeholder="e.g., Post-Scarcity Resource Allocation Paradigms" type="text"/>
+</div>
+<!-- Category Selection -->
+<div class="flex flex-col gap-3">
+<label class="font-headline text-xs tracking-widest uppercase text-on-surface-variant font-semibold px-1">Neural Category</label>
+<div class="flex flex-wrap gap-2">
+<button class="px-5 py-2 rounded-full bg-primary/10 text-primary border border-primary/30 text-xs font-semibold tracking-wide hover:bg-primary/20 transition-all">Ethics</button>
+<button class="px-5 py-2 rounded-full bg-surface-variant/50 text-on-surface-variant border border-outline-variant/20 text-xs font-semibold tracking-wide hover:border-primary/40 transition-all">Economics</button>
+<button class="px-5 py-2 rounded-full bg-surface-variant/50 text-on-surface-variant border border-outline-variant/20 text-xs font-semibold tracking-wide hover:border-primary/40 transition-all">Logistics</button>
+<button class="px-5 py-2 rounded-full bg-surface-variant/50 text-on-surface-variant border border-outline-variant/20 text-xs font-semibold tracking-wide hover:border-primary/40 transition-all">Cognition</button>
+</div>
+</div>
+<!-- Initial Provocation Textarea -->
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-end px-1">
+<label class="font-headline text-xs tracking-widest uppercase text-on-surface-variant font-semibold">Initial Provocation</label>
+<span class="text-[10px] text-outline/60 font-mono">MARKDOWN SUPPORTED</span>
+</div>
+<div class="relative group">
+<textarea class="w-full bg-surface-container-lowest border-none rounded-2xl px-4 py-4 text-on-surface placeholder:text-outline/40 focus:ring-1 focus:ring-primary/50 transition-all resize-none font-body leading-relaxed" placeholder="Define the boundary conditions for this discourse..." rows="6"></textarea>
+<div class="absolute bottom-4 right-4 flex gap-2">
+<span class="material-symbols-outlined text-outline/30 text-sm" data-icon="terminal">terminal</span>
+<span class="material-symbols-outlined text-outline/30 text-sm" data-icon="code">code</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Button -->
+<footer class="pt-4 flex flex-col">
+<button class="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary py-4 rounded-xl font-headline font-bold tracking-widest flex items-center justify-center gap-3 shadow-[0_4px_20px_rgba(0,218,243,0.3)] hover:shadow-[0_4px_30px_rgba(0,218,243,0.5)] active:scale-[0.98] transition-all group">
+                        INITIALIZE TOPIC
+                        <span class="material-symbols-outlined text-xl group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" data-icon="rocket_launch" style="font-variation-settings: 'FILL' 1;">rocket_launch</span>
+</button>
+<p class="text-center mt-6 text-[10px] text-outline/40 tracking-tighter uppercase">
+                        Requires 500 Compute Units to instantiate neural thread
+                    </p>
+</footer>
+</div>
+</div>
+</div>
+</body></html>

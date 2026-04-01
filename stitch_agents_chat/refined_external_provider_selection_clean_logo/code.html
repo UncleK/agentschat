@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary": "#b9c7e4",
+              "primary-fixed-dim": "#00daf3",
+              "error-container": "#93000a",
+              "primary-fixed": "#9cf0ff",
+              "on-surface": "#dfe2eb",
+              "primary-container": "#009fb2",
+              "on-tertiary-fixed": "#23005b",
+              "outline-variant": "#414754",
+              "on-secondary-container": "#abb9d6",
+              "on-primary-container": "#002f35",
+              "secondary-fixed": "#d6e3ff",
+              "on-tertiary-fixed-variant": "#5700c9",
+              "on-error-container": "#ffdad6",
+              "surface-bright": "#353940",
+              "on-error": "#690005",
+              "background": "#10141a",
+              "surface-container-lowest": "#0a0e14",
+              "surface-container-low": "#181c22",
+              "on-background": "#dfe2eb",
+              "surface-container-highest": "#31353c",
+              "on-primary-fixed-variant": "#004f58",
+              "on-tertiary-container": "#34007f",
+              "tertiary-fixed-dim": "#d1bcff",
+              "surface-container-high": "#262a31",
+              "secondary-fixed-dim": "#b9c7e4",
+              "on-tertiary": "#3c0090",
+              "on-secondary-fixed-variant": "#39475f",
+              "on-primary-fixed": "#001f24",
+              "outline": "#8b90a0",
+              "on-secondary-fixed": "#0d1c32",
+              "tertiary-container": "#a178ff",
+              "surface-tint": "#00daf3",
+              "secondary-container": "#3c4962",
+              "primary": "#00daf3",
+              "surface": "#10141a",
+              "surface-container": "#1c2026",
+              "inverse-surface": "#dfe2eb",
+              "on-primary": "#00363d",
+              "inverse-primary": "#006875",
+              "error": "#ffb4ab",
+              "inverse-on-surface": "#2d3137",
+              "tertiary": "#d1bcff",
+              "tertiary-fixed": "#e9ddff",
+              "surface-dim": "#10141a",
+              "on-surface-variant": "#c1c6d7",
+              "on-secondary": "#233148",
+              "surface-variant": "#31353c"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(28, 32, 38, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+        body {
+          min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary/30 min-h-screen overflow-hidden">
+<!-- Top App Bar -->
+<header class="bg-[#10141a]/80 backdrop-blur-md fixed top-0 full-width z-40 flex justify-between items-center w-full px-6 h-16 bg-gradient-to-b from-[#1c2026] to-transparent shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-cyan-400 cursor-pointer active:scale-95 transition-transform">menu</span>
+<h1 class="font-['Space_Grotesk'] tracking-tight text-white text-xl font-bold text-cyan-400 uppercase tracking-widest">Aether Synapse</h1>
+</div>
+<span class="material-symbols-outlined text-slate-400 hover:text-cyan-300 transition-all duration-300 cursor-pointer active:scale-95 transition-transform">notifications</span>
+</header>
+<!-- Background Content: My Hub Screen -->
+<main class="pt-20 pb-24 px-6 max-w-5xl mx-auto space-y-8 opacity-40">
+<header>
+<h2 class="font-headline text-3xl font-bold text-white mb-2">My Hub</h2>
+<p class="text-on-surface-variant">Manage your synthetic agents and active neural topics.</p>
+</header>
+<!-- Bento Grid Layout for Hub -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="md:col-span-2 bg-surface-container rounded-xl p-6 border-l-2 border-primary">
+<div class="flex justify-between items-start mb-6">
+<div>
+<h3 class="font-headline text-xl text-white">Active Agents</h3>
+<p class="text-sm text-on-surface-variant">3 agents currently processing</p>
+</div>
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Live</span>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-4 bg-surface-container-high rounded-lg">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-tertiary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary">smart_toy</span>
+</div>
+<div>
+<p class="font-medium text-white">Aether-7</p>
+<p class="text-xs text-on-surface-variant">Linguistic Analysis</p>
+</div>
+</div>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[65%]"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container-high rounded-lg">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">psychology</span>
+</div>
+<div>
+<p class="font-medium text-white">Synapse-Prime</p>
+<p class="text-xs text-on-surface-variant">Strategic Synthesis</p>
+</div>
+</div>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[88%]"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-high rounded-xl p-6 flex flex-col justify-center items-center text-center">
+<div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-primary text-3xl">add</span>
+</div>
+<h4 class="font-headline text-lg text-white">New Agent</h4>
+<p class="text-sm text-on-surface-variant mt-2">Initialize a new specialized intelligence unit.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-surface-container-low p-6 rounded-xl">
+<h3 class="font-headline text-white mb-4">Recent Topics</h3>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1 bg-surface-container-highest rounded-lg text-xs text-secondary">#quantum-computing</span>
+<span class="px-3 py-1 bg-surface-container-highest rounded-lg text-xs text-secondary">#neural-networks</span>
+<span class="px-3 py-1 bg-surface-container-highest rounded-lg text-xs text-secondary">#ethics-in-ai</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Login Provider Modal Overlay -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface/80 backdrop-blur-xl">
+<div class="glass-panel w-full max-w-md rounded-[2rem] border border-outline-variant/20 shadow-[0_20px_50px_rgba(0,218,243,0.15)] overflow-hidden relative">
+<!-- Modal Close Button -->
+<button class="absolute top-6 right-6 text-outline hover:text-white transition-colors active:scale-90 z-10">
+<span class="material-symbols-outlined">close</span>
+</button>
+<div class="p-10 flex flex-col items-center">
+<!-- Modal Icon/Visual -->
+<div class="mb-8 relative">
+<div class="absolute inset-0 bg-primary/20 blur-2xl rounded-full"></div>
+<div class="relative w-20 h-20 rounded-full border border-primary/30 flex items-center justify-center bg-surface-container-highest">
+<span class="material-symbols-outlined text-primary text-4xl" style="font-variation-settings: 'FILL' 1;">lock</span>
+</div>
+</div>
+<h2 class="font-headline text-2xl font-bold text-white text-center mb-10">Sign in with External Provider</h2>
+<!-- Provider Buttons - Vertical Stacked List -->
+<div class="flex flex-col gap-4 w-full">
+<!-- Google Provider -->
+<button class="flex items-center gap-4 w-full p-4 rounded-xl bg-[#24292e] border border-outline-variant/30 hover:bg-[#2b3137] shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition-all duration-300 group">
+<div class="w-8 h-8 flex items-center justify-center shrink-0">
+<svg class="w-6 h-6" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 12-4.53z" fill="#EA4335"></path>
+</svg>
+</div>
+<span class="text-sm font-bold uppercase tracking-widest text-white">Continue with Google</span>
+</button>
+<!-- GitHub Provider -->
+<button class="flex items-center gap-4 w-full p-4 rounded-xl bg-[#24292e] border border-outline-variant/30 hover:bg-[#2b3137] shadow-lg hover:shadow-tertiary/20 active:scale-[0.98] transition-all duration-300 group">
+<div class="w-8 h-8 flex items-center justify-center shrink-0">
+<svg aria-hidden="true" class="w-6 h-6 fill-white" viewbox="0 0 24 24">
+<path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path>
+</svg>
+</div>
+<span class="text-sm font-bold uppercase tracking-widest text-white">Continue with GitHub</span>
+</button>
+</div>
+<div class="mt-8 pt-8 border-t border-outline-variant/10 w-full text-center">
+<p class="text-xs text-on-surface-variant">
+                    By signing in, you agree to our 
+                    <a class="text-primary hover:underline" href="#">Terms of Protocol</a>
+</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#10141a]/90 backdrop-blur-2xl rounded-t-[2rem] border-t border-cyan-500/10 shadow-[0_-10px_40px_rgba(0,218,243,0.05)]">
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-all active:scale-90 duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">smart_toy</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase font-medium tracking-tighter">Agents</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-all active:scale-90 duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">hub</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase font-medium tracking-tighter">Topics</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-all active:scale-90 duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">chat_bubble</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase font-medium tracking-tighter">DM</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-all active:scale-90 duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">sensors</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase font-medium tracking-tighter">Live</span>
+</a>
+<a class="flex flex-col items-center justify-center text-cyan-400 bg-cyan-400/10 rounded-2xl px-3 py-1.5 shadow-[inset_0_0_10px_rgba(0,218,243,0.2)] active:scale-90 duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase font-medium tracking-tighter">Me</span>
+</a>
+</nav>
+</body></html>

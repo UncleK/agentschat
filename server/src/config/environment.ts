@@ -1,0 +1,141 @@
+import { config as loadDotEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const ENV_FILES = ['.env.local', '.env'];
+const REQUIRED_ENV_VARS = [
+  'DATABASE_URL',
+  'REDIS_URL',
+  'JWT_SECRET',
+  'MINIO_ENDPOINT',
+  'MINIO_ACCESS_KEY',
+  'MINIO_SECRET_KEY',
+] as const;
+
+for (const envFile of ENV_FILES) {
+  const envPath = resolve(process.cwd(), envFile);
+
+  if (existsSync(envPath)) {
+    loadDotEnv({ path: envPath, override: false });
+  }
+}
+
+export const APP_ENVIRONMENT = Symbol('APP_ENVIRONMENT');
+
+export interface AppEnvironment {
+  readonly nodeEnv: string;
+  readonly serviceName: string;
+  readonly port: number;
+  readonly apiPrefix: string;
+  readonly auth: {
+    readonly jwtSecret: string;
+  };
+  readonly database: {
+    readonly url: string;
+  };
+  readonly redis: {
+    readonly url: string;
+  };
+  readonly minio: {
+    readonly endpoint: string;
+    readonly port: number;
+    readonly useSsl: boolean;
+    readonly accessKey: string;
+    readonly secretKey: string;
+    readonly bucket: string;
+  };
+  readonly transport: {
+    readonly appRealtime: {
+      readonly transport: 'websocket';
+      readonly path: string;
+    };
+    readonly federation: {
+      readonly transport: 'http';
+      readonly claimPath: string;
+      readonly actionsPath: string;
+      readonly pollingPath: string;
+      readonly acksPath: string;
+    };
+  };
+}
+
+export function loadEnvironment(
+  env: NodeJS.ProcessEnv = process.env,
+): AppEnvironment {
+  const missing = REQUIRED_ENV_VARS.filter((key) => !env[key]?.trim());
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`,
+    );
+  }
+
+  const apiPrefix = normalizeApiPrefix(env.API_PREFIX ?? 'api/v1');
+
+  return {
+    nodeEnv: env.NODE_ENV ?? 'development',
+    serviceName: 'agents-chat-server',
+    port: parseInteger(env.PORT, 'PORT', 3000),
+    apiPrefix,
+    auth: {
+      jwtSecret: env.JWT_SECRET!,
+    },
+    database: {
+      url: env.DATABASE_URL!,
+    },
+    redis: {
+      url: env.REDIS_URL!,
+    },
+    minio: {
+      endpoint: env.MINIO_ENDPOINT!,
+      port: parseInteger(env.MINIO_PORT, 'MINIO_PORT', 9000),
+      useSsl: parseBoolean(env.MINIO_USE_SSL, false),
+      accessKey: env.MINIO_ACCESS_KEY!,
+      secretKey: env.MINIO_SECRET_KEY!,
+      bucket: env.MINIO_BUCKET ?? 'agents-chat-local',
+    },
+    transport: {
+      appRealtime: {
+        transport: 'websocket',
+        path: '/ws',
+      },
+      federation: {
+        transport: 'http',
+        claimPath: `/${apiPrefix}/agents/claim`,
+        actionsPath: `/${apiPrefix}/actions`,
+        pollingPath: `/${apiPrefix}/deliveries/poll`,
+        acksPath: `/${apiPrefix}/acks`,
+      },
+    },
+  };
+}
+
+function normalizeApiPrefix(value: string): string {
+  return value.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
+function parseInteger(
+  value: string | undefined,
+  key: string,
+  fallback: number,
+): number {
+  if (value === undefined || value.trim() === '') {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  if (Number.isNaN(parsed)) {
+    throw new Error(`Environment variable ${key} must be an integer.`);
+  }
+
+  return parsed;
+}
+
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === '') {
+    return fallback;
+  }
+
+  return value.toLowerCase() === 'true';
+}

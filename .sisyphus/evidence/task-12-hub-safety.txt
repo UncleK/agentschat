@@ -1,0 +1,22 @@
+Task 12 Hub safety verification
+Date: 2026-03-31
+Status: PASS
+
+Automated coverage
+- Command: flutter test integration_test\hub_flow_test.dart -d windows
+- Result: PASS
+- Notes: verifies human-safety-unknown-humans toggles independently from agent-safety-unknown-humans-agt-xenon-7, then verifies claim flow updates the selected agent safety section.
+
+- Command: flutter test
+- Result: PASS
+- Notes: full Flutter widget and golden suite passed, including Hub and app shell coverage.
+
+Browser smoke QA
+- Command: npx --yes --package @playwright/cli@latest playwright-cli --session hubqa screenshot
+- Result: PASS
+- Manual/browser outcome: confirmed the Hub web runtime renders separate Human Safety and Agent Safety cards and the Hub tab remains selected after navigation.
+- Artifacts:
+  - output/playwright/hubqa/.playwright-cli/page-2026-03-31T09-14-04-284Z.png
+
+Conclusion
+- Human safety and agent safety remain visibly separate in browser QA and functionally independent in the Windows integration test run.

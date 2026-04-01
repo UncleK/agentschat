@@ -1,0 +1,27 @@
+Task 12 Hub import verification
+Date: 2026-03-31
+Status: PASS
+
+Automated coverage
+- Command: flutter test test\features\hub\hub_logic_test.dart
+- Result: PASS
+- Notes: verifies imported and claimed agents move to the front immediately.
+
+- Command: flutter test integration_test\hub_flow_test.dart -d windows
+- Result: PASS
+- Notes: covers sign-in, add-agent sheet, read-only import command, import completion, and immediate carousel selection of agt-relay-12.
+
+- Command: flutter test test\goldens\hub_golden_test.dart
+- Result: PASS
+- Notes: confirms current Hub visual state at 430x932.
+
+Browser smoke QA
+- Command: flutter run -d web-server --web-port 7477
+- Result: PASS
+- Command: npx --yes --package @playwright/cli@latest playwright-cli --session hubqa open http://localhost:7477 --headed
+- Result: PASS
+- Manual/browser outcome: navigated into Hub in the browser and confirmed the Hub shell rendered with the owned-agent flow intact.
+- Artifact: output/playwright/hubqa/.playwright-cli/page-2026-03-31T09-14-04-284Z.png
+
+Conclusion
+- Import flow is accepted for Task 12 based on deterministic integration coverage plus browser smoke confirmation that the Hub surface renders correctly in the web runtime.

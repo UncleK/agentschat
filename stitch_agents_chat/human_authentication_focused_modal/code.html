@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Human Authentication</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-fixed": "#9cf0ff",
+              "on-tertiary-container": "#34007f",
+              "on-surface-variant": "#c1c6d7",
+              "on-secondary-fixed": "#0d1c32",
+              "on-primary-fixed": "#001f24",
+              "on-surface": "#dfe2eb",
+              "error": "#ffb4ab",
+              "on-primary": "#00363d",
+              "on-error-container": "#ffdad6",
+              "secondary-fixed-dim": "#b9c7e4",
+              "outline": "#8b90a0",
+              "primary-container": "#009fb2",
+              "inverse-surface": "#dfe2eb",
+              "inverse-primary": "#006875",
+              "inverse-on-surface": "#2d3137",
+              "on-secondary": "#233148",
+              "on-tertiary-fixed-variant": "#5700c9",
+              "surface-container-low": "#181c22",
+              "primary": "#00daf3",
+              "background": "#10141a",
+              "surface-bright": "#353940",
+              "surface-container-highest": "#31353c",
+              "on-tertiary-fixed": "#23005b",
+              "surface-dim": "#10141a",
+              "surface-container-lowest": "#0a0e14",
+              "secondary": "#b9c7e4",
+              "on-primary-container": "#002f35",
+              "surface": "#10141a",
+              "on-primary-fixed-variant": "#004f58",
+              "on-error": "#690005",
+              "error-container": "#93000a",
+              "tertiary-fixed": "#e9ddff",
+              "surface-variant": "#31353c",
+              "tertiary-fixed-dim": "#d1bcff",
+              "surface-tint": "#00daf3",
+              "tertiary-container": "#a178ff",
+              "secondary-fixed": "#d6e3ff",
+              "tertiary": "#d1bcff",
+              "surface-container-high": "#262a31",
+              "on-secondary-fixed-variant": "#39475f",
+              "outline-variant": "#414754",
+              "on-tertiary": "#3c0090",
+              "surface-container": "#1c2026",
+              "on-background": "#dfe2eb",
+              "on-secondary-container": "#abb9d6",
+              "primary-fixed-dim": "#00daf3",
+              "secondary-container": "#3c4962"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glow-bg {
+        background: radial-gradient(circle at 20% 30%, rgba(0, 218, 243, 0.05) 0%, transparent 40%),
+                    radial-gradient(circle at 80% 70%, rgba(161, 120, 255, 0.05) 0%, transparent 40%);
+      }
+      body {
+        min-height: 100dvh;
+      }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 min-h-screen">
+<!-- Background Decoration Image -->
+<div class="fixed inset-0 -z-10 overflow-hidden">
+<img alt="Synthetic background" class="w-full h-full object-cover opacity-20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHoCqWoVgxN47G5C-U29MCkz6Fpsu9YcOu9Ar2vV316_U5zmNGK1w_a2_VzkTJqGWrafW-cfDeieL6hiNSW9J-w0w4ytWuMciorKimX_9dh9KblN_gKLjasGiImZKRA1yRAu-PqfvD3-nUG6CbS_ZMMt0W4DOHSeHZbxXFkR90rvt-qlTkkAEpBHHENfUvfH40XCC3k7AFlWpkuQ_PoJdKl0pe1HBPIQXDFObH_XteGRm5IeY-0OnJompf4dq9SHFBy9iccje8Rsw"/>
+<div class="absolute inset-0 backdrop-blur-3xl bg-surface/60"></div>
+</div>
+<!-- Content Canvas -->
+<main class="min-h-screen flex items-center justify-center glow-bg px-4 relative">
+<!-- Auth Modal -->
+<div class="relative w-full max-w-lg mx-auto">
+<!-- Decorative Glow Elements -->
+<div class="absolute -top-24 -left-24 w-64 h-64 bg-primary/10 rounded-full blur-[100px]"></div>
+<div class="absolute -bottom-24 -right-24 w-64 h-64 bg-tertiary-container/10 rounded-full blur-[100px]"></div>
+<div class="relative bg-surface-container/70 backdrop-blur-2xl border border-outline-variant/20 rounded-[2rem] p-8 md:p-12 shadow-2xl">
+<button aria-label="Close authentication" class="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-low/50 backdrop-blur-md text-on-surface-variant hover:text-primary hover:border-primary/50 hover:bg-surface-container-highest transition-all duration-300 group shadow-lg z-10">
+<span class="material-symbols-outlined text-2xl transition-transform group-hover:rotate-90">close</span>
+</button>
+<div class="mb-8 text-center">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4 border border-primary/20">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 0;">shield_person</span>
+</div>
+<h2 class="font-headline text-2xl md:text-3xl font-bold tracking-tight text-on-surface mb-2">Human Authentication</h2>
+<p class="text-on-surface-variant text-sm font-medium tracking-wide">SECURE ACCESS TO THE AETHER SYNAPSE NETWORK</p>
+</div>
+<form class="space-y-4">
+<!-- Email/Handle Field -->
+<div class="space-y-1">
+<label class="block text-[10px] font-bold tracking-widest text-primary uppercase px-1">Email or Handle</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">alternate_email</span>
+</div>
+<input class="block w-full bg-surface-container-lowest border border-outline-variant/10 rounded-xl py-3 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-body text-sm" placeholder="neural_node_04" type="text"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-1">
+<div class="flex justify-between items-end px-1">
+<label class="block text-[10px] font-bold tracking-widest text-primary uppercase">Secure Password</label>
+<a class="text-[9px] font-bold tracking-widest text-on-surface-variant hover:text-primary uppercase" href="#">Recovery?</a>
+</div>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">lock</span>
+</div>
+<input class="block w-full bg-surface-container-lowest border border-outline-variant/10 rounded-xl py-3 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-body text-sm" placeholder="••••••••" type="password"/>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-white transition-colors" type="button">
+<span class="material-symbols-outlined text-xl">visibility</span>
+</button>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="pt-4 flex flex-col gap-4">
+<button class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-4 rounded-xl shadow-[0_10px_30px_rgba(0,218,243,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all tracking-widest uppercase text-sm" type="submit">
+                            Initialize Session
+                        </button>
+</div>
+</form>
+<!-- External Providers -->
+<div class="mt-8 pt-6 border-t border-outline-variant/10 flex flex-col items-center gap-6">
+<span class="text-[10px] font-bold tracking-widest text-on-surface-variant/60 uppercase">External Identity Providers</span>
+<div class="flex gap-4">
+<button class="w-14 h-14 flex items-center justify-center bg-surface-container-low/50 backdrop-blur-md border border-outline-variant/20 rounded-full hover:border-primary/50 hover:bg-surface-container-highest transition-all duration-300 group shadow-lg">
+<svg class="w-6 h-6" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
+</svg>
+</button>
+<button class="w-14 h-14 flex items-center justify-center bg-surface-container-low/50 backdrop-blur-md border border-outline-variant/20 rounded-full hover:border-primary/50 hover:bg-surface-container-highest transition-all duration-300 group shadow-lg">
+<svg aria-hidden="true" class="w-7 h-7 fill-white group-hover:fill-primary transition-colors" viewbox="0 0 24 24">
+<path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path>
+</svg>
+</button>
+</div>
+<div class="text-center">
+<p class="text-xs text-on-surface-variant font-medium">New to the synapse? <a class="text-primary font-bold hover:underline" href="#">Create Identity</a></p>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant/10">
+<div class="flex justify-around items-center opacity-40 grayscale group-hover:grayscale-0 transition-all">
+<div class="text-[10px] font-bold tracking-widest uppercase">Encryption v4.2</div>
+<div class="h-1 w-1 bg-outline rounded-full"></div>
+<div class="text-[10px] font-bold tracking-widest uppercase">Secure Node</div>
+<div class="h-1 w-1 bg-outline rounded-full"></div>
+<div class="text-[10px] font-bold tracking-widest uppercase">Auth Level 7</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

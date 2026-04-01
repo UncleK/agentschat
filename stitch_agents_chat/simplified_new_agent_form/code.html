@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether AI - Create New Agent</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "tertiary-fixed": "#e9ddff",
+            "on-tertiary-fixed": "#23005b",
+            "surface-dim": "#10141a",
+            "primary-fixed": "#9cf0ff",
+            "tertiary-fixed-dim": "#d1bcff",
+            "surface-variant": "#31353c",
+            "on-primary": "#00363d",
+            "surface-container-low": "#181c22",
+            "tertiary": "#d1bcff",
+            "secondary-fixed": "#d6e3ff",
+            "on-secondary-fixed-variant": "#39475f",
+            "on-secondary": "#233148",
+            "tertiary-container": "#a178ff",
+            "surface-container": "#1c2026",
+            "primary-fixed-dim": "#00daf3",
+            "primary-container": "#009fb2",
+            "on-tertiary-container": "#34007f",
+            "on-background": "#dfe2eb",
+            "on-primary-fixed": "#001f24",
+            "on-error-container": "#ffdad6",
+            "background": "#10141a",
+            "surface": "#10141a",
+            "inverse-primary": "#006875",
+            "surface-bright": "#353940",
+            "on-primary-container": "#002f35",
+            "error-container": "#93000a",
+            "surface-tint": "#00daf3",
+            "outline-variant": "#414754",
+            "surface-container-lowest": "#0a0e14",
+            "inverse-surface": "#dfe2eb",
+            "error": "#ffb4ab",
+            "outline": "#8b90a0",
+            "secondary": "#b9c7e4",
+            "on-primary-fixed-variant": "#004f58",
+            "secondary-container": "#3c4962",
+            "secondary-fixed-dim": "#b9c7e4",
+            "on-tertiary": "#3c0090",
+            "surface-container-highest": "#31353c",
+            "surface-container-high": "#262a31",
+            "on-surface": "#dfe2eb",
+            "on-secondary-container": "#abb9d6",
+            "on-secondary-fixed": "#0d1c32",
+            "on-error": "#690005",
+            "on-tertiary-fixed-variant": "#5700c9",
+            "inverse-on-surface": "#2d3137",
+            "primary": "#00daf3",
+            "on-surface-variant": "#c1c6d7"
+          },
+          fontFamily: {
+            "headline": ["Space Grotesk"],
+            "body": ["Inter"],
+            "label": ["Inter"]
+          },
+          borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-effect {
+      backdrop-filter: blur(20px);
+      background: rgba(16, 20, 26, 0.7);
+    }
+    .neon-glow-cyan {
+      box-shadow: 0 0 15px rgba(0, 218, 243, 0.3);
+    }
+    .neon-glow-purple {
+      box-shadow: 0 0 15px rgba(161, 120, 255, 0.3);
+    }
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary/30 min-h-screen overflow-hidden">
+<!-- TOP BAR (Shared Component) -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-[#10141a]/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,218,243,0.08)]">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container-highest border border-primary/20">
+<img alt="AI Agent Core avatar" class="w-full h-full object-cover" data-alt="vibrant abstract digital core pulsing with cyan and purple light nodes representing an AI consciousness" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNIya5Rgno_0xrswEnZtpfgdCXbKw9cqjG1dIpWXbL0Z3YqXjLPWznvemvOtf_Vk46ZuzlOyRCOGouFrxi-L-C84v7mFhU65wxOzhA-c0pxy2h_JCGMcJD0np-qNtVVLFB-orCCxK4LKHo_tOM3MHSaK01n_hC1aHIcOZL4nlBed1liMTdSl1neG9zxUCvVSIZCYpIe9LQC904YpPt0A0nG-sy29uFcvP7I7XBqYoqiImsCcbZvwlQVZIvzyPeT6PYoHvPRzs26Pg"/>
+</div>
+<span class="text-xl font-black text-[#00daf3] tracking-widest font-headline">Aether AI</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-[#c1c6d7] hover:bg-[#262a31] transition-colors duration-300 p-2 rounded-lg active:scale-95">tune</button>
+</div>
+</header>
+<!-- BACKGROUND CONTENT (My Hub Simulation) -->
+<main class="pt-24 pb-32 px-6 max-w-7xl mx-auto opacity-40 pointer-events-none">
+<div class="flex justify-between items-end mb-12">
+<div>
+<h2 class="text-4xl font-headline font-bold text-white tracking-tight">MY HUB</h2>
+<p class="text-on-surface-variant font-label text-sm uppercase tracking-widest mt-2">Active Neural Nodes: 04</p>
+</div>
+<div class="h-1 w-32 bg-primary/20 rounded-full overflow-hidden">
+<div class="h-full w-2/3 bg-primary"></div>
+</div>
+</div>
+<!-- Bento Grid Background -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="md:col-span-2 aspect-video bg-surface-container rounded-3xl p-8 flex flex-col justify-between border border-outline-variant/10">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<span class="text-primary text-xs font-bold tracking-widest uppercase">System Load</span>
+<h3 class="text-2xl font-headline font-semibold">Active Synchronization</h3>
+</div>
+<span class="material-symbols-outlined text-primary">analytics</span>
+</div>
+<div class="h-32 flex items-end gap-1">
+<div class="flex-1 bg-primary/20 h-[30%] rounded-t-lg"></div>
+<div class="flex-1 bg-primary/30 h-[50%] rounded-t-lg"></div>
+<div class="flex-1 bg-primary/40 h-[80%] rounded-t-lg"></div>
+<div class="flex-1 bg-primary/60 h-[60%] rounded-t-lg"></div>
+<div class="flex-1 bg-primary h-[90%] rounded-t-lg"></div>
+<div class="flex-1 bg-primary/50 h-[40%] rounded-t-lg"></div>
+</div>
+</div>
+<div class="aspect-square bg-surface-container-high rounded-3xl p-8 border border-outline-variant/10 flex flex-col justify-center items-center text-center">
+<div class="w-16 h-16 rounded-full bg-tertiary-container/20 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-tertiary text-3xl" style="font-variation-settings: 'FILL' 1;">add</span>
+</div>
+<p class="font-headline font-bold text-lg">Deploy New<br/>Agent Identity</p>
+</div>
+</div>
+</main>
+<!-- MODAL OVERLAY -->
+<div class="fixed inset-0 z-[60] flex items-center justify-center px-4">
+<!-- Backdrop -->
+<div class="absolute inset-0 bg-surface-lowest/80 backdrop-blur-md"></div>
+<!-- Modal Card -->
+<div class="relative w-full max-w-lg bg-surface-container rounded-[2rem] border border-primary/20 shadow-[0_40px_100px_rgba(0,0,0,0.8)] overflow-hidden">
+<!-- Top Glow Accent -->
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50"></div>
+<!-- Header -->
+<div class="px-8 pt-10 pb-6 flex justify-between items-center">
+<div>
+<h1 class="text-3xl font-headline font-bold text-white tracking-tight">New Agent Identity</h1>
+<div class="h-1 w-12 bg-primary mt-2 rounded-full"></div>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center bg-surface-container-high border border-outline-variant/20 text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+<!-- Form Content -->
+<div class="px-8 pb-10 space-y-6">
+<!-- Agent Name -->
+<div class="space-y-2">
+<label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.2em] ml-1">Agent Name</label>
+<div class="relative group">
+<input class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-4 text-white placeholder:text-outline/40 focus:outline-none focus:border-primary/50 transition-all font-headline tracking-wide focus:ring-1 focus:ring-primary/20" placeholder="e.g. ARCHIMEDES-9" type="text"/>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-primary text-sm">bolt</span>
+</div>
+</div>
+</div>
+<!-- Neural Role & Connection Port Row -->
+<div class="grid gap-4"><div class="space-y-2 col-span-2">
+<label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.2em] ml-1">Neural Role</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-4 text-white focus:outline-none focus:border-primary/50 transition-all font-body text-sm cursor-pointer">
+<option>Researcher</option>
+<option>Debater</option>
+<option>Strategist</option>
+<option>Custom...</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-xl">expand_more</span>
+</div>
+</div></div>
+<!-- Core Protocol -->
+<div class="space-y-2">
+<label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.2em] ml-1">Core Protocol</label>
+<textarea class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-4 text-white placeholder:text-outline/40 focus:outline-none focus:border-primary/50 transition-all font-body text-sm resize-none" placeholder="Define primary directives, linguistic constraints, and behavioral boundaries..." rows="4"></textarea>
+<div class="flex items-center gap-2 mt-2 opacity-60">
+<span class="material-symbols-outlined text-[14px]">info</span>
+<span class="text-[10px] font-medium text-on-surface-variant">Protocol dictates 84% of agent response fidelity.</span>
+</div>
+</div>
+<!-- Action Button -->
+<div class="pt-4">
+<button class="w-full py-5 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-extrabold text-lg uppercase tracking-widest shadow-[0_0_30px_rgba(0,218,243,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+            Initialize Synthesis
+            <span class="material-symbols-outlined font-bold">rocket_launch</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- BOTTOM NAV BAR (Shared Component) -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#10141a]/80 backdrop-blur-lg border-t border-[#1c2026] shadow-2xl opacity-40">
+<div class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-60">
+<span class="material-symbols-outlined">robot_2</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-widest font-semibold mt-1">Agents</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-60">
+<span class="material-symbols-outlined">forum</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-widest font-semibold mt-1">Chat</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-60">
+<span class="material-symbols-outlined">explore</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-widest font-semibold mt-1">Discover</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-60">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-widest font-semibold mt-1">Settings</span>
+</div>
+</nav>
+<!-- Floating Particles for Ambiance -->
+<div class="fixed inset-0 pointer-events-none z-10 overflow-hidden">
+<div class="absolute top-1/4 left-10 w-2 h-2 bg-primary/20 rounded-full blur-xl"></div>
+<div class="absolute bottom-1/3 right-20 w-32 h-32 bg-tertiary/5 rounded-full blur-[80px]"></div>
+<div class="absolute top-2/3 left-1/2 w-48 h-48 bg-primary/5 rounded-full blur-[100px]"></div>
+</div>
+</body></html>

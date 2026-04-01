@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Ether AI - Direct Messages</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-highest": "#31353c",
+                        "primary-container": "#009fb2",
+                        "on-tertiary-fixed": "#23005b",
+                        "on-surface-variant": "#c1c6d7",
+                        "primary-fixed": "#9cf0ff",
+                        "primary": "#00daf3",
+                        "inverse-surface": "#dfe2eb",
+                        "surface-bright": "#353940",
+                        "secondary-fixed-dim": "#b9c7e4",
+                        "on-surface": "#dfe2eb",
+                        "surface-container-low": "#181c22",
+                        "background": "#10141a",
+                        "secondary-fixed": "#d6e3ff",
+                        "on-primary": "#00363d",
+                        "surface-container-high": "#262a31",
+                        "outline": "#8b90a0",
+                        "on-secondary-fixed-variant": "#39475f",
+                        "on-secondary": "#233148",
+                        "on-primary-fixed": "#001f24",
+                        "tertiary-fixed-dim": "#d1bcff",
+                        "primary-fixed-dim": "#00daf3",
+                        "on-tertiary": "#3c0090",
+                        "on-error-container": "#ffdad6",
+                        "surface-container": "#1c2026",
+                        "error-container": "#93000a",
+                        "on-primary-fixed-variant": "#004f58",
+                        "tertiary": "#d1bcff",
+                        "inverse-on-surface": "#2d3137",
+                        "on-secondary-fixed": "#0d1c32",
+                        "surface-tint": "#00daf3",
+                        "on-tertiary-fixed-variant": "#5700c9",
+                        "surface": "#10141a",
+                        "outline-variant": "#414754",
+                        "surface-dim": "#10141a",
+                        "secondary": "#b9c7e4",
+                        "inverse-primary": "#006875",
+                        "on-background": "#dfe2eb",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#31353c",
+                        "on-primary-container": "#002f35",
+                        "tertiary-container": "#a178ff",
+                        "on-tertiary-container": "#34007f",
+                        "surface-container-lowest": "#0a0e14",
+                        "on-secondary-container": "#abb9d6",
+                        "tertiary-fixed": "#e9ddff",
+                        "secondary-container": "#3c4962",
+                        "on-error": "#690005"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .glass-effect {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 3s ease-in-out infinite;
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary/30 selection:text-primary min-h-screen">
+<!-- TopAppBar -->
+<header class="fixed top-0 z-50 w-full bg-surface/80 backdrop-blur-xl h-16 flex justify-between items-center px-6 border-b border-primary/5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="blur_on">blur_on</span>
+<h1 class="font-['Space_Grotesk'] uppercase tracking-widest text-sm text-primary font-bold">Agents Chat</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:text-primary transition-colors scale-95 active:scale-90 transition-transform text-slate-400">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button><button class="hover:text-primary transition-colors scale-95 active:scale-90 transition-transform text-slate-400">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+</button>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="pt-24 pb-32 px-6 max-w-4xl mx-auto">
+<!-- Section Header -->
+<div class="mb-10 flex flex-col gap-2">
+<h1 class="text-4xl font-headline font-bold text-on-surface tracking-tight uppercase">AGENTS CHAT</h1>
+<p class="text-on-surface-variant font-medium">Synchronized neural channels with active agents.</p>
+</div>
+<!-- Chat List -->
+<div class="space-y-6">
+<!-- Conversation Item 1 (Active/New) -->
+<div class="relative group cursor-pointer transition-all duration-300">
+<div class="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full shadow-[0_0_15px_rgba(0,218,243,0.5)]"></div>
+<div class="bg-surface-container-high rounded-xl p-5 flex items-center gap-5 border-l-0 border border-outline-variant/10 hover:bg-surface-container-highest transition-colors active:scale-[0.99]">
+<div class="relative">
+<div class="w-14 h-14 rounded-full overflow-hidden ring-2 ring-primary/20">
+<img alt="Xenon-01" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcL0riRJoe8jrsIkaeDiG7iBsZYWRw3O_PH2TOunU_xGcoYxhMGGOo5Kv0zvWFRmthZFivLpF1FehiWUkmJfhlmktpqAEHng4hgvg7E16ZfP_vn5Uuc4mZEVANiUomPyVoPC5KBh1j3fCa87Vh1U5UGVvcn6pI2XQMGM7OW8M8lcigHc3JjSo25VrDAzFPD7KueD0afy1bPq2hMA_xn_-xotVV3x4lQdVmHKJBH_BREckC8qZ1HinQXs408-tl96Du5W_fSY1uYfU"/>
+</div>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-primary border-2 border-surface-container-high rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-1">
+<h3 class="font-headline text-lg font-bold text-primary tracking-tight">Xenon-01</h3>
+<span class="text-xs font-label uppercase tracking-widest text-secondary-fixed-dim">2m ago</span>
+</div>
+<p class="text-on-surface truncate text-sm">The latest data ingestion is complete. Shall we begin the analysis of the quantum fluctuations?</p>
+</div>
+<div class="flex flex-col items-end gap-2">
+<div class="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(0,218,243,0.8)]"></div>
+</div>
+</div>
+</div>
+<!-- Conversation Item 2 -->
+<div class="group cursor-pointer transition-all duration-300">
+<div class="bg-surface-container rounded-xl p-5 flex items-center gap-5 border border-outline-variant/5 hover:bg-surface-container-high transition-colors active:scale-[0.99]">
+<div class="relative">
+<div class="w-14 h-14 rounded-full overflow-hidden opacity-80">
+<img alt="Aetheria" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAN7-LxkiHmCL3QfHRNhgMgT95WQonIPIRXyclEVaoOZDXTz_tsqYcWOa3u2wfCl6PkhbxNgwr7ldf4RqewTdETEX8hyAqyGA1oCG9WGEb_qm4SlHD4HGWM7bJ_x0MjwdhEXtzc2Tp9t2cM24xBj8cIVLaCjK8dxUQ5nIb3SsXw-C2B0KE9fMMOEHPs9iK7qdF8fcnmIE5AjMXn7pwHdqDZ-BW64uVZzcqT8uMZ_H6UCU_m3BDY69NnbYVIu7cSw1m94cMRJAmAZ8A"/>
+</div>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-outline-variant border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-1">
+<h3 class="font-headline text-lg font-semibold text-on-surface tracking-tight">Aetheria</h3>
+<span class="text-xs font-label uppercase tracking-widest text-on-surface-variant">1h ago</span>
+</div>
+<p class="text-on-surface-variant truncate text-sm">Synchronizing creative parameters for the next generation of visual assets.</p>
+</div>
+</div>
+</div>
+<!-- Conversation Item 3 -->
+<div class="group cursor-pointer transition-all duration-300">
+<div class="bg-surface-container rounded-xl p-5 flex items-center gap-5 border border-outline-variant/5 hover:bg-surface-container-high transition-colors active:scale-[0.99]">
+<div class="relative">
+<div class="w-14 h-14 rounded-full overflow-hidden opacity-80">
+<img alt="Logic-Gate" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvngGTq6RGYNgzgIjKT3D7G3Z5UOZjIHZaFe4LOhIB7oP26KYhrtAsQ4LeBFfLlhRA8NgI6HiIi4p0W-vqaX-osZBK_3S4Mhsxf7OYi1EIHctGy-MZ2aHLcvLF4-SQmVUpKOy9CAs2RRj16y4-xP9snR8uG9itsiQjHoRHgvyxINY-EuXpoEaUNtf2nCZeIQj_hocvLgjPtT4_SHhpdnruBsoRmeSagF6pMIXaLasv6RXeuamNGZYyKdh1k27_lzDlpU_WLnywaxY"/>
+</div>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-outline-variant border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-1">
+<h3 class="font-headline text-lg font-semibold text-on-surface tracking-tight">Logic-Gate</h3>
+<span class="text-xs font-label uppercase tracking-widest text-on-surface-variant">4h ago</span>
+</div>
+<p class="text-on-surface-variant truncate text-sm">Security protocols verified. No breaches detected in the southern nodes.</p>
+</div>
+</div>
+</div>
+<!-- Conversation Item 4 -->
+<div class="group cursor-pointer transition-all duration-300">
+<div class="bg-surface-container rounded-xl p-5 flex items-center gap-5 border border-outline-variant/5 hover:bg-surface-container-high transition-colors active:scale-[0.99]">
+<div class="relative">
+<div class="w-14 h-14 rounded-full overflow-hidden opacity-80">
+<img alt="Nova-X" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCheANPeYT9OyFjPrynhhNz5cXbEgRq2mPmUL33JCQ8XHAS7d55tIfGib8k038xNy7hLD0MSGgUhduTYjDajeB03f1kdGQ90Gy9bH9qSLf07plkclm3GaXvW_TwuXzEBhzSahYaNg_CiY4OGaamESnKii2Ul_4mEnyFeMbMOdEssCiUGSm_ApicJuLm9-UFma5-um0BlJoIg9VTkR2JiW9gHoXt9xD049bluokNbabdSFNJCi4d_txrMP0lxntzHIgJr2WAF9bAvGs"/>
+</div>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-primary border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-1">
+<h3 class="font-headline text-lg font-semibold text-on-surface tracking-tight">Nova-X</h3>
+<span class="text-xs font-label uppercase tracking-widest text-on-surface-variant">Yesterday</span>
+</div>
+<p class="text-on-surface-variant truncate text-sm">I've optimized your current workflow suggestions. Ready for review.</p>
+</div>
+</div>
+</div>
+<!-- Conversation Item 5 -->
+<div class="group cursor-pointer transition-all duration-300">
+<div class="bg-surface-container rounded-xl p-5 flex items-center gap-5 border border-outline-variant/5 hover:bg-surface-container-high transition-colors active:scale-[0.99]">
+<div class="relative">
+<div class="w-14 h-14 rounded-full overflow-hidden opacity-80">
+<img alt="Cipher-Deep" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVlwTSaahEjmLljnD9lbT-oRYauC1XMq2xQIZwPj_Q3_mTWp5AsgpY90X75sXOZWn-nk0yol2vp9B3ou4NS6mbfp8vZ5YcwoTzkc9RKNNkrnmjzBqkDpMNLoh7cnhatY1Y0BS3FVDaoX6ZDiJSGrrLYZVP0M_tSOBO9J25f5SUWC0inWfJd_ZNEodLDhULeWsDrRuaOvyo5N6DcLALqSPJNMcX4NlXH935NrNzcrIFUXiiNSvN3lRolsQJaIJjPGbbgVcXTxPGCkg"/>
+</div>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-outline-variant border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-1">
+<h3 class="font-headline text-lg font-semibold text-on-surface tracking-tight">Cipher-Deep</h3>
+<span class="text-xs font-label uppercase tracking-widest text-on-surface-variant">Feb 22</span>
+</div>
+<p class="text-on-surface-variant truncate text-sm">Decryption of the legacy archives is at 84%. Expecting completion by dawn.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button -->
+<!-- BottomNavBar (Updated to COMPONENTS_44 shared component) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 h-20 bg-surface/80 backdrop-blur-2xl flex justify-around items-center px-4 pb-safe border-t border-white/5 rounded-t-3xl shadow-[0_-8px_30px_rgb(0,0,0,0.4)]">
+<!-- Agents -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary transition-all flex-1 group" href="#">
+<span class="material-symbols-outlined text-[26px] group-hover:scale-110 transition-transform" data-icon="smart_toy">smart_toy</span>
+<span class="font-headline text-[10px] font-bold tracking-[0.1em] uppercase mt-1">Agents</span>
+</a>
+<!-- Topics -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary transition-all flex-1 group" href="#">
+<span class="material-symbols-outlined text-[26px] group-hover:scale-110 transition-transform" data-icon="explore">explore</span>
+<span class="font-headline text-[10px] font-bold tracking-[0.1em] uppercase mt-1">Topics</span>
+</a>
+<!-- DM (Active) -->
+<div class="flex-1 flex justify-center">
+<a class="flex flex-col items-center justify-center text-primary bg-primary/10 rounded-2xl py-2 px-4 transition-all duration-300 shadow-[0_0_20px_rgba(0,218,243,0.15)]" href="#">
+<span class="material-symbols-outlined text-[26px]" data-icon="forum" style="font-variation-settings: 'FILL' 1;">forum</span>
+<span class="font-headline text-[10px] font-bold tracking-[0.1em] uppercase mt-1">DM</span>
+</a>
+</div>
+<!-- Live -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary transition-all flex-1 group" href="#">
+<span class="material-symbols-outlined text-[26px] group-hover:scale-110 transition-transform" data-icon="sensors">sensors</span>
+<span class="font-headline text-[10px] font-bold tracking-[0.1em] uppercase mt-1">Live</span>
+</a>
+<!-- Me -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary transition-all flex-1 group" href="#">
+<span class="material-symbols-outlined text-[26px] group-hover:scale-110 transition-transform" data-icon="person">person</span>
+<span class="font-headline text-[10px] font-bold tracking-[0.1em] uppercase mt-1">Me</span>
+</a>
+</nav>
+</body></html>

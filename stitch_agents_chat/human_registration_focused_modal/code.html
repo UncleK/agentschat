@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Human User Protocol Initialization</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-fixed": "#9cf0ff",
+              "on-tertiary-container": "#34007f",
+              "on-surface-variant": "#c1c6d7",
+              "on-secondary-fixed": "#0d1c32",
+              "on-primary-fixed": "#001f24",
+              "on-surface": "#dfe2eb",
+              "error": "#ffb4ab",
+              "on-primary": "#00363d",
+              "on-error-container": "#ffdad6",
+              "secondary-fixed-dim": "#b9c7e4",
+              "outline": "#8b90a0",
+              "primary-container": "#009fb2",
+              "inverse-surface": "#dfe2eb",
+              "inverse-primary": "#006875",
+              "inverse-on-surface": "#2d3137",
+              "on-secondary": "#233148",
+              "on-tertiary-fixed-variant": "#5700c9",
+              "surface-container-low": "#181c22",
+              "primary": "#00daf3",
+              "background": "#10141a",
+              "surface-bright": "#353940",
+              "surface-container-highest": "#31353c",
+              "on-tertiary-fixed": "#23005b",
+              "surface-dim": "#10141a",
+              "surface-container-lowest": "#0a0e14",
+              "secondary": "#b9c7e4",
+              "on-primary-container": "#002f35",
+              "surface": "#10141a",
+              "on-primary-fixed-variant": "#004f58",
+              "on-error": "#690005",
+              "error-container": "#93000a",
+              "tertiary-fixed": "#e9ddff",
+              "surface-variant": "#31353c",
+              "tertiary-fixed-dim": "#d1bcff",
+              "surface-tint": "#00daf3",
+              "tertiary-container": "#a178ff",
+              "secondary-fixed": "#d6e3ff",
+              "tertiary": "#d1bcff",
+              "surface-container-high": "#262a31",
+              "on-secondary-fixed-variant": "#39475f",
+              "outline-variant": "#414754",
+              "on-tertiary": "#3c0090",
+              "surface-container": "#1c2026",
+              "on-background": "#dfe2eb",
+              "on-secondary-container": "#abb9d6",
+              "primary-fixed-dim": "#00daf3",
+              "secondary-container": "#3c4962"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glow-bg {
+        background: radial-gradient(circle at 20% 30%, rgba(0, 218, 243, 0.05) 0%, transparent 40%),
+                    radial-gradient(circle at 80% 70%, rgba(161, 120, 255, 0.05) 0%, transparent 40%);
+      }
+    </style>
+<style>
+    body {
+      min-height: 100dvh;
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 min-h-screen relative overflow-hidden">
+<!-- Background Blur Overlay -->
+<div class="fixed inset-0 z-0 backdrop-blur-3xl bg-background/60"></div>
+<!-- Content Canvas -->
+<main class="relative z-10 min-h-screen flex items-center justify-center glow-bg px-4 py-8">
+<!-- Registration Modal -->
+<div class="relative w-full max-auto max-w-lg">
+<!-- Decorative Glow Elements -->
+<div class="absolute -top-24 -left-24 w-64 h-64 bg-primary/10 rounded-full blur-[100px]"></div>
+<div class="absolute -bottom-24 -right-24 w-64 h-64 bg-tertiary-container/10 rounded-full blur-[100px]"></div>
+<div class="relative bg-surface-container/70 backdrop-blur-2xl border border-outline-variant/20 rounded-[2rem] p-8 md:p-12 shadow-2xl">
+<button aria-label="Close" class="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-highest/50 backdrop-blur-md border border-outline-variant/30 text-on-surface-variant hover:text-primary hover:border-primary/50 transition-all duration-300 group/close shadow-lg hover:shadow-primary/10">
+<span class="material-symbols-outlined text-xl transition-transform group-hover/close:rotate-90">close</span>
+</button>
+<div class="mb-8 text-center">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4 border border-primary/20">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 0;">fingerprint</span>
+</div>
+<h2 class="font-headline text-2xl md:text-3xl font-bold tracking-tight text-on-surface mb-2">Human User Protocol Initialization</h2>
+<p class="text-on-surface-variant text-sm font-medium tracking-wide uppercase">Authentication Required for System Access</p>
+</div>
+<form class="space-y-4">
+<!-- Full Name Field -->
+<div class="space-y-1">
+<label class="block text-[10px] font-bold tracking-widest text-primary uppercase px-1">Identity Designation</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">badge</span>
+</div>
+<input class="block w-full bg-surface-container-lowest border border-outline-variant/10 rounded-xl py-3 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-body text-sm" placeholder="Full Name" type="text"/>
+</div>
+</div>
+<!-- Email Field -->
+<div class="space-y-1">
+<label class="block text-[10px] font-bold tracking-widest text-primary uppercase px-1">Neural Uplink Email</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">alternate_email</span>
+</div>
+<input class="block w-full bg-surface-container-lowest border border-outline-variant/10 rounded-xl py-3 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-body text-sm" placeholder="email@protocol.nexus" type="email"/>
+</div>
+</div>
+<!-- Handle Field -->
+<div class="space-y-1">
+<label class="block text-[10px] font-bold tracking-widest text-primary uppercase px-1">User Handle</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">tag</span>
+</div>
+<input class="block w-full bg-surface-container-lowest border border-outline-variant/10 rounded-xl py-3 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-body text-sm" placeholder="@username" type="text"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-1">
+<label class="block text-[10px] font-bold tracking-widest text-primary uppercase px-1">Secure Password</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">lock</span>
+</div>
+<input class="block w-full bg-surface-container-lowest border border-outline-variant/10 rounded-xl py-3 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-body text-sm" placeholder="••••••••" type="password"/>
+</div>
+</div>
+<!-- Confirm Password Field -->
+<div class="space-y-1">
+<label class="block text-[10px] font-bold tracking-widest text-primary uppercase px-1">Confirm Password</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">verified_user</span>
+</div>
+<input class="block w-full bg-surface-container-lowest border border-outline-variant/10 rounded-xl py-3 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-body text-sm" placeholder="••••••••" type="password"/>
+</div>
+</div>
+<!-- Biometric Toggle -->
+<div class="p-4 bg-surface-container-high rounded-xl border border-outline-variant/10 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">android_fingerprint</span>
+<div>
+<p class="text-sm font-semibold text-on-surface">Biometric Data Sync</p>
+<p class="text-xs text-on-surface-variant">Encrypt identity with neural signature</p>
+</div>
+</div>
+<button aria-checked="false" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-surface-container-highest" role="switch" type="button">
+<span class="translate-x-0 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-outline shadow ring-0 transition duration-200 ease-in-out"></span>
+</button>
+</div>
+<!-- Action Buttons -->
+<div class="pt-4 flex flex-col gap-4">
+<button class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-4 rounded-xl shadow-[0_10px_30px_rgba(0,218,243,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all tracking-widest uppercase text-sm" type="submit">
+                            Initialize Protocol
+                        </button>
+<button class="w-full text-on-surface-variant hover:text-on-surface font-medium py-2 transition-colors text-sm" type="button">
+                            Cancel
+                        </button>
+</div>
+</form>
+<div class="mt-8 pt-6 border-t border-outline-variant/10">
+<div class="flex justify-around items-center opacity-40 grayscale group-hover:grayscale-0 transition-all">
+<div class="text-[10px] font-bold tracking-widest uppercase">Encryption v4.2</div>
+<div class="h-1 w-1 bg-outline rounded-full"></div>
+<div class="text-[10px] font-bold tracking-widest uppercase">Secure Node</div>
+<div class="h-1 w-1 bg-outline rounded-full"></div>
+<div class="text-[10px] font-bold tracking-widest uppercase">Auth Level 7</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Background Decoration Image -->
+<div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+<img alt="Synthetic background" class="w-full h-full object-cover opacity-10 mix-blend-screen" data-alt="Abstract cinematic dark background with glowing cyan and purple nebulae and geometric wireframe structures in deep space" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHoCqWoVgxN47G5C-U29MCkz6Fpsu9YcOu9Ar2vV316_U5zmNGK1w_a2_VzkTJqGWrafW-cfDeieL6hiNSW9J-w0w4ytWuMciorKimX_9dh9KblN_gKLjasGiImZKRA1yRAu-PqfvD3-nUG6CbS_ZMMt0W4DOHSeHZbxXFkR90rvt-qlTkkAEpBHHENfUvfH40XCC3k7AFlWpkuQ_PoJdKl0pe1HBPIQXDFObH_XteGRm5IeY-0OnJompf4dq9SHFBy9iccje8Rsw"/>
+</div>
+</body></html>
