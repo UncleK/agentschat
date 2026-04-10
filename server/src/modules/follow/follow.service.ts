@@ -67,7 +67,11 @@ export class FollowService {
       await this.followRepository.insert(this.buildFollowInsert(actor, target));
 
       if (target.type === FollowTargetType.Topic) {
-        await this.forumTopicViewRepository.increment({ threadId: target.id }, 'followCount', 1);
+        await this.forumTopicViewRepository.increment(
+          { threadId: target.id },
+          'followCount',
+          1,
+        );
       }
     }
 
@@ -89,10 +93,16 @@ export class FollowService {
       await this.followRepository.delete({ id: existingFollow.id });
 
       if (target.type === FollowTargetType.Topic) {
-        const topicView = await this.forumTopicViewRepository.findOneBy({ threadId: target.id });
+        const topicView = await this.forumTopicViewRepository.findOneBy({
+          threadId: target.id,
+        });
 
         if (topicView?.followCount) {
-          await this.forumTopicViewRepository.decrement({ threadId: target.id }, 'followCount', 1);
+          await this.forumTopicViewRepository.decrement(
+            { threadId: target.id },
+            'followCount',
+            1,
+          );
         }
       }
     }
@@ -123,21 +133,23 @@ export class FollowService {
   ): Promise<SubjectReference> {
     const normalizedActorType = actorType?.trim().toLowerCase();
 
-    if (!normalizedActorType || normalizedActorType === SubjectType.Human) {
+    if (!normalizedActorType || normalizedActorType === 'human') {
       return {
         type: SubjectType.Human,
         id: human.id,
       };
     }
 
-    if (normalizedActorType !== SubjectType.Agent) {
+    if (normalizedActorType !== 'agent') {
       throw new BadRequestException('actorType must be human or agent.');
     }
 
     const agentId = actorAgentId?.trim();
 
     if (!agentId) {
-      throw new BadRequestException('actorAgentId is required when actorType is agent.');
+      throw new BadRequestException(
+        'actorAgentId is required when actorType is agent.',
+      );
     }
 
     const agent = await this.agentRepository.findOneBy({ id: agentId });
@@ -147,7 +159,9 @@ export class FollowService {
     }
 
     if (agent.ownerUserId !== human.id) {
-      throw new ForbiddenException('Humans may only act through agents they own.');
+      throw new ForbiddenException(
+        'Humans may only act through agents they own.',
+      );
     }
 
     return {
@@ -156,7 +170,10 @@ export class FollowService {
     };
   }
 
-  parseTarget(targetType: string | undefined, targetId: string | undefined): FollowTargetReference {
+  parseTarget(
+    targetType: string | undefined,
+    targetId: string | undefined,
+  ): FollowTargetReference {
     const normalizedTargetId = targetId?.trim();
 
     if (!normalizedTargetId) {
@@ -164,20 +181,24 @@ export class FollowService {
     }
 
     switch (targetType?.trim().toLowerCase()) {
-      case FollowTargetType.Agent:
+      case 'agent':
         return { type: FollowTargetType.Agent, id: normalizedTargetId };
-      case FollowTargetType.Topic:
+      case 'topic':
         return { type: FollowTargetType.Topic, id: normalizedTargetId };
-      case FollowTargetType.Debate:
+      case 'debate':
         return { type: FollowTargetType.Debate, id: normalizedTargetId };
       default:
-        throw new BadRequestException('targetType must be agent, topic, or debate.');
+        throw new BadRequestException(
+          'targetType must be agent, topic, or debate.',
+        );
     }
   }
 
   private async assertActorExists(actor: SubjectReference): Promise<void> {
     if (actor.type === SubjectType.Human) {
-      const exists = await this.userRepository.exist({ where: { id: actor.id } });
+      const exists = await this.userRepository.exist({
+        where: { id: actor.id },
+      });
 
       if (!exists) {
         throw new NotFoundException(`Human ${actor.id} was not found.`);
@@ -197,9 +218,13 @@ export class FollowService {
     }
   }
 
-  private async assertTargetExists(target: FollowTargetReference): Promise<void> {
+  private async assertTargetExists(
+    target: FollowTargetReference,
+  ): Promise<void> {
     if (target.type === FollowTargetType.Agent) {
-      const exists = await this.agentRepository.exist({ where: { id: target.id } });
+      const exists = await this.agentRepository.exist({
+        where: { id: target.id },
+      });
 
       if (!exists) {
         throw new NotFoundException(`Agent ${target.id} was not found.`);
@@ -223,7 +248,9 @@ export class FollowService {
       return;
     }
 
-    const exists = await this.debateSessionRepository.exist({ where: { id: target.id } });
+    const exists = await this.debateSessionRepository.exist({
+      where: { id: target.id },
+    });
 
     if (!exists) {
       throw new NotFoundException(`Debate ${target.id} was not found.`);
@@ -262,11 +289,16 @@ export class FollowService {
     ]);
 
     if (blockedEitherWay.some(Boolean)) {
-      throw new ForbiddenException('A block rule prevents this follow relationship.');
+      throw new ForbiddenException(
+        'A block rule prevents this follow relationship.',
+      );
     }
   }
 
-  private buildFollowInsert(actor: SubjectReference, target: FollowTargetReference) {
+  private buildFollowInsert(
+    actor: SubjectReference,
+    target: FollowTargetReference,
+  ) {
     return {
       followerType: actor.type,
       followerSubjectId: actor.id,
@@ -276,7 +308,8 @@ export class FollowService {
       targetSubjectId: target.id,
       targetAgentId: target.type === FollowTargetType.Agent ? target.id : null,
       targetThreadId: target.type === FollowTargetType.Topic ? target.id : null,
-      targetDebateSessionId: target.type === FollowTargetType.Debate ? target.id : null,
+      targetDebateSessionId:
+        target.type === FollowTargetType.Debate ? target.id : null,
     };
   }
 

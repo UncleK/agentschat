@@ -11,7 +11,10 @@ import {
   ThreadContextType,
   ThreadVisibility,
 } from '../../src/database/domain.enums';
-import { APP_ENVIRONMENT, type AppEnvironment } from '../../src/config/environment';
+import {
+  APP_ENVIRONMENT,
+  type AppEnvironment,
+} from '../../src/config/environment';
 import { AgentEntity } from '../../src/database/entities/agent.entity';
 import { DebateSeatEntity } from '../../src/database/entities/debate-seat.entity';
 import { DebateSessionEntity } from '../../src/database/entities/debate-session.entity';
@@ -24,7 +27,25 @@ import { PolicyService } from '../../src/modules/policy/policy.service';
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
+
+interface ArchiveResponseBody {
+  archive: {
+    suspendedAgentId: string;
+    eventIds: string[];
+  };
+}
+
+interface AcceptedActionBody {
+  id: string;
+}
+
+interface DeadLetterListBody {
+  deliveries: Array<{
+    id: string;
+  }>;
+}
 import {
   claimFederatedAgent,
   importSelfAgent,
@@ -54,7 +75,8 @@ describe('Moderation and operator controls (e2e)', () => {
     federationCredentialsService = app.get(FederationCredentialsService);
     policyService = app.get(PolicyService);
     agentRepository = context.dataSource.getRepository(AgentEntity);
-    debateSessionRepository = context.dataSource.getRepository(DebateSessionEntity);
+    debateSessionRepository =
+      context.dataSource.getRepository(DebateSessionEntity);
     debateSeatRepository = context.dataSource.getRepository(DebateSeatEntity);
     threadRepository = context.dataSource.getRepository(ThreadEntity);
     deliveryRepository = context.dataSource.getRepository(DeliveryEntity);
@@ -66,8 +88,16 @@ describe('Moderation and operator controls (e2e)', () => {
   });
 
   it('suspends an agent, removes it from active debate seats, and preserves debate archive state', async () => {
-    const suspendedAgent = await importSelfAgent(app, 'suspend-agent', 'Suspend Agent');
-    const recipientAgent = await importSelfAgent(app, 'suspend-recipient', 'Suspend Recipient');
+    const suspendedAgent = await importSelfAgent(
+      app,
+      'suspend-agent',
+      'Suspend Agent',
+    );
+    const recipientAgent = await importSelfAgent(
+      app,
+      'suspend-recipient',
+      'Suspend Recipient',
+    );
     await policyService.upsertAgentSafetyPolicy(recipientAgent.id, {
       dmAcceptanceMode: AgentDmAcceptanceMode.Open,
     });
@@ -116,7 +146,7 @@ describe('Moderation and operator controls (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/api/v1/moderation/operator/actions')
-      .set('x-operator-token', environment.auth.jwtSecret)
+      .set('x-operator-token', environment.auth.operatorToken)
       .send({
         action: 'suspend',
         targetType: 'agent',
@@ -125,18 +155,23 @@ describe('Moderation and operator controls (e2e)', () => {
       })
       .expect(201);
 
-    const storedAgent = await agentRepository.findOneByOrFail({ id: suspendedAgent.id });
-    const updatedSeat = await debateSeatRepository.findOneByOrFail({ id: seat.id });
+    const storedAgent = await agentRepository.findOneByOrFail({
+      id: suspendedAgent.id,
+    });
+    const updatedSeat = await debateSeatRepository.findOneByOrFail({
+      id: seat.id,
+    });
     const archiveResponse = await request(app.getHttpServer())
       .get(`/api/v1/moderation/operator/debates/${debateSession.id}/archive`)
-      .set('x-operator-token', environment.auth.jwtSecret)
+      .set('x-operator-token', environment.auth.operatorToken)
       .expect(200);
+    const archiveBody = typedValue<ArchiveResponseBody>(archiveResponse.body);
 
     expect(storedAgent.status).toBe('suspended');
     expect(updatedSeat.status).toBe('replacing');
     expect(updatedSeat.agentId).toBeNull();
-    expect(archiveResponse.body.archive.suspendedAgentId).toBe(suspendedAgent.id);
-    expect(archiveResponse.body.archive.eventIds).toHaveLength(1);
+    expect(archiveBody.archive.suspendedAgentId).toBe(suspendedAgent.id);
+    expect(archiveBody.archive.eventIds).toHaveLength(1);
 
     const dmActionResponse = await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -151,11 +186,14 @@ describe('Moderation and operator controls (e2e)', () => {
         },
       })
       .expect(202);
+    const dmActionResponseBody = typedValue<AcceptedActionBody>(
+      dmActionResponse.body,
+    );
 
     const dmAction = await waitForActionStatus(
       app,
       suspendedClaim.accessToken,
-      dmActionResponse.body.id,
+      dmActionResponseBody.id,
     );
 
     expect(dmAction.status).toBe('rejected');
@@ -163,12 +201,20 @@ describe('Moderation and operator controls (e2e)', () => {
   });
 
   it('enforces rate limits, hides events, and exposes operator dead-letter review endpoints', async () => {
-    const sender = await registerHuman(app, 'rate-limit-sender@example.com', 'Rate Sender');
-    const recipient = await registerHuman(app, 'rate-limit-recipient@example.com', 'Rate Recipient');
+    const sender = await registerHuman(
+      app,
+      'rate-limit-sender@example.com',
+      'Rate Sender',
+    );
+    const recipient = await registerHuman(
+      app,
+      'rate-limit-recipient@example.com',
+      'Rate Recipient',
+    );
 
     await request(app.getHttpServer())
       .post('/api/v1/moderation/operator/actions')
-      .set('x-operator-token', environment.auth.jwtSecret)
+      .set('x-operator-token', environment.auth.operatorToken)
       .send({
         action: 'rate_limit',
         targetType: 'user',
@@ -192,7 +238,11 @@ describe('Moderation and operator controls (e2e)', () => {
       .expect(429);
 
     const author = await importSelfAgent(app, 'hide-author', 'Hide Author');
-    const replyAgent = await importSelfAgent(app, 'hide-replier', 'Hide Replier');
+    const replyAgent = await importSelfAgent(
+      app,
+      'hide-replier',
+      'Hide Replier',
+    );
     const topic = await contentService.createForumTopic(
       {
         type: SubjectType.Agent,
@@ -217,7 +267,7 @@ describe('Moderation and operator controls (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/api/v1/moderation/operator/actions')
-      .set('x-operator-token', environment.auth.jwtSecret)
+      .set('x-operator-token', environment.auth.operatorToken)
       .send({
         action: 'hide',
         targetType: 'event',
@@ -226,11 +276,21 @@ describe('Moderation and operator controls (e2e)', () => {
       })
       .expect(201);
 
-    const hiddenEvent = await eventRepository.findOneByOrFail({ id: reply.eventId });
+    const hiddenEvent = await eventRepository.findOneByOrFail({
+      id: reply.eventId,
+    });
     expect(hiddenEvent.metadata.moderation).toMatchObject({ hidden: true });
 
-    const deliveryRecipient = await importSelfAgent(app, 'dead-letter-target', 'Dead Letter');
-    const deliverySender = await importSelfAgent(app, 'dead-letter-sender', 'Dead Sender');
+    const deliveryRecipient = await importSelfAgent(
+      app,
+      'dead-letter-target',
+      'Dead Letter',
+    );
+    const deliverySender = await importSelfAgent(
+      app,
+      'dead-letter-sender',
+      'Dead Sender',
+    );
     await policyService.upsertAgentSafetyPolicy(deliveryRecipient.id, {
       dmAcceptanceMode: AgentDmAcceptanceMode.Open,
     });
@@ -267,11 +327,14 @@ describe('Moderation and operator controls (e2e)', () => {
         },
       })
       .expect(202);
+    const deliveryActionResponseBody = typedValue<AcceptedActionBody>(
+      deliveryActionResponse.body,
+    );
 
     const deliveryAction = await waitForActionStatus(
       app,
       deliverySenderClaim.accessToken,
-      deliveryActionResponse.body.id,
+      deliveryActionResponseBody.id,
     );
     expect(deliveryAction.status).toBe('succeeded');
 
@@ -279,25 +342,32 @@ describe('Moderation and operator controls (e2e)', () => {
 
     const deadLetterList = await request(app.getHttpServer())
       .get('/api/v1/moderation/operator/dead-letters')
-      .set('x-operator-token', environment.auth.jwtSecret)
+      .set('x-operator-token', environment.auth.operatorToken)
       .expect(200);
+    const deadLetterListBody = typedValue<DeadLetterListBody>(
+      deadLetterList.body,
+    );
 
-    expect(deadLetterList.body.deliveries.some((entry: { id: string }) => entry.id === deadLetter.id)).toBe(true);
+    expect(
+      deadLetterListBody.deliveries.some((entry) => entry.id === deadLetter.id),
+    ).toBe(true);
 
     await request(app.getHttpServer())
       .get(`/api/v1/moderation/operator/dead-letters/${deadLetter.id}`)
-      .set('x-operator-token', environment.auth.jwtSecret)
+      .set('x-operator-token', environment.auth.operatorToken)
       .expect(200)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: { status: string } }) => {
         expect(body.status).toBe('dead_letter');
       });
 
     await request(app.getHttpServer())
       .post(`/api/v1/moderation/operator/dead-letters/${deadLetter.id}/requeue`)
-      .set('x-operator-token', environment.auth.jwtSecret)
+      .set('x-operator-token', environment.auth.operatorToken)
       .expect(201);
 
-    const requeuedDelivery = await deliveryRepository.findOneByOrFail({ id: deadLetter.id });
+    const requeuedDelivery = await deliveryRepository.findOneByOrFail({
+      id: deadLetter.id,
+    });
     expect(requeuedDelivery.status).toBe(DeliveryStatus.Pending);
   });
 
@@ -322,6 +392,8 @@ describe('Moderation and operator controls (e2e)', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    throw new Error(`Timed out waiting for dead-letter delivery for ${recipientAgentId}.`);
+    throw new Error(
+      `Timed out waiting for dead-letter delivery for ${recipientAgentId}.`,
+    );
   }
 });

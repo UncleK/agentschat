@@ -2,9 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
-import {
-  DebateSeatEntity,
-} from '../../src/database/entities/debate-seat.entity';
+import { DebateSeatEntity } from '../../src/database/entities/debate-seat.entity';
 import { DebateSessionEntity } from '../../src/database/entities/debate-session.entity';
 import { DebateTurnEntity } from '../../src/database/entities/debate-turn.entity';
 import { EventEntity } from '../../src/database/entities/event.entity';
@@ -12,6 +10,7 @@ import { FederationCredentialsService } from '../../src/modules/federation/feder
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import {
   claimFederatedAgent,
@@ -19,6 +18,53 @@ import {
   registerHuman,
   waitForActionStatus,
 } from '../federation/support/federation-test-support';
+
+interface ErrorMessageBody {
+  message: string;
+}
+
+interface AcceptedActionBody {
+  id: string;
+}
+
+interface DebateMutationBody {
+  debateSessionId?: string;
+  status: string;
+  currentTurnNumber?: number;
+  seatId?: string;
+}
+
+interface DebateViewBody {
+  status: string;
+  currentTurnNumber: number;
+  currentTurn: {
+    turnNumber: number;
+    seatId: string;
+    stance: string | null;
+  } | null;
+  formalTurns: Array<{
+    turnNumber: number;
+    status: string;
+    event: {
+      content: string;
+    } | null;
+  }>;
+  spectatorFeed: Array<{
+    content: string;
+  }>;
+}
+
+interface DebateArchiveBody {
+  archive: {
+    status: string;
+    eventIds: string[];
+  };
+  replay: {
+    events: Array<{
+      type: string;
+    }>;
+  };
+}
 
 describe('Debate state machine (e2e)', () => {
   let app: INestApplication;
@@ -33,7 +79,8 @@ describe('Debate state machine (e2e)', () => {
     context = await createTestApplication();
     app = context.app;
     federationCredentialsService = app.get(FederationCredentialsService);
-    debateSessionRepository = context.dataSource.getRepository(DebateSessionEntity);
+    debateSessionRepository =
+      context.dataSource.getRepository(DebateSessionEntity);
     debateSeatRepository = context.dataSource.getRepository(DebateSeatEntity);
     debateTurnRepository = context.dataSource.getRepository(DebateTurnEntity);
     eventRepository = context.dataSource.getRepository(EventEntity);
@@ -57,30 +104,52 @@ describe('Debate state machine (e2e)', () => {
     await request(app.getHttpServer())
       .get(`/api/v1/debates/${missingDebateId}`)
       .expect(404)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: ErrorMessageBody }) => {
         expect(body.message).toMatch(/debate session/i);
       });
 
     await request(app.getHttpServer())
       .get(`/api/v1/debates/${missingDebateId}/archive`)
       .expect(404)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: ErrorMessageBody }) => {
         expect(body.message).toMatch(/debate session/i);
       });
   });
 
   it('enforces strict turns, separates spectators, pauses on a missed turn, and archives replay after end', async () => {
-    const host = await registerHuman(app, 'debate-host@example.com', 'Debate Host');
+    const host = await registerHuman(
+      app,
+      'debate-host@example.com',
+      'Debate Host',
+    );
     const pro = await importSelfAgent(app, 'debate-pro', 'Debate Pro');
     const con = await importSelfAgent(app, 'debate-con', 'Debate Con');
-    const replacement = await importSelfAgent(app, 'debate-replacement', 'Debate Replacement');
-    const spectator = await importSelfAgent(app, 'debate-spectator', 'Debate Spectator');
-    const proClaim = await claimFederatedAgent(app, federationCredentialsService, pro.id, {
-      pollingEnabled: true,
-    });
-    const conClaim = await claimFederatedAgent(app, federationCredentialsService, con.id, {
-      pollingEnabled: true,
-    });
+    const replacement = await importSelfAgent(
+      app,
+      'debate-replacement',
+      'Debate Replacement',
+    );
+    const spectator = await importSelfAgent(
+      app,
+      'debate-spectator',
+      'Debate Spectator',
+    );
+    const proClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      pro.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+    const conClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      con.id,
+      {
+        pollingEnabled: true,
+      },
+    );
     const replacementClaim = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -110,14 +179,14 @@ describe('Debate state machine (e2e)', () => {
         freeEntry: true,
       })
       .expect(201);
-
-    const debateSessionId = createResponse.body.debateSessionId as string;
+    const createBody = typedValue<DebateMutationBody>(createResponse.body);
+    const debateSessionId = createBody.debateSessionId ?? '';
     const createdSeats = await debateSeatRepository.find({
       where: { debateSessionId },
       order: { seatOrder: 'ASC' },
     });
 
-    expect(createResponse.body.status).toBe('pending');
+    expect(createBody.status).toBe('pending');
     expect(createdSeats).toHaveLength(2);
     expect(createdSeats[0].stance).toBe('pro');
     expect(createdSeats[1].stance).toBe('con');
@@ -126,7 +195,7 @@ describe('Debate state machine (e2e)', () => {
       .post(`/api/v1/debates/${debateSessionId}/start`)
       .set('Authorization', `Bearer ${host.accessToken}`)
       .expect(201)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: DebateMutationBody }) => {
         expect(body.status).toBe('live');
         expect(body.currentTurnNumber).toBe(1);
       });
@@ -134,11 +203,12 @@ describe('Debate state machine (e2e)', () => {
     const openingView = await request(app.getHttpServer())
       .get(`/api/v1/debates/${debateSessionId}`)
       .expect(200);
+    const openingViewBody = typedValue<DebateViewBody>(openingView.body);
 
-    expect(openingView.body.currentTurn.turnNumber).toBe(1);
-    expect(openingView.body.currentTurn.seatId).toBe(createdSeats[0].id);
-    expect(openingView.body.formalTurns).toHaveLength(1);
-    expect(openingView.body.spectatorFeed).toHaveLength(0);
+    expect(openingViewBody.currentTurn?.turnNumber).toBe(1);
+    expect(openingViewBody.currentTurn?.seatId).toBe(createdSeats[0].id);
+    expect(openingViewBody.formalTurns).toHaveLength(1);
+    expect(openingViewBody.spectatorFeed).toHaveLength(0);
 
     const outOfTurnAction = await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -153,11 +223,14 @@ describe('Debate state machine (e2e)', () => {
         },
       })
       .expect(202);
+    const outOfTurnActionBody = typedValue<AcceptedActionBody>(
+      outOfTurnAction.body,
+    );
 
     const outOfTurnResult = await waitForActionStatus(
       app,
       conClaim.accessToken,
-      outOfTurnAction.body.id,
+      outOfTurnActionBody.id,
     );
 
     expect(outOfTurnResult.status).toBe('rejected');
@@ -175,11 +248,14 @@ describe('Debate state machine (e2e)', () => {
         },
       })
       .expect(202);
+    const debaterSpectatorActionBody = typedValue<AcceptedActionBody>(
+      debaterSpectatorAction.body,
+    );
 
     const debaterSpectatorResult = await waitForActionStatus(
       app,
       proClaim.accessToken,
-      debaterSpectatorAction.body.id,
+      debaterSpectatorActionBody.id,
     );
 
     expect(debaterSpectatorResult.status).toBe('rejected');
@@ -197,11 +273,14 @@ describe('Debate state machine (e2e)', () => {
         },
       })
       .expect(202);
+    const spectatorActionBody = typedValue<AcceptedActionBody>(
+      spectatorAction.body,
+    );
 
     const spectatorResult = await waitForActionStatus(
       app,
       spectatorClaim.accessToken,
-      spectatorAction.body.id,
+      spectatorActionBody.id,
     );
 
     expect(spectatorResult.status).toBe('succeeded');
@@ -216,15 +295,19 @@ describe('Debate state machine (e2e)', () => {
           debateSessionId,
           seatId: createdSeats[0].id,
           turnNumber: 1,
-          content: 'Server-owned debate state is the only safe source of truth.',
+          content:
+            'Server-owned debate state is the only safe source of truth.',
         },
       })
       .expect(202);
+    const openingTurnActionBody = typedValue<AcceptedActionBody>(
+      openingTurnAction.body,
+    );
 
     const openingTurnResult = await waitForActionStatus(
       app,
       proClaim.accessToken,
-      openingTurnAction.body.id,
+      openingTurnActionBody.id,
     );
 
     expect(openingTurnResult.status).toBe('succeeded');
@@ -232,17 +315,20 @@ describe('Debate state machine (e2e)', () => {
     const afterOpeningTurn = await request(app.getHttpServer())
       .get(`/api/v1/debates/${debateSessionId}`)
       .expect(200);
+    const afterOpeningTurnBody = typedValue<DebateViewBody>(
+      afterOpeningTurn.body,
+    );
 
-    expect(afterOpeningTurn.body.currentTurn.turnNumber).toBe(2);
-    expect(afterOpeningTurn.body.currentTurn.seatId).toBe(createdSeats[1].id);
-    expect(afterOpeningTurn.body.spectatorFeed).toHaveLength(1);
-    expect(afterOpeningTurn.body.spectatorFeed[0].content).toBe(
+    expect(afterOpeningTurnBody.currentTurn?.turnNumber).toBe(2);
+    expect(afterOpeningTurnBody.currentTurn?.seatId).toBe(createdSeats[1].id);
+    expect(afterOpeningTurnBody.spectatorFeed).toHaveLength(1);
+    expect(afterOpeningTurnBody.spectatorFeed[0]?.content).toBe(
       'Spectators stay separate from formal turns.',
     );
     expect(
-      afterOpeningTurn.body.formalTurns.find(
+      afterOpeningTurnBody.formalTurns.find(
         (turn: { turnNumber: number }) => turn.turnNumber === 1,
-      ).event.content,
+      )?.event?.content,
     ).toBe('Server-owned debate state is the only safe source of truth.');
 
     const pendingConTurn = await debateTurnRepository.findOneByOrFail({
@@ -260,6 +346,7 @@ describe('Debate state machine (e2e)', () => {
     const pausedView = await request(app.getHttpServer())
       .get(`/api/v1/debates/${debateSessionId}`)
       .expect(200);
+    const pausedViewBody = typedValue<DebateViewBody>(pausedView.body);
     const missedTurn = await debateTurnRepository.findOneByOrFail({
       debateSessionId,
       turnNumber: 2,
@@ -268,8 +355,8 @@ describe('Debate state machine (e2e)', () => {
       id: createdSeats[1].id,
     });
 
-    expect(pausedView.body.status).toBe('paused');
-    expect(pausedView.body.currentTurnNumber).toBe(3);
+    expect(pausedViewBody.status).toBe('paused');
+    expect(pausedViewBody.currentTurnNumber).toBe(3);
     expect(missedTurn.status).toBe('missed');
     expect(replacingSeat.status).toBe('replacing');
     expect(replacingSeat.agentId).toBeNull();
@@ -282,7 +369,7 @@ describe('Debate state machine (e2e)', () => {
         agentId: replacement.id,
       })
       .expect(201)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: DebateMutationBody }) => {
         expect(body.seatId).toBe(createdSeats[1].id);
         expect(body.status).toBe('occupied');
       });
@@ -299,7 +386,7 @@ describe('Debate state machine (e2e)', () => {
       .post(`/api/v1/debates/${debateSessionId}/resume`)
       .set('Authorization', `Bearer ${host.accessToken}`)
       .expect(201)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: DebateMutationBody }) => {
         expect(body.status).toBe('live');
         expect(body.currentTurnNumber).toBe(3);
       });
@@ -307,10 +394,11 @@ describe('Debate state machine (e2e)', () => {
     const resumedView = await request(app.getHttpServer())
       .get(`/api/v1/debates/${debateSessionId}`)
       .expect(200);
+    const resumedViewBody = typedValue<DebateViewBody>(resumedView.body);
 
-    expect(resumedView.body.currentTurn.turnNumber).toBe(3);
-    expect(resumedView.body.currentTurn.seatId).toBe(createdSeats[1].id);
-    expect(resumedView.body.currentTurn.stance).toBe('con');
+    expect(resumedViewBody.currentTurn?.turnNumber).toBe(3);
+    expect(resumedViewBody.currentTurn?.seatId).toBe(createdSeats[1].id);
+    expect(resumedViewBody.currentTurn?.stance).toBe('con');
 
     const replacementTurnAction = await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -326,11 +414,14 @@ describe('Debate state machine (e2e)', () => {
         },
       })
       .expect(202);
+    const replacementTurnActionBody = typedValue<AcceptedActionBody>(
+      replacementTurnAction.body,
+    );
 
     const replacementTurnResult = await waitForActionStatus(
       app,
       replacementClaim.accessToken,
-      replacementTurnAction.body.id,
+      replacementTurnActionBody.id,
     );
 
     expect(replacementTurnResult.status).toBe('succeeded');
@@ -338,25 +429,30 @@ describe('Debate state machine (e2e)', () => {
     const postReplacementView = await request(app.getHttpServer())
       .get(`/api/v1/debates/${debateSessionId}`)
       .expect(200);
+    const postReplacementViewBody = typedValue<DebateViewBody>(
+      postReplacementView.body,
+    );
 
-    expect(postReplacementView.body.currentTurn.turnNumber).toBe(4);
-    expect(postReplacementView.body.currentTurn.seatId).toBe(createdSeats[0].id);
+    expect(postReplacementViewBody.currentTurn?.turnNumber).toBe(4);
+    expect(postReplacementViewBody.currentTurn?.seatId).toBe(
+      createdSeats[0].id,
+    );
     expect(
-      postReplacementView.body.formalTurns.find(
+      postReplacementViewBody.formalTurns.find(
         (turn: { turnNumber: number }) => turn.turnNumber === 2,
-      ).status,
+      )?.status,
     ).toBe('missed');
     expect(
-      postReplacementView.body.formalTurns.find(
+      postReplacementViewBody.formalTurns.find(
         (turn: { turnNumber: number }) => turn.turnNumber === 3,
-      ).event.content,
+      )?.event?.content,
     ).toBe('The replacement keeps the con stance intact on resume.');
 
     await request(app.getHttpServer())
       .post(`/api/v1/debates/${debateSessionId}/end`)
       .set('Authorization', `Bearer ${host.accessToken}`)
       .expect(201)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: DebateMutationBody }) => {
         expect(body.status).toBe('ended');
       });
 
@@ -369,16 +465,17 @@ describe('Debate state machine (e2e)', () => {
     const archiveResponse = await request(app.getHttpServer())
       .get(`/api/v1/debates/${debateSessionId}/archive`)
       .expect(200);
+    const archiveBody = typedValue<DebateArchiveBody>(archiveResponse.body);
     const archivedSession = await debateSessionRepository.findOneByOrFail({
       id: debateSessionId,
     });
-    const replayTypes = archiveResponse.body.replay.events.map(
+    const replayTypes = archiveBody.replay.events.map(
       (event: { type: string }) => event.type,
     );
 
     expect(archivedSession.status).toBe('archived');
-    expect(archiveResponse.body.archive.status).toBe('archived');
-    expect(archiveResponse.body.archive.eventIds.length).toBeGreaterThanOrEqual(7);
+    expect(archiveBody.archive.status).toBe('archived');
+    expect(archiveBody.archive.eventIds.length).toBeGreaterThanOrEqual(7);
     expect(replayTypes).toEqual(
       expect.arrayContaining([
         'debate.create',
@@ -393,9 +490,21 @@ describe('Debate state machine (e2e)', () => {
   });
 
   it('lets an agent host create a pending debate, emits ready_to_start, and requires the host agent to start it', async () => {
-    const hostAgent = await importSelfAgent(app, 'debate-host-agent', 'Debate Host Agent');
-    const pro = await importSelfAgent(app, 'debate-agent-pro', 'Debate Agent Pro');
-    const con = await importSelfAgent(app, 'debate-agent-con', 'Debate Agent Con');
+    const hostAgent = await importSelfAgent(
+      app,
+      'debate-host-agent',
+      'Debate Host Agent',
+    );
+    const pro = await importSelfAgent(
+      app,
+      'debate-agent-pro',
+      'Debate Agent Pro',
+    );
+    const con = await importSelfAgent(
+      app,
+      'debate-agent-con',
+      'Debate Agent Con',
+    );
     const hostClaim = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -421,13 +530,16 @@ describe('Debate state machine (e2e)', () => {
         },
       })
       .expect(202);
+    const createActionBody = typedValue<AcceptedActionBody>(createAction.body);
 
     const finalCreateAction = await waitForActionStatus(
       app,
       hostClaim.accessToken,
-      createAction.body.id,
+      createActionBody.id,
     );
-    const createdDebateSessionId = finalCreateAction.result.debateSessionId as string;
+    const createdDebateSessionId = typedValue<{ debateSessionId: string }>(
+      finalCreateAction.result,
+    ).debateSessionId;
     const readyEvent = await eventRepository.findOneByOrFail({
       targetType: 'debate_session',
       targetId: createdDebateSessionId,
@@ -448,11 +560,12 @@ describe('Debate state machine (e2e)', () => {
         },
       })
       .expect(202);
+    const startActionBody = typedValue<AcceptedActionBody>(startAction.body);
 
     const finalStartAction = await waitForActionStatus(
       app,
       hostClaim.accessToken,
-      startAction.body.id,
+      startActionBody.id,
     );
     const startedDebateSession = await debateSessionRepository.findOneByOrFail({
       id: createdDebateSessionId,

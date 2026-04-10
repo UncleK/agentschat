@@ -21,6 +21,7 @@ import { PolicyService } from '../../src/modules/policy/policy.service';
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import {
   claimFederatedAgent,
@@ -47,8 +48,10 @@ describe('Unified content actions (e2e)', () => {
     policyService = app.get(PolicyService);
     threadRepository = context.dataSource.getRepository(ThreadEntity);
     eventRepository = context.dataSource.getRepository(EventEntity);
-    forumTopicViewRepository = context.dataSource.getRepository(ForumTopicViewEntity);
-    debateSessionRepository = context.dataSource.getRepository(DebateSessionEntity);
+    forumTopicViewRepository =
+      context.dataSource.getRepository(ForumTopicViewEntity);
+    debateSessionRepository =
+      context.dataSource.getRepository(DebateSessionEntity);
     debateSeatRepository = context.dataSource.getRepository(DebateSeatEntity);
     debateTurnRepository = context.dataSource.getRepository(DebateTurnEntity);
   });
@@ -58,20 +61,38 @@ describe('Unified content actions (e2e)', () => {
   });
 
   it('persists dm, forum, and debate actions through the canonical thread and event model', async () => {
-    const author = await importSelfAgent(app, 'actions-author', 'Actions Author');
+    const author = await importSelfAgent(
+      app,
+      'actions-author',
+      'Actions Author',
+    );
     const peer = await importSelfAgent(app, 'actions-peer', 'Actions Peer');
-    const spectator = await importSelfAgent(app, 'actions-spectator', 'Actions Spectator');
+    const spectator = await importSelfAgent(
+      app,
+      'actions-spectator',
+      'Actions Spectator',
+    );
 
     await policyService.upsertAgentSafetyPolicy(peer.id, {
       dmAcceptanceMode: AgentDmAcceptanceMode.Open,
     });
 
-    const authorClaim = await claimFederatedAgent(app, federationCredentialsService, author.id, {
-      pollingEnabled: true,
-    });
-    const peerClaim = await claimFederatedAgent(app, federationCredentialsService, peer.id, {
-      pollingEnabled: true,
-    });
+    const authorClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      author.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+    const peerClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      peer.id,
+      {
+        pollingEnabled: true,
+      },
+    );
     const spectatorClaim = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -90,24 +111,32 @@ describe('Unified content actions (e2e)', () => {
         content: 'Canonical direct message.',
       },
     });
-    const topicAction = await submitAction(authorClaim.accessToken, 'content-topic', {
-      type: 'forum.topic.create',
-      payload: {
-        title: 'Canonical forum topic',
-        tags: ['canonical', 'task6'],
-        contentType: 'markdown',
-        content: 'Opening markdown post.',
+    const topicAction = await submitAction(
+      authorClaim.accessToken,
+      'content-topic',
+      {
+        type: 'forum.topic.create',
+        payload: {
+          title: 'Canonical forum topic',
+          tags: ['canonical', 'task6'],
+          contentType: 'markdown',
+          content: 'Opening markdown post.',
+        },
       },
-    });
-    const replyAction = await submitAction(peerClaim.accessToken, 'content-reply', {
-      type: 'forum.reply.create',
-      payload: {
-        threadId: topicAction.threadId,
-        parentEventId: topicAction.eventId,
-        contentType: 'code',
-        content: 'const reply = true;',
+    );
+    const replyAction = await submitAction(
+      peerClaim.accessToken,
+      'content-reply',
+      {
+        type: 'forum.reply.create',
+        payload: {
+          threadId: topicAction.threadId,
+          parentEventId: topicAction.eventId,
+          contentType: 'code',
+          content: 'const reply = true;',
+        },
       },
-    });
+    );
 
     const debateThread = await threadRepository.save(
       threadRepository.create({
@@ -144,26 +173,31 @@ describe('Unified content actions (e2e)', () => {
       }),
     ]);
 
-    const debateTurnAction = await submitAction(authorClaim.accessToken, 'content-turn', {
-      type: 'debate.turn.submit',
-      payload: {
-        debateSessionId: debateSession.id,
-        seatId: authorSeat.id,
-        turnNumber: 1,
-        contentType: 'text',
-        content: 'Structured debate turn through the canonical event service.',
+    const debateTurnAction = await submitAction(
+      authorClaim.accessToken,
+      'content-turn',
+      {
+        type: 'debate.turn.submit',
+        payload: {
+          debateSessionId: debateSession.id,
+          seatId: authorSeat.id,
+          turnNumber: 1,
+          contentType: 'text',
+          content:
+            'Structured debate turn through the canonical event service.',
+        },
       },
-    });
+    );
     const spectatorAction = await submitAction(
       spectatorClaim.accessToken,
       'content-spectator',
       {
-      type: 'debate.spectator.post',
-      payload: {
-        debateSessionId: debateSession.id,
-        contentType: 'text',
-        content: 'Spectator commentary in the same thread store.',
-      },
+        type: 'debate.spectator.post',
+        payload: {
+          debateSessionId: debateSession.id,
+          contentType: 'text',
+          content: 'Spectator commentary in the same thread store.',
+        },
       },
     );
 
@@ -201,8 +235,16 @@ describe('Unified content actions (e2e)', () => {
   });
 
   it('rejects debate turn submissions from agents that do not occupy the seat', async () => {
-    const seatedAgent = await importSelfAgent(app, 'turn-seat-owner', 'Turn Seat Owner');
-    const intruder = await importSelfAgent(app, 'turn-intruder', 'Turn Intruder');
+    const seatedAgent = await importSelfAgent(
+      app,
+      'turn-seat-owner',
+      'Turn Seat Owner',
+    );
+    const intruder = await importSelfAgent(
+      app,
+      'turn-intruder',
+      'Turn Intruder',
+    );
     const intruderClaim = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -253,15 +295,18 @@ describe('Unified content actions (e2e)', () => {
         },
       })
       .expect(202);
+    const responseBody = typedValue<{ id: string }>(response.body);
 
     const finalAction = await waitForActionStatus(
       app,
       intruderClaim.accessToken,
-      response.body.id,
+      responseBody.id,
     );
 
     expect(finalAction.status).toBe('rejected');
-    expect(finalAction.error?.message).toMatch(/only the seated agent can submit/i);
+    expect(finalAction.error?.message).toMatch(
+      /only the seated agent can submit/i,
+    );
   });
 
   async function submitAction(
@@ -278,8 +323,13 @@ describe('Unified content actions (e2e)', () => {
       .set('Idempotency-Key', idempotencyKey)
       .send(body)
       .expect(202);
+    const responseBody = typedValue<{ id: string }>(response.body);
 
-    const finalAction = await waitForActionStatus(app, accessToken, response.body.id);
+    const finalAction = await waitForActionStatus(
+      app,
+      accessToken,
+      responseBody.id,
+    );
 
     expect(finalAction.status).toBe('succeeded');
 

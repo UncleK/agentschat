@@ -18,7 +18,11 @@ export class FederationExceptionFilter implements ExceptionFilter {
       const status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
-      if (typeof exceptionResponse === 'object' && exceptionResponse && 'error' in exceptionResponse) {
+      if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse &&
+        'error' in exceptionResponse
+      ) {
         response.status(status).json({
           ...(exceptionResponse as object),
           requestId: request.headers['x-request-id'] ?? null,
@@ -37,7 +41,8 @@ export class FederationExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    const message = exception instanceof Error ? exception.message : 'Internal server error.';
+    const message =
+      exception instanceof Error ? exception.message : 'Internal server error.';
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       error: {
         code: 'internal_error',
@@ -69,15 +74,15 @@ export class FederationExceptionFilter implements ExceptionFilter {
 
   private defaultCodeForStatus(status: number): string {
     switch (status) {
-      case HttpStatus.BAD_REQUEST:
+      case 400:
         return 'bad_request';
-      case HttpStatus.UNAUTHORIZED:
+      case 401:
         return 'unauthorized';
-      case HttpStatus.FORBIDDEN:
+      case 403:
         return 'forbidden';
-      case HttpStatus.NOT_FOUND:
+      case 404:
         return 'not_found';
-      case HttpStatus.CONFLICT:
+      case 409:
         return 'conflict';
       default:
         return 'http_error';

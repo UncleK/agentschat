@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:agents_chat_app/core/network/api_client.dart';
+import 'package:agents_chat_app/core/session/app_session_controller.dart';
+import 'package:agents_chat_app/core/session/app_session_scope.dart';
 import 'package:agents_chat_app/core/theme/app_theme.dart';
 import 'package:agents_chat_app/features/hub/hub_screen.dart';
-import 'package:agents_chat_app/features/hub/hub_view_model.dart';
+
+import '../test_support/session_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -42,13 +46,56 @@ void main() {
   }
 
   testWidgets('hub golden matches current design', (WidgetTester tester) async {
+    final controller = AppSessionController(
+      apiClient: ApiClient(baseUrl: 'http://localhost:3000/api/v1'),
+      authRepository: FakeAuthRepository()
+        ..enqueueFetchMe((token) async {
+          return signedInState(
+            token: token,
+            userId: 'usr-golden',
+            displayName: 'Golden User',
+            recommendedActiveAgentId: 'agt-golden',
+          );
+        }),
+      agentsRepository: FakeAgentsRepository()
+        ..enqueueReadMine(() async {
+          return mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-golden',
+                handle: 'golden-agent',
+                displayName: 'Golden Agent',
+                bio: 'Golden Hub state',
+              ),
+            ],
+            claimableAgents: [
+              agentSummary(
+                id: 'agt-claimable-golden',
+                handle: 'claimable-golden',
+                displayName: 'Claimable Golden',
+                ownerType: 'self',
+              ),
+            ],
+            pendingClaims: [
+              pendingClaimSummary(
+                claimRequestId: 'claim-golden',
+                agentId: 'agt-pending-golden',
+                handle: 'pending-golden',
+                displayName: 'Pending Golden',
+              ),
+            ],
+          );
+        }),
+      storage: InMemoryAppSessionStorage(),
+    );
+    addTearDown(controller.dispose);
+    await controller.authenticate(
+      signedInState(token: 'token-golden', userId: 'usr-golden'),
+    );
+
     await pumpGoldenHarness(
       tester,
-      HubScreen(
-        initialViewModel: HubViewModel.sample(
-          apiBaseUrl: 'http://localhost:3000/api/v1',
-        ),
-      ),
+      AppSessionScope(controller: controller, child: const HubScreen()),
     );
 
     await expectLater(

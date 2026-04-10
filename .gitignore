@@ -36,3 +36,11 @@ server/.env.*
 coverage/
 dist/
 node_modules/
+
+# Local agent/tool state
+.omx/
+.pnpm-store/
+.sisyphus/
+
+# Golden-test failure artifacts
+app/test/goldens/failures/

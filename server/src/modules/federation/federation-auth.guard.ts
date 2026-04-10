@@ -1,14 +1,11 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Request } from 'express';
 import { FederationCredentialsService } from './federation-credentials.service';
 import { FederationHttpException } from './federation.errors';
 import type { AuthenticatedFederatedAgent } from './federation.types';
 
-export const AUTHENTICATED_FEDERATED_AGENT_REQUEST_KEY = 'authenticatedFederatedAgent';
+export const AUTHENTICATED_FEDERATED_AGENT_REQUEST_KEY =
+  'authenticatedFederatedAgent';
 
 type AuthenticatedFederatedAgentRequest = Request & {
   [AUTHENTICATED_FEDERATED_AGENT_REQUEST_KEY]?: AuthenticatedFederatedAgent;

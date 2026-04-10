@@ -1,10 +1,7 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
-import {
-  APP_ENVIRONMENT,
-  type AppEnvironment,
-} from '../../config/environment';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
   AgentOwnerType,
   ConnectionTransportMode,
@@ -31,7 +28,10 @@ import {
   FederationActionRejectionError,
   FederationHttpException,
 } from './federation.errors';
-import { AuthenticatedFederatedAgent, SubjectReference } from './federation.types';
+import {
+  AuthenticatedFederatedAgent,
+  SubjectReference,
+} from './federation.types';
 
 interface ClaimAgentInput {
   claimToken?: string;
@@ -48,6 +48,8 @@ interface SubmittedActionInput {
 
 @Injectable()
 export class FederationService {
+  private readonly actionProcessingByAgentId = new Map<string, Promise<void>>();
+
   constructor(
     @Inject(APP_ENVIRONMENT)
     private readonly environment: AppEnvironment,
@@ -85,7 +87,8 @@ export class FederationService {
       );
     }
 
-    const claimPayload = this.federationCredentialsService.verifyAgentClaimToken(claimToken);
+    const claimPayload =
+      this.federationCredentialsService.verifyAgentClaimToken(claimToken);
     const agent = await this.federationCredentialsService.assertAgentExists(
       claimPayload.agentId,
     );
@@ -110,7 +113,9 @@ export class FederationService {
 
     const claimResult = await this.dataSource.transaction(async (manager) => {
       const connectionRepository = manager.getRepository(AgentConnectionEntity);
-      let connection = await connectionRepository.findOneBy({ agentId: agent.id });
+      let connection = await connectionRepository.findOneBy({
+        agentId: agent.id,
+      });
 
       if (!connection) {
         connection = await connectionRepository.save(
@@ -127,9 +132,10 @@ export class FederationService {
         );
       }
 
-      const accessToken = this.federationCredentialsService.generateAgentAccessToken(
-        connection.id,
-      );
+      const accessToken =
+        this.federationCredentialsService.generateAgentAccessToken(
+          connection.id,
+        );
       const webhookSecret =
         transportMode === ConnectionTransportMode.Webhook ||
         transportMode === ConnectionTransportMode.Hybrid
@@ -146,7 +152,8 @@ export class FederationService {
       connection.pollingEnabled =
         transportMode === ConnectionTransportMode.Polling ||
         transportMode === ConnectionTransportMode.Hybrid;
-      connection.tokenHash = this.federationCredentialsService.hashValue(accessToken);
+      connection.tokenHash =
+        this.federationCredentialsService.hashValue(accessToken);
       connection.lastSeenAt = new Date();
       connection.capabilities = input.capabilities ?? {};
 
@@ -209,10 +216,10 @@ export class FederationService {
       );
     }
 
-    const accessToken = this.federationCredentialsService.generateAgentAccessToken(
-      connection.id,
-    );
-    connection.tokenHash = this.federationCredentialsService.hashValue(accessToken);
+    const accessToken =
+      this.federationCredentialsService.generateAgentAccessToken(connection.id);
+    connection.tokenHash =
+      this.federationCredentialsService.hashValue(accessToken);
     connection.lastSeenAt = new Date();
     await this.agentConnectionRepository.save(connection);
 
@@ -240,7 +247,11 @@ export class FederationService {
     const actionType = input.type?.trim();
 
     if (!actionType) {
-      throw new FederationHttpException(400, 'action_type_required', 'type is required.');
+      throw new FederationHttpException(
+        400,
+        'action_type_required',
+        'type is required.',
+      );
     }
 
     const payload = this.normalizePayload(input.payload);
@@ -267,19 +278,39 @@ export class FederationService {
       };
     }
 
-    const action = await this.federationActionRepository.save(
-      this.federationActionRepository.create({
+    let action: FederationActionEntity;
+
+    try {
+      action = await this.federationActionRepository.save(
+        this.federationActionRepository.create({
+          agentId: agent.id,
+          actionType,
+          status: FederationActionStatus.Accepted,
+          idempotencyKey,
+          requestHash,
+          payload,
+        }),
+      );
+    } catch (error) {
+      const recoveredAction = await this.recoverConcurrentIdempotentAction({
         agentId: agent.id,
-        actionType,
-        status: FederationActionStatus.Accepted,
         idempotencyKey,
         requestHash,
-        payload,
-      }),
-    );
+        error,
+      });
+
+      if (recoveredAction) {
+        return {
+          created: false,
+          action: this.serializeAction(recoveredAction),
+        };
+      }
+
+      throw error;
+    }
 
     setImmediate(() => {
-      void this.processAcceptedAction(action.id);
+      this.enqueueAcceptedAction(action.agentId, action.id);
     });
 
     return {
@@ -306,7 +337,9 @@ export class FederationService {
   }
 
   private async processAcceptedAction(actionId: string): Promise<void> {
-    const action = await this.federationActionRepository.findOneBy({ id: actionId });
+    const action = await this.federationActionRepository.findOneBy({
+      id: actionId,
+    });
 
     if (!action || action.status !== FederationActionStatus.Accepted) {
       return;
@@ -333,7 +366,9 @@ export class FederationService {
           ...(error.details ? { details: error.details } : {}),
         };
       } else if (error instanceof FederationHttpException) {
-        const response = error.getResponse() as { error: Record<string, unknown> };
+        const response = error.getResponse() as {
+          error: Record<string, unknown>;
+        };
         action.status = FederationActionStatus.Rejected;
         action.errorPayload = response.error;
       } else if (error instanceof HttpException) {
@@ -343,7 +378,8 @@ export class FederationService {
         action.status = FederationActionStatus.Failed;
         action.errorPayload = {
           code: 'internal_error',
-          message: error instanceof Error ? error.message : 'Internal action failure.',
+          message:
+            error instanceof Error ? error.message : 'Internal action failure.',
         };
       }
 
@@ -351,6 +387,57 @@ export class FederationService {
     }
 
     await this.federationActionRepository.save(action);
+  }
+
+  private enqueueAcceptedAction(agentId: string, actionId: string): void {
+    const previous = this.actionProcessingByAgentId.get(agentId);
+    const next = (previous ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        await this.processAcceptedAction(actionId);
+      })
+      .finally(() => {
+        if (this.actionProcessingByAgentId.get(agentId) === next) {
+          this.actionProcessingByAgentId.delete(agentId);
+        }
+      });
+
+    this.actionProcessingByAgentId.set(agentId, next);
+  }
+
+  private async recoverConcurrentIdempotentAction(input: {
+    agentId: string;
+    idempotencyKey: string;
+    requestHash: string;
+    error: unknown;
+  }): Promise<FederationActionEntity | null> {
+    if (
+      !this.isUniqueConstraintViolation(
+        input.error,
+        'IDX_federation_actions_agent_idempotency_unique',
+      )
+    ) {
+      return null;
+    }
+
+    const existingAction = await this.federationActionRepository.findOneBy({
+      agentId: input.agentId,
+      idempotencyKey: input.idempotencyKey,
+    });
+
+    if (!existingAction) {
+      return null;
+    }
+
+    if (existingAction.requestHash !== input.requestHash) {
+      throw new FederationHttpException(
+        409,
+        'idempotency_key_conflict',
+        'The same Idempotency-Key was already used with a different payload.',
+      );
+    }
+
+    return existingAction;
   }
 
   private async executeAction(action: FederationActionEntity): Promise<{
@@ -503,7 +590,10 @@ export class FederationService {
   }
 
   private async handleDirectMessage(action: FederationActionEntity) {
-    const recipient = this.parseRecipient(action.payload.targetType, action.payload.targetId);
+    const recipient = this.parseRecipient(
+      action.payload.targetType,
+      action.payload.targetId,
+    );
     const persistedMessage = await this.contentService.sendAgentDirectMessage(
       action.agentId,
       {
@@ -570,7 +660,9 @@ export class FederationService {
       },
       {
         threadId: this.requiredString(action.payload.threadId, 'threadId'),
-        parentEventId: this.optionalNullableString(action.payload.parentEventId),
+        parentEventId: this.optionalNullableString(
+          action.payload.parentEventId,
+        ),
         contentType: this.optionalString(action.payload.contentType),
         content: this.optionalNullableString(action.payload.content),
         caption: this.optionalNullableString(action.payload.caption),
@@ -588,20 +680,23 @@ export class FederationService {
   }
 
   private async handleDebateCreate(action: FederationActionEntity) {
-    const result = await this.debateService.createAgentHostedDebate(action.agentId, {
-      topic: this.optionalNullableString(action.payload.topic),
-      proStance: this.optionalNullableString(action.payload.proStance),
-      conStance: this.optionalNullableString(action.payload.conStance),
-      proAgentId: this.optionalNullableString(action.payload.proAgentId),
-      conAgentId: this.optionalNullableString(action.payload.conAgentId),
-      freeEntry: this.optionalBoolean(action.payload.freeEntry),
-      humanHostAllowed:
-        this.optionalBoolean(action.payload.humanHostAllowed) ??
-        this.optionalBoolean(action.payload.human_host),
-      hostType: this.optionalString(action.payload.hostType),
-      hostId: this.optionalNullableString(action.payload.hostId),
-      hostAgentId: this.optionalNullableString(action.payload.hostAgentId),
-    });
+    const result = await this.debateService.createAgentHostedDebate(
+      action.agentId,
+      {
+        topic: this.optionalNullableString(action.payload.topic),
+        proStance: this.optionalNullableString(action.payload.proStance),
+        conStance: this.optionalNullableString(action.payload.conStance),
+        proAgentId: this.optionalNullableString(action.payload.proAgentId),
+        conAgentId: this.optionalNullableString(action.payload.conAgentId),
+        freeEntry: this.optionalBoolean(action.payload.freeEntry),
+        humanHostAllowed:
+          this.optionalBoolean(action.payload.humanHostAllowed) ??
+          this.optionalBoolean(action.payload.human_host),
+        hostType: this.optionalString(action.payload.hostType),
+        hostId: this.optionalNullableString(action.payload.hostId),
+        hostAgentId: this.optionalNullableString(action.payload.hostAgentId),
+      },
+    );
 
     return {
       threadId: result.threadId,
@@ -748,9 +843,16 @@ export class FederationService {
   }
 
   private async handleClaimConfirmation(action: FederationActionEntity) {
-    const claimRequestId = this.requiredString(action.payload.claimRequestId, 'claimRequestId');
-    const challengeToken = this.requiredString(action.payload.challengeToken, 'challengeToken');
-    const challengeHash = this.federationCredentialsService.hashValue(challengeToken);
+    const claimRequestId = this.requiredString(
+      action.payload.claimRequestId,
+      'claimRequestId',
+    );
+    const challengeToken = this.requiredString(
+      action.payload.challengeToken,
+      'challengeToken',
+    );
+    const challengeHash =
+      this.federationCredentialsService.hashValue(challengeToken);
 
     return this.dataSource.transaction(async (manager) => {
       const claimRepository = manager.getRepository(ClaimRequestEntity);
@@ -868,11 +970,11 @@ export class FederationService {
     }
 
     switch (normalized) {
-      case ConnectionTransportMode.Webhook:
+      case 'webhook':
         return ConnectionTransportMode.Webhook;
-      case ConnectionTransportMode.Polling:
+      case 'polling':
         return ConnectionTransportMode.Polling;
-      case ConnectionTransportMode.Hybrid:
+      case 'hybrid':
         return ConnectionTransportMode.Hybrid;
       default:
         throw new FederationHttpException(
@@ -901,18 +1003,24 @@ export class FederationService {
     return payload;
   }
 
-  private parseRecipient(targetType: unknown, targetId: unknown): SubjectReference {
-    const normalizedType = this.requiredString(targetType, 'targetType').toLowerCase();
+  private parseRecipient(
+    targetType: unknown,
+    targetId: unknown,
+  ): SubjectReference {
+    const normalizedType = this.requiredString(
+      targetType,
+      'targetType',
+    ).toLowerCase();
     const id = this.requiredString(targetId, 'targetId');
 
-    if (normalizedType === SubjectType.Agent) {
+    if (normalizedType === 'agent') {
       return {
         type: SubjectType.Agent,
         id,
       };
     }
 
-    if (normalizedType === SubjectType.Human) {
+    if (normalizedType === 'human') {
       return {
         type: SubjectType.Human,
         id,
@@ -926,14 +1034,17 @@ export class FederationService {
   }
 
   private parseFollowTargetType(targetType: unknown): FollowTargetType {
-    const normalized = this.requiredString(targetType, 'targetType').toLowerCase();
+    const normalized = this.requiredString(
+      targetType,
+      'targetType',
+    ).toLowerCase();
 
     switch (normalized) {
-      case FollowTargetType.Agent:
+      case 'agent':
         return FollowTargetType.Agent;
-      case FollowTargetType.Topic:
+      case 'topic':
         return FollowTargetType.Topic;
-      case FollowTargetType.Debate:
+      case 'debate':
         return FollowTargetType.Debate;
       default:
         throw new FederationActionRejectionError(
@@ -948,7 +1059,9 @@ export class FederationService {
     targetId: string,
   ): Promise<void> {
     if (targetType === FollowTargetType.Agent) {
-      const exists = await this.agentRepository.exist({ where: { id: targetId } });
+      const exists = await this.agentRepository.exist({
+        where: { id: targetId },
+      });
 
       if (!exists) {
         throw new FederationActionRejectionError(
@@ -978,7 +1091,9 @@ export class FederationService {
       return;
     }
 
-    const exists = await this.debateSessionRepository.exist({ where: { id: targetId } });
+    const exists = await this.debateSessionRepository.exist({
+      where: { id: targetId },
+    });
 
     if (!exists) {
       throw new FederationActionRejectionError(
@@ -1045,7 +1160,26 @@ export class FederationService {
     return JSON.stringify(this.sortValue(value));
   }
 
-  private serializeHttpException(error: HttpException): Record<string, unknown> {
+  private isUniqueConstraintViolation(
+    error: unknown,
+    constraintName: string,
+  ): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const driverError = error.driverError as
+      | { code?: string; constraint?: string }
+      | undefined;
+
+    return (
+      driverError?.code === '23505' && driverError.constraint === constraintName
+    );
+  }
+
+  private serializeHttpException(
+    error: HttpException,
+  ): Record<string, unknown> {
     const response = error.getResponse();
 
     if (typeof response === 'string') {

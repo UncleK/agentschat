@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, IsNull, QueryFailedError, Repository } from 'typeorm';
 import {
   DeliveryChannel,
   DeliveryStatus,
@@ -60,15 +57,24 @@ export class NotificationsService {
     const uniqueRecipients = new Map<string, NotificationRecipient>();
 
     for (const recipient of recipients) {
-      if (event.actorType === EventActorType.Human && event.actorUserId === recipient.id) {
+      if (
+        event.actorType === EventActorType.Human &&
+        event.actorUserId === recipient.id
+      ) {
         continue;
       }
 
-      if (event.actorType === EventActorType.Agent && event.actorAgentId === recipient.id) {
+      if (
+        event.actorType === EventActorType.Agent &&
+        event.actorAgentId === recipient.id
+      ) {
         continue;
       }
 
-      uniqueRecipients.set(`${recipient.type}:${recipient.id}:${recipient.kind}`, recipient);
+      uniqueRecipients.set(
+        `${recipient.type}:${recipient.id}:${recipient.kind}`,
+        recipient,
+      );
     }
 
     for (const recipient of uniqueRecipients.values()) {
@@ -102,7 +108,9 @@ export class NotificationsService {
     });
 
     return {
-      notifications: notifications.map((notification) => this.serializeNotification(notification)),
+      notifications: notifications.map((notification) =>
+        this.serializeNotification(notification),
+      ),
     };
   }
 
@@ -145,7 +153,11 @@ export class NotificationsService {
         .andWhere('read_at IS NULL')
         .execute();
     } else {
-      const ids = [...new Set((notificationIds ?? []).map((id) => id.trim()).filter(Boolean))];
+      const ids = [
+        ...new Set(
+          (notificationIds ?? []).map((id) => id.trim()).filter(Boolean),
+        ),
+      ];
 
       if (ids.length > 0) {
         const readableNotifications = await this.notificationRepository.findBy({
@@ -184,7 +196,9 @@ export class NotificationsService {
     return bellState;
   }
 
-  private async collectRecipients(event: EventEntity): Promise<NotificationRecipient[]> {
+  private async collectRecipients(
+    event: EventEntity,
+  ): Promise<NotificationRecipient[]> {
     switch (event.eventType) {
       case 'dm.send':
         return this.collectDirectMessageRecipients(event);
@@ -297,8 +311,10 @@ export class NotificationsService {
       this.notificationRepository.create({
         recipientType: recipient.type,
         recipientSubjectId: recipient.id,
-        recipientUserId: recipient.type === SubjectType.Human ? recipient.id : null,
-        recipientAgentId: recipient.type === SubjectType.Agent ? recipient.id : null,
+        recipientUserId:
+          recipient.type === SubjectType.Human ? recipient.id : null,
+        recipientAgentId:
+          recipient.type === SubjectType.Agent ? recipient.id : null,
         kind: recipient.kind,
         eventId: event.id,
         threadId: event.threadId,
@@ -322,42 +338,71 @@ export class NotificationsService {
     event: EventEntity,
     recipientAgentId: string,
   ): Promise<void> {
-    const existing = await this.deliveryRepository.findOneBy({
-      eventId: event.id,
-      recipientAgentId,
-    });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const existing = await this.deliveryRepository.findOneBy({
+        eventId: event.id,
+        recipientAgentId,
+      });
 
-    if (existing) {
-      return;
+      if (existing) {
+        return;
+      }
+
+      const [latestDelivery, connection] = await Promise.all([
+        this.deliveryRepository.find({
+          where: { recipientAgentId },
+          order: { sequence: 'DESC' },
+          take: 1,
+        }),
+        this.agentConnectionRepository.findOneBy({ agentId: recipientAgentId }),
+      ]);
+      const sequence = (latestDelivery[0]?.sequence ?? 0) + 1;
+
+      try {
+        await this.deliveryRepository.insert({
+          eventId: event.id,
+          recipientAgentId,
+          agentConnectionId: connection?.id ?? null,
+          sequence,
+          status: DeliveryStatus.Pending,
+          deliveryChannel: connection?.pollingEnabled
+            ? DeliveryChannel.Polling
+            : DeliveryChannel.Webhook,
+          attemptCount: 0,
+          nextAttemptAt: new Date(),
+          replayExpiresAt: new Date(Date.now() + this.replayWindowMs),
+          ackedAt: null,
+          deadLetteredAt: null,
+          lastAttemptAt: null,
+          lastError: null,
+        });
+        return;
+      } catch (error) {
+        if (
+          this.isUniqueConstraintViolation(
+            error,
+            'IDX_deliveries_event_recipient_unique',
+          )
+        ) {
+          return;
+        }
+
+        if (
+          this.isUniqueConstraintViolation(
+            error,
+            'IDX_deliveries_recipient_sequence_unique',
+          )
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
     }
 
-    const [latestDelivery, connection] = await Promise.all([
-      this.deliveryRepository.find({
-        where: { recipientAgentId },
-        order: { sequence: 'DESC' },
-        take: 1,
-      }),
-      this.agentConnectionRepository.findOneBy({ agentId: recipientAgentId }),
-    ]);
-    const sequence = (latestDelivery[0]?.sequence ?? 0) + 1;
-
-    await this.deliveryRepository.insert({
-      eventId: event.id,
-      recipientAgentId,
-      agentConnectionId: connection?.id ?? null,
-      sequence,
-      status: DeliveryStatus.Pending,
-      deliveryChannel: connection?.pollingEnabled
-        ? DeliveryChannel.Polling
-        : DeliveryChannel.Webhook,
-      attemptCount: 0,
-      nextAttemptAt: new Date(),
-      replayExpiresAt: new Date(Date.now() + this.replayWindowMs),
-      ackedAt: null,
-      deadLetteredAt: null,
-      lastAttemptAt: null,
-      lastError: null,
-    });
+    throw new Error(
+      `Failed to enqueue delivery for event ${event.id} and recipient ${recipientAgentId}.`,
+    );
   }
 
   private serializeNotification(notification: NotificationEntity) {
@@ -370,5 +415,22 @@ export class NotificationsService {
       readAt: notification.readAt?.toISOString() ?? null,
       createdAt: notification.createdAt.toISOString(),
     };
+  }
+
+  private isUniqueConstraintViolation(
+    error: unknown,
+    constraintName: string,
+  ): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const driverError = error.driverError as
+      | { code?: string; constraint?: string }
+      | undefined;
+
+    return (
+      driverError?.code === '23505' && driverError.constraint === constraintName
+    );
   }
 }

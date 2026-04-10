@@ -27,28 +27,11 @@ class AgentsHallScreen extends StatefulWidget {
 
 class _AgentsHallScreenState extends State<AgentsHallScreen> {
   late AgentsHallViewModel _viewModel;
-  late final TextEditingController _searchController;
-  late final FocusNode _searchFocusNode;
 
   @override
   void initState() {
     super.initState();
     _viewModel = widget.initialViewModel;
-    _searchController = TextEditingController(text: _viewModel.searchQuery);
-    _searchFocusNode = FocusNode();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.dispose();
-    super.dispose();
-  }
-
-  void _updateQuery(String value) {
-    setState(() {
-      _viewModel = _viewModel.copyWith(searchQuery: value);
-    });
   }
 
   void _openDetails(HallAgentCardModel agent) {
@@ -76,163 +59,113 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'AGENTS HALL',
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(color: AppColors.primary),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Synthetic intelligence directory',
-            style: Theme.of(context).textTheme.displaySmall,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Browse presence-aware agents, request access when direct DM is closed, and jump into active debates as a spectator.',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          GlassPanel(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        key: const Key('hall-search-input'),
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        onChanged: _updateQuery,
-                        decoration: InputDecoration(
-                          hintText: 'Search agents, skills, or runtime',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          filled: true,
-                          fillColor: AppColors.surfaceHighest.withValues(
-                            alpha: 0.55,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: AppRadii.medium,
-                            borderSide: BorderSide(
-                              color: AppColors.outline.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: AppRadii.medium,
-                            borderSide: BorderSide(
-                              color: AppColors.outline.withValues(alpha: 0.3),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    IconButton(
-                      key: const Key('hall-search-button'),
-                      onPressed: () => _searchFocusNode.requestFocus(),
-                      icon: const Icon(Icons.search_rounded),
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surfaceHighest.withValues(
-                          alpha: 0.5,
-                        ),
-                        foregroundColor: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    _BellSummary(state: _viewModel.bellState),
-                  ],
+          RichText(
+            key: const Key('hall-hero-title'),
+            text: TextSpan(
+              style: Theme.of(context).textTheme.displaySmall,
+              children: const [
+                TextSpan(text: 'Synthetic '),
+                TextSpan(
+                  text: 'Intelligence',
+                  style: TextStyle(color: AppColors.primary),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    StatusChip(label: '${visibleAgents.length} visible'),
-                    StatusChip(
-                      label: _viewModel.bellState.label,
-                      tone: _viewModel.bellState.mode == HallBellMode.live
-                          ? StatusChipTone.tertiary
-                          : StatusChipTone.neutral,
-                    ),
-                    const StatusChip(label: 'debate > online > offline'),
-                  ],
-                ),
+                TextSpan(text: '\nDirectory'),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Connect with specialized autonomous entities designed for high-fidelity collaboration in the digital ether.',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: AppSpacing.xxxl),
           LayoutBuilder(
             builder: (context, constraints) {
-              final crossAxisCount = constraints.maxWidth >= 1040
-                  ? 3
-                  : constraints.maxWidth >= 680
-                  ? 2
-                  : 1;
+              if (constraints.maxWidth < 760) {
+                return Column(
+                  children: [
+                    for (
+                      var index = 0;
+                      index < visibleAgents.length;
+                      index++
+                    ) ...[
+                      _AgentCard(
+                        agent: visibleAgents[index],
+                        onOpenDetails: () => _openDetails(visibleAgents[index]),
+                      ),
+                      if (index != visibleAgents.length - 1)
+                        const SizedBox(height: AppSpacing.lg),
+                    ],
+                  ],
+                );
+              }
 
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  mainAxisSpacing: AppSpacing.lg,
-                  crossAxisSpacing: AppSpacing.lg,
-                  childAspectRatio: crossAxisCount == 1 ? 0.92 : 0.82,
-                ),
-                itemCount: visibleAgents.length,
-                itemBuilder: (context, index) {
-                  final agent = visibleAgents[index];
-                  return _AgentCard(
-                    agent: agent,
-                    onOpenDetails: () => _openDetails(agent),
-                  );
-                },
+              final columnCount = constraints.maxWidth >= 1100 ? 3 : 2;
+              final columns = List.generate(
+                columnCount,
+                (_) => <HallAgentCardModel>[],
+              );
+              for (var index = 0; index < visibleAgents.length; index++) {
+                columns[index % columnCount].add(visibleAgents[index]);
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var index = 0; index < columns.length; index++) ...[
+                    Expanded(
+                      child: Column(
+                        children: [
+                          for (
+                            var itemIndex = 0;
+                            itemIndex < columns[index].length;
+                            itemIndex++
+                          ) ...[
+                            _AgentCard(
+                              agent: columns[index][itemIndex],
+                              onOpenDetails: () =>
+                                  _openDetails(columns[index][itemIndex]),
+                            ),
+                            if (itemIndex != columns[index].length - 1)
+                              const SizedBox(height: AppSpacing.lg),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (index != columns.length - 1)
+                      const SizedBox(width: AppSpacing.xl),
+                  ],
+                ],
               );
             },
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BellSummary extends StatelessWidget {
-  const _BellSummary({required this.state});
-
-  final HallBellState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final tone = switch (state.mode) {
-      HallBellMode.live => StatusChipTone.tertiary,
-      HallBellMode.unread => StatusChipTone.primary,
-      HallBellMode.muted || HallBellMode.quiet => StatusChipTone.neutral,
-    };
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceHighest.withValues(alpha: 0.5),
-        borderRadius: AppRadii.medium,
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.35)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(state.icon, color: AppColors.primary, size: AppSpacing.lg),
-            const SizedBox(width: AppSpacing.sm),
-            StatusChip(
-              label: state.label,
-              tone: tone,
-              showDot: state.hasUnread,
+          const SizedBox(height: AppSpacing.xl),
+          Align(
+            alignment: Alignment.center,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.surfaceHigh.withValues(alpha: 0.78),
+                borderRadius: AppRadii.pill,
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Text(
+                  'Showing ${visibleAgents.length} of ${_viewModel.agents.length} agents',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -257,102 +190,128 @@ class _AgentCard extends StatelessWidget {
       child: InkWell(
         key: Key('agent-card-${agent.id}'),
         onTap: onOpenDetails,
-        borderRadius: AppRadii.large,
-        child: GlassPanel(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          accentColor: agent.isDebating
-              ? AppColors.tertiary
-              : AppColors.primary,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceHighest.withValues(alpha: 0.7),
-                      borderRadius: AppRadii.medium,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Icon(
-                        agent.isDebating
-                            ? Icons.forum_rounded
-                            : agent.isOnline
-                            ? Icons.smart_toy_rounded
-                            : Icons.cloud_off_rounded,
-                        color: agent.isDebating
-                            ? AppColors.tertiary
-                            : AppColors.primary,
+        borderRadius: const BorderRadius.all(Radius.circular(28)),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceHigh.withValues(alpha: 0.74),
+            borderRadius: const BorderRadius.all(Radius.circular(28)),
+            border: Border.all(
+              color: (agent.isDebating ? AppColors.tertiary : AppColors.primary)
+                  .withValues(alpha: 0.16),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceHighest.withValues(alpha: 0.78),
+                        borderRadius: AppRadii.medium,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Icon(
+                          agent.isDebating
+                              ? Icons.forum_rounded
+                              : agent.isOnline
+                              ? Icons.smart_toy_rounded
+                              : Icons.cloud_off_rounded,
+                          color: agent.isDebating
+                              ? AppColors.tertiary
+                              : AppColors.primary,
+                        ),
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  StatusChip(label: agent.presenceLabel, tone: presenceTone),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                agent.name,
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                agent.headline,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.primaryFixed,
+                    const Spacer(),
+                    StatusChip(
+                      label: agent.presenceLabel,
+                      tone: presenceTone,
+                      showDot: agent.isOnline || agent.isDebating,
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                agent.description,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: agent.skills
-                    .map(
-                      (skill) => StatusChip(
-                        label: skill,
-                        tone: StatusChipTone.neutral,
-                        showDot: false,
-                      ),
-                    )
-                    .toList(),
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  Expanded(
-                    child: PrimaryGradientButton(
-                      key: Key(
-                        'agent-cta-${agent.primaryActionLabel.toLowerCase()}-${agent.id}',
-                      ),
-                      label: agent.primaryActionLabel,
-                      icon: agent.directMessageAllowed
-                          ? Icons.chat_bubble_rounded
-                          : Icons.key_rounded,
-                      onPressed: onOpenDetails,
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  agent.name,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  agent.headline,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: AppColors.onSurface),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  agent.description,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                  ),
+                ),
+                if (agent.skills.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    agent.skills.take(3).join(' • '),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.onSurfaceMuted,
                     ),
                   ),
-                  if (agent.canJoinDebate) ...[
-                    const SizedBox(width: AppSpacing.md),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                if (agent.metadata.isNotEmpty)
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: agent.metadata
+                        .take(2)
+                        .map(
+                          (item) => StatusChip(
+                            label: '${item.label}: ${item.value}',
+                            tone: StatusChipTone.neutral,
+                            showDot: false,
+                          ),
+                        )
+                        .toList(),
+                  ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
                     Expanded(
                       child: PrimaryGradientButton(
-                        key: Key('agent-cta-join-${agent.id}'),
-                        label: 'Join',
-                        icon: Icons.forum_rounded,
-                        useTertiary: true,
+                        key: Key(
+                          'agent-cta-${agent.primaryActionLabel.toLowerCase()}-${agent.id}',
+                        ),
+                        label: agent.primaryActionLabel,
+                        icon: agent.directMessageAllowed
+                            ? Icons.chat_bubble_rounded
+                            : Icons.key_rounded,
                         onPressed: onOpenDetails,
                       ),
                     ),
+                    if (agent.canJoinDebate) ...[
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: PrimaryGradientButton(
+                          key: Key('agent-cta-join-${agent.id}'),
+                          label: 'Join',
+                          icon: Icons.forum_rounded,
+                          useTertiary: true,
+                          onPressed: onOpenDetails,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

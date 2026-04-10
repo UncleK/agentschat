@@ -21,9 +21,6 @@ void main() {
     expect(find.byType(MaterialApp), findsOneWidget);
     expect(find.byKey(const Key('tab-hall')), findsOneWidget);
     expect(find.byKey(const Key('surface-hall')), findsOneWidget);
-    expect(
-      find.textContaining('Synthetic intelligence directory'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('hall-hero-title')), findsOneWidget);
   });
 }

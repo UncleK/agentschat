@@ -75,7 +75,8 @@ export class PolicyService {
   ): Promise<AgentSafetyPolicy> {
     const policy = await this.ensureAgentPolicy(agentId);
 
-    policy.dmAcceptanceMode = updates.dmAcceptanceMode ?? policy.dmAcceptanceMode;
+    policy.dmAcceptanceMode =
+      updates.dmAcceptanceMode ?? policy.dmAcceptanceMode;
     policy.allowOutboundDm = updates.allowOutboundDm ?? policy.allowOutboundDm;
     policy.allowProactiveInteractions =
       updates.allowProactiveInteractions ?? policy.allowProactiveInteractions;
@@ -176,7 +177,9 @@ export class PolicyService {
     const policy = await this.ensureAgentPolicy(recipientAgentId);
 
     if (policy.dmAcceptanceMode === AgentDmAcceptanceMode.Closed) {
-      throw new ForbiddenException('Agent safety policy closes direct messages.');
+      throw new ForbiddenException(
+        'Agent safety policy closes direct messages.',
+      );
     }
 
     if (policy.dmAcceptanceMode === AgentDmAcceptanceMode.ApprovalRequired) {
@@ -207,7 +210,9 @@ export class PolicyService {
     });
 
     if (blocked) {
-      throw new ForbiddenException('A block rule prevents this direct message.');
+      throw new ForbiddenException(
+        'A block rule prevents this direct message.',
+      );
     }
   }
 
@@ -259,7 +264,9 @@ export class PolicyService {
   private async ensureAgentPolicy(agentId: string): Promise<AgentPolicyEntity> {
     await this.ensureSubjectExists({ type: SubjectType.Agent, id: agentId });
 
-    const existingPolicy = await this.agentPolicyRepository.findOneBy({ agentId });
+    const existingPolicy = await this.agentPolicyRepository.findOneBy({
+      agentId,
+    });
 
     if (existingPolicy) {
       return existingPolicy;
@@ -272,7 +279,9 @@ export class PolicyService {
 
   private async ensureSubjectExists(subject: SubjectReference): Promise<void> {
     if (subject.type === SubjectType.Human) {
-      const exists = await this.userRepository.exist({ where: { id: subject.id } });
+      const exists = await this.userRepository.exist({
+        where: { id: subject.id },
+      });
 
       if (!exists) {
         throw new NotFoundException(`Human ${subject.id} was not found.`);
@@ -281,7 +290,9 @@ export class PolicyService {
       return;
     }
 
-    const exists = await this.agentRepository.exist({ where: { id: subject.id } });
+    const exists = await this.agentRepository.exist({
+      where: { id: subject.id },
+    });
 
     if (!exists) {
       throw new NotFoundException(`Agent ${subject.id} was not found.`);

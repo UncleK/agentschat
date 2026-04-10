@@ -1,31 +1,67 @@
 import 'chat_models.dart';
 
+enum ChatSurfaceState {
+  preview,
+  resolvingActiveAgent,
+  loadingThreads,
+  ready,
+  blocked,
+  error,
+}
+
+const _selectedConversationSentinel = Object();
+const _activeAgentNameSentinel = Object();
+const _surfaceMessageSentinel = Object();
+
 class ChatViewModel {
   const ChatViewModel({
     required this.conversations,
     required this.selectedConversationId,
+    required this.surfaceState,
+    required this.activeAgentName,
+    required this.surfaceMessage,
     this.isThreadSearchOpen = false,
     this.threadSearchQuery = '',
+    this.conversationSearchQuery = '',
   });
 
   final List<ChatConversationModel> conversations;
-  final String selectedConversationId;
+  final String? selectedConversationId;
+  final ChatSurfaceState surfaceState;
+  final String? activeAgentName;
+  final String? surfaceMessage;
   final bool isThreadSearchOpen;
   final String threadSearchQuery;
+  final String conversationSearchQuery;
 
-  ChatViewModel copyWith({
-    List<ChatConversationModel>? conversations,
-    String? selectedConversationId,
-    bool? isThreadSearchOpen,
-    String? threadSearchQuery,
-  }) {
-    return ChatViewModel(
-      conversations: conversations ?? this.conversations,
-      selectedConversationId:
-          selectedConversationId ?? this.selectedConversationId,
-      isThreadSearchOpen: isThreadSearchOpen ?? this.isThreadSearchOpen,
-      threadSearchQuery: threadSearchQuery ?? this.threadSearchQuery,
-    );
+  bool get hasConversations => conversations.isNotEmpty;
+
+  bool get hasSelectedConversation => selectedConversationOrNull != null;
+
+  bool get isResolvingActiveAgent {
+    return surfaceState == ChatSurfaceState.resolvingActiveAgent;
+  }
+
+  bool get isLoadingThreads => surfaceState == ChatSurfaceState.loadingThreads;
+
+  bool get isBlocked => surfaceState == ChatSurfaceState.blocked;
+
+  bool get isError => surfaceState == ChatSurfaceState.error;
+
+  bool get isPreview => surfaceState == ChatSurfaceState.preview;
+
+  ChatConversationModel? get selectedConversationOrNull {
+    final selectedConversationId = this.selectedConversationId;
+    if (selectedConversationId == null || selectedConversationId.isEmpty) {
+      return null;
+    }
+
+    for (final conversation in conversations) {
+      if (conversation.id == selectedConversationId) {
+        return conversation;
+      }
+    }
+    return null;
   }
 
   List<ChatConversationModel> get visibleConversations {
@@ -44,27 +80,70 @@ class ChatViewModel {
         );
       });
 
-    return sorted;
-  }
+    final query = conversationSearchQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      return sorted;
+    }
 
-  ChatConversationModel get selectedConversation {
-    return conversations.firstWhere(
-      (conversation) => conversation.id == selectedConversationId,
-      orElse: () => conversations.first,
-    );
+    return sorted
+        .where((conversation) {
+          return conversation.remoteAgentName.toLowerCase().contains(query) ||
+              conversation.remoteAgentHeadline.toLowerCase().contains(query) ||
+              conversation.latestPreview.toLowerCase().contains(query) ||
+              conversation.latestSpeakerLabel.toLowerCase().contains(query) ||
+              conversation.participantsLabel.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
   }
 
   List<ChatMessageModel> get visibleMessages {
+    final conversation = selectedConversationOrNull;
+    if (conversation == null) {
+      return const [];
+    }
+
     final query = threadSearchQuery.trim().toLowerCase();
-    final messages = selectedConversation.messages;
+    final messages = conversation.messages;
     if (!isThreadSearchOpen || query.isEmpty) {
       return messages;
     }
 
-    return messages.where((message) {
-      return message.authorName.toLowerCase().contains(query) ||
-          message.body.toLowerCase().contains(query);
-    }).toList();
+    return messages
+        .where((message) {
+          return message.authorName.toLowerCase().contains(query) ||
+              message.body.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
+  }
+
+  ChatViewModel copyWith({
+    List<ChatConversationModel>? conversations,
+    Object? selectedConversationId = _selectedConversationSentinel,
+    ChatSurfaceState? surfaceState,
+    Object? activeAgentName = _activeAgentNameSentinel,
+    Object? surfaceMessage = _surfaceMessageSentinel,
+    bool? isThreadSearchOpen,
+    String? threadSearchQuery,
+    String? conversationSearchQuery,
+  }) {
+    return ChatViewModel(
+      conversations: conversations ?? this.conversations,
+      selectedConversationId:
+          selectedConversationId == _selectedConversationSentinel
+          ? this.selectedConversationId
+          : selectedConversationId as String?,
+      surfaceState: surfaceState ?? this.surfaceState,
+      activeAgentName: activeAgentName == _activeAgentNameSentinel
+          ? this.activeAgentName
+          : activeAgentName as String?,
+      surfaceMessage: surfaceMessage == _surfaceMessageSentinel
+          ? this.surfaceMessage
+          : surfaceMessage as String?,
+      isThreadSearchOpen: isThreadSearchOpen ?? this.isThreadSearchOpen,
+      threadSearchQuery: threadSearchQuery ?? this.threadSearchQuery,
+      conversationSearchQuery:
+          conversationSearchQuery ?? this.conversationSearchQuery,
+    );
   }
 
   ChatConversationEntryMode entryModeFor(ChatConversationModel conversation) {
@@ -119,8 +198,25 @@ class ChatViewModel {
     );
   }
 
+  ChatViewModel clearSelection({bool preserveConversations = true}) {
+    return copyWith(
+      conversations: preserveConversations ? null : const [],
+      selectedConversationId: null,
+      isThreadSearchOpen: false,
+      threadSearchQuery: '',
+    );
+  }
+
   ChatViewModel openThreadSearch() {
     return copyWith(isThreadSearchOpen: true);
+  }
+
+  ChatViewModel updateConversationSearch(String value) {
+    return copyWith(conversationSearchQuery: value);
+  }
+
+  ChatViewModel clearConversationSearch() {
+    return copyWith(conversationSearchQuery: '');
   }
 
   ChatViewModel closeThreadSearch() {
@@ -132,7 +228,7 @@ class ChatViewModel {
   }
 
   ChatShareDraft shareDraftForSelectedConversation() {
-    final conversation = selectedConversation;
+    final conversation = _requireSelectedConversation();
     return ChatShareDraft(
       remoteAgentName: conversation.remoteAgentName,
       entryPoint: conversation.entryPoint,
@@ -143,23 +239,133 @@ class ChatViewModel {
 
   ChatViewModel queueFollowRequest(String conversationId) {
     return copyWith(
-      conversations: conversations.map((conversation) {
-        if (conversation.id != conversationId) {
-          return conversation;
-        }
+      conversations: conversations
+          .map((conversation) {
+            if (conversation.id != conversationId) {
+              return conversation;
+            }
 
-        return conversation.copyWith(
-          viewerFollowsRemoteAgent: true,
-          requestQueued: true,
-        );
-      }).toList(),
+            return conversation.copyWith(
+              viewerFollowsRemoteAgent: true,
+              requestQueued: true,
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
+  ChatViewModel replaceConversations(
+    List<ChatConversationModel> nextConversations, {
+    required String? activeAgentName,
+  }) {
+    return copyWith(
+      conversations: nextConversations,
+      selectedConversationId: null,
+      surfaceState: ChatSurfaceState.ready,
+      activeAgentName: activeAgentName,
+      surfaceMessage: null,
+      isThreadSearchOpen: false,
+      threadSearchQuery: '',
+    );
+  }
+
+  ChatViewModel replaceConversationMessages(
+    String conversationId,
+    List<ChatMessageModel> messages,
+  ) {
+    return copyWith(
+      conversations: conversations
+          .map((conversation) {
+            if (conversation.id != conversationId) {
+              return conversation;
+            }
+            return conversation.copyWith(messages: messages);
+          })
+          .toList(growable: false),
+    );
+  }
+
+  ChatViewModel markConversationRead(String conversationId) {
+    return copyWith(
+      conversations: conversations
+          .map((conversation) {
+            if (conversation.id != conversationId) {
+              return conversation;
+            }
+            return conversation.copyWith(hasUnread: false, unreadCount: 0);
+          })
+          .toList(growable: false),
+    );
+  }
+
+  factory ChatViewModel.resolvingActiveAgent() {
+    return const ChatViewModel(
+      conversations: [],
+      selectedConversationId: null,
+      surfaceState: ChatSurfaceState.resolvingActiveAgent,
+      activeAgentName: null,
+      surfaceMessage: 'Resolving the current active agent.',
+    );
+  }
+
+  factory ChatViewModel.loadingThreads({required String? activeAgentName}) {
+    return ChatViewModel(
+      conversations: const [],
+      selectedConversationId: null,
+      surfaceState: ChatSurfaceState.loadingThreads,
+      activeAgentName: activeAgentName,
+      surfaceMessage:
+          'Loading direct threads for ${activeAgentName ?? 'your agent'}.',
+    );
+  }
+
+  factory ChatViewModel.blocked({required String message}) {
+    return ChatViewModel(
+      conversations: const [],
+      selectedConversationId: null,
+      surfaceState: ChatSurfaceState.blocked,
+      activeAgentName: null,
+      surfaceMessage: message,
+    );
+  }
+
+  factory ChatViewModel.error({
+    required String message,
+    String? activeAgentName,
+  }) {
+    return ChatViewModel(
+      conversations: const [],
+      selectedConversationId: null,
+      surfaceState: ChatSurfaceState.error,
+      activeAgentName: activeAgentName,
+      surfaceMessage: message,
+    );
+  }
+
+  factory ChatViewModel.ready({
+    required List<ChatConversationModel> conversations,
+    required String? activeAgentName,
+  }) {
+    return ChatViewModel(
+      conversations: conversations,
+      selectedConversationId: null,
+      surfaceState: ChatSurfaceState.ready,
+      activeAgentName: activeAgentName,
+      surfaceMessage: null,
     );
   }
 
   factory ChatViewModel.signedInSample() {
+    return ChatViewModel.previewForActiveAgent('AETHER-7');
+  }
+
+  factory ChatViewModel.previewForActiveAgent(String activeAgentName) {
     return ChatViewModel(
       selectedConversationId: 'agt-xenon-remote',
-      conversations: const [
+      surfaceState: ChatSurfaceState.preview,
+      activeAgentName: activeAgentName,
+      surfaceMessage: null,
+      conversations: [
         ChatConversationModel(
           id: 'agt-xenon-remote',
           remoteAgentName: 'Xenon-01',
@@ -199,7 +405,7 @@ class ChatViewModel {
             ),
             ChatMessageModel(
               id: 'local-agent-1',
-              authorName: 'AETHER-7',
+              authorName: activeAgentName,
               body:
                   'Understood. I am starting a recursive audit on the unstable parameters and will publish only to this thread.',
               timestampLabel: '14:29',
@@ -274,5 +480,13 @@ class ChatViewModel {
         ),
       ],
     );
+  }
+
+  ChatConversationModel _requireSelectedConversation() {
+    final conversation = selectedConversationOrNull;
+    if (conversation == null) {
+      throw StateError('A selected conversation is required.');
+    }
+    return conversation;
   }
 }

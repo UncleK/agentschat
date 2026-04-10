@@ -13,12 +13,11 @@ class AuthRepository {
     required String displayName,
     required String password,
   }) async {
-    final response = await apiClient.post('/auth/register/email', body: {
-      'email': email,
-      'displayName': displayName,
-      'password': password,
-    });
-    return _parseAuthResponse(response);
+    final response = await apiClient.post(
+      '/auth/register/email',
+      body: {'email': email, 'displayName': displayName, 'password': password},
+    );
+    return _parseLoginResponse(response);
   }
 
   /// Log in an existing human account with email/password.
@@ -26,47 +25,74 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    final response = await apiClient.post('/auth/login/email', body: {
-      'email': email,
-      'password': password,
-    });
-    return _parseAuthResponse(response);
+    final response = await apiClient.post(
+      '/auth/login/email',
+      body: {'email': email, 'password': password},
+    );
+    return _parseLoginResponse(response);
   }
 
-  /// Log in or register via Google OAuth.
+  /// Temporarily disabled until backend provider-token verification exists.
   Future<AuthState> loginWithGoogle({
     required String email,
     required String displayName,
     required String providerSubject,
   }) async {
-    final response = await apiClient.post('/auth/login/google', body: {
-      'email': email,
-      'displayName': displayName,
-      'providerSubject': providerSubject,
-    });
-    return _parseAuthResponse(response);
+    throw UnsupportedError(
+      'Google login is temporarily disabled until provider token verification is implemented.',
+    );
   }
 
-  /// Log in or register via GitHub OAuth.
+  /// Temporarily disabled until backend provider-token verification exists.
   Future<AuthState> loginWithGitHub({
     required String email,
     required String displayName,
     required String providerSubject,
   }) async {
-    final response = await apiClient.post('/auth/login/github', body: {
-      'email': email,
-      'displayName': displayName,
-      'providerSubject': providerSubject,
-    });
-    return _parseAuthResponse(response);
+    throw UnsupportedError(
+      'GitHub login is temporarily disabled until provider token verification is implemented.',
+    );
   }
 
-  AuthState _parseAuthResponse(Map<String, dynamic> response) {
+  /// Fetch the canonical authenticated human session state.
+  Future<AuthState> fetchMe({required String token}) async {
+    final response = await apiClient.get('/auth/me');
+    return _parseBootstrapResponse(response, token: token);
+  }
+
+  AuthState _parseLoginResponse(Map<String, dynamic> response) {
+    final user = response['user'] as Map<String, dynamic>? ?? const {};
     return AuthState(
-      token: response['token'] as String? ?? '',
-      userId: response['userId'] as String? ?? '',
-      email: response['email'] as String? ?? '',
-      displayName: response['displayName'] as String? ?? '',
+      token: response['accessToken'] as String? ?? '',
+      user: AuthUser(
+        id: user['id'] as String? ?? '',
+        email: user['email'] as String? ?? '',
+        displayName: user['displayName'] as String? ?? '',
+        avatarUrl: user['avatarUrl'] as String?,
+        authProvider: user['authProvider'] as String?,
+      ),
+      recommendedActiveAgentId: null,
+      isSessionAuthenticated: true,
+    );
+  }
+
+  AuthState _parseBootstrapResponse(
+    Map<String, dynamic> response, {
+    required String token,
+  }) {
+    final user = response['user'] as Map<String, dynamic>? ?? const {};
+    final session = response['session'] as Map<String, dynamic>? ?? const {};
+    return AuthState(
+      token: token,
+      user: AuthUser(
+        id: user['id'] as String? ?? '',
+        email: user['email'] as String? ?? '',
+        displayName: user['displayName'] as String? ?? '',
+        avatarUrl: user['avatarUrl'] as String?,
+        authProvider: user['authProvider'] as String?,
+      ),
+      recommendedActiveAgentId: response['recommendedActiveAgentId'] as String?,
+      isSessionAuthenticated: session['authenticated'] as bool? ?? false,
     );
   }
 }

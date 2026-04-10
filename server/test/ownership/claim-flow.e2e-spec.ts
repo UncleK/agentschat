@@ -1,81 +1,462 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { Repository } from 'typeorm';
+import { AgentStatus } from '../../src/database/domain.enums';
+import { AgentEntity } from '../../src/database/entities/agent.entity';
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
+
+interface HumanAuthResponse {
+  accessToken: string;
+  user: {
+    id: string;
+  };
+}
+
+interface AgentSummaryResponse {
+  id: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: null;
+  bio: string | null;
+  ownerType: string;
+  ownerUserId: string | null;
+  status: string;
+}
+
+interface ClaimRequestResponse {
+  claimRequest: {
+    id: string;
+    status: string;
+  };
+  challengeToken: string;
+}
+
+interface AgentsMineResponse {
+  agents: AgentSummaryResponse[];
+  claimableAgents: AgentSummaryResponse[];
+  pendingClaims: Array<{
+    claimRequestId: string;
+    agentId: string;
+    handle: string;
+    displayName: string;
+    status: string;
+    requestedAt: string;
+    expiresAt: string;
+  }>;
+}
+
+interface ClaimConfirmationResponse {
+  claimRequest: {
+    status: string;
+  };
+  agent: {
+    ownerType: string;
+    ownerUserId: string | null;
+  };
+}
 
 describe('Agent claim flow (e2e)', () => {
   let app: INestApplication;
   let context: TestApplicationContext;
+  let agentRepository: Repository<AgentEntity>;
 
   beforeAll(async () => {
     context = await createTestApplication();
     app = context.app;
+    agentRepository = context.dataSource.getRepository(AgentEntity);
   });
 
   afterAll(async () => {
     await context?.close();
   });
 
-  it('moves a self-owned agent to human-owned after deterministic challenge confirmation', async () => {
-    const registerResponse = await request(app.getHttpServer())
+  it('returns distinct owned, claimable, and pending partitions for the current human', async () => {
+    const registerResponse = await registerEmailHuman(
+      'agents-mine-owner@example.com',
+      'Agents Mine Owner',
+    );
+
+    const otherHuman = await registerEmailHuman(
+      'agents-mine-other@example.com',
+      'Other Claimer',
+    );
+
+    const humanToken = registerResponse.accessToken;
+    const otherHumanToken = otherHuman.accessToken;
+
+    const ownedOlder = await importHumanOwnedAgent(humanToken, {
+      handle: 'owned-older-agent',
+      displayName: 'Owned Older Agent',
+      bio: 'Owned older bio',
+    });
+
+    const ownedNewer = await importHumanOwnedAgent(humanToken, {
+      handle: 'owned-newer-agent',
+      displayName: 'Owned Newer Agent',
+    });
+
+    const suspendedOwned = await importHumanOwnedAgent(humanToken, {
+      handle: 'owned-suspended-agent',
+      displayName: 'Owned Suspended Agent',
+    });
+
+    await agentRepository.update(
+      { id: suspendedOwned.id },
+      { status: AgentStatus.Suspended },
+    );
+
+    const claimableOlder = await importSelfOwnedAgent({
+      handle: 'claimable-older-agent',
+      displayName: 'Claimable Older Agent',
+      bio: 'Claimable older bio',
+    });
+
+    const claimableNewer = await importSelfOwnedAgent({
+      handle: 'claimable-newer-agent',
+      displayName: 'Claimable Newer Agent',
+    });
+
+    const pendingOlder = await importSelfOwnedAgent({
+      handle: 'pending-older-agent',
+      displayName: 'Pending Older Agent',
+    });
+
+    const pendingNewer = await importSelfOwnedAgent({
+      handle: 'pending-newer-agent',
+      displayName: 'Pending Newer Agent',
+    });
+
+    const blockedByOtherPending = await importSelfOwnedAgent({
+      handle: 'blocked-by-other-pending',
+      displayName: 'Blocked By Other Pending',
+    });
+
+    const pendingOlderClaim = await createClaimRequest(
+      humanToken,
+      pendingOlder.id,
+    );
+
+    const pendingNewerClaim = await createClaimRequest(
+      humanToken,
+      pendingNewer.id,
+    );
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/agents/${blockedByOtherPending.id}/claim-requests`)
+      .set('Authorization', `Bearer ${otherHumanToken}`)
+      .expect(201);
+
+    const agentsMineResponse = await readAgentsMine(humanToken);
+
+    expect(agentsMineResponse.agents.map(({ id }) => id)).toEqual([
+      ownedNewer.id,
+      ownedOlder.id,
+    ]);
+    expect(agentsMineResponse.claimableAgents.map(({ id }) => id)).toEqual([
+      claimableNewer.id,
+      claimableOlder.id,
+    ]);
+    expect(
+      agentsMineResponse.pendingClaims.map(
+        ({ claimRequestId }) => claimRequestId,
+      ),
+    ).toEqual([
+      pendingNewerClaim.claimRequest.id,
+      pendingOlderClaim.claimRequest.id,
+    ]);
+
+    expect(agentsMineResponse.agents).toEqual([
+      {
+        id: ownedNewer.id,
+        handle: 'owned-newer-agent',
+        displayName: 'Owned Newer Agent',
+        avatarUrl: null,
+        bio: null,
+        ownerType: 'human',
+        status: 'offline',
+      },
+      {
+        id: ownedOlder.id,
+        handle: 'owned-older-agent',
+        displayName: 'Owned Older Agent',
+        avatarUrl: null,
+        bio: 'Owned older bio',
+        ownerType: 'human',
+        status: 'offline',
+      },
+    ]);
+    expect(agentsMineResponse.claimableAgents).toEqual([
+      {
+        id: claimableNewer.id,
+        handle: 'claimable-newer-agent',
+        displayName: 'Claimable Newer Agent',
+        avatarUrl: null,
+        bio: null,
+        ownerType: 'self',
+        status: 'offline',
+      },
+      {
+        id: claimableOlder.id,
+        handle: 'claimable-older-agent',
+        displayName: 'Claimable Older Agent',
+        avatarUrl: null,
+        bio: 'Claimable older bio',
+        ownerType: 'self',
+        status: 'offline',
+      },
+    ]);
+    expect(agentsMineResponse.pendingClaims).toEqual(
+      typedValue<Array<Record<string, unknown>>>([
+        {
+          claimRequestId: pendingNewerClaim.claimRequest.id,
+          agentId: pendingNewer.id,
+          handle: 'pending-newer-agent',
+          displayName: 'Pending Newer Agent',
+          status: 'pending',
+          requestedAt: typedValue<unknown>(expect.any(String)),
+          expiresAt: typedValue<unknown>(expect.any(String)),
+        },
+        {
+          claimRequestId: pendingOlderClaim.claimRequest.id,
+          agentId: pendingOlder.id,
+          handle: 'pending-older-agent',
+          displayName: 'Pending Older Agent',
+          status: 'pending',
+          requestedAt: typedValue<unknown>(expect.any(String)),
+          expiresAt: typedValue<unknown>(expect.any(String)),
+        },
+      ]),
+    );
+
+    expect(agentsMineResponse.agents).not.toContainEqual(
+      expect.objectContaining({ id: suspendedOwned.id }),
+    );
+    expect(agentsMineResponse.claimableAgents).not.toContainEqual(
+      expect.objectContaining({ id: blockedByOtherPending.id }),
+    );
+    expect(agentsMineResponse.pendingClaims).not.toContainEqual(
+      expect.objectContaining({ agentId: blockedByOtherPending.id }),
+    );
+
+    expect(Object.keys(agentsMineResponse.agents[0] ?? {}).sort()).toEqual([
+      'avatarUrl',
+      'bio',
+      'displayName',
+      'handle',
+      'id',
+      'ownerType',
+      'status',
+    ]);
+    expect(
+      Object.keys(agentsMineResponse.pendingClaims[0] ?? {}).sort(),
+    ).toEqual([
+      'agentId',
+      'claimRequestId',
+      'displayName',
+      'expiresAt',
+      'handle',
+      'requestedAt',
+      'status',
+    ]);
+  });
+
+  it('moves a self-owned agent through claimable, pending, and owned partitions', async () => {
+    const registerResponse = await registerEmailHuman(
+      'claim-owner@example.com',
+      'Claim Owner',
+    );
+
+    const humanToken = registerResponse.accessToken;
+
+    const selfOwnedAgent = await importSelfOwnedAgent({
+      handle: 'self-owned-agent',
+      displayName: 'Self Owned Agent',
+    });
+
+    expect(selfOwnedAgent.ownerType).toBe('self');
+    expect(selfOwnedAgent.ownerUserId).toBeNull();
+
+    const claimableResponse = await readAgentsMine(humanToken);
+
+    expect(claimableResponse.agents).toEqual([]);
+    expect(claimableResponse.claimableAgents).toContainEqual({
+      id: selfOwnedAgent.id,
+      handle: 'self-owned-agent',
+      displayName: 'Self Owned Agent',
+      avatarUrl: null,
+      bio: null,
+      ownerType: 'self',
+      status: 'offline',
+    });
+    expect(claimableResponse.pendingClaims).toEqual([]);
+
+    const firstClaimRequest = await createClaimRequest(
+      humanToken,
+      selfOwnedAgent.id,
+    );
+
+    const secondClaimRequest = await createClaimRequest(
+      humanToken,
+      selfOwnedAgent.id,
+    );
+
+    expect(firstClaimRequest.claimRequest.status).toBe('pending');
+    expect(secondClaimRequest.claimRequest.id).toBe(
+      firstClaimRequest.claimRequest.id,
+    );
+    expect(secondClaimRequest.challengeToken).toBe(
+      firstClaimRequest.challengeToken,
+    );
+    expect(firstClaimRequest.challengeToken).toBe(
+      `claim:${selfOwnedAgent.id}:${registerResponse.user.id}`,
+    );
+
+    const pendingResponse = await readAgentsMine(humanToken);
+
+    expect(pendingResponse.agents).toEqual([]);
+    expect(pendingResponse.claimableAgents).not.toContainEqual(
+      expect.objectContaining({ id: selfOwnedAgent.id }),
+    );
+    expect(pendingResponse.pendingClaims).toContainEqual(
+      typedValue<Record<string, unknown>>({
+        claimRequestId: firstClaimRequest.claimRequest.id,
+        agentId: selfOwnedAgent.id,
+        handle: 'self-owned-agent',
+        displayName: 'Self Owned Agent',
+        status: 'pending',
+        requestedAt: typedValue<unknown>(expect.any(String)),
+        expiresAt: typedValue<unknown>(expect.any(String)),
+      }),
+    );
+
+    const confirmationResponse = await confirmClaimRequest(
+      humanToken,
+      selfOwnedAgent.id,
+      firstClaimRequest.claimRequest.id,
+      firstClaimRequest.challengeToken,
+    );
+
+    expect(confirmationResponse.claimRequest.status).toBe('confirmed');
+    expect(confirmationResponse.agent.ownerType).toBe('human');
+    expect(confirmationResponse.agent.ownerUserId).toBe(
+      registerResponse.user.id,
+    );
+
+    const ownedResponse = await readAgentsMine(humanToken);
+
+    expect(ownedResponse.agents).toContainEqual({
+      id: selfOwnedAgent.id,
+      handle: 'self-owned-agent',
+      displayName: 'Self Owned Agent',
+      avatarUrl: null,
+      bio: null,
+      ownerType: 'human',
+      status: 'offline',
+    });
+    expect(ownedResponse.claimableAgents).not.toContainEqual(
+      expect.objectContaining({ id: selfOwnedAgent.id }),
+    );
+    expect(ownedResponse.pendingClaims).not.toContainEqual(
+      expect.objectContaining({ agentId: selfOwnedAgent.id }),
+    );
+  });
+
+  it('rejects /agents/mine without valid human auth', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/agents/mine')
+      .set('Authorization', 'Bearer invalid-token')
+      .expect(401);
+  });
+
+  async function registerEmailHuman(
+    email: string,
+    displayName: string,
+  ): Promise<HumanAuthResponse> {
+    const response = await request(app.getHttpServer())
       .post('/api/v1/auth/register/email')
       .send({
-        email: 'claim-owner@example.com',
-        displayName: 'Claim Owner',
+        email,
+        displayName,
         password: 'password123',
       })
       .expect(201);
 
-    const humanToken = registerResponse.body.accessToken as string;
+    return typedValue<HumanAuthResponse>(response.body);
+  }
 
-    const selfOwnedAgent = await request(app.getHttpServer())
+  async function importHumanOwnedAgent(
+    accessToken: string,
+    body: {
+      handle: string;
+      displayName: string;
+      bio?: string;
+    },
+  ): Promise<AgentSummaryResponse> {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/agents/import/human')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(body)
+      .expect(201);
+
+    return typedValue<AgentSummaryResponse>(response.body);
+  }
+
+  async function importSelfOwnedAgent(body: {
+    handle: string;
+    displayName: string;
+    bio?: string;
+  }): Promise<AgentSummaryResponse> {
+    const response = await request(app.getHttpServer())
       .post('/api/v1/agents/import/self')
-      .send({
-        handle: 'self-owned-agent',
-        displayName: 'Self Owned Agent',
-      })
+      .send(body)
       .expect(201);
 
-    expect(selfOwnedAgent.body.ownerType).toBe('self');
-    expect(selfOwnedAgent.body.ownerUserId).toBeNull();
+    return typedValue<AgentSummaryResponse>(response.body);
+  }
 
-    const firstClaimRequest = await request(app.getHttpServer())
-      .post(`/api/v1/agents/${selfOwnedAgent.body.id}/claim-requests`)
-      .set('Authorization', `Bearer ${humanToken}`)
+  async function createClaimRequest(
+    accessToken: string,
+    agentId: string,
+  ): Promise<ClaimRequestResponse> {
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/agents/${agentId}/claim-requests`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(201);
 
-    const secondClaimRequest = await request(app.getHttpServer())
-      .post(`/api/v1/agents/${selfOwnedAgent.body.id}/claim-requests`)
-      .set('Authorization', `Bearer ${humanToken}`)
-      .expect(201);
+    return typedValue<ClaimRequestResponse>(response.body);
+  }
 
-    expect(firstClaimRequest.body.claimRequest.status).toBe('pending');
-    expect(secondClaimRequest.body.claimRequest.id).toBe(
-      firstClaimRequest.body.claimRequest.id,
-    );
-    expect(secondClaimRequest.body.challengeToken).toBe(
-      firstClaimRequest.body.challengeToken,
-    );
-    expect(firstClaimRequest.body.challengeToken).toBe(
-      `claim:${selfOwnedAgent.body.id}:${registerResponse.body.user.id}`,
-    );
+  async function readAgentsMine(
+    accessToken: string,
+  ): Promise<AgentsMineResponse> {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/agents/mine')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
 
-    const confirmationResponse = await request(app.getHttpServer())
+    return typedValue<AgentsMineResponse>(response.body);
+  }
+
+  async function confirmClaimRequest(
+    accessToken: string,
+    agentId: string,
+    claimRequestId: string,
+    challengeToken: string,
+  ): Promise<ClaimConfirmationResponse> {
+    const response = await request(app.getHttpServer())
       .post(
-        `/api/v1/agents/${selfOwnedAgent.body.id}/claim-requests/${firstClaimRequest.body.claimRequest.id}/confirm`,
+        `/api/v1/agents/${agentId}/claim-requests/${claimRequestId}/confirm`,
       )
-      .set('Authorization', `Bearer ${humanToken}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({
-        challengeToken: firstClaimRequest.body.challengeToken,
+        challengeToken,
       })
       .expect(200);
 
-    expect(confirmationResponse.body.claimRequest.status).toBe('confirmed');
-    expect(confirmationResponse.body.agent.ownerType).toBe('human');
-    expect(confirmationResponse.body.agent.ownerUserId).toBe(
-      registerResponse.body.user.id,
-    );
-  });
+    return typedValue<ClaimConfirmationResponse>(response.body);
+  }
 });

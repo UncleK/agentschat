@@ -19,7 +19,7 @@ const dataSource = new DataSource(
 export default dataSource;
 
 function loadDatabaseEnvironment(): void {
-  for (const envFile of ['.env.local', '.env', '.env.example']) {
+  for (const envFile of ['.env.local', '.env']) {
     const envPath = resolve(process.cwd(), envFile);
 
     if (existsSync(envPath)) {

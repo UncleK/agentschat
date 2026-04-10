@@ -7,10 +7,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { Repository } from 'typeorm';
-import {
-  APP_ENVIRONMENT,
-  type AppEnvironment,
-} from '../../config/environment';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { AgentEntity } from '../../database/entities/agent.entity';
 import { FederationHttpException } from './federation.errors';
@@ -40,16 +37,25 @@ export class FederationCredentialsService {
       exp: Date.now() + ttlMs,
     };
 
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString(
+      'base64url',
+    );
     const signature = this.signValue(encodedPayload, 'claim');
 
     return `claim.v1.${encodedPayload}.${signature}`;
   }
 
   verifyAgentClaimToken(token: string): ClaimTokenPayload {
-    const [kind, version, encodedPayload, signature] = token.split('.');
+    const parts = token.split('.');
+    const [kind, version, encodedPayload, signature] = parts;
 
-    if (kind !== 'claim' || version !== 'v1' || !encodedPayload || !signature) {
+    if (
+      parts.length !== 4 ||
+      kind !== 'claim' ||
+      version !== 'v1' ||
+      !encodedPayload ||
+      !signature
+    ) {
       throw new FederationHttpException(
         401,
         'invalid_claim_token',
@@ -73,11 +79,25 @@ export class FederationCredentialsService {
       );
     }
 
-    const payload = JSON.parse(
-      Buffer.from(encodedPayload, 'base64url').toString('utf8'),
-    ) as ClaimTokenPayload;
+    let payload: ClaimTokenPayload;
 
-    if (payload.kind !== 'agent_claim' || !payload.agentId || payload.exp <= Date.now()) {
+    try {
+      payload = JSON.parse(
+        Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+      ) as ClaimTokenPayload;
+    } catch {
+      throw new FederationHttpException(
+        401,
+        'invalid_claim_token',
+        'The claim token is malformed.',
+      );
+    }
+
+    if (
+      payload.kind !== 'agent_claim' ||
+      !payload.agentId ||
+      payload.exp <= Date.now()
+    ) {
       throw new FederationHttpException(
         401,
         'expired_claim_token',
@@ -100,7 +120,9 @@ export class FederationCredentialsService {
     return createHash('sha256').update(value).digest('hex');
   }
 
-  async authenticateAgentToken(token: string): Promise<AuthenticatedFederatedAgent> {
+  async authenticateAgentToken(
+    token: string,
+  ): Promise<AuthenticatedFederatedAgent> {
     const [version, connectionId] = token.split('.');
 
     if (version !== 'fed_v1' || !connectionId) {
@@ -159,7 +181,11 @@ export class FederationCredentialsService {
     const agent = await this.agentRepository.findOneBy({ id: agentId });
 
     if (!agent) {
-      throw new FederationHttpException(404, 'agent_not_found', `Agent ${agentId} was not found.`);
+      throw new FederationHttpException(
+        404,
+        'agent_not_found',
+        `Agent ${agentId} was not found.`,
+      );
     }
 
     return agent;

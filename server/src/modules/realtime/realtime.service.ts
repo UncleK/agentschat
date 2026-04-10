@@ -16,15 +16,30 @@ interface HumanSocketSession {
   userId: string;
 }
 
+interface UpgradeRequest {
+  headers: Record<string, string | string[] | undefined>;
+  url?: string;
+}
+
+type UpgradeListener = (
+  request: UpgradeRequest,
+  socket: Socket,
+  head: Buffer,
+) => void;
+
+interface UpgradeCapableServer {
+  on: (event: 'upgrade', listener: UpgradeListener) => void;
+  off?: (event: 'upgrade', listener: UpgradeListener) => void;
+}
+
 @Injectable()
-export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy {
+export class RealtimeService
+  implements OnApplicationBootstrap, OnModuleDestroy
+{
   private readonly logger = new Logger(RealtimeService.name);
   private readonly sessionsByUserId = new Map<string, Set<Socket>>();
   private readonly sessionBySocket = new Map<Socket, HumanSocketSession>();
-  private httpServer?: {
-    on: (event: string, listener: (...args: unknown[]) => void) => void;
-    off?: (event: string, listener: (...args: unknown[]) => void) => void;
-  };
+  private httpServer?: UpgradeCapableServer;
 
   constructor(
     private readonly httpAdapterHost: HttpAdapterHost,
@@ -34,18 +49,19 @@ export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy 
   ) {}
 
   onApplicationBootstrap(): void {
-    const httpServer = this.httpAdapterHost.httpAdapter?.getHttpServer();
+    const httpServer =
+      this.httpAdapterHost.httpAdapter?.getHttpServer() as unknown;
 
-    if (!httpServer?.on) {
+    if (!this.isUpgradeCapableServer(httpServer)) {
       return;
     }
 
     this.httpServer = httpServer;
-    httpServer.on('upgrade', this.handleUpgrade);
+    httpServer.on('upgrade', this.handleUpgradeListener);
   }
 
   onModuleDestroy(): void {
-    this.httpServer?.off?.('upgrade', this.handleUpgrade);
+    this.httpServer?.off?.('upgrade', this.handleUpgradeListener);
 
     for (const session of this.sessionBySocket.values()) {
       session.socket.destroy();
@@ -74,14 +90,19 @@ export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy 
     }
   }
 
-  private readonly handleUpgrade = async (
-    request: {
-      headers: Record<string, string | string[] | undefined>;
-      url?: string;
-    },
+  private readonly handleUpgradeListener: UpgradeListener = (
+    request,
+    socket,
+    head,
+  ) => {
+    void this.handleUpgrade(request, socket, head);
+  };
+
+  private async handleUpgrade(
+    request: UpgradeRequest,
     socket: Socket,
     head: Buffer,
-  ) => {
+  ): Promise<void> {
     try {
       const requestUrl = new URL(
         request.url ?? '/',
@@ -93,8 +114,12 @@ export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy 
       }
 
       const token = this.extractBearerToken(request.headers, requestUrl);
-      const authenticatedHuman = await this.authService.authenticateHumanToken(token);
-      const websocketKey = this.readHeader(request.headers, 'sec-websocket-key');
+      const authenticatedHuman =
+        await this.authService.authenticateHumanToken(token);
+      const websocketKey = this.readHeader(
+        request.headers,
+        'sec-websocket-key',
+      );
 
       if (!websocketKey) {
         throw new Error('Missing Sec-WebSocket-Key header.');
@@ -136,7 +161,25 @@ export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy 
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
       socket.destroy();
     }
-  };
+  }
+
+  private isUpgradeCapableServer(
+    value: unknown,
+  ): value is UpgradeCapableServer {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    const candidate = value as {
+      on?: unknown;
+      off?: unknown;
+    };
+
+    return (
+      typeof candidate.on === 'function' &&
+      (candidate.off === undefined || typeof candidate.off === 'function')
+    );
+  }
 
   private handleSocketData(socket: Socket, chunk: Buffer): void {
     const frame = this.decodeFrame(chunk);
@@ -153,7 +196,7 @@ export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy 
     }
 
     if (frame.opcode === 0x9) {
-      socket.write(this.encodeFrame(frame.payload, 0xA));
+      socket.write(this.encodeFrame(frame.payload, 0xa));
     }
   }
 
@@ -221,7 +264,9 @@ export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private encodeFrame(payload: string | Buffer, opcode: number): Buffer {
-    const payloadBuffer = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8');
+    const payloadBuffer = Buffer.isBuffer(payload)
+      ? payload
+      : Buffer.from(payload, 'utf8');
     let header: Buffer;
 
     if (payloadBuffer.length < 126) {
@@ -236,9 +281,7 @@ export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy 
     return Buffer.concat([header, payloadBuffer]);
   }
 
-  private decodeFrame(
-    chunk: Buffer,
-  ): {
+  private decodeFrame(chunk: Buffer): {
     opcode: number;
     payload: Buffer;
   } | null {
@@ -260,7 +303,10 @@ export class RealtimeService implements OnApplicationBootstrap, OnModuleDestroy 
       offset = 4;
     }
 
-    let payload = chunk.subarray(offset + (masked ? 4 : 0), offset + (masked ? 4 : 0) + payloadLength);
+    let payload = chunk.subarray(
+      offset + (masked ? 4 : 0),
+      offset + (masked ? 4 : 0) + payloadLength,
+    );
 
     if (masked) {
       const mask = chunk.subarray(offset, offset + 4);

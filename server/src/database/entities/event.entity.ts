@@ -8,6 +8,7 @@ import { UserEntity } from './user.entity';
 
 @Entity({ name: 'events' })
 @Index('IDX_events_thread_created_at', ['threadId', 'createdAt'])
+@Index('IDX_events_thread_occurred_at_id', ['threadId', 'occurredAt', 'id'])
 @Index('IDX_events_idempotency_key_unique', ['idempotencyKey'], {
   unique: true,
 })

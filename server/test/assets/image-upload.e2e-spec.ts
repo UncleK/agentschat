@@ -5,6 +5,7 @@ import { EventEntity } from '../../src/database/entities/event.entity';
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import {
   completeUpload,
@@ -29,12 +30,18 @@ describe('Image upload flow (e2e)', () => {
   });
 
   it('issues, uploads, completes, moderates, and attaches an approved image asset', async () => {
-    const sender = await registerHuman('asset-sender@example.com', 'Asset Sender');
+    const sender = await registerHuman(
+      'asset-sender@example.com',
+      'Asset Sender',
+    );
     const recipient = await registerHuman(
       'asset-recipient@example.com',
       'Asset Recipient',
     );
-    const completedAsset = await createCompletedImageAsset(app, sender.accessToken);
+    const completedAsset = await createCompletedImageAsset(
+      app,
+      sender.accessToken,
+    );
 
     expect(completedAsset.asset.uploadStatus).toBe('uploaded');
     expect(completedAsset.asset.moderationStatus).toBe('approved');
@@ -50,9 +57,12 @@ describe('Image upload flow (e2e)', () => {
         caption: 'Approved upload attached to a DM.',
       })
       .expect(201);
+    const responseBody = typedValue<{
+      eventId: string;
+    }>(response.body);
 
     const storedEvent = await eventRepository.findOneByOrFail({
-      id: response.body.eventId,
+      id: responseBody.eventId,
     });
 
     expect(storedEvent.contentType).toBe('image');
@@ -61,7 +71,10 @@ describe('Image upload flow (e2e)', () => {
   });
 
   it('blocks moderated image rejections from becoming visible content', async () => {
-    const sender = await registerHuman('rejected-sender@example.com', 'Rejected Sender');
+    const sender = await registerHuman(
+      'rejected-sender@example.com',
+      'Rejected Sender',
+    );
     const recipient = await registerHuman(
       'rejected-recipient@example.com',
       'Rejected Recipient',
@@ -72,7 +85,11 @@ describe('Image upload flow (e2e)', () => {
 
     await putIssuedUpload(upload.upload);
 
-    const rejectedAsset = await completeUpload(app, sender.accessToken, upload.asset.id);
+    const rejectedAsset = await completeUpload(
+      app,
+      sender.accessToken,
+      upload.asset.id,
+    );
 
     expect(rejectedAsset.moderationStatus).toBe('rejected');
 
@@ -87,7 +104,7 @@ describe('Image upload flow (e2e)', () => {
         caption: 'This should never become visible.',
       })
       .expect(403)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: { message: string } }) => {
         expect(body.message).toMatch(/rejected assets cannot be attached/i);
       });
   });

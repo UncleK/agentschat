@@ -1,7 +1,12 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
-import { AgentOwnerType, ClaimRequestStatus, FollowTargetType, SubjectType } from '../../src/database/domain.enums';
+import {
+  AgentOwnerType,
+  ClaimRequestStatus,
+  FollowTargetType,
+  SubjectType,
+} from '../../src/database/domain.enums';
 import { AgentEntity } from '../../src/database/entities/agent.entity';
 import { ClaimRequestEntity } from '../../src/database/entities/claim-request.entity';
 import { FollowEntity } from '../../src/database/entities/follow.entity';
@@ -9,6 +14,7 @@ import { FederationCredentialsService } from '../../src/modules/federation/feder
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import {
   claimFederatedAgent,
@@ -31,7 +37,8 @@ describe('Federation conformance (e2e)', () => {
     federationCredentialsService = app.get(FederationCredentialsService);
     agentRepository = context.dataSource.getRepository(AgentEntity);
     followRepository = context.dataSource.getRepository(FollowEntity);
-    claimRequestRepository = context.dataSource.getRepository(ClaimRequestEntity);
+    claimRequestRepository =
+      context.dataSource.getRepository(ClaimRequestEntity);
   });
 
   afterAll(async () => {
@@ -39,12 +46,29 @@ describe('Federation conformance (e2e)', () => {
   });
 
   it('covers profile update, follow/unfollow, and claim.confirm against canonical models', async () => {
-    const profileAgent = await importSelfAgent(app, 'conformance-profile', 'Conformance Profile');
-    const followTarget = await importSelfAgent(app, 'conformance-target', 'Conformance Target');
-    const claimAgent = await importSelfAgent(app, 'conformance-claim', 'Conformance Claim');
-    const profileClaim = await claimFederatedAgent(app, federationCredentialsService, profileAgent.id, {
-      pollingEnabled: true,
-    });
+    const profileAgent = await importSelfAgent(
+      app,
+      'conformance-profile',
+      'Conformance Profile',
+    );
+    const followTarget = await importSelfAgent(
+      app,
+      'conformance-target',
+      'Conformance Target',
+    );
+    const claimAgent = await importSelfAgent(
+      app,
+      'conformance-claim',
+      'Conformance Claim',
+    );
+    const profileClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      profileAgent.id,
+      {
+        pollingEnabled: true,
+      },
+    );
     const claimConnection = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -53,7 +77,11 @@ describe('Federation conformance (e2e)', () => {
         pollingEnabled: true,
       },
     );
-    const human = await registerHuman(app, 'conformance-owner@example.com', 'Conformance Owner');
+    const human = await registerHuman(
+      app,
+      'conformance-owner@example.com',
+      'Conformance Owner',
+    );
 
     const profileUpdate = await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -68,9 +96,16 @@ describe('Federation conformance (e2e)', () => {
         },
       })
       .expect(202);
-    await waitForActionStatus(app, profileClaim.accessToken, profileUpdate.body.id);
+    const profileUpdateBody = typedValue<{ id: string }>(profileUpdate.body);
+    await waitForActionStatus(
+      app,
+      profileClaim.accessToken,
+      profileUpdateBody.id,
+    );
 
-    const updatedProfileAgent = await agentRepository.findOneByOrFail({ id: profileAgent.id });
+    const updatedProfileAgent = await agentRepository.findOneByOrFail({
+      id: profileAgent.id,
+    });
     expect(updatedProfileAgent.displayName).toBe('Conformance Profile Updated');
     expect(updatedProfileAgent.bio).toBe('Updated through federation.');
     expect(updatedProfileAgent.profileTags).toEqual(['federation', 'task-5']);
@@ -87,7 +122,12 @@ describe('Federation conformance (e2e)', () => {
         },
       })
       .expect(202);
-    await waitForActionStatus(app, profileClaim.accessToken, followAction.body.id);
+    const followActionBody = typedValue<{ id: string }>(followAction.body);
+    await waitForActionStatus(
+      app,
+      profileClaim.accessToken,
+      followActionBody.id,
+    );
 
     const followEdge = await followRepository.findOneByOrFail({
       followerType: SubjectType.Agent,
@@ -109,7 +149,12 @@ describe('Federation conformance (e2e)', () => {
         },
       })
       .expect(202);
-    await waitForActionStatus(app, profileClaim.accessToken, unfollowAction.body.id);
+    const unfollowActionBody = typedValue<{ id: string }>(unfollowAction.body);
+    await waitForActionStatus(
+      app,
+      profileClaim.accessToken,
+      unfollowActionBody.id,
+    );
 
     const removedFollow = await followRepository.findOneBy({
       followerType: SubjectType.Agent,
@@ -123,6 +168,10 @@ describe('Federation conformance (e2e)', () => {
       .post(`/api/v1/agents/${claimAgent.id}/claim-requests`)
       .set('Authorization', `Bearer ${human.accessToken}`)
       .expect(201);
+    const claimRequestBody = typedValue<{
+      claimRequest: { id: string };
+      challengeToken: string;
+    }>(claimRequestResponse.body);
 
     const claimConfirmAction = await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -131,22 +180,27 @@ describe('Federation conformance (e2e)', () => {
       .send({
         type: 'claim.confirm',
         payload: {
-          claimRequestId: claimRequestResponse.body.claimRequest.id,
-          challengeToken: claimRequestResponse.body.challengeToken,
+          claimRequestId: claimRequestBody.claimRequest.id,
+          challengeToken: claimRequestBody.challengeToken,
         },
       })
       .expect(202);
+    const claimConfirmActionBody = typedValue<{ id: string }>(
+      claimConfirmAction.body,
+    );
 
     const finalClaimAction = await waitForActionStatus(
       app,
       claimConnection.accessToken,
-      claimConfirmAction.body.id,
+      claimConfirmActionBody.id,
     );
     expect(finalClaimAction.status).toBe('succeeded');
 
-    const claimedAgent = await agentRepository.findOneByOrFail({ id: claimAgent.id });
+    const claimedAgent = await agentRepository.findOneByOrFail({
+      id: claimAgent.id,
+    });
     const claimRequest = await claimRequestRepository.findOneByOrFail({
-      id: claimRequestResponse.body.claimRequest.id,
+      id: claimRequestBody.claimRequest.id,
     });
 
     expect(claimedAgent.ownerType).toBe(AgentOwnerType.Human);

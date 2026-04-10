@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   Param,
   Post,
@@ -10,6 +11,7 @@ import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
 import type { AuthenticatedHuman } from '../auth/auth.types';
 import { AgentsService } from './agents.service';
+import type { AgentsMineResponse } from './agents.service';
 
 interface ImportAgentBody {
   handle: string;
@@ -25,6 +27,14 @@ interface ConfirmClaimBody {
 @Controller('agents')
 export class AgentsController {
   constructor(private readonly agentsService: AgentsService) {}
+
+  @Get('mine')
+  @UseGuards(HumanAuthGuard)
+  readMine(
+    @CurrentHuman() human: AuthenticatedHuman,
+  ): Promise<AgentsMineResponse> {
+    return this.agentsService.readMine(human);
+  }
 
   @Post('import/self')
   importSelfOwnedAgent(@Body() body: ImportAgentBody) {

@@ -31,7 +31,10 @@ describe('Safety policies', () => {
   });
 
   it('enforces the human safety policy for stranger human direct messages', async () => {
-    const recipient = await registerHuman('recipient@example.com', 'Recipient Human');
+    const recipient = await registerHuman(
+      'recipient@example.com',
+      'Recipient Human',
+    );
     const sender = await registerHuman('sender@example.com', 'Sender Human');
 
     await policyService.updateHumanSafetyPolicy(recipient.user.id, {
@@ -47,14 +50,22 @@ describe('Safety policies', () => {
         content: 'Hello from a stranger human.',
       })
       .expect(403)
-      .expect(({ body }) => {
-        expect(body.message).toMatch(/human safety policy blocks stranger human/i);
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toMatch(
+          /human safety policy blocks stranger human/i,
+        );
       });
   });
 
   it('enforces the agent safety policy separately from the human safety policy', async () => {
-    const sender = await registerHuman('agent-sender@example.com', 'Agent Sender');
-    const followedAgent = await importSelfAgent('followed-agent', 'Followed Agent');
+    const sender = await registerHuman(
+      'agent-sender@example.com',
+      'Agent Sender',
+    );
+    const followedAgent = await importSelfAgent(
+      'followed-agent',
+      'Followed Agent',
+    );
 
     await policyService.upsertAgentSafetyPolicy(followedAgent.id, {
       dmAcceptanceMode: AgentDmAcceptanceMode.FollowedOnly,
@@ -69,8 +80,10 @@ describe('Safety policies', () => {
         content: 'I should be blocked before following.',
       })
       .expect(403)
-      .expect(({ body }) => {
-        expect(body.message).toMatch(/only allows direct messages from followers/i);
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toMatch(
+          /only allows direct messages from followers/i,
+        );
       });
 
     await followRepository.save(
@@ -96,8 +109,14 @@ describe('Safety policies', () => {
   });
 
   it('applies explicit block rules even when agent DMs are otherwise open', async () => {
-    const sender = await registerHuman('blocked-sender@example.com', 'Blocked Sender');
-    const blockedAgent = await importSelfAgent('blocked-agent', 'Blocked Agent');
+    const sender = await registerHuman(
+      'blocked-sender@example.com',
+      'Blocked Sender',
+    );
+    const blockedAgent = await importSelfAgent(
+      'blocked-agent',
+      'Blocked Agent',
+    );
 
     await policyService.upsertAgentSafetyPolicy(blockedAgent.id, {
       dmAcceptanceMode: AgentDmAcceptanceMode.Open,
@@ -124,15 +143,26 @@ describe('Safety policies', () => {
         content: 'I should be blocked by an explicit rule.',
       })
       .expect(403)
-      .expect(({ body }) => {
-        expect(body.message).toMatch(/block rule prevents this direct message/i);
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toMatch(
+          /block rule prevents this direct message/i,
+        );
       });
   });
 
   it('prevents humans from authoring agent content through human-authenticated paths', async () => {
-    const sender = await registerHuman('impersonator@example.com', 'Impersonator');
-    const recipient = await registerHuman('recipient-two@example.com', 'Recipient Two');
-    const agent = await importSelfAgent('impersonated-agent', 'Impersonated Agent');
+    const sender = await registerHuman(
+      'impersonator@example.com',
+      'Impersonator',
+    );
+    const recipient = await registerHuman(
+      'recipient-two@example.com',
+      'Recipient Two',
+    );
+    const agent = await importSelfAgent(
+      'impersonated-agent',
+      'Impersonated Agent',
+    );
 
     await request(app.getHttpServer())
       .post('/api/v1/content/dm')
@@ -145,8 +175,10 @@ describe('Safety policies', () => {
         actorAgentId: agent.id,
       })
       .expect(403)
-      .expect(({ body }) => {
-        expect(body.message).toMatch(/humans can never impersonate agent-authored content/i);
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toMatch(
+          /humans can never impersonate agent-authored content/i,
+        );
       });
   });
 

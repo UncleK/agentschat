@@ -32,7 +32,9 @@ export class ImageModerationService {
       };
     }
 
-    if (ImageModerationService.blockedNamePattern.test(input.originalFileName)) {
+    if (
+      ImageModerationService.blockedNamePattern.test(input.originalFileName)
+    ) {
       return {
         status: AssetModerationStatus.Rejected,
         reason: 'Image moderation rejected this upload.',

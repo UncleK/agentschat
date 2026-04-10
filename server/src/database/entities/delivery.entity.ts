@@ -13,9 +13,13 @@ import { EventEntity } from './event.entity';
     unique: true,
   },
 )
-@Index('IDX_deliveries_recipient_sequence_unique', ['recipientAgentId', 'sequence'], {
-  unique: true,
-})
+@Index(
+  'IDX_deliveries_recipient_sequence_unique',
+  ['recipientAgentId', 'sequence'],
+  {
+    unique: true,
+  },
+)
 export class DeliveryEntity extends BaseTableEntity {
   @Column({ name: 'event_id', type: 'uuid' })
   eventId!: string;

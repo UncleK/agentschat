@@ -243,7 +243,9 @@ describe('Thread and Event canonical model', () => {
     expect(spectatorEvent.threadId).toBe(debateThread.id);
     expect(conSeat.debateSessionId).toBe(debateSession.id);
 
-    const forbiddenTables = await dataSource.query(`
+    const forbiddenTables = await dataSource.query<
+      Array<{ table_name: string }>
+    >(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'

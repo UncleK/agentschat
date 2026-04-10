@@ -3,8 +3,10 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  NotImplementedException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   createHmac,
@@ -14,21 +16,35 @@ import {
 } from 'node:crypto';
 import { promisify } from 'node:util';
 import { Repository } from 'typeorm';
-import {
-  APP_ENVIRONMENT,
-  type AppEnvironment,
-} from '../../config/environment';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import { AuthProvider } from '../../database/domain.enums';
 import { UserEntity } from '../../database/entities/user.entity';
+import { AgentsService } from '../agents/agents.service';
 import { AuthenticatedHuman, HumanTokenPayload } from './auth.types';
 
 const scrypt = promisify(scryptCallback);
 
+export interface AuthSessionBootstrapResponse {
+  user: {
+    id: string;
+    email: string;
+    displayName: string;
+    authProvider: AuthProvider;
+    avatarUrl: string | null;
+  };
+  session: {
+    authenticated: true;
+  };
+  recommendedActiveAgentId: string | null;
+}
+
 @Injectable()
 export class AuthService {
   private readonly tokenLifetimeMs = 7 * 24 * 60 * 60 * 1000;
+  private agentsService: AgentsService | null = null;
 
   constructor(
+    private readonly moduleRef: ModuleRef,
     @Inject(APP_ENVIRONMENT)
     private readonly environment: AppEnvironment,
     @InjectRepository(UserEntity)
@@ -48,7 +64,9 @@ export class AuthService {
     const existingUser = await this.userRepository.findOneBy({ email });
 
     if (existingUser) {
-      throw new ConflictException(`A human account already exists for ${email}.`);
+      throw new ConflictException(
+        `A human account already exists for ${email}.`,
+      );
     }
 
     const user = await this.userRepository.save(
@@ -69,11 +87,18 @@ export class AuthService {
     const password = this.normalizePassword(input.password, false);
     const user = await this.userRepository.findOneBy({ email });
 
-    if (!user || user.authProvider !== AuthProvider.Email || !user.passwordHash) {
+    if (
+      !user ||
+      user.authProvider !== AuthProvider.Email ||
+      !user.passwordHash
+    ) {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    const passwordMatches = await this.verifyPassword(password, user.passwordHash);
+    const passwordMatches = await this.verifyPassword(
+      password,
+      user.passwordHash,
+    );
 
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid email or password.');
@@ -82,54 +107,17 @@ export class AuthService {
     return this.buildAuthResponse(user);
   }
 
-  async loginWithExternalProvider(input: {
+  loginWithExternalProvider(input: {
     provider: AuthProvider.Google | AuthProvider.GitHub;
     email: string;
     displayName: string;
     providerSubject: string;
     avatarUrl?: string | null;
   }) {
-    const email = this.normalizeEmail(input.email);
-    const displayName = this.normalizeDisplayName(input.displayName);
-    const providerSubject = input.providerSubject?.trim();
-
-    if (!providerSubject) {
-      throw new BadRequestException('providerSubject is required.');
-    }
-
-    const existingUser = await this.userRepository.findOneBy({ email });
-
-    if (existingUser) {
-      if (existingUser.authProvider !== input.provider) {
-        throw new ConflictException(
-          `The email ${email} is already registered with a different auth provider.`,
-        );
-      }
-
-      if (existingUser.providerSubject !== providerSubject) {
-        throw new UnauthorizedException(
-          'The external provider subject does not match the stored account.',
-        );
-      }
-
-      existingUser.displayName = displayName;
-      existingUser.avatarUrl = input.avatarUrl?.trim() || null;
-
-      const updatedUser = await this.userRepository.save(existingUser);
-      return this.buildAuthResponse(updatedUser);
-    }
-
-    const user = await this.userRepository.save(
-      this.userRepository.create({
-        email,
-        displayName,
-        authProvider: input.provider,
-        providerSubject,
-        avatarUrl: input.avatarUrl?.trim() || null,
-      }),
+    void input;
+    throw new NotImplementedException(
+      'External-provider login is disabled until provider token verification is implemented.',
     );
-
-    return this.buildAuthResponse(user);
   }
 
   async authenticateHumanToken(token: string): Promise<AuthenticatedHuman> {
@@ -137,10 +125,35 @@ export class AuthService {
     const user = await this.userRepository.findOneBy({ id: payload.sub });
 
     if (!user) {
-      throw new UnauthorizedException('Authenticated human account was not found.');
+      throw new UnauthorizedException(
+        'Authenticated human account was not found.',
+      );
     }
 
     return this.toAuthenticatedHuman(user);
+  }
+
+  async readSessionBootstrap(
+    human: AuthenticatedHuman,
+  ): Promise<AuthSessionBootstrapResponse> {
+    const [user, eligibleOwnedAgents] = await Promise.all([
+      this.userRepository.findOneBy({ id: human.id }),
+      this.getAgentsService().findEligibleOwnedAgents(human.id),
+    ]);
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'Authenticated human account was not found.',
+      );
+    }
+
+    return {
+      user: this.toAuthSessionUser(user),
+      session: {
+        authenticated: true,
+      },
+      recommendedActiveAgentId: eligibleOwnedAgents[0]?.id ?? null,
+    };
   }
 
   private buildAuthResponse(user: UserEntity) {
@@ -159,22 +172,58 @@ export class AuthService {
     };
   }
 
+  private toAuthSessionUser(
+    user: UserEntity,
+  ): AuthSessionBootstrapResponse['user'] {
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      authProvider: user.authProvider,
+      avatarUrl: user.avatarUrl,
+    };
+  }
+
+  private getAgentsService(): AgentsService {
+    const agentsService =
+      this.agentsService ??
+      this.moduleRef.get<AgentsService>(AgentsService, {
+        strict: false,
+      });
+
+    if (!agentsService) {
+      throw new Error('AgentsService provider is not available.');
+    }
+
+    this.agentsService = agentsService;
+
+    return agentsService;
+  }
+
   private signHumanToken(user: UserEntity): string {
     const payload: HumanTokenPayload = {
       kind: 'human',
       sub: user.id,
       exp: Date.now() + this.tokenLifetimeMs,
     };
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString(
+      'base64url',
+    );
     const signature = this.signValue(encodedPayload);
 
     return `v1.${encodedPayload}.${signature}`;
   }
 
   private verifyToken(token: string): HumanTokenPayload {
-    const [version, encodedPayload, signature] = token.split('.');
+    const parts = token.split('.');
+    const [version, encodedPayload, signature] = parts;
 
-    if (version !== 'v1' || !encodedPayload || !signature) {
+    if (
+      parts.length !== 3 ||
+      version !== 'v1' ||
+      !encodedPayload ||
+      !signature
+    ) {
       throw new UnauthorizedException('Malformed human auth token.');
     }
 
@@ -190,12 +239,20 @@ export class AuthService {
       throw new UnauthorizedException('Invalid human auth token signature.');
     }
 
-    const payload = JSON.parse(
-      Buffer.from(encodedPayload, 'base64url').toString('utf8'),
-    ) as HumanTokenPayload;
+    let payload: HumanTokenPayload;
+
+    try {
+      payload = JSON.parse(
+        Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+      ) as HumanTokenPayload;
+    } catch {
+      throw new UnauthorizedException('Malformed human auth token.');
+    }
 
     if (payload.kind !== 'human' || !payload.sub || payload.exp <= Date.now()) {
-      throw new UnauthorizedException('Human auth token is expired or invalid.');
+      throw new UnauthorizedException(
+        'Human auth token is expired or invalid.',
+      );
     }
 
     return payload;
@@ -226,6 +283,10 @@ export class AuthService {
 
     const derivedKey = (await scrypt(password, salt, 64)) as Buffer;
     const actualHash = derivedKey.toString('hex');
+
+    if (actualHash.length !== expectedHash.length) {
+      return false;
+    }
 
     return timingSafeEqual(
       Buffer.from(actualHash, 'utf8'),
@@ -261,7 +322,9 @@ export class AuthService {
     }
 
     if (requireLength && normalized.length < 8) {
-      throw new BadRequestException('password must be at least 8 characters long.');
+      throw new BadRequestException(
+        'password must be at least 8 characters long.',
+      );
     }
 
     return normalized;

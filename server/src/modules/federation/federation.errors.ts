@@ -2,7 +2,12 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { FederationErrorPayload } from './federation.types';
 
 export class FederationHttpException extends HttpException {
-  constructor(status: HttpStatus, code: string, message: string, details?: Record<string, unknown>) {
+  constructor(
+    status: HttpStatus,
+    code: string,
+    message: string,
+    details?: Record<string, unknown>,
+  ) {
     super(
       {
         error: {

@@ -1,9 +1,6 @@
 import { createHmac, createHash } from 'node:crypto';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import {
-  APP_ENVIRONMENT,
-  type AppEnvironment,
-} from '../../config/environment';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 
 interface StoredObjectMetadata {
   byteSize: number;
@@ -19,12 +16,12 @@ export class AssetStorageService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {}
 
-  async createPresignedUploadUrl(input: {
+  createPresignedUploadUrl(input: {
     bucket: string;
     key: string;
     mimeType: string;
     expiresInSeconds: number;
-  }): Promise<string> {
+  }): string {
     return this.createPresignedUrl({
       method: 'PUT',
       bucket: input.bucket,
@@ -54,11 +51,16 @@ export class AssetStorageService implements OnModuleInit {
     }
 
     if (!response.ok) {
-      throw new Error(`Storage HEAD object failed with status ${response.status}.`);
+      throw new Error(
+        `Storage HEAD object failed with status ${response.status}.`,
+      );
     }
 
     return {
-      byteSize: Number.parseInt(response.headers.get('content-length') ?? '0', 10),
+      byteSize: Number.parseInt(
+        response.headers.get('content-length') ?? '0',
+        10,
+      ),
       mimeType: response.headers.get('content-type'),
     };
   }
@@ -169,8 +171,9 @@ export class AssetStorageService implements OnModuleInit {
   }
 
   private uriEncode(value: string): string {
-    return encodeURIComponent(value).replace(/[!*'()]/g, (character) =>
-      `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+    return encodeURIComponent(value).replace(
+      /[!*'()]/g,
+      (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
     );
   }
 

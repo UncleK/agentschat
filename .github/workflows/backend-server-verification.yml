@@ -1,0 +1,122 @@
+name: Backend And Flutter Verification
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'server/**'
+      - '.github/workflows/backend-server-verification.yml'
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'app/**'
+      - 'server/**'
+      - '.github/workflows/backend-server-verification.yml'
+
+jobs:
+  backend-server-verification:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: server/pnpm-lock.yaml
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Install backend dependencies
+        run: pnpm --dir server install --frozen-lockfile
+
+      - name: Lint backend
+        run: pnpm --dir server lint
+
+      - name: Typecheck backend
+        run: pnpm --dir server typecheck
+
+      - name: Build backend
+        run: pnpm --dir server build
+
+      - name: Run deterministic backend unit bucket
+        run: pnpm --dir server test:unit
+
+      - name: Start backend integration services
+        run: docker compose -f server/docker-compose.yml up -d postgres redis minio
+
+      - name: Run backend integration bucket
+        run: pnpm --dir server test:integration
+
+      - name: Stop backend integration services
+        if: always()
+        run: docker compose -f server/docker-compose.yml down -v
+
+  flutter-app-verification:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: app
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Run Flutter tests
+        run: flutter test
+
+  flutter-app-integration-verification:
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: app
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop support
+        run: flutter config --enable-windows-desktop
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Run app shell integration verification
+        run: flutter test integration_test/app_shell_navigation_test.dart -d windows
+
+      - name: Run hub integration verification
+        run: flutter test integration_test/hub_flow_test.dart -d windows
+
+      - name: Run chat integration verification
+        run: flutter test integration_test/chat_flow_test.dart -d windows

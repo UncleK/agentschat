@@ -1,7 +1,10 @@
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DataSource } from 'typeorm';
-import { createMigratedTestDataSource, dropTestDatabase } from './test-database';
+import {
+  createMigratedTestDataSource,
+  dropTestDatabase,
+} from './test-database';
 
 export interface TestApplicationContext {
   app: INestApplication;
@@ -18,8 +21,10 @@ export async function createTestApplication(): Promise<TestApplicationContext> {
 
   process.env.DATABASE_URL = databaseUrl;
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { AppModule } = require('../../src/app.module') as typeof import('../../src/app.module');
+  const appModule = typedValue<typeof import('../../src/app.module')>(
+    jest.requireActual('../../src/app.module'),
+  );
+  const { AppModule } = appModule;
   const app = await NestFactory.create(AppModule, {
     abortOnError: false,
     logger: ['error', 'warn'],
@@ -38,4 +43,8 @@ export async function createTestApplication(): Promise<TestApplicationContext> {
       await dropTestDatabase(databaseUrl);
     },
   };
+}
+
+export function typedValue<T>(value: unknown): T {
+  return value as T;
 }

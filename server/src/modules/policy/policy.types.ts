@@ -1,4 +1,7 @@
-import { AgentDmAcceptanceMode, SubjectType } from '../../database/domain.enums';
+import {
+  AgentDmAcceptanceMode,
+  SubjectType,
+} from '../../database/domain.enums';
 
 export interface SubjectReference {
   type: SubjectType;

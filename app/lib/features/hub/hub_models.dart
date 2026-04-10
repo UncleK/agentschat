@@ -5,29 +5,9 @@ enum HubOwnershipOrigin { local, imported, claimed }
 extension HubOwnershipOriginX on HubOwnershipOrigin {
   String get label {
     return switch (this) {
-      HubOwnershipOrigin.local => 'Local',
+      HubOwnershipOrigin.local => 'Owned',
       HubOwnershipOrigin.imported => 'Imported',
       HubOwnershipOrigin.claimed => 'Claimed',
-    };
-  }
-}
-
-enum HubAuthProvider { email, google, github }
-
-extension HubAuthProviderX on HubAuthProvider {
-  String get label {
-    return switch (this) {
-      HubAuthProvider.email => 'Email',
-      HubAuthProvider.google => 'Google',
-      HubAuthProvider.github => 'GitHub',
-    };
-  }
-
-  IconData get icon {
-    return switch (this) {
-      HubAuthProvider.email => Icons.alternate_email_rounded,
-      HubAuthProvider.google => Icons.travel_explore_rounded,
-      HubAuthProvider.github => Icons.code_rounded,
     };
   }
 }
@@ -91,28 +71,27 @@ class HubRelationshipModel {
 @immutable
 class HubHumanAuthModel {
   const HubHumanAuthModel({
-    required this.provider,
+    required this.isSignedIn,
+    required this.providerLabel,
     required this.displayName,
     required this.handle,
     required this.statusLine,
   });
 
   static const signedOut = HubHumanAuthModel(
-    provider: null,
-    displayName: 'Human session offline',
-    handle: 'Sign in to claim agents or adjust personal safety.',
+    isSignedIn: false,
+    providerLabel: 'Signed out',
+    displayName: 'Human access offline',
+    handle: 'Sign in to manage owned agents, claims, and security controls.',
     statusLine:
-        'Email, Google, and GitHub sample states stay available without touching backend auth.',
+        'Secure access controls the live Hub session and determines which owned agents can become active.',
   );
 
-  final HubAuthProvider? provider;
+  final bool isSignedIn;
+  final String providerLabel;
   final String displayName;
   final String handle;
   final String statusLine;
-
-  bool get isSignedIn => provider != null;
-
-  String get providerLabel => provider?.label ?? 'Signed out';
 }
 
 @immutable
@@ -120,6 +99,7 @@ class HubOwnedAgentModel {
   const HubOwnedAgentModel({
     required this.id,
     required this.name,
+    required this.handle,
     required this.headline,
     required this.runtimeLabel,
     required this.endpointLabel,
@@ -134,6 +114,7 @@ class HubOwnedAgentModel {
 
   final String id;
   final String name;
+  final String handle;
   final String headline;
   final String runtimeLabel;
   final String endpointLabel;
@@ -156,6 +137,7 @@ class HubOwnedAgentModel {
     return HubOwnedAgentModel(
       id: id,
       name: name,
+      handle: handle,
       headline: headline,
       runtimeLabel: runtimeLabel,
       endpointLabel: endpointLabel,
@@ -171,22 +153,39 @@ class HubOwnedAgentModel {
 }
 
 @immutable
-class HubImportCandidateModel {
-  const HubImportCandidateModel({
-    required this.agent,
-    required this.command,
-    required this.claimToken,
+class HubClaimableAgentModel {
+  const HubClaimableAgentModel({
+    required this.id,
+    required this.name,
+    required this.handle,
+    required this.headline,
+    required this.statusLabel,
   });
 
-  final HubOwnedAgentModel agent;
-  final String command;
-  final String claimToken;
+  final String id;
+  final String name;
+  final String handle;
+  final String headline;
+  final String statusLabel;
 }
 
 @immutable
-class HubClaimTemplateModel {
-  const HubClaimTemplateModel({required this.claimCode, required this.agent});
+class HubPendingClaimModel {
+  const HubPendingClaimModel({
+    required this.claimRequestId,
+    required this.agentId,
+    required this.name,
+    required this.handle,
+    required this.statusLabel,
+    required this.requestedAtLabel,
+    required this.expiresAtLabel,
+  });
 
-  final String claimCode;
-  final HubOwnedAgentModel agent;
+  final String claimRequestId;
+  final String agentId;
+  final String name;
+  final String handle;
+  final String statusLabel;
+  final String requestedAtLabel;
+  final String expiresAtLabel;
 }

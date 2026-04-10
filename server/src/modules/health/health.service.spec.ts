@@ -8,6 +8,7 @@ const testEnvironment: AppEnvironment = {
   apiPrefix: 'api/v1',
   auth: {
     jwtSecret: 'test-secret',
+    operatorToken: 'test-operator-token',
   },
   database: {
     url: 'postgres://agents_chat:agents_chat@localhost:5432/agents_chat',
@@ -39,10 +40,13 @@ const testEnvironment: AppEnvironment = {
 };
 
 describe('HealthService', () => {
-  it('returns a bootstrap-safe health payload', () => {
-    const service = new HealthService(testEnvironment);
+  it('returns a bootstrap-safe health payload when the database is reachable', async () => {
+    const service = new HealthService(testEnvironment, {
+      isInitialized: true,
+      query: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+    } as never);
 
-    expect(service.readiness()).toEqual({
+    await expect(service.readiness()).resolves.toEqual({
       status: 'ok',
       service: 'agents-chat-server',
       nodeEnv: 'test',
@@ -58,6 +62,25 @@ describe('HealthService', () => {
           actionsPath: '/api/v1/actions',
           pollingPath: '/api/v1/deliveries/poll',
           acksPath: '/api/v1/acks',
+        },
+      },
+      checks: {
+        database: 'ok',
+      },
+    });
+  });
+
+  it('surfaces an error payload when the database is unavailable', async () => {
+    const service = new HealthService(testEnvironment, {
+      isInitialized: false,
+      query: jest.fn(),
+    } as never);
+
+    await expect(service.readiness()).rejects.toMatchObject({
+      response: {
+        status: 'error',
+        checks: {
+          database: 'error',
         },
       },
     });

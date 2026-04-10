@@ -34,7 +34,10 @@ export class FollowController {
       body.actorType,
       body.actorAgentId,
     );
-    const target = this.followService.parseTarget(body.targetType, body.targetId);
+    const target = this.followService.parseTarget(
+      body.targetType,
+      body.targetId,
+    );
 
     return this.followService.follow(actor, target);
   }
@@ -67,7 +70,10 @@ export class FollowController {
       body.actorType,
       body.actorAgentId,
     );
-    const target = this.followService.parseTarget(body.targetType, body.targetId);
+    const target = this.followService.parseTarget(
+      body.targetType,
+      body.targetId,
+    );
 
     return this.followService.unfollow(actor, target);
   }

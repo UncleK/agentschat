@@ -96,7 +96,7 @@ export class DebateService {
 
     const hostType = this.optionalString(input.hostType)?.toLowerCase();
 
-    if (hostType && hostType !== SubjectType.Human) {
+    if (hostType && hostType !== 'human') {
       throw new BadRequestException(
         'Human-authenticated debate creation only supports a human host.',
       );
@@ -112,7 +112,10 @@ export class DebateService {
     );
   }
 
-  async createAgentHostedDebate(actorAgentId: string, input: CreateDebateInput) {
+  async createAgentHostedDebate(
+    actorAgentId: string,
+    input: CreateDebateInput,
+  ) {
     await this.moderationService.assertActorAllowed({
       type: SubjectType.Agent,
       id: actorAgentId,
@@ -121,7 +124,7 @@ export class DebateService {
     const hostType = this.optionalString(input.hostType)?.toLowerCase();
     const hostAgentId = this.optionalString(input.hostAgentId ?? input.hostId);
 
-    if (hostType && hostType !== SubjectType.Agent) {
+    if (hostType && hostType !== 'agent') {
       throw new ConflictException(
         'Federated debate creation requires the acting agent to be the host.',
       );
@@ -151,7 +154,9 @@ export class DebateService {
     });
 
     if (!debateSession) {
-      throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+      throw new NotFoundException(
+        `Debate session ${debateSessionId} was not found.`,
+      );
     }
 
     const [seats, turns, spectatorFeed] = await Promise.all([
@@ -196,9 +201,7 @@ export class DebateService {
       currentTurnNumber: debateSession.currentTurnNumber,
       archivedAt: debateSession.archivedAt?.toISOString() ?? null,
       seats: seats.map((seat) => this.serializeSeat(seat)),
-      currentTurn: currentTurn
-        ? this.serializeTurn(currentTurn, seats)
-        : null,
+      currentTurn: currentTurn ? this.serializeTurn(currentTurn, seats) : null,
       formalTurns: turns.map((turn) => this.serializeTurn(turn, seats)),
       spectatorFeed: spectatorFeed.map((event) => this.serializeEvent(event)),
     };
@@ -210,7 +213,9 @@ export class DebateService {
     });
 
     if (!debateSession) {
-      throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+      throw new NotFoundException(
+        `Debate session ${debateSessionId} was not found.`,
+      );
     }
 
     if (debateSession.status === DebateSessionStatus.Ended) {
@@ -226,13 +231,16 @@ export class DebateService {
     await this.moderationService.assertActorAllowed(actor);
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const debateSessionRepository = manager.getRepository(DebateSessionEntity);
+      const debateSessionRepository =
+        manager.getRepository(DebateSessionEntity);
       const debateSession = await debateSessionRepository.findOneBy({
         id: debateSessionId,
       });
 
       if (!debateSession) {
-        throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+        throw new NotFoundException(
+          `Debate session ${debateSessionId} was not found.`,
+        );
       }
 
       this.assertHostActor(debateSession, actor);
@@ -243,7 +251,12 @@ export class DebateService {
 
       const seats = await this.loadSeats(manager, debateSession.id);
 
-      if (seats.length !== 2 || seats.some((seat) => !seat.agentId || seat.status !== DebateSeatStatus.Occupied)) {
+      if (
+        seats.length !== 2 ||
+        seats.some(
+          (seat) => !seat.agentId || seat.status !== DebateSeatStatus.Occupied,
+        )
+      ) {
         throw new ConflictException(
           'A debate requires exactly two occupied seats before it can go live.',
         );
@@ -299,18 +312,25 @@ export class DebateService {
     return result;
   }
 
-  async pauseDebate(actor: DebateActor, debateSessionId: string, reason?: string | null) {
+  async pauseDebate(
+    actor: DebateActor,
+    debateSessionId: string,
+    reason?: string | null,
+  ) {
     await this.moderationService.assertActorAllowed(actor);
     await this.sweepDebateSession(debateSessionId);
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const debateSessionRepository = manager.getRepository(DebateSessionEntity);
+      const debateSessionRepository =
+        manager.getRepository(DebateSessionEntity);
       const debateSession = await debateSessionRepository.findOneBy({
         id: debateSessionId,
       });
 
       if (!debateSession) {
-        throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+        throw new NotFoundException(
+          `Debate session ${debateSessionId} was not found.`,
+        );
       }
 
       this.assertHostActor(debateSession, actor);
@@ -363,13 +383,16 @@ export class DebateService {
     await this.sweepDebateSession(debateSessionId);
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const debateSessionRepository = manager.getRepository(DebateSessionEntity);
+      const debateSessionRepository =
+        manager.getRepository(DebateSessionEntity);
       const debateSession = await debateSessionRepository.findOneBy({
         id: debateSessionId,
       });
 
       if (!debateSession) {
-        throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+        throw new NotFoundException(
+          `Debate session ${debateSessionId} was not found.`,
+        );
       }
 
       this.assertHostActor(debateSession, actor);
@@ -387,7 +410,11 @@ export class DebateService {
       );
       const expectedSeat = seats.find((seat) => seat.id === debateTurn.seatId);
 
-      if (!expectedSeat || expectedSeat.status !== DebateSeatStatus.Occupied || !expectedSeat.agentId) {
+      if (
+        !expectedSeat ||
+        expectedSeat.status !== DebateSeatStatus.Occupied ||
+        !expectedSeat.agentId
+      ) {
         throw new ConflictException(
           'A replacement debater must occupy the expected seat before resuming.',
         );
@@ -441,14 +468,17 @@ export class DebateService {
     await this.sweepDebateSession(debateSessionId);
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const debateSessionRepository = manager.getRepository(DebateSessionEntity);
+      const debateSessionRepository =
+        manager.getRepository(DebateSessionEntity);
       const debateTurnRepository = manager.getRepository(DebateTurnEntity);
       const debateSession = await debateSessionRepository.findOneBy({
         id: debateSessionId,
       });
 
       if (!debateSession) {
-        throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+        throw new NotFoundException(
+          `Debate session ${debateSessionId} was not found.`,
+        );
       }
 
       this.assertHostActor(debateSession, actor);
@@ -457,7 +487,9 @@ export class DebateService {
         debateSession.status !== DebateSessionStatus.Live &&
         debateSession.status !== DebateSessionStatus.Paused
       ) {
-        throw new ConflictException('Only live or paused debates can be ended.');
+        throw new ConflictException(
+          'Only live or paused debates can be ended.',
+        );
       }
 
       const currentTurn = await debateTurnRepository.findOneBy({
@@ -517,10 +549,16 @@ export class DebateService {
     return result;
   }
 
-  async assignReplacementSeat(actor: DebateActor, input: AssignReplacementInput) {
+  async assignReplacementSeat(
+    actor: DebateActor,
+    input: AssignReplacementInput,
+  ) {
     await this.moderationService.assertActorAllowed(actor);
 
-    const debateSessionId = this.requiredString(input.debateSessionId, 'debateSessionId');
+    const debateSessionId = this.requiredString(
+      input.debateSessionId,
+      'debateSessionId',
+    );
     const agentId = this.requiredString(input.agentId, 'agentId');
 
     await this.moderationService.assertActorAllowed({
@@ -530,20 +568,25 @@ export class DebateService {
     await this.sweepDebateSession(debateSessionId);
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const debateSessionRepository = manager.getRepository(DebateSessionEntity);
+      const debateSessionRepository =
+        manager.getRepository(DebateSessionEntity);
       const debateSeatRepository = manager.getRepository(DebateSeatEntity);
       const debateSession = await debateSessionRepository.findOneBy({
         id: debateSessionId,
       });
 
       if (!debateSession) {
-        throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+        throw new NotFoundException(
+          `Debate session ${debateSessionId} was not found.`,
+        );
       }
 
       this.assertHostActor(debateSession, actor);
 
       if (debateSession.status !== DebateSessionStatus.Paused) {
-        throw new ConflictException('Replacement seating is only available while a debate is paused.');
+        throw new ConflictException(
+          'Replacement seating is only available while a debate is paused.',
+        );
       }
 
       if (!debateSession.freeEntry) {
@@ -627,7 +670,8 @@ export class DebateService {
 
   async sweepDebateSession(debateSessionId: string): Promise<void> {
     const result = await this.dataSource.transaction(async (manager) => {
-      const debateSessionRepository = manager.getRepository(DebateSessionEntity);
+      const debateSessionRepository =
+        manager.getRepository(DebateSessionEntity);
       const debateTurnRepository = manager.getRepository(DebateTurnEntity);
       const debateSeatRepository = manager.getRepository(DebateSeatEntity);
       const debateSession = await debateSessionRepository.findOneBy({
@@ -654,7 +698,9 @@ export class DebateService {
       }
 
       const seats = await this.loadSeats(manager, debateSession.id);
-      const seat = seats.find((candidate) => candidate.id === currentTurn.seatId);
+      const seat = seats.find(
+        (candidate) => candidate.id === currentTurn.seatId,
+      );
 
       if (!seat) {
         return null;
@@ -761,7 +807,9 @@ export class DebateService {
     }
 
     if (debateSession.status !== DebateSessionStatus.Live) {
-      throw new ConflictException('Debate turns can only be submitted while the debate is live.');
+      throw new ConflictException(
+        'Debate turns can only be submitted while the debate is live.',
+      );
     }
 
     const expectedTurnNumber = debateSession.currentTurnNumber;
@@ -771,7 +819,9 @@ export class DebateService {
     );
 
     if (requestedTurnNumber !== expectedTurnNumber) {
-      throw new ConflictException('Only the current debate turn may be submitted.');
+      throw new ConflictException(
+        'Only the current debate turn may be submitted.',
+      );
     }
 
     const seat = await this.resolveSeatForTurnSubmission(
@@ -782,7 +832,9 @@ export class DebateService {
     );
 
     if (seat.status !== DebateSeatStatus.Occupied || !seat.agentId) {
-      throw new ConflictException('Only an occupied debate seat may submit a turn.');
+      throw new ConflictException(
+        'Only an occupied debate seat may submit a turn.',
+      );
     }
 
     let debateTurn = await debateTurnRepository.findOneBy({
@@ -796,7 +848,11 @@ export class DebateService {
         debateSessionId: debateSession.id,
       });
 
-      if (existingTurnCount === 0 && expectedTurnNumber === 1 && seats.length === 1) {
+      if (
+        existingTurnCount === 0 &&
+        expectedTurnNumber === 1 &&
+        seats.length === 1
+      ) {
         debateTurn = await this.createPendingTurn(
           manager,
           debateSession,
@@ -814,15 +870,22 @@ export class DebateService {
     }
 
     if (debateTurn.status !== DebateTurnStatus.Pending || debateTurn.eventId) {
-      throw new ConflictException('The current debate turn is not accepting submissions.');
+      throw new ConflictException(
+        'The current debate turn is not accepting submissions.',
+      );
     }
 
-    if (debateTurn.deadlineAt && debateTurn.deadlineAt.getTime() <= Date.now()) {
-      throw new ConflictException('The current debate turn has already expired.');
+    if (
+      debateTurn.deadlineAt &&
+      debateTurn.deadlineAt.getTime() <= Date.now()
+    ) {
+      throw new ConflictException(
+        'The current debate turn has already expired.',
+      );
     }
 
     if (debateTurn.seatId !== seat.id) {
-      throw new ConflictException('It is not this seat\'s turn.');
+      throw new ConflictException("It is not this seat's turn.");
     }
 
     return {
@@ -940,13 +1003,18 @@ export class DebateService {
     };
   }
 
-  async assertSpectatorCommentAllowed(actor: DebateActor, debateSessionId: string) {
+  async assertSpectatorCommentAllowed(
+    actor: DebateActor,
+    debateSessionId: string,
+  ) {
     const debateSession = await this.debateSessionRepository.findOneBy({
       id: debateSessionId,
     });
 
     if (!debateSession) {
-      throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+      throw new NotFoundException(
+        `Debate session ${debateSessionId} was not found.`,
+      );
     }
 
     if (actor.type === SubjectType.Agent) {
@@ -980,7 +1048,9 @@ export class DebateService {
     const conAgentId = this.requiredString(input.conAgentId, 'conAgentId');
 
     if (proAgentId === conAgentId) {
-      throw new ConflictException('The pro and con seats must be assigned to different agents.');
+      throw new ConflictException(
+        'The pro and con seats must be assigned to different agents.',
+      );
     }
 
     await Promise.all([
@@ -990,7 +1060,8 @@ export class DebateService {
 
     const result = await this.dataSource.transaction(async (manager) => {
       const threadRepository = manager.getRepository(ThreadEntity);
-      const debateSessionRepository = manager.getRepository(DebateSessionEntity);
+      const debateSessionRepository =
+        manager.getRepository(DebateSessionEntity);
       const debateSeatRepository = manager.getRepository(DebateSeatEntity);
       const thread = await threadRepository.save(
         threadRepository.create({
@@ -1113,7 +1184,9 @@ export class DebateService {
     }
 
     if (agent.status === AgentStatus.Suspended) {
-      throw new ForbiddenException('Suspended agents cannot be seated in a debate.');
+      throw new ForbiddenException(
+        'Suspended agents cannot be seated in a debate.',
+      );
     }
   }
 
@@ -1127,7 +1200,9 @@ export class DebateService {
         : debateSession.hostAgentId;
 
     if (debateSession.hostType !== actor.type || expectedHostId !== actor.id) {
-      throw new ForbiddenException('Only the debate host can perform this action.');
+      throw new ForbiddenException(
+        'Only the debate host can perform this action.',
+      );
     }
   }
 
@@ -1155,8 +1230,13 @@ export class DebateService {
       turnNumber,
     );
 
-    if (expectedSeat.status !== DebateSeatStatus.Occupied || !expectedSeat.agentId) {
-      throw new ConflictException('The expected seat must be occupied before the turn can begin.');
+    if (
+      expectedSeat.status !== DebateSeatStatus.Occupied ||
+      !expectedSeat.agentId
+    ) {
+      throw new ConflictException(
+        'The expected seat must be occupied before the turn can begin.',
+      );
     }
 
     const existingTurn = await debateTurnRepository.findOneBy({
@@ -1165,11 +1245,21 @@ export class DebateService {
     });
 
     if (!existingTurn) {
-      return this.createPendingTurn(manager, debateSession, expectedSeat, turnNumber);
+      return this.createPendingTurn(
+        manager,
+        debateSession,
+        expectedSeat,
+        turnNumber,
+      );
     }
 
-    if (existingTurn.status !== DebateTurnStatus.Pending || existingTurn.eventId) {
-      throw new ConflictException('The requested debate turn is already closed.');
+    if (
+      existingTurn.status !== DebateTurnStatus.Pending ||
+      existingTurn.eventId
+    ) {
+      throw new ConflictException(
+        'The requested debate turn is already closed.',
+      );
     }
 
     await debateTurnRepository.update(
@@ -1195,7 +1285,9 @@ export class DebateService {
     turnNumber: number,
   ): Promise<DebateTurnEntity> {
     if (seat.status !== DebateSeatStatus.Occupied || !seat.agentId) {
-      throw new ConflictException('The expected seat must be occupied before the turn can begin.');
+      throw new ConflictException(
+        'The expected seat must be occupied before the turn can begin.',
+      );
     }
 
     const debateTurnRepository = manager.getRepository(DebateTurnEntity);
@@ -1222,23 +1314,29 @@ export class DebateService {
     turnNumber: number,
   ): Promise<DebateSeatEntity> {
     if (seats.length !== 2) {
-      throw new ConflictException('Debates must keep exactly two canonical seats.');
+      throw new ConflictException(
+        'Debates must keep exactly two canonical seats.',
+      );
     }
 
     if (turnNumber <= 1) {
       const firstSeat = seats.find((seat) => seat.seatOrder === 1);
 
       if (!firstSeat) {
-        throw new ConflictException('The opening debate seat could not be resolved.');
+        throw new ConflictException(
+          'The opening debate seat could not be resolved.',
+        );
       }
 
       return firstSeat;
     }
 
-    const previousTurn = await manager.getRepository(DebateTurnEntity).findOneBy({
-      debateSessionId,
-      turnNumber: turnNumber - 1,
-    });
+    const previousTurn = await manager
+      .getRepository(DebateTurnEntity)
+      .findOneBy({
+        debateSessionId,
+        turnNumber: turnNumber - 1,
+      });
 
     if (!previousTurn) {
       return this.determineExpectedSeat(manager, debateSessionId, seats, 1);
@@ -1247,7 +1345,9 @@ export class DebateService {
     const previousSeat = seats.find((seat) => seat.id === previousTurn.seatId);
 
     if (!previousSeat) {
-      throw new ConflictException('The previous debate seat could not be resolved.');
+      throw new ConflictException(
+        'The previous debate seat could not be resolved.',
+      );
     }
 
     if (previousTurn.status === DebateTurnStatus.Missed) {
@@ -1287,7 +1387,9 @@ export class DebateService {
       }
 
       if (seat.agentId !== actorAgentId) {
-        throw new ForbiddenException('Only the seated agent can submit this debate turn.');
+        throw new ForbiddenException(
+          'Only the seated agent can submit this debate turn.',
+        );
       }
 
       return seat;
@@ -1317,11 +1419,15 @@ export class DebateService {
       const seat = seats.find((candidate) => candidate.id === requestedId);
 
       if (!seat) {
-        throw new NotFoundException(`Debate seat ${requestedId} was not found.`);
+        throw new NotFoundException(
+          `Debate seat ${requestedId} was not found.`,
+        );
       }
 
       if (seat.status !== DebateSeatStatus.Replacing || seat.agentId) {
-        throw new ConflictException('Only a replacing debate seat can accept a replacement agent.');
+        throw new ConflictException(
+          'Only a replacing debate seat can accept a replacement agent.',
+        );
       }
 
       return seat;
@@ -1332,7 +1438,9 @@ export class DebateService {
     );
 
     if (replacingSeats.length !== 1) {
-      throw new BadRequestException('seatId is required when multiple seats are awaiting replacement.');
+      throw new BadRequestException(
+        'seatId is required when multiple seats are awaiting replacement.',
+      );
     }
 
     return replacingSeats[0];
@@ -1383,16 +1491,23 @@ export class DebateService {
     const seat = seats.find((candidate) => candidate.id === debateTurn.seatId);
 
     if (!seat) {
-      throw new ConflictException('The assigned debate seat could not be resolved.');
+      throw new ConflictException(
+        'The assigned debate seat could not be resolved.',
+      );
     }
 
-    return this.createSystemDebateEvent(manager, debateSession, 'debate.turn.assigned', {
-      seatId: seat.id,
-      stance: seat.stance,
-      agentId: seat.agentId,
-      turnNumber: debateTurn.turnNumber,
-      deadlineAt: debateTurn.deadlineAt?.toISOString() ?? null,
-    });
+    return this.createSystemDebateEvent(
+      manager,
+      debateSession,
+      'debate.turn.assigned',
+      {
+        seatId: seat.id,
+        stance: seat.stance,
+        agentId: seat.agentId,
+        turnNumber: debateTurn.turnNumber,
+        deadlineAt: debateTurn.deadlineAt?.toISOString() ?? null,
+      },
+    );
   }
 
   private async collectSessionAgentIds(
@@ -1412,7 +1527,9 @@ export class DebateService {
     actor: DebateActor,
     role: ThreadParticipantRole,
   ): Promise<void> {
-    const participantRepository = manager.getRepository(ThreadParticipantEntity);
+    const participantRepository = manager.getRepository(
+      ThreadParticipantEntity,
+    );
     const existingParticipant = await participantRepository.findOneBy({
       threadId,
       participantType: actor.type,
@@ -1420,7 +1537,10 @@ export class DebateService {
     });
 
     if (existingParticipant) {
-      const nextRole = this.mergeParticipantRole(existingParticipant.role, role);
+      const nextRole = this.mergeParticipantRole(
+        existingParticipant.role,
+        role,
+      );
 
       if (nextRole !== existingParticipant.role) {
         await participantRepository.update(
@@ -1476,10 +1596,15 @@ export class DebateService {
         })
         .getExists();
 
-      const nextStatus = hasLiveSeat ? AgentStatus.Debating : AgentStatus.Online;
+      const nextStatus = hasLiveSeat
+        ? AgentStatus.Debating
+        : AgentStatus.Online;
 
       if (agent.status !== nextStatus) {
-        await this.agentRepository.update({ id: agentId }, { status: nextStatus });
+        await this.agentRepository.update(
+          { id: agentId },
+          { status: nextStatus },
+        );
       }
     }
   }
@@ -1532,7 +1657,12 @@ export class DebateService {
       return fallback;
     }
 
-    const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string'
+          ? Number.parseInt(value, 10)
+          : Number.NaN;
 
     if (!Number.isInteger(parsed) || parsed <= 0) {
       throw new BadRequestException('turnNumber must be a positive integer.');

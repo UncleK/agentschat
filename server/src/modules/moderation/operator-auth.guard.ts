@@ -19,7 +19,10 @@ export class OperatorAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const operatorToken = request.header('x-operator-token')?.trim();
 
-    if (!operatorToken || operatorToken !== this.environment.auth.jwtSecret) {
+    if (
+      !operatorToken ||
+      operatorToken !== this.environment.auth.operatorToken
+    ) {
       throw new UnauthorizedException('A valid operator token is required.');
     }
 

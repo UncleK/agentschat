@@ -109,9 +109,17 @@ export class ModerationService {
     reason?: string;
   }) {
     const scope = this.parseSubject(body.scopeType, body.scopeId, 'scope');
-    const blocked = this.parseSubject(body.blockedType, body.blockedId, 'blocked');
+    const blocked = this.parseSubject(
+      body.blockedType,
+      body.blockedId,
+      'blocked',
+    );
 
-    return this.policyService.createBlockRule(scope, blocked, body.reason?.trim());
+    return this.policyService.createBlockRule(
+      scope,
+      blocked,
+      body.reason?.trim(),
+    );
   }
 
   async assertActorAllowed(actor: SubjectReference): Promise<void> {
@@ -123,11 +131,16 @@ export class ModerationService {
       }
 
       if (agent.status === AgentStatus.Suspended) {
-        throw new ForbiddenException('Suspended agents cannot perform this action.');
+        throw new ForbiddenException(
+          'Suspended agents cannot perform this action.',
+        );
       }
     }
 
-    const targetType = actor.type === SubjectType.Human ? ModerationTargetType.User : ModerationTargetType.Agent;
+    const targetType =
+      actor.type === SubjectType.Human
+        ? ModerationTargetType.User
+        : ModerationTargetType.Agent;
     const actions = await this.moderationActionRepository.find({
       where: {
         targetType,
@@ -144,23 +157,32 @@ export class ModerationService {
       }
 
       if (action.action === 'suspend') {
-        throw new ForbiddenException('Suspended actors cannot perform this action.');
+        throw new ForbiddenException(
+          'Suspended actors cannot perform this action.',
+        );
       }
 
       if (action.action === 'mute') {
-        throw new ForbiddenException('Muted actors cannot perform this action.');
+        throw new ForbiddenException(
+          'Muted actors cannot perform this action.',
+        );
       }
 
       if (action.action === 'rate_limit') {
-        const intervalSeconds = this.readNumberMetadata(action.metadata, 'minIntervalSeconds') ?? 60;
+        const intervalSeconds =
+          this.readNumberMetadata(action.metadata, 'minIntervalSeconds') ?? 60;
         const latestEvent = await this.eventRepository.findOne({
-          where: actor.type === SubjectType.Human ? { actorType: EventActorType.Human, actorUserId: actor.id } : { actorType: EventActorType.Agent, actorAgentId: actor.id },
+          where:
+            actor.type === SubjectType.Human
+              ? { actorType: EventActorType.Human, actorUserId: actor.id }
+              : { actorType: EventActorType.Agent, actorAgentId: actor.id },
           order: {
             occurredAt: 'DESC',
           },
         });
         const activeSince =
-          latestEvent && latestEvent.occurredAt.getTime() > action.createdAt.getTime()
+          latestEvent &&
+          latestEvent.occurredAt.getTime() > action.createdAt.getTime()
             ? latestEvent.occurredAt.getTime()
             : action.createdAt.getTime();
 
@@ -184,15 +206,21 @@ export class ModerationService {
     const moderation = this.readModerationState(thread.metadata);
 
     if (moderation.hidden || moderation.deleted) {
-      throw new ForbiddenException('This thread is no longer available for new activity.');
+      throw new ForbiddenException(
+        'This thread is no longer available for new activity.',
+      );
     }
   }
 
   async assertDebateWritable(debateSessionId: string): Promise<void> {
-    const debateSession = await this.debateSessionRepository.findOneBy({ id: debateSessionId });
+    const debateSession = await this.debateSessionRepository.findOneBy({
+      id: debateSessionId,
+    });
 
     if (!debateSession) {
-      throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+      throw new NotFoundException(
+        `Debate session ${debateSessionId} was not found.`,
+      );
     }
 
     if (
@@ -200,7 +228,9 @@ export class ModerationService {
       debateSession.status === DebateSessionStatus.Archived ||
       debateSession.archivedAt
     ) {
-      throw new ForbiddenException('Ended or archived debates do not accept new activity.');
+      throw new ForbiddenException(
+        'Ended or archived debates do not accept new activity.',
+      );
     }
   }
 
@@ -215,12 +245,16 @@ export class ModerationService {
     });
 
     return {
-      deliveries: deliveries.map((delivery) => this.serializeDelivery(delivery)),
+      deliveries: deliveries.map((delivery) =>
+        this.serializeDelivery(delivery),
+      ),
     };
   }
 
   async getDeadLetter(deliveryId: string) {
-    const delivery = await this.deliveryRepository.findOneBy({ id: deliveryId });
+    const delivery = await this.deliveryRepository.findOneBy({
+      id: deliveryId,
+    });
 
     if (!delivery) {
       throw new NotFoundException(`Delivery ${deliveryId} was not found.`);
@@ -230,14 +264,18 @@ export class ModerationService {
   }
 
   async requeueDeadLetter(deliveryId: string) {
-    const delivery = await this.deliveryRepository.findOneBy({ id: deliveryId });
+    const delivery = await this.deliveryRepository.findOneBy({
+      id: deliveryId,
+    });
 
     if (!delivery) {
       throw new NotFoundException(`Delivery ${deliveryId} was not found.`);
     }
 
-    if (delivery.status !== 'dead_letter') {
-      throw new ConflictException('Only dead-letter deliveries can be requeued.');
+    if (delivery.status !== DeliveryStatus.DeadLetter) {
+      throw new ConflictException(
+        'Only dead-letter deliveries can be requeued.',
+      );
     }
 
     await this.deliveryRepository.update(
@@ -256,13 +294,19 @@ export class ModerationService {
   }
 
   async readDebateArchive(debateSessionId: string) {
-    const debateSession = await this.debateSessionRepository.findOneBy({ id: debateSessionId });
+    const debateSession = await this.debateSessionRepository.findOneBy({
+      id: debateSessionId,
+    });
 
     if (!debateSession) {
-      throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+      throw new NotFoundException(
+        `Debate session ${debateSessionId} was not found.`,
+      );
     }
 
-    const thread = await this.threadRepository.findOneBy({ id: debateSession.threadId });
+    const thread = await this.threadRepository.findOneBy({
+      id: debateSession.threadId,
+    });
     const archive =
       thread?.metadata.debateArchive &&
       typeof thread.metadata.debateArchive === 'object' &&
@@ -270,12 +314,16 @@ export class ModerationService {
         ? (thread.metadata.debateArchive as Record<string, unknown>)
         : null;
     const replayEventIds = Array.isArray(archive?.eventIds)
-      ? archive.eventIds.filter((eventId): eventId is string => typeof eventId === 'string')
+      ? archive.eventIds.filter(
+          (eventId): eventId is string => typeof eventId === 'string',
+        )
       : [];
     const replayEvents = replayEventIds.length
       ? await this.eventRepository.findBy({ id: In(replayEventIds) })
       : [];
-    const replayEventMap = new Map(replayEvents.map((event) => [event.id, event]));
+    const replayEventMap = new Map(
+      replayEvents.map((event) => [event.id, event]),
+    );
 
     return {
       debateSessionId,
@@ -293,10 +341,14 @@ export class ModerationService {
     debateSessionId: string,
     details: Record<string, unknown> = {},
   ) {
-    const debateSession = await this.debateSessionRepository.findOneBy({ id: debateSessionId });
+    const debateSession = await this.debateSessionRepository.findOneBy({
+      id: debateSessionId,
+    });
 
     if (!debateSession) {
-      throw new NotFoundException(`Debate session ${debateSessionId} was not found.`);
+      throw new NotFoundException(
+        `Debate session ${debateSessionId} was not found.`,
+      );
     }
 
     await this.debateSessionRepository.update(
@@ -311,7 +363,9 @@ export class ModerationService {
     return this.readDebateArchive(debateSession.id);
   }
 
-  private async applyMaterializedEffect(action: ModerationActionEntity): Promise<void> {
+  private async applyMaterializedEffect(
+    action: ModerationActionEntity,
+  ): Promise<void> {
     switch (action.action) {
       case 'suspend':
         await this.applySuspension(action);
@@ -385,9 +439,13 @@ export class ModerationService {
     }
   }
 
-  private async applyVisibilityAction(action: ModerationActionEntity): Promise<void> {
+  private async applyVisibilityAction(
+    action: ModerationActionEntity,
+  ): Promise<void> {
     if (action.targetType === ModerationTargetType.Event) {
-      const event = await this.eventRepository.findOneBy({ id: action.targetSubjectId });
+      const event = await this.eventRepository.findOneBy({
+        id: action.targetSubjectId,
+      });
 
       if (!event) {
         return;
@@ -412,7 +470,9 @@ export class ModerationService {
     }
 
     if (action.targetType === ModerationTargetType.Thread) {
-      const thread = await this.threadRepository.findOneBy({ id: action.targetSubjectId });
+      const thread = await this.threadRepository.findOneBy({
+        id: action.targetSubjectId,
+      });
 
       if (!thread) {
         return;
@@ -448,7 +508,9 @@ export class ModerationService {
     debateSessionId: string,
     details: Record<string, unknown>,
   ): Promise<void> {
-    const debateSession = await this.debateSessionRepository.findOneBy({ id: debateSessionId });
+    const debateSession = await this.debateSessionRepository.findOneBy({
+      id: debateSessionId,
+    });
 
     if (!debateSession) {
       return;
@@ -496,7 +558,10 @@ export class ModerationService {
     );
   }
 
-  private parseTarget(targetType: string | undefined, targetId: string | undefined) {
+  private parseTarget(
+    targetType: string | undefined,
+    targetId: string | undefined,
+  ) {
     const normalizedTargetId = targetId?.trim();
 
     if (!normalizedTargetId) {
@@ -513,7 +578,10 @@ export class ModerationService {
       case ModerationTargetType.Event:
         return { type: ModerationTargetType.Event, id: normalizedTargetId };
       case ModerationTargetType.DebateSession:
-        return { type: ModerationTargetType.DebateSession, id: normalizedTargetId };
+        return {
+          type: ModerationTargetType.DebateSession,
+          id: normalizedTargetId,
+        };
       default:
         throw new BadRequestException(
           'targetType must be user, agent, thread, event, or debate_session.',
@@ -538,7 +606,9 @@ export class ModerationService {
       case SubjectType.Agent:
         return { type: SubjectType.Agent, id };
       default:
-        throw new BadRequestException(`${fieldName}Type must be human or agent.`);
+        throw new BadRequestException(
+          `${fieldName}Type must be human or agent.`,
+        );
     }
   }
 
@@ -547,7 +617,9 @@ export class ModerationService {
       return {};
     }
 
-    return typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {};
+    return typeof metadata === 'object' && !Array.isArray(metadata)
+      ? metadata
+      : {};
   }
 
   private async assertTargetExists(
@@ -563,7 +635,9 @@ export class ModerationService {
             ? await this.threadRepository.exist({ where: { id: targetId } })
             : targetType === ModerationTargetType.Event
               ? await this.eventRepository.exist({ where: { id: targetId } })
-              : await this.debateSessionRepository.exist({ where: { id: targetId } });
+              : await this.debateSessionRepository.exist({
+                  where: { id: targetId },
+                });
 
     if (!exists) {
       throw new NotFoundException(`${targetType} ${targetId} was not found.`);
@@ -575,16 +649,22 @@ export class ModerationService {
       targetType,
       targetSubjectId: targetId,
       targetUserId: targetType === ModerationTargetType.User ? targetId : null,
-      targetAgentId: targetType === ModerationTargetType.Agent ? targetId : null,
-      targetThreadId: targetType === ModerationTargetType.Thread ? targetId : null,
-      targetEventId: targetType === ModerationTargetType.Event ? targetId : null,
+      targetAgentId:
+        targetType === ModerationTargetType.Agent ? targetId : null,
+      targetThreadId:
+        targetType === ModerationTargetType.Thread ? targetId : null,
+      targetEventId:
+        targetType === ModerationTargetType.Event ? targetId : null,
       targetDebateSessionId:
         targetType === ModerationTargetType.DebateSession ? targetId : null,
     };
   }
 
   private isStillActive(action: ModerationActionEntity): boolean {
-    const durationSeconds = this.readNumberMetadata(action.metadata, 'durationSeconds');
+    const durationSeconds = this.readNumberMetadata(
+      action.metadata,
+      'durationSeconds',
+    );
 
     if (!durationSeconds) {
       return true;
@@ -603,7 +683,9 @@ export class ModerationService {
 
   private readModerationState(metadata: Record<string, unknown>) {
     const raw =
-      metadata.moderation && typeof metadata.moderation === 'object' && !Array.isArray(metadata.moderation)
+      metadata.moderation &&
+      typeof metadata.moderation === 'object' &&
+      !Array.isArray(metadata.moderation)
         ? (metadata.moderation as Record<string, unknown>)
         : null;
 

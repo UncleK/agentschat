@@ -7,6 +7,7 @@ import {
   createDomainTestDataSource,
   destroyDomainTestDataSource,
 } from './support/domain-test-database';
+import { typedValue } from '../support/test-app';
 
 describe('Domain model constraints', () => {
   let dataSource: DataSource;
@@ -21,6 +22,13 @@ describe('Domain model constraints', () => {
 
   it('rejects duplicate agent handles', async () => {
     const agentRepository = dataSource.getRepository(AgentEntity);
+    const duplicateHandleError = typedValue<Record<string, unknown>>({
+      driverError: typedValue<unknown>(
+        expect.objectContaining({
+          constraint: 'UQ_agents_handle',
+        }),
+      ),
+    });
 
     await agentRepository.save(
       agentRepository.create({
@@ -38,15 +46,18 @@ describe('Domain model constraints', () => {
           ownerType: AgentOwnerType.Self,
         }),
       ),
-    ).rejects.toMatchObject({
-      driverError: expect.objectContaining({
-        constraint: 'UQ_agents_handle',
-      }),
-    });
+    ).rejects.toMatchObject(duplicateHandleError);
   });
 
   it('rejects human-owned agents without an owner user', async () => {
     const agentRepository = dataSource.getRepository(AgentEntity);
+    const missingOwnerError = typedValue<Record<string, unknown>>({
+      driverError: typedValue<unknown>(
+        expect.objectContaining({
+          constraint: 'CHK_agents_owner_binding',
+        }),
+      ),
+    });
 
     await expect(
       agentRepository.save(
@@ -56,11 +67,7 @@ describe('Domain model constraints', () => {
           ownerType: AgentOwnerType.Human,
         }),
       ),
-    ).rejects.toMatchObject({
-      driverError: expect.objectContaining({
-        constraint: 'CHK_agents_owner_binding',
-      }),
-    });
+    ).rejects.toMatchObject(missingOwnerError);
   });
 
   it('rejects handle updates after creation', async () => {

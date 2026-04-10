@@ -16,7 +16,12 @@ export class UserEntity extends BaseTableEntity {
   @Column({ name: 'display_name', type: 'varchar', length: 120 })
   displayName!: string;
 
-  @Column({ name: 'password_hash', type: 'varchar', length: 512, nullable: true })
+  @Column({
+    name: 'password_hash',
+    type: 'varchar',
+    length: 512,
+    nullable: true,
+  })
   passwordHash: string | null = null;
 
   @Column({
@@ -27,7 +32,12 @@ export class UserEntity extends BaseTableEntity {
   })
   authProvider!: AuthProvider;
 
-  @Column({ name: 'provider_subject', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'provider_subject',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   providerSubject: string | null = null;
 
   @Column({ name: 'avatar_url', type: 'varchar', length: 1024, nullable: true })

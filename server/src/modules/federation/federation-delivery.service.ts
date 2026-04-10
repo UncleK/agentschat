@@ -1,11 +1,13 @@
-import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Repository } from 'typeorm';
-import {
-  APP_ENVIRONMENT,
-  type AppEnvironment,
-} from '../../config/environment';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
   ConnectionTransportMode,
   DeliveryChannel,
@@ -96,7 +98,9 @@ export class FederationDeliveryService
     recipientAgentId: string,
     connection: AgentConnectionEntity,
   ): Promise<void> {
-    const deliveries = await this.deliveryRepository.findBy({ recipientAgentId });
+    const deliveries = await this.deliveryRepository.findBy({
+      recipientAgentId,
+    });
 
     const pendingDeliveries = deliveries.filter(
       (delivery) =>
@@ -138,13 +142,19 @@ export class FederationDeliveryService
     const normalizedCursor = this.parseCursor(cursor);
 
     while (true) {
-      const deliveries = await this.collectPollableDeliveries(agent.id, normalizedCursor, limit);
+      const deliveries = await this.collectPollableDeliveries(
+        agent.id,
+        normalizedCursor,
+        limit,
+      );
 
       if (deliveries.length > 0 || Date.now() >= deadline) {
         const latestCursor = deliveries.at(-1)?.cursor as string | undefined;
 
         return {
-          cursor: latestCursor ?? (normalizedCursor === null ? null : String(normalizedCursor)),
+          cursor:
+            latestCursor ??
+            (normalizedCursor === null ? null : String(normalizedCursor)),
           deliveries,
         };
       }
@@ -165,7 +175,9 @@ export class FederationDeliveryService
       );
     }
 
-    const uniqueDeliveryIds = [...new Set(deliveryIds.map((value) => value.trim()).filter(Boolean))];
+    const uniqueDeliveryIds = [
+      ...new Set(deliveryIds.map((value) => value.trim()).filter(Boolean)),
+    ];
 
     if (uniqueDeliveryIds.length === 0) {
       throw new FederationHttpException(
@@ -178,7 +190,9 @@ export class FederationDeliveryService
     const deliveries = await this.deliveryRepository.findBy({
       recipientAgentId: agent.id,
     });
-    const deliveriesById = new Map(deliveries.map((delivery) => [delivery.id, delivery]));
+    const deliveriesById = new Map(
+      deliveries.map((delivery) => [delivery.id, delivery]),
+    );
     const results: Array<Record<string, unknown>> = [];
 
     for (const deliveryId of uniqueDeliveryIds) {
@@ -238,7 +252,8 @@ export class FederationDeliveryService
     const deliveries: Array<Record<string, unknown>> = [];
 
     while (deliveries.length < boundedLimit) {
-      const outstanding = await this.loadEarliestOutstandingDelivery(recipientAgentId);
+      const outstanding =
+        await this.loadEarliestOutstandingDelivery(recipientAgentId);
 
       if (!outstanding) {
         break;
@@ -248,7 +263,10 @@ export class FederationDeliveryService
         continue;
       }
 
-      if (outstanding.nextAttemptAt && outstanding.nextAttemptAt.getTime() > Date.now()) {
+      if (
+        outstanding.nextAttemptAt &&
+        outstanding.nextAttemptAt.getTime() > Date.now()
+      ) {
         break;
       }
 
@@ -289,7 +307,9 @@ export class FederationDeliveryService
           continue;
         }
 
-        const outstanding = await this.loadEarliestOutstandingDelivery(connection.agentId);
+        const outstanding = await this.loadEarliestOutstandingDelivery(
+          connection.agentId,
+        );
 
         if (!outstanding) {
           continue;
@@ -299,7 +319,10 @@ export class FederationDeliveryService
           continue;
         }
 
-        if (outstanding.nextAttemptAt && outstanding.nextAttemptAt.getTime() > Date.now()) {
+        if (
+          outstanding.nextAttemptAt &&
+          outstanding.nextAttemptAt.getTime() > Date.now()
+        ) {
           continue;
         }
 
@@ -341,10 +364,13 @@ export class FederationDeliveryService
           outstanding.status =
             attemptNumber === 0 ? DeliveryStatus.Sent : DeliveryStatus.Retrying;
           outstanding.lastError = null;
-          outstanding.nextAttemptAt = this.nextAttemptAt(outstanding.attemptCount);
+          outstanding.nextAttemptAt = this.nextAttemptAt(
+            outstanding.attemptCount,
+          );
           await this.deliveryRepository.save(outstanding);
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'Webhook delivery failed.';
+          const message =
+            error instanceof Error ? error.message : 'Webhook delivery failed.';
           await this.markDeliveryAttemptFailure(outstanding, message);
         }
       }
@@ -384,8 +410,13 @@ export class FederationDeliveryService
     await this.deliveryRepository.save(delivery);
   }
 
-  private async ensureDeliveryIsActive(delivery: DeliveryEntity): Promise<boolean> {
-    if (delivery.status === DeliveryStatus.Acked || delivery.status === DeliveryStatus.DeadLetter) {
+  private async ensureDeliveryIsActive(
+    delivery: DeliveryEntity,
+  ): Promise<boolean> {
+    if (
+      delivery.status === DeliveryStatus.Acked ||
+      delivery.status === DeliveryStatus.DeadLetter
+    ) {
       return false;
     }
 
@@ -425,7 +456,9 @@ export class FederationDeliveryService
   private async serializeDeliveryById(
     deliveryId: string,
   ): Promise<Record<string, unknown>> {
-    const delivery = await this.deliveryRepository.findOneBy({ id: deliveryId });
+    const delivery = await this.deliveryRepository.findOneBy({
+      id: deliveryId,
+    });
 
     if (!delivery) {
       throw new FederationHttpException(
@@ -435,7 +468,9 @@ export class FederationDeliveryService
       );
     }
 
-    const event = await this.eventRepository.findOneBy({ id: delivery.eventId });
+    const event = await this.eventRepository.findOneBy({
+      id: delivery.eventId,
+    });
 
     if (!event) {
       throw new FederationHttpException(
@@ -469,15 +504,23 @@ export class FederationDeliveryService
     };
   }
 
-  private externalEventType(delivery: DeliveryEntity, event: EventEntity): string {
-    if (event.eventType === 'dm.send' && event.actorAgentId !== delivery.recipientAgentId) {
+  private externalEventType(
+    delivery: DeliveryEntity,
+    event: EventEntity,
+  ): string {
+    if (
+      event.eventType === 'dm.send' &&
+      event.actorAgentId !== delivery.recipientAgentId
+    ) {
       return 'dm.received';
     }
 
     return event.eventType;
   }
 
-  private async nextSequenceForRecipient(recipientAgentId: string): Promise<number> {
+  private async nextSequenceForRecipient(
+    recipientAgentId: string,
+  ): Promise<number> {
     const deliveries = await this.deliveryRepository.find({
       where: { recipientAgentId },
       order: { sequence: 'DESC' },
@@ -488,7 +531,10 @@ export class FederationDeliveryService
   }
 
   private nextAttemptAt(attemptCount: number): Date {
-    const delayMs = this.retryScheduleMs[Math.min(attemptCount, this.retryScheduleMs.length - 1)] ?? 0;
+    const delayMs =
+      this.retryScheduleMs[
+        Math.min(attemptCount, this.retryScheduleMs.length - 1)
+      ] ?? 0;
     return new Date(Date.now() + delayMs);
   }
 

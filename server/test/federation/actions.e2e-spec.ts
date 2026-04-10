@@ -9,6 +9,7 @@ import { PolicyService } from '../../src/modules/policy/policy.service';
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import {
   claimFederatedAgent,
@@ -30,7 +31,9 @@ describe('Federation actions (e2e)', () => {
     federationCredentialsService = app.get(FederationCredentialsService);
     policyService = app.get(PolicyService);
     eventRepository = context.dataSource.getRepository(EventEntity);
-    federationActionRepository = context.dataSource.getRepository(FederationActionEntity);
+    federationActionRepository = context.dataSource.getRepository(
+      FederationActionEntity,
+    );
   });
 
   afterAll(async () => {
@@ -38,14 +41,27 @@ describe('Federation actions (e2e)', () => {
   });
 
   it('accepts dm.send asynchronously and deduplicates repeated Idempotency-Key submissions', async () => {
-    const sender = await importSelfAgent(app, 'actions-sender', 'Actions Sender');
-    const recipient = await importSelfAgent(app, 'actions-recipient', 'Actions Recipient');
+    const sender = await importSelfAgent(
+      app,
+      'actions-sender',
+      'Actions Sender',
+    );
+    const recipient = await importSelfAgent(
+      app,
+      'actions-recipient',
+      'Actions Recipient',
+    );
     await policyService.upsertAgentSafetyPolicy(recipient.id, {
       dmAcceptanceMode: AgentDmAcceptanceMode.Open,
     });
-    const senderClaim = await claimFederatedAgent(app, federationCredentialsService, sender.id, {
-      pollingEnabled: true,
-    });
+    const senderClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      sender.id,
+      {
+        pollingEnabled: true,
+      },
+    );
     await claimFederatedAgent(app, federationCredentialsService, recipient.id, {
       pollingEnabled: true,
     });
@@ -79,13 +95,17 @@ describe('Federation actions (e2e)', () => {
         },
       })
       .expect(200);
+    const firstResponseBody = typedValue<{ id: string }>(firstResponse.body);
+    const duplicateResponseBody = typedValue<{ id: string }>(
+      duplicateResponse.body,
+    );
 
-    expect(duplicateResponse.body.id).toBe(firstResponse.body.id);
+    expect(duplicateResponseBody.id).toBe(firstResponseBody.id);
 
     const finalAction = await waitForActionStatus(
       app,
       senderClaim.accessToken,
-      firstResponse.body.id,
+      firstResponseBody.id,
     );
 
     expect(finalAction.status).toBe('succeeded');
@@ -104,10 +124,19 @@ describe('Federation actions (e2e)', () => {
   });
 
   it('rejects requests without Idempotency-Key and surfaces async action errors via GET /actions/:id', async () => {
-    const sender = await importSelfAgent(app, 'actions-errors', 'Actions Errors');
-    const senderClaim = await claimFederatedAgent(app, federationCredentialsService, sender.id, {
-      pollingEnabled: true,
-    });
+    const sender = await importSelfAgent(
+      app,
+      'actions-errors',
+      'Actions Errors',
+    );
+    const senderClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      sender.id,
+      {
+        pollingEnabled: true,
+      },
+    );
 
     await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -119,7 +148,7 @@ describe('Federation actions (e2e)', () => {
         },
       })
       .expect(400)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: { error: { code: string } } }) => {
         expect(body.error.code).toBe('idempotency_key_required');
       });
 
@@ -134,11 +163,14 @@ describe('Federation actions (e2e)', () => {
         },
       })
       .expect(202);
+    const unsupportedActionBody = typedValue<{ id: string }>(
+      unsupportedAction.body,
+    );
 
     const finalAction = await waitForActionStatus(
       app,
       senderClaim.accessToken,
-      unsupportedAction.body.id,
+      unsupportedActionBody.id,
     );
 
     expect(finalAction.status).toBe('rejected');

@@ -1,31 +1,42 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
+import 'core/auth/auth_repository.dart';
 import 'core/config/app_environment.dart';
+import 'core/network/agents_repository.dart';
+import 'core/network/api_exception.dart';
+import 'core/network/notifications_repository.dart';
 import 'core/navigation/app_shell_tab.dart';
 import 'core/network/api_client.dart';
+import 'core/session/app_session_controller.dart';
+import 'core/session/app_session_scope.dart';
+import 'core/session/app_session_storage.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_effects.dart';
 import 'core/theme/app_radii.dart';
 import 'core/theme/app_spacing.dart';
 import 'core/widgets/glass_panel.dart';
-import 'core/widgets/primary_gradient_button.dart';
 import 'core/widgets/status_chip.dart';
-import 'core/widgets/surface_card.dart';
 import 'features/agents_hall/agents_hall_screen.dart';
 import 'features/agents_hall/agents_hall_view_model.dart';
 import 'features/chat/chat_screen.dart';
-import 'features/chat/chat_view_model.dart';
 import 'features/debate/debate_screen.dart';
 import 'features/debate/debate_view_model.dart';
 import 'features/forum/forum_screen.dart';
 import 'features/forum/forum_view_model.dart';
 import 'features/hub/hub_screen.dart';
-import 'features/hub/hub_view_model.dart';
 
 class AgentsChatAppShell extends StatefulWidget {
-  const AgentsChatAppShell({super.key, required this.environment});
+  const AgentsChatAppShell({
+    super.key,
+    required this.environment,
+    this.sessionController,
+    this.notificationsRepository,
+  });
 
   final AppEnvironment environment;
+  final AppSessionController? sessionController;
+  final NotificationsRepository? notificationsRepository;
 
   @override
   State<AgentsChatAppShell> createState() => _AgentsChatAppShellState();
@@ -33,43 +44,47 @@ class AgentsChatAppShell extends StatefulWidget {
 
 class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
   AppShellTab _currentTab = AppShellTab.hall;
-  late final ApiClient _apiClient;
-  String _selectedAgentId = 'agt-xenon-7';
+  late final AppSessionController _sessionController;
+  late final NotificationsRepository _notificationsRepository;
+  late final bool _ownsSessionController;
+  List<_ShellNotification> _notifications = const [];
+  NotificationBellState _notificationBellState = NotificationBellState.empty;
+  String? _notificationsErrorMessage;
+  String? _notificationsUserId;
+  int _notificationsRequestId = 0;
 
   @override
   void initState() {
     super.initState();
-    _apiClient = ApiClient(baseUrl: widget.environment.apiBaseUrl);
+    final apiClient =
+        widget.sessionController?.apiClient ??
+        ApiClient(baseUrl: widget.environment.apiBaseUrl);
+    _ownsSessionController = widget.sessionController == null;
+    _sessionController =
+        widget.sessionController ??
+        AppSessionController(
+          apiClient: apiClient,
+          authRepository: AuthRepository(apiClient: apiClient),
+          agentsRepository: AgentsRepository(apiClient: apiClient),
+          storage: const SharedPreferencesAppSessionStorage(),
+          enableLocalPreviewAgents:
+              widget.environment.flavor == AppFlavor.local,
+        );
+    _notificationsRepository =
+        widget.notificationsRepository ??
+        NotificationsRepository(apiClient: apiClient);
+    _sessionController.addListener(_handleSessionChanged);
+    unawaited(_sessionController.bootstrap());
   }
 
-  void _onSelectedAgentChanged(String agentId) {
-    setState(() {
-      _selectedAgentId = agentId;
-    });
+  @override
+  void dispose() {
+    _sessionController.removeListener(_handleSessionChanged);
+    if (_ownsSessionController) {
+      _sessionController.dispose();
+    }
+    super.dispose();
   }
-  final List<_ShellNotification> _notifications = [
-    const _ShellNotification(
-      id: 'notif-claim-confirmed',
-      title: 'Orbit-9 claim confirmed',
-      detail: 'Your pending claim is ready to move into the Hub carousel.',
-      accentColor: AppColors.tertiary,
-      isUnread: true,
-    ),
-    const _ShellNotification(
-      id: 'notif-debate-started',
-      title: 'Live debate resumed',
-      detail: 'Logos_V2 and Xenon-7 are back on stage in the alignment room.',
-      accentColor: AppColors.primary,
-      isUnread: true,
-    ),
-    const _ShellNotification(
-      id: 'notif-follow-topic',
-      title: 'Followed topic is trending',
-      detail: 'Ethics of AI: The Alignment Problem crossed 800 views.',
-      accentColor: AppColors.primaryFixed,
-      isUnread: false,
-    ),
-  ];
 
   void _selectTab(AppShellTab tab) {
     if (_currentTab == tab) {
@@ -81,10 +96,182 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
     });
   }
 
-  bool get _hasUnreadNotifications =>
-      _notifications.any((notification) => notification.isUnread);
+  bool get _hasUnreadNotifications => _notificationBellState.hasUnread;
+
+  String? get _liveNotificationsUserId {
+    if (_sessionController.bootstrapStatus != AppSessionBootstrapStatus.ready ||
+        !_sessionController.isAuthenticated) {
+      return null;
+    }
+
+    final userId = _sessionController.currentUser?.id;
+    if (userId == null || userId.isEmpty) {
+      return null;
+    }
+    return userId;
+  }
+
+  void _handleSessionChanged() {
+    final nextUserId = _liveNotificationsUserId;
+    if (nextUserId == null) {
+      if (_notificationsUserId == null &&
+          _notifications.isEmpty &&
+          !_notificationBellState.hasUnread) {
+        return;
+      }
+
+      setState(() {
+        _notificationsUserId = null;
+        _notifications = const [];
+        _notificationBellState = NotificationBellState.empty;
+        _notificationsErrorMessage = null;
+      });
+      return;
+    }
+
+    if (_notificationsUserId == nextUserId) {
+      return;
+    }
+
+    _notificationsUserId = nextUserId;
+    unawaited(_refreshNotificationBellState(userId: nextUserId));
+  }
+
+  bool _canApplyNotificationsResult(int requestId, String userId) {
+    return mounted &&
+        requestId == _notificationsRequestId &&
+        _liveNotificationsUserId == userId;
+  }
+
+  Future<void> _refreshNotificationBellState({required String userId}) async {
+    final requestId = ++_notificationsRequestId;
+    try {
+      final bellState = await _notificationsRepository.bellState();
+      if (!_canApplyNotificationsResult(requestId, userId)) {
+        return;
+      }
+
+      setState(() {
+        _notificationBellState = bellState;
+        _notificationsErrorMessage = null;
+      });
+    } on ApiException catch (error) {
+      if (!_canApplyNotificationsResult(requestId, userId)) {
+        return;
+      }
+
+      if (error.isUnauthorized) {
+        await _sessionController.handleUnauthorized();
+        return;
+      }
+
+      setState(() {
+        _notificationsErrorMessage =
+            'Notifications are temporarily unavailable.';
+      });
+    } catch (_) {
+      if (!_canApplyNotificationsResult(requestId, userId)) {
+        return;
+      }
+
+      setState(() {
+        _notificationsErrorMessage =
+            'Notifications are temporarily unavailable.';
+      });
+    }
+  }
+
+  Future<void> _refreshNotifications({required String userId}) async {
+    final requestId = ++_notificationsRequestId;
+    try {
+      final listResponse = await _notificationsRepository.list();
+      final bellState = await _notificationsRepository.bellState();
+      if (!_canApplyNotificationsResult(requestId, userId)) {
+        return;
+      }
+
+      setState(() {
+        _notifications = listResponse.notifications
+            .map(_ShellNotification.fromRecord)
+            .toList(growable: false);
+        _notificationBellState = bellState;
+        _notificationsErrorMessage = null;
+      });
+    } on ApiException catch (error) {
+      if (!_canApplyNotificationsResult(requestId, userId)) {
+        return;
+      }
+
+      if (error.isUnauthorized) {
+        await _sessionController.handleUnauthorized();
+        return;
+      }
+
+      setState(() {
+        _notificationsErrorMessage =
+            'Notifications are temporarily unavailable.';
+      });
+    } catch (_) {
+      if (!_canApplyNotificationsResult(requestId, userId)) {
+        return;
+      }
+
+      setState(() {
+        _notificationsErrorMessage =
+            'Notifications are temporarily unavailable.';
+      });
+    }
+  }
+
+  Future<bool> _markNotificationsRead({required String userId}) async {
+    final requestId = ++_notificationsRequestId;
+    try {
+      final bellState = await _notificationsRepository.markRead(markAll: true);
+      if (!_canApplyNotificationsResult(requestId, userId)) {
+        return false;
+      }
+
+      setState(() {
+        _notificationBellState = bellState;
+        _notificationsErrorMessage = null;
+      });
+      return true;
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await _sessionController.handleUnauthorized();
+        return false;
+      }
+
+      if (mounted) {
+        setState(() {
+          _notificationsErrorMessage =
+              'Notifications are temporarily unavailable.';
+        });
+      }
+      return false;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _notificationsErrorMessage =
+              'Notifications are temporarily unavailable.';
+        });
+      }
+      return false;
+    }
+  }
 
   Future<void> _openNotificationCenter() async {
+    final userId = _liveNotificationsUserId;
+    if (userId != null) {
+      await _refreshNotifications(userId: userId);
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final shouldMarkRead =
+        userId != null &&
+        _notifications.any((notification) => notification.isUnread);
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -92,78 +279,83 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       builder: (context) => _NotificationCenterSheet(
         notifications: _notifications,
         hasUnreadNotifications: _hasUnreadNotifications,
+        isAuthenticated: userId != null,
+        errorMessage: _notificationsErrorMessage,
       ),
     );
 
-    if (!mounted || !_hasUnreadNotifications) {
+    if (!mounted || !shouldMarkRead) {
       return;
     }
 
-    setState(() {
-      for (var index = 0; index < _notifications.length; index += 1) {
-        _notifications[index] = _notifications[index].copyWith(isUnread: false);
-      }
-    });
+    final didMarkRead = await _markNotificationsRead(userId: userId);
+    if (!mounted || !didMarkRead) {
+      return;
+    }
+
+    await _refreshNotifications(userId: userId);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: AppEffects.backgroundGradient,
-        ),
-        child: Stack(
-          children: [
-            const _ShellBackdrop(),
-            SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  _ShellTopBar(
-                    currentTab: _currentTab,
-                    flavorLabel: widget.environment.flavor.label,
-                    hasUnreadNotifications: _hasUnreadNotifications,
-                    onOpenNotifications: _openNotificationCenter,
-                  ),
-                  Expanded(
-                    child: AnimatedSwitcher(
-                      duration: AppEffects.medium,
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, animation) {
-                        final slideAnimation = Tween<Offset>(
-                          begin: const Offset(0.06, 0),
-                          end: Offset.zero,
-                        ).animate(animation);
+    return AppSessionScope(
+      controller: _sessionController,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: AppEffects.backgroundGradient,
+          ),
+          child: Stack(
+            children: [
+              const _ShellBackdrop(),
+              SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    _ShellTopBar(
+                      currentTab: _currentTab,
+                      hasUnreadNotifications: _hasUnreadNotifications,
+                      onOpenNotifications: _openNotificationCenter,
+                    ),
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: AppEffects.medium,
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          final slideAnimation = Tween<Offset>(
+                            begin: const Offset(0.06, 0),
+                            end: Offset.zero,
+                          ).animate(animation);
 
-                        return FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: slideAnimation,
-                            child: child,
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: slideAnimation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: KeyedSubtree(
+                          key: ValueKey(_currentTab),
+                          child: _TabSurfaceBuilder(
+                            tab: _currentTab,
+                            environment: widget.environment,
                           ),
-                        );
-                      },
-                      child: KeyedSubtree(
-                        key: ValueKey(_currentTab),
-                        child: _TabSurfaceBuilder(
-                          tab: _currentTab,
-                          environment: widget.environment,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-      bottomNavigationBar: _ShellBottomDock(
-        currentTab: _currentTab,
-        onSelect: _selectTab,
+        bottomNavigationBar: _ShellBottomDock(
+          currentTab: _currentTab,
+          onSelect: _selectTab,
+        ),
       ),
     );
   }
@@ -235,71 +427,67 @@ class _GlowOrb extends StatelessWidget {
 class _ShellTopBar extends StatelessWidget {
   const _ShellTopBar({
     required this.currentTab,
-    required this.flavorLabel,
     required this.hasUnreadNotifications,
     required this.onOpenNotifications,
   });
 
   final AppShellTab currentTab;
-  final String flavorLabel;
   final bool hasUnreadNotifications;
   final VoidCallback onOpenNotifications;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.md,
-        AppSpacing.xl,
-        AppSpacing.lg,
-      ),
-      child: GlassPanel(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
+    return Container(
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.background.withValues(alpha: 0.84),
+        border: Border(
+          bottom: BorderSide(color: AppColors.primary.withValues(alpha: 0.06)),
         ),
-        borderRadius: AppRadii.hero,
-        child: Row(
-          children: [
-            const _ToneIcon(
-              icon: Icons.blur_on_rounded,
-              accentColor: AppColors.primary,
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Agents Chat',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(color: AppColors.primary),
-                  ),
-                  const SizedBox(height: AppSpacing.xxs),
-                  Text(
-                    '${currentTab.label} shell',
-                    key: const Key('active-tab-label'),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 218, 243, 0.08),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.blur_on_rounded,
+            color: AppColors.primary,
+            size: AppSpacing.xl,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              currentTab.topBarTitle,
+              key: const Key('active-tab-label'),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2.2,
               ),
             ),
-            StatusChip(
-              label: flavorLabel,
-              tone: StatusChipTone.neutral,
-              showDot: false,
+          ),
+          if (currentTab.showsSearchAction) ...[
+            _GhostIconButton(
+              buttonKey: const Key('shell-search-button'),
+              icon: Icons.search_rounded,
+              isHighlighted: false,
+              onTap: () {},
             ),
             const SizedBox(width: AppSpacing.sm),
-            _GhostIconButton(
-              buttonKey: const Key('notification-center-button'),
-              icon: Icons.notifications_active_outlined,
-              isHighlighted: hasUnreadNotifications,
-              onTap: onOpenNotifications,
-            ),
           ],
-        ),
+          _GhostIconButton(
+            buttonKey: const Key('notification-center-button'),
+            icon: Icons.notifications_active_outlined,
+            isHighlighted: hasUnreadNotifications,
+            onTap: onOpenNotifications,
+          ),
+        ],
       ),
     );
   }
@@ -485,91 +673,20 @@ class _ShellTabButton extends StatelessWidget {
 }
 
 class _TabSurfaceBuilder extends StatelessWidget {
-  const _TabSurfaceBuilder({
-    required this.tab,
-    required this.environment,
-    required this.apiClient,
-    required this.selectedAgentId,
-    required this.onSelectedAgentChanged,
-  });
+  const _TabSurfaceBuilder({required this.tab, required this.environment});
 
   final AppShellTab tab;
   final AppEnvironment environment;
-  final ApiClient apiClient;
-  final String selectedAgentId;
-  final ValueChanged<String> onSelectedAgentChanged;
 
   @override
   Widget build(BuildContext context) {
     return switch (tab) {
       AppShellTab.hall => _HallSurface(tab: tab),
       AppShellTab.forum => _ForumSurface(tab: tab),
-      AppShellTab.chat => _ChatSurface(
-          tab: tab,
-          apiClient: apiClient,
-          activeAgentId: selectedAgentId,
-        ),
+      AppShellTab.chat => _ChatSurface(tab: tab),
       AppShellTab.live => _LiveSurface(tab: tab),
-      AppShellTab.hub => _HubSurface(
-          tab: tab,
-          environment: environment,
-          onSelectedAgentChanged: onSelectedAgentChanged,
-        ),
+      AppShellTab.hub => _HubSurface(tab: tab, environment: environment),
     };
-  }
-}
-
-class _SurfaceScaffold extends StatelessWidget {
-  const _SurfaceScaffold({
-    required this.tab,
-    required this.eyebrow,
-    required this.title,
-    required this.subtitle,
-    required this.statusChips,
-    required this.children,
-  });
-
-  final AppShellTab tab;
-  final String eyebrow;
-  final String title;
-  final String subtitle;
-  final List<Widget> statusChips;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      key: Key('surface-${tab.id}'),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        0,
-        AppSpacing.xl,
-        AppSpacing.xxxl,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            eyebrow.toUpperCase(),
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(color: AppColors.primary),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(title, style: Theme.of(context).textTheme.displaySmall),
-          const SizedBox(height: AppSpacing.md),
-          Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
-          const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: statusChips,
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          ...children,
-        ],
-      ),
-    );
   }
 }
 
@@ -596,23 +713,13 @@ class _ForumSurface extends StatelessWidget {
 }
 
 class _ChatSurface extends StatelessWidget {
-  const _ChatSurface({
-    required this.tab,
-    required this.apiClient,
-    required this.activeAgentId,
-  });
+  const _ChatSurface({required this.tab});
 
   final AppShellTab tab;
-  final ApiClient apiClient;
-  final String activeAgentId;
 
   @override
   Widget build(BuildContext context) {
-    return ChatScreen(
-      initialViewModel: ChatViewModel.signedInSample(),
-      apiClient: apiClient,
-      activeAgentId: activeAgentId,
-    );
+    return const ChatScreen();
   }
 }
 
@@ -628,22 +735,14 @@ class _LiveSurface extends StatelessWidget {
 }
 
 class _HubSurface extends StatelessWidget {
-  const _HubSurface({
-    required this.tab,
-    required this.environment,
-    required this.onSelectedAgentChanged,
-  });
+  const _HubSurface({required this.tab, required this.environment});
 
   final AppShellTab tab;
   final AppEnvironment environment;
-  final ValueChanged<String> onSelectedAgentChanged;
 
   @override
   Widget build(BuildContext context) {
-    return HubScreen(
-      initialViewModel: HubViewModel.sample(apiBaseUrl: environment.apiBaseUrl),
-      onSelectedAgentChanged: onSelectedAgentChanged,
-    );
+    return const HubScreen();
   }
 }
 
@@ -651,10 +750,14 @@ class _NotificationCenterSheet extends StatelessWidget {
   const _NotificationCenterSheet({
     required this.notifications,
     required this.hasUnreadNotifications,
+    required this.isAuthenticated,
+    required this.errorMessage,
   });
 
   final List<_ShellNotification> notifications;
   final bool hasUnreadNotifications;
+  final bool isAuthenticated;
+  final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -699,8 +802,10 @@ class _NotificationCenterSheet extends StatelessWidget {
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
                               hasUnreadNotifications
-                                  ? 'Unread alerts are highlighted in blue until opened.'
-                                  : 'All alerts have been reviewed in this sample session.',
+                                  ? 'Unread alerts are highlighted in blue until reviewed.'
+                                  : isAuthenticated
+                                  ? 'You are all caught up with the live notification feed.'
+                                  : 'Sign in to review notifications for this account.',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ],
@@ -714,11 +819,35 @@ class _NotificationCenterSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  for (var index = 0; index < notifications.length; index += 1) ...[
-                    _NotificationRow(notification: notifications[index]),
-                    if (index != notifications.length - 1)
-                      const SizedBox(height: AppSpacing.md),
+                  if (errorMessage != null) ...[
+                    Text(
+                      errorMessage!,
+                      key: const Key('notification-center-error'),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: AppColors.error),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
                   ],
+                  if (notifications.isEmpty)
+                    Text(
+                      errorMessage != null
+                          ? 'Try again in a moment.'
+                          : isAuthenticated
+                          ? 'No notifications yet.'
+                          : 'Sign in to view notifications.',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    )
+                  else
+                    for (
+                      var index = 0;
+                      index < notifications.length;
+                      index += 1
+                    ) ...[
+                      _NotificationRow(notification: notifications[index]),
+                      if (index != notifications.length - 1)
+                        const SizedBox(height: AppSpacing.md),
+                    ],
                 ],
               ),
             ),
@@ -793,251 +922,6 @@ class _NotificationRow extends StatelessWidget {
   }
 }
 
-class _DebateLane extends StatelessWidget {
-  const _DebateLane({
-    required this.label,
-    required this.status,
-    required this.accentColor,
-  });
-
-  final String label;
-  final String status;
-  final Color accentColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.06),
-        borderRadius: AppRadii.large,
-        border: Border.all(color: accentColor.withValues(alpha: 0.18)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          children: [
-            _ToneIcon(icon: Icons.person_2_rounded, accentColor: accentColor),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(color: accentColor),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              status.toUpperCase(),
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: accentColor),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ConversationPreviewCard extends StatelessWidget {
-  const _ConversationPreviewCard({
-    required this.name,
-    required this.preview,
-    required this.timestamp,
-    required this.accentColor,
-    this.highlighted = false,
-  });
-
-  final String name;
-  final String preview;
-  final String timestamp;
-  final Color accentColor;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      accentColor: accentColor,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 3,
-            height: 68,
-            decoration: BoxDecoration(
-              color: highlighted ? accentColor : AppColors.outline,
-              borderRadius: AppRadii.pill,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          _ToneIcon(icon: Icons.smart_toy_rounded, accentColor: accentColor),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: highlighted
-                              ? accentColor
-                              : AppColors.onSurface,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      timestamp.toUpperCase(),
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(preview, style: Theme.of(context).textTheme.bodyMedium),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ConfigRow extends StatelessWidget {
-  const _ConfigRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      accentColor: AppColors.tertiary,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label.toUpperCase(),
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.tertiarySoft,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  value,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurface),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          const _ToneIcon(
-            icon: Icons.settings_ethernet_rounded,
-            accentColor: AppColors.tertiary,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniSignalCard extends StatelessWidget {
-  const _MiniSignalCard({
-    required this.title,
-    required this.value,
-    required this.accentColor,
-  });
-
-  final String title;
-  final String value;
-  final Color accentColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 140,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: accentColor.withValues(alpha: 0.08),
-          borderRadius: AppRadii.medium,
-          border: Border.all(color: accentColor.withValues(alpha: 0.16)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title.toUpperCase(),
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: accentColor),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(value, style: Theme.of(context).textTheme.titleMedium),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuotePanel extends StatelessWidget {
-  const _QuotePanel({this.accentColor = AppColors.primary});
-
-  final Color accentColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLow.withValues(alpha: 0.7),
-        borderRadius: AppRadii.large,
-        border: Border.all(color: accentColor.withValues(alpha: 0.16)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 3,
-              height: 54,
-              decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius: AppRadii.pill,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Text(
-                '“Theme, chrome, and shell density are locked. Data, actions, and domain logic arrive in later tasks.”',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.onSurface,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ToneIcon extends StatelessWidget {
   const _ToneIcon({required this.icon, required this.accentColor});
 
@@ -1060,33 +944,6 @@ class _ToneIcon extends StatelessWidget {
   }
 }
 
-class _VersusBadge extends StatelessWidget {
-  const _VersusBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceHighest,
-        borderRadius: AppRadii.pill,
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.5)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        child: Text(
-          'VS',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(color: AppColors.primary),
-        ),
-      ),
-    );
-  }
-}
-
 class _ShellNotification {
   const _ShellNotification({
     required this.id,
@@ -1101,6 +958,61 @@ class _ShellNotification {
   final String detail;
   final Color accentColor;
   final bool isUnread;
+
+  factory _ShellNotification.fromRecord(NotificationRecord record) {
+    final kind = record.kind ?? '';
+    return _ShellNotification(
+      id: record.id,
+      title: _titleFor(kind),
+      detail: _detailFor(record, kind),
+      accentColor: _accentColorFor(kind),
+      isUnread: record.isUnread,
+    );
+  }
+
+  static String _titleFor(String kind) {
+    switch (kind) {
+      case 'dm.received':
+        return 'New direct message';
+      case 'forum.reply':
+        return 'New forum reply';
+      case 'debate.activity':
+        return 'Debate activity';
+      default:
+        return kind.isEmpty ? 'Notification' : kind;
+    }
+  }
+
+  static String _detailFor(NotificationRecord record, String kind) {
+    final payloadContent = record.payload['content'];
+    if (payloadContent is String && payloadContent.trim().isNotEmpty) {
+      return payloadContent.trim();
+    }
+
+    switch (kind) {
+      case 'dm.received':
+        return 'A new direct message is ready to review.';
+      case 'forum.reply':
+        return 'A followed conversation has a new reply.';
+      case 'debate.activity':
+        return 'There is new activity in a debate you follow.';
+      default:
+        return 'A live notification is ready to review.';
+    }
+  }
+
+  static Color _accentColorFor(String kind) {
+    switch (kind) {
+      case 'dm.received':
+        return AppColors.primary;
+      case 'forum.reply':
+        return AppColors.primaryFixed;
+      case 'debate.activity':
+        return AppColors.tertiary;
+      default:
+        return AppColors.primary;
+    }
+  }
 
   _ShellNotification copyWith({bool? isUnread}) {
     return _ShellNotification(

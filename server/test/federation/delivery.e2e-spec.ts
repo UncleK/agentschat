@@ -1,8 +1,12 @@
-import { AddressInfo, createServer } from 'node:http';
+import { createServer } from 'node:http';
+import { AddressInfo } from 'node:net';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
-import { AgentDmAcceptanceMode, DeliveryStatus } from '../../src/database/domain.enums';
+import {
+  AgentDmAcceptanceMode,
+  DeliveryStatus,
+} from '../../src/database/domain.enums';
 import { DeliveryEntity } from '../../src/database/entities/delivery.entity';
 import { EventEntity } from '../../src/database/entities/event.entity';
 import { FederationCredentialsService } from '../../src/modules/federation/federation-credentials.service';
@@ -10,12 +14,34 @@ import { PolicyService } from '../../src/modules/policy/policy.service';
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import {
   claimFederatedAgent,
   importSelfAgent,
   waitForActionStatus,
 } from './support/federation-test-support';
+
+interface AcceptedActionBody {
+  id: string;
+}
+
+interface DeliveryPollBody {
+  cursor: string | null;
+  deliveries: Array<{
+    deliveryId: string;
+    event: {
+      type: string;
+      content: string;
+    };
+  }>;
+}
+
+interface AckBody {
+  results: Array<{
+    status: string;
+  }>;
+}
 
 describe('Federation delivery (e2e)', () => {
   let app: INestApplication;
@@ -39,14 +65,27 @@ describe('Federation delivery (e2e)', () => {
   });
 
   it('supports cursor polling, explicit ACKs, and per-recipient ordering', async () => {
-    const sender = await importSelfAgent(app, 'delivery-poll-sender', 'Delivery Poll Sender');
-    const recipient = await importSelfAgent(app, 'delivery-poll-recipient', 'Delivery Poll Recipient');
+    const sender = await importSelfAgent(
+      app,
+      'delivery-poll-sender',
+      'Delivery Poll Sender',
+    );
+    const recipient = await importSelfAgent(
+      app,
+      'delivery-poll-recipient',
+      'Delivery Poll Recipient',
+    );
     await policyService.upsertAgentSafetyPolicy(recipient.id, {
       dmAcceptanceMode: AgentDmAcceptanceMode.Open,
     });
-    const senderClaim = await claimFederatedAgent(app, federationCredentialsService, sender.id, {
-      pollingEnabled: true,
-    });
+    const senderClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      sender.id,
+      {
+        pollingEnabled: true,
+      },
+    );
     const recipientClaim = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -82,62 +121,80 @@ describe('Federation delivery (e2e)', () => {
         },
       })
       .expect(202);
+    const firstActionBody = typedValue<AcceptedActionBody>(firstAction.body);
+    const secondActionBody = typedValue<AcceptedActionBody>(secondAction.body);
 
-    await waitForActionStatus(app, senderClaim.accessToken, firstAction.body.id);
-    await waitForActionStatus(app, senderClaim.accessToken, secondAction.body.id);
+    await waitForActionStatus(app, senderClaim.accessToken, firstActionBody.id);
+    await waitForActionStatus(
+      app,
+      senderClaim.accessToken,
+      secondActionBody.id,
+    );
 
     const firstPoll = await request(app.getHttpServer())
       .get('/api/v1/deliveries/poll?wait_seconds=1')
       .set('Authorization', `Bearer ${recipientClaim.accessToken}`)
       .expect(200);
+    const firstPollBody = typedValue<DeliveryPollBody>(firstPoll.body);
 
-    expect(firstPoll.body.deliveries).toHaveLength(1);
-    expect(firstPoll.body.deliveries[0].event.type).toBe('dm.received');
-    expect(firstPoll.body.deliveries[0].event.content).toBe('First message');
+    expect(firstPollBody.deliveries).toHaveLength(1);
+    expect(firstPollBody.deliveries[0]?.event.type).toBe('dm.received');
+    expect(firstPollBody.deliveries[0]?.event.content).toBe('First message');
 
     const repeatedFirstPoll = await request(app.getHttpServer())
-      .get(`/api/v1/deliveries/poll?cursor=${firstPoll.body.cursor}&wait_seconds=1`)
+      .get(
+        `/api/v1/deliveries/poll?cursor=${firstPollBody.cursor}&wait_seconds=1`,
+      )
       .set('Authorization', `Bearer ${recipientClaim.accessToken}`)
       .expect(200);
+    const repeatedFirstPollBody = typedValue<DeliveryPollBody>(
+      repeatedFirstPoll.body,
+    );
 
-    expect(repeatedFirstPoll.body.deliveries).toHaveLength(1);
-    expect(repeatedFirstPoll.body.deliveries[0].deliveryId).toBe(
-      firstPoll.body.deliveries[0].deliveryId,
+    expect(repeatedFirstPollBody.deliveries).toHaveLength(1);
+    expect(repeatedFirstPollBody.deliveries[0]?.deliveryId).toBe(
+      firstPollBody.deliveries[0]?.deliveryId,
     );
 
     await request(app.getHttpServer())
       .post('/api/v1/acks')
       .set('Authorization', `Bearer ${recipientClaim.accessToken}`)
       .send({
-        deliveryIds: [firstPoll.body.deliveries[0].deliveryId],
+        deliveryIds: [firstPollBody.deliveries[0]?.deliveryId],
       })
       .expect(201)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: AckBody }) => {
         expect(body.results[0].status).toBe('acked');
       });
 
     const secondPoll = await request(app.getHttpServer())
-      .get(`/api/v1/deliveries/poll?cursor=${firstPoll.body.cursor}&wait_seconds=1`)
+      .get(
+        `/api/v1/deliveries/poll?cursor=${firstPollBody.cursor}&wait_seconds=1`,
+      )
       .set('Authorization', `Bearer ${recipientClaim.accessToken}`)
       .expect(200);
+    const secondPollBody = typedValue<DeliveryPollBody>(secondPoll.body);
 
-    expect(secondPoll.body.deliveries).toHaveLength(1);
-    expect(secondPoll.body.deliveries[0].event.content).toBe('Second message');
+    expect(secondPollBody.deliveries).toHaveLength(1);
+    expect(secondPollBody.deliveries[0]?.event.content).toBe('Second message');
 
     await request(app.getHttpServer())
       .post('/api/v1/acks')
       .set('Authorization', `Bearer ${recipientClaim.accessToken}`)
       .send({
-        deliveryIds: [secondPoll.body.deliveries[0].deliveryId],
+        deliveryIds: [secondPollBody.deliveries[0]?.deliveryId],
       })
       .expect(201);
 
     const emptyPoll = await request(app.getHttpServer())
-      .get(`/api/v1/deliveries/poll?cursor=${secondPoll.body.cursor}&wait_seconds=0`)
+      .get(
+        `/api/v1/deliveries/poll?cursor=${secondPollBody.cursor}&wait_seconds=0`,
+      )
       .set('Authorization', `Bearer ${recipientClaim.accessToken}`)
       .expect(200);
+    const emptyPollBody = typedValue<DeliveryPollBody>(emptyPoll.body);
 
-    expect(emptyPoll.body.deliveries).toEqual([]);
+    expect(emptyPollBody.deliveries).toEqual([]);
   });
 
   it('retries webhook deliveries without ACK and eventually dead-letters them', async () => {
@@ -160,22 +217,43 @@ describe('Federation delivery (e2e)', () => {
         responseStream.end('ok');
       });
     });
-    await new Promise<void>((resolve) => webhookServer.listen(0, '127.0.0.1', resolve));
-    const webhookUrl = `http://127.0.0.1:${(webhookServer.address() as AddressInfo).port}/deliveries`;
+    await new Promise<void>((resolve) =>
+      webhookServer.listen(0, '127.0.0.1', resolve),
+    );
+    const webhookAddress = typedValue<AddressInfo>(webhookServer.address());
+    const webhookUrl = `http://127.0.0.1:${webhookAddress.port}/deliveries`;
 
     try {
-      const sender = await importSelfAgent(app, 'delivery-webhook-sender', 'Delivery Webhook Sender');
-      const recipient = await importSelfAgent(app, 'delivery-webhook-recipient', 'Delivery Webhook Recipient');
+      const sender = await importSelfAgent(
+        app,
+        'delivery-webhook-sender',
+        'Delivery Webhook Sender',
+      );
+      const recipient = await importSelfAgent(
+        app,
+        'delivery-webhook-recipient',
+        'Delivery Webhook Recipient',
+      );
       await policyService.upsertAgentSafetyPolicy(recipient.id, {
         dmAcceptanceMode: AgentDmAcceptanceMode.Open,
       });
-      const senderClaim = await claimFederatedAgent(app, federationCredentialsService, sender.id, {
-        pollingEnabled: true,
-      });
-      await claimFederatedAgent(app, federationCredentialsService, recipient.id, {
-        transportMode: 'webhook',
-        webhookUrl,
-      });
+      const senderClaim = await claimFederatedAgent(
+        app,
+        federationCredentialsService,
+        sender.id,
+        {
+          pollingEnabled: true,
+        },
+      );
+      await claimFederatedAgent(
+        app,
+        federationCredentialsService,
+        recipient.id,
+        {
+          transportMode: 'webhook',
+          webhookUrl,
+        },
+      );
 
       const actionResponse = await request(app.getHttpServer())
         .post('/api/v1/actions')
@@ -190,16 +268,39 @@ describe('Federation delivery (e2e)', () => {
           },
         })
         .expect(202);
+      const actionResponseBody = typedValue<AcceptedActionBody>(
+        actionResponse.body,
+      );
 
-      await waitForActionStatus(app, senderClaim.accessToken, actionResponse.body.id);
+      await waitForActionStatus(
+        app,
+        senderClaim.accessToken,
+        actionResponseBody.id,
+      );
 
-      const deadLetterDelivery = await waitForDeadLetter(deliveryRepository, recipient.id);
+      const deadLetterDelivery = await waitForDeadLetter(
+        deliveryRepository,
+        recipient.id,
+      );
 
       expect(receivedRequests.length).toBeGreaterThanOrEqual(2);
-      expect(receivedRequests[0].headers['x-agents-chat-signature']).toEqual(expect.any(String));
-      expect(receivedRequests[0].headers['x-agents-chat-timestamp']).toEqual(expect.any(String));
-      expect(receivedRequests[0].headers['x-agents-chat-delivery-id']).toEqual(expect.any(String));
-      expect(JSON.parse(receivedRequests[0].body).delivery.event.type).toBe('dm.received');
+      expect(receivedRequests[0].headers['x-agents-chat-signature']).toEqual(
+        expect.any(String),
+      );
+      expect(receivedRequests[0].headers['x-agents-chat-timestamp']).toEqual(
+        expect.any(String),
+      );
+      expect(receivedRequests[0].headers['x-agents-chat-delivery-id']).toEqual(
+        expect.any(String),
+      );
+      const webhookPayload = typedValue<{
+        delivery: {
+          event: {
+            type: string;
+          };
+        };
+      }>(JSON.parse(receivedRequests[0].body) as unknown);
+      expect(webhookPayload.delivery.event.type).toBe('dm.received');
       expect(deadLetterDelivery.status).toBe(DeliveryStatus.DeadLetter);
 
       const dmEvents = await eventRepository.findBy({
@@ -242,5 +343,7 @@ async function waitForDeadLetter(
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  throw new Error(`Timed out waiting for recipient ${recipientAgentId} to dead-letter a delivery.`);
+  throw new Error(
+    `Timed out waiting for recipient ${recipientAgentId} to dead-letter a delivery.`,
+  );
 }

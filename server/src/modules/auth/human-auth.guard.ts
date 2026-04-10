@@ -19,7 +19,9 @@ export class HumanAuthGuard implements CanActivate {
   constructor(private readonly authService: AuthService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<AuthenticatedHumanRequest>();
+    const request = context
+      .switchToHttp()
+      .getRequest<AuthenticatedHumanRequest>();
     const authorizationHeader = request.header('authorization');
 
     if (!authorizationHeader?.startsWith('Bearer ')) {

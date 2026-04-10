@@ -47,6 +47,48 @@ interface AuthoredContentInput {
   metadata?: Record<string, unknown>;
 }
 
+interface DirectMessageReadInput {
+  activeAgentId?: string | null;
+  cursor?: string | null;
+  limit?: string | null;
+}
+
+interface DirectMessageCursor {
+  occurredAt: Date;
+  eventId: string;
+}
+
+interface DirectMessageThreadEventRow {
+  threadId: string;
+  eventId: string;
+  contentType: EventContentType;
+  content: string | null;
+  occurredAt: Date;
+}
+
+interface DirectMessageCounterpartDto {
+  type: SubjectType;
+  id: string;
+  displayName: string;
+  handle: string | null;
+  avatarUrl: string | null;
+}
+
+interface DirectMessageAssetDto {
+  id: string;
+  kind: string;
+  mimeType: string;
+  byteSize: number | null;
+  storageBucket: string;
+  storageKey: string;
+}
+
+interface DirectMessageActorDto {
+  type: SubjectType;
+  id: string;
+  displayName: string;
+}
+
 interface ForumTopicCreateInput extends AuthoredContentInput {
   title?: string | null;
   tags?: unknown;
@@ -99,35 +141,36 @@ export class ContentService {
     human: AuthenticatedHuman,
     input: HumanDirectMessageInput,
   ) {
-    if (input.actorType?.trim().toLowerCase() === SubjectType.Agent || input.actorAgentId) {
+    if (
+      input.actorType?.trim().toLowerCase() === SubjectType.Agent ||
+      input.actorAgentId
+    ) {
       throw new ForbiddenException(
         'Humans can never impersonate agent-authored content.',
       );
     }
 
-    if (input.activeAgentId) {
-      const isOwner = await this.agentRepository.exist({
-        where: {
-          id: input.activeAgentId,
-          ownerType: AgentOwnerType.Human,
-          ownerUserId: human.id,
-        },
-      });
-
-      if (!isOwner) {
-        throw new ForbiddenException(
-          'Humans can only use their own agents as the active agent context.',
-        );
-      }
-    }
+    const activeAgentId = await this.resolveOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    const actor = activeAgentId
+      ? {
+          type: SubjectType.Agent,
+          id: activeAgentId,
+        }
+      : {
+          type: SubjectType.Human,
+          id: human.id,
+        };
 
     return this.sendDirectMessage(
-      {
-        type: SubjectType.Human,
-        id: human.id,
-      },
+      actor,
       this.resolveRecipient(input, human.id),
-      input,
+      {
+        ...input,
+        activeAgentId,
+      },
     );
   }
 
@@ -147,6 +190,175 @@ export class ContentService {
       input,
       input.idempotencyKey,
     );
+  }
+
+  async getDirectMessageThreads(
+    human: AuthenticatedHuman,
+    input: DirectMessageReadInput,
+  ) {
+    const activeAgentId = await this.requireOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    const limit = this.parseLimit(input.limit, 20, 50);
+    const cursor = this.parseDirectMessageCursor(input.cursor);
+    const latestEvents = await this.readLatestDirectMessageEvents(
+      activeAgentId,
+      cursor,
+      limit,
+    );
+    const pageEvents = latestEvents.slice(0, limit);
+    const threadIds = pageEvents.map((event) => event.threadId);
+    const participants =
+      threadIds.length === 0
+        ? []
+        : await this.threadParticipantRepository.find({
+            where: {
+              threadId: In(threadIds),
+            },
+            relations: {
+              agent: true,
+              user: true,
+            },
+          });
+    const participantsByThreadId = new Map<string, ThreadParticipantEntity[]>();
+    const unreadCountsByThreadId = await this.readDirectMessageUnreadCounts(
+      human.id,
+      activeAgentId,
+      threadIds,
+    );
+
+    for (const participant of participants) {
+      const threadParticipants =
+        participantsByThreadId.get(participant.threadId) ?? [];
+      threadParticipants.push(participant);
+      participantsByThreadId.set(participant.threadId, threadParticipants);
+    }
+
+    return {
+      activeAgentId,
+      threads: pageEvents.map((event) => ({
+        threadId: event.threadId,
+        counterpart: this.serializeDirectMessageCounterpart(
+          participantsByThreadId.get(event.threadId) ?? [],
+          activeAgentId,
+        ),
+        lastMessage: {
+          eventId: event.eventId,
+          contentType: event.contentType,
+          preview: this.buildDirectMessagePreview(
+            event.contentType,
+            event.content,
+          ),
+          occurredAt: event.occurredAt.toISOString(),
+        },
+        unreadCount: unreadCountsByThreadId.get(event.threadId) ?? 0,
+      })),
+      nextCursor:
+        latestEvents.length > limit && pageEvents.length > 0
+          ? this.encodeDirectMessageCursor(pageEvents.at(-1)!)
+          : null,
+    };
+  }
+
+  async getDirectMessageThreadMessages(
+    human: AuthenticatedHuman,
+    threadId: string,
+    input: DirectMessageReadInput,
+  ) {
+    const activeAgentId = await this.requireOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    const normalizedThreadId = this.requiredString(threadId, 'threadId');
+    await this.assertDirectMessageThreadMembership(
+      normalizedThreadId,
+      activeAgentId,
+    );
+    const limit = this.parseLimit(input.limit, 50, 100);
+    const cursor = this.parseDirectMessageCursor(input.cursor);
+    const query = this.eventRepository
+      .createQueryBuilder('event')
+      .leftJoinAndSelect('event.actorAgent', 'actorAgent')
+      .leftJoinAndSelect('event.actorUser', 'actorUser')
+      .leftJoinAndSelect('event.asset', 'asset')
+      .where('event.threadId = :threadId', {
+        threadId: normalizedThreadId,
+      })
+      .andWhere('event.eventType = :eventType', {
+        eventType: 'dm.send',
+      })
+      .orderBy('event.occurredAt', 'DESC')
+      .addOrderBy('event.id', 'DESC')
+      .take(limit + 1);
+
+    if (cursor) {
+      query.andWhere(
+        '(event.occurredAt < :cursorOccurredAt OR (event.occurredAt = :cursorOccurredAt AND event.id < :cursorEventId))',
+        {
+          cursorOccurredAt: cursor.occurredAt.toISOString(),
+          cursorEventId: cursor.eventId,
+        },
+      );
+    }
+
+    const events = await query.getMany();
+    const pageEvents = events.slice(0, limit);
+
+    return {
+      threadId: normalizedThreadId,
+      activeAgentId,
+      messages: pageEvents
+        .slice()
+        .reverse()
+        .map((event) => this.serializeDirectMessageMessage(event)),
+      nextCursor:
+        events.length > limit && pageEvents.length > 0
+          ? this.encodeDirectMessageCursor({
+              occurredAt: pageEvents.at(-1)!.occurredAt,
+              eventId: pageEvents.at(-1)!.id,
+            })
+          : null,
+    };
+  }
+
+  async markDirectMessageThreadRead(
+    human: AuthenticatedHuman,
+    threadId: string,
+    input: Pick<DirectMessageReadInput, 'activeAgentId'>,
+  ) {
+    const activeAgentId = await this.requireOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    const normalizedThreadId = this.requiredString(threadId, 'threadId');
+    const participant = await this.assertDirectMessageThreadMembership(
+      normalizedThreadId,
+      activeAgentId,
+    );
+    const latestEvent =
+      await this.readLatestDirectMessageThreadEvent(normalizedThreadId);
+
+    if (
+      latestEvent &&
+      (participant.lastReadEventId !== latestEvent.eventId ||
+        participant.lastReadAt?.getTime() !== latestEvent.occurredAt.getTime())
+    ) {
+      await this.threadParticipantRepository.update(
+        {
+          id: participant.id,
+        },
+        {
+          lastReadEventId: latestEvent.eventId,
+          lastReadAt: latestEvent.occurredAt,
+        },
+      );
+    }
+
+    return {
+      threadId: normalizedThreadId,
+      unreadCount: 0,
+    };
   }
 
   async createForumTopic(
@@ -174,7 +386,12 @@ export class ContentService {
         }),
       );
 
-      await this.ensureParticipant(manager, thread.id, actor, ThreadParticipantRole.Host);
+      await this.ensureParticipant(
+        manager,
+        thread.id,
+        actor,
+        ThreadParticipantRole.Host,
+      );
 
       const event = await eventRepository.save(
         eventRepository.create({
@@ -231,10 +448,14 @@ export class ContentService {
 
     await this.moderationService.assertThreadWritable(threadId);
 
-    const topicView = await this.forumTopicViewRepository.findOneBy({ threadId });
+    const topicView = await this.forumTopicViewRepository.findOneBy({
+      threadId,
+    });
 
     if (!topicView) {
-      throw new NotFoundException(`Forum topic view ${threadId} was not found.`);
+      throw new NotFoundException(
+        `Forum topic view ${threadId} was not found.`,
+      );
     }
 
     const parentEventId =
@@ -245,7 +466,9 @@ export class ContentService {
     });
 
     if (!parentEvent) {
-      throw new NotFoundException(`Parent event ${parentEventId} was not found.`);
+      throw new NotFoundException(
+        `Parent event ${parentEventId} was not found.`,
+      );
     }
 
     const authoredContent = await this.normalizeContentInput(input);
@@ -257,7 +480,12 @@ export class ContentService {
         id: topicView.id,
       });
 
-      await this.ensureParticipant(manager, threadId, actor, ThreadParticipantRole.Member);
+      await this.ensureParticipant(
+        manager,
+        threadId,
+        actor,
+        ThreadParticipantRole.Member,
+      );
 
       const event = await eventRepository.save(
         eventRepository.create({
@@ -297,7 +525,10 @@ export class ContentService {
       id: actorAgentId,
     });
 
-    const debateSessionId = this.requiredString(input.debateSessionId, 'debateSessionId');
+    const debateSessionId = this.requiredString(
+      input.debateSessionId,
+      'debateSessionId',
+    );
     await this.debateService.sweepDebateSession(debateSessionId);
     await this.moderationService.assertDebateWritable(debateSessionId);
 
@@ -345,13 +576,16 @@ export class ContentService {
         }),
       );
 
-      const turnState = await this.debateService.completeTurnSubmission(manager, {
-        debateSession,
-        debateTurn,
-        seat,
-        actorAgentId,
-        eventId: event.id,
-      });
+      const turnState = await this.debateService.completeTurnSubmission(
+        manager,
+        {
+          debateSession,
+          debateTurn,
+          seat,
+          actorAgentId,
+          eventId: event.id,
+        },
+      );
 
       return {
         threadId: debateSession.threadId,
@@ -377,13 +611,17 @@ export class ContentService {
   ) {
     await this.moderationService.assertActorAllowed(actor);
 
-    const debateSessionId = this.requiredString(input.debateSessionId, 'debateSessionId');
+    const debateSessionId = this.requiredString(
+      input.debateSessionId,
+      'debateSessionId',
+    );
     await this.debateService.sweepDebateSession(debateSessionId);
     await this.moderationService.assertDebateWritable(debateSessionId);
-    const debateSession = await this.debateService.assertSpectatorCommentAllowed(
-      actor,
-      debateSessionId,
-    );
+    const debateSession =
+      await this.debateService.assertSpectatorCommentAllowed(
+        actor,
+        debateSessionId,
+      );
 
     const authoredContent = await this.normalizeContentInput(input);
 
@@ -440,7 +678,12 @@ export class ContentService {
 
     const result = await this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
-      const thread = await this.findOrCreateDirectMessageThread(manager, actor, recipient, input.activeAgentId);
+      const thread = await this.findOrCreateDirectMessageThread(
+        manager,
+        actor,
+        recipient,
+        input.activeAgentId,
+      );
       const event = await eventRepository.save(
         eventRepository.create({
           threadId: thread.id,
@@ -466,6 +709,435 @@ export class ContentService {
     await this.notificationsService.processEventById(result.eventId);
 
     return result;
+  }
+
+  private async resolveOwnedActiveAgentContext(
+    human: AuthenticatedHuman,
+    activeAgentId: string | null | undefined,
+  ): Promise<string | null> {
+    const normalizedActiveAgentId = this.optionalString(activeAgentId);
+
+    if (!normalizedActiveAgentId) {
+      return null;
+    }
+
+    const activeAgent = await this.agentRepository.findOneBy({
+      id: normalizedActiveAgentId,
+      ownerType: AgentOwnerType.Human,
+      ownerUserId: human.id,
+    });
+
+    if (!activeAgent) {
+      throw new ForbiddenException(
+        'Humans can only use their own agents as the active agent context.',
+      );
+    }
+
+    return activeAgent.id;
+  }
+
+  private async requireOwnedActiveAgentContext(
+    human: AuthenticatedHuman,
+    activeAgentId: string | null | undefined,
+  ): Promise<string> {
+    const resolvedActiveAgentId = await this.resolveOwnedActiveAgentContext(
+      human,
+      activeAgentId,
+    );
+
+    if (!resolvedActiveAgentId) {
+      throw new BadRequestException('activeAgentId is required.');
+    }
+
+    return resolvedActiveAgentId;
+  }
+
+  private async readLatestDirectMessageEvents(
+    activeAgentId: string,
+    cursor: DirectMessageCursor | null,
+    limit: number,
+  ): Promise<DirectMessageThreadEventRow[]> {
+    const parameters: unknown[] = [
+      ThreadContextType.DirectMessage,
+      SubjectType.Agent,
+      activeAgentId,
+      ThreadParticipantRole.Member,
+      'dm.send',
+    ];
+    let cursorClause = '';
+
+    if (cursor) {
+      const occurredAtParameterIndex = parameters.length + 1;
+      parameters.push(cursor.occurredAt.toISOString());
+      const eventIdParameterIndex = parameters.length + 1;
+      parameters.push(cursor.eventId);
+      cursorClause = `
+        AND (
+          ranked.occurred_at < $${occurredAtParameterIndex}
+          OR (
+            ranked.occurred_at = $${occurredAtParameterIndex}
+            AND ranked.event_id < $${eventIdParameterIndex}
+          )
+        )`;
+    }
+
+    const limitParameterIndex = parameters.length + 1;
+    parameters.push(limit + 1);
+
+    const rows = await this.dataSource.query<
+      Array<{
+        thread_id: string;
+        event_id: string;
+        content_type: EventContentType;
+        content: string | null;
+        occurred_at: string | Date;
+      }>
+    >(
+      `
+        WITH ranked AS (
+          SELECT
+            event.thread_id,
+            event.id AS event_id,
+            event.content_type,
+            event.content,
+            event.occurred_at,
+            ROW_NUMBER() OVER (
+              PARTITION BY event.thread_id
+              ORDER BY event.occurred_at DESC, event.id DESC
+            ) AS event_rank
+          FROM events event
+          INNER JOIN threads thread
+            ON thread.id = event.thread_id
+            AND thread.context_type = $1
+          INNER JOIN thread_participants participant
+            ON participant.thread_id = event.thread_id
+            AND participant.participant_type = $2
+            AND participant.participant_subject_id = $3
+            AND participant.role = $4
+          WHERE event.event_type = $5
+        )
+        SELECT
+          ranked.thread_id,
+          ranked.event_id,
+          ranked.content_type,
+          ranked.content,
+          ranked.occurred_at
+        FROM ranked
+        WHERE ranked.event_rank = 1${cursorClause}
+        ORDER BY ranked.occurred_at DESC, ranked.event_id DESC
+        LIMIT $${limitParameterIndex}
+      `,
+      parameters,
+    );
+
+    return rows.map((row) => ({
+      threadId: row.thread_id,
+      eventId: row.event_id,
+      contentType: row.content_type,
+      content: row.content,
+      occurredAt: new Date(row.occurred_at),
+    }));
+  }
+
+  private async readDirectMessageUnreadCounts(
+    humanId: string,
+    activeAgentId: string,
+    threadIds: string[],
+  ): Promise<Map<string, number>> {
+    if (threadIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await this.dataSource.query<
+      Array<{
+        thread_id: string;
+        unread_count: string | number;
+      }>
+    >(
+      `
+        SELECT
+          participant.thread_id,
+          COUNT(event.id)::int AS unread_count
+        FROM thread_participants participant
+        LEFT JOIN events event
+          ON event.thread_id = participant.thread_id
+          AND event.event_type = $4
+          AND NOT (
+            (event.actor_type = $5 AND event.actor_agent_id = $6)
+            OR (event.actor_type = $7 AND event.actor_user_id = $8)
+          )
+          AND (
+            participant.last_read_at IS NULL
+            OR event.occurred_at > participant.last_read_at
+            OR (
+              participant.last_read_at IS NOT NULL
+              AND participant.last_read_event_id IS NOT NULL
+              AND event.occurred_at = participant.last_read_at
+              AND event.id > participant.last_read_event_id
+            )
+          )
+        WHERE participant.thread_id = ANY($1::uuid[])
+          AND participant.participant_type = $2
+          AND participant.participant_subject_id = $3
+          AND participant.role = $9
+        GROUP BY participant.thread_id
+      `,
+      [
+        threadIds,
+        SubjectType.Agent,
+        activeAgentId,
+        'dm.send',
+        EventActorType.Agent,
+        activeAgentId,
+        EventActorType.Human,
+        humanId,
+        ThreadParticipantRole.Member,
+      ],
+    );
+
+    return new Map(
+      rows.map((row) => [row.thread_id, Number(row.unread_count)]),
+    );
+  }
+
+  private async readLatestDirectMessageThreadEvent(threadId: string) {
+    const event = await this.eventRepository
+      .createQueryBuilder('event')
+      .select(['event.id', 'event.occurredAt'])
+      .where('event.threadId = :threadId', {
+        threadId,
+      })
+      .andWhere('event.eventType = :eventType', {
+        eventType: 'dm.send',
+      })
+      .orderBy('event.occurredAt', 'DESC')
+      .addOrderBy('event.id', 'DESC')
+      .getOne();
+
+    if (!event) {
+      return null;
+    }
+
+    return {
+      eventId: event.id,
+      occurredAt: event.occurredAt,
+    };
+  }
+
+  private async assertDirectMessageThreadMembership(
+    threadId: string,
+    activeAgentId: string,
+  ): Promise<ThreadParticipantEntity> {
+    const membership = await this.threadParticipantRepository
+      .createQueryBuilder('participant')
+      .innerJoin(
+        'participant.thread',
+        'thread',
+        'thread.contextType = :contextType',
+        {
+          contextType: ThreadContextType.DirectMessage,
+        },
+      )
+      .where('participant.threadId = :threadId', {
+        threadId,
+      })
+      .andWhere('participant.participantType = :participantType', {
+        participantType: SubjectType.Agent,
+      })
+      .andWhere('participant.participantSubjectId = :activeAgentId', {
+        activeAgentId,
+      })
+      .andWhere('participant.role = :role', {
+        role: ThreadParticipantRole.Member,
+      })
+      .getOne();
+
+    if (!membership) {
+      throw new NotFoundException(
+        `Direct message thread ${threadId} was not found.`,
+      );
+    }
+
+    return membership;
+  }
+
+  private parseLimit(
+    value: string | null | undefined,
+    defaultValue: number,
+    maxValue: number,
+  ): number {
+    const normalizedValue = this.optionalString(value);
+
+    if (!normalizedValue) {
+      return defaultValue;
+    }
+
+    if (!/^\d+$/.test(normalizedValue)) {
+      throw new BadRequestException(
+        `limit must be an integer between 1 and ${maxValue}.`,
+      );
+    }
+
+    const parsed = Number.parseInt(normalizedValue, 10);
+
+    if (parsed < 1 || parsed > maxValue) {
+      throw new BadRequestException(
+        `limit must be an integer between 1 and ${maxValue}.`,
+      );
+    }
+
+    return parsed;
+  }
+
+  private parseDirectMessageCursor(
+    cursor: string | null | undefined,
+  ): DirectMessageCursor | null {
+    const normalizedCursor = this.optionalString(cursor);
+
+    if (!normalizedCursor) {
+      return null;
+    }
+
+    try {
+      const payload = JSON.parse(
+        Buffer.from(normalizedCursor, 'base64url').toString('utf8'),
+      ) as {
+        occurredAt?: unknown;
+        eventId?: unknown;
+      };
+      const occurredAt = new Date(
+        this.requiredString(payload.occurredAt, 'occurredAt'),
+      );
+      const eventId = this.requiredString(payload.eventId, 'eventId');
+
+      if (Number.isNaN(occurredAt.getTime())) {
+        throw new Error('Invalid occurredAt value.');
+      }
+
+      return {
+        occurredAt,
+        eventId,
+      };
+    } catch {
+      throw new BadRequestException(
+        'cursor must be a valid direct message cursor.',
+      );
+    }
+  }
+
+  private encodeDirectMessageCursor(cursor: {
+    occurredAt: Date;
+    eventId: string;
+  }): string {
+    return Buffer.from(
+      JSON.stringify({
+        occurredAt: cursor.occurredAt.toISOString(),
+        eventId: cursor.eventId,
+      }),
+    ).toString('base64url');
+  }
+
+  private buildDirectMessagePreview(
+    contentType: EventContentType,
+    content: string | null,
+  ): string {
+    const normalizedContent = content?.trim();
+
+    if (normalizedContent) {
+      return normalizedContent;
+    }
+
+    if (contentType === EventContentType.Image) {
+      return 'Image';
+    }
+
+    return '';
+  }
+
+  private serializeDirectMessageCounterpart(
+    participants: ThreadParticipantEntity[],
+    activeAgentId: string,
+  ): DirectMessageCounterpartDto {
+    const counterpart =
+      participants.find(
+        (participant) =>
+          participant.role === ThreadParticipantRole.Member &&
+          participant.participantType === SubjectType.Agent &&
+          participant.participantSubjectId !== activeAgentId,
+      ) ??
+      participants.find(
+        (participant) =>
+          participant.role === ThreadParticipantRole.Member &&
+          participant.participantSubjectId !== activeAgentId,
+      );
+
+    if (!counterpart) {
+      throw new NotFoundException('Direct message counterpart was not found.');
+    }
+
+    if (counterpart.participantType === SubjectType.Agent) {
+      return {
+        type: SubjectType.Agent,
+        id: counterpart.participantSubjectId,
+        displayName: counterpart.agent?.displayName ?? 'Unknown agent',
+        handle: counterpart.agent?.handle ?? null,
+        avatarUrl: counterpart.agent?.avatarUrl ?? null,
+      };
+    }
+
+    return {
+      type: SubjectType.Human,
+      id: counterpart.participantSubjectId,
+      displayName: counterpart.user?.displayName ?? 'Unknown human',
+      handle: null,
+      avatarUrl: counterpart.user?.avatarUrl ?? null,
+    };
+  }
+
+  private serializeDirectMessageMessage(event: EventEntity) {
+    return {
+      eventId: event.id,
+      actor: this.serializeDirectMessageActor(event),
+      contentType: event.contentType,
+      content: event.content,
+      asset: event.asset ? this.serializeDirectMessageAsset(event.asset) : null,
+      occurredAt: event.occurredAt.toISOString(),
+    };
+  }
+
+  private serializeDirectMessageActor(
+    event: EventEntity,
+  ): DirectMessageActorDto {
+    if (event.actorType === EventActorType.Agent && event.actorAgentId) {
+      return {
+        type: SubjectType.Agent,
+        id: event.actorAgentId,
+        displayName: event.actorAgent?.displayName ?? 'Unknown agent',
+      };
+    }
+
+    if (event.actorType === EventActorType.Human && event.actorUserId) {
+      return {
+        type: SubjectType.Human,
+        id: event.actorUserId,
+        displayName: event.actorUser?.displayName ?? 'Unknown human',
+      };
+    }
+
+    throw new NotFoundException('Direct message actor could not be resolved.');
+  }
+
+  private serializeDirectMessageAsset(
+    asset: AssetEntity,
+  ): DirectMessageAssetDto {
+    return {
+      id: asset.id,
+      kind: asset.kind,
+      mimeType: asset.mimeType,
+      byteSize: asset.byteSize,
+      storageBucket: asset.storageBucket,
+      storageKey: asset.storageKey,
+    };
   }
 
   private async normalizeContentInput(
@@ -494,11 +1166,15 @@ export class ContentService {
     }
 
     if (assetId) {
-      throw new BadRequestException('assetId is only supported for image content.');
+      throw new BadRequestException(
+        'assetId is only supported for image content.',
+      );
     }
 
     if (this.optionalString(input.caption)) {
-      throw new BadRequestException('caption is only supported for image content.');
+      throw new BadRequestException(
+        'caption is only supported for image content.',
+      );
     }
 
     return {
@@ -515,7 +1191,9 @@ export class ContentService {
     subject: SubjectReference,
     role: ThreadParticipantRole,
   ): Promise<void> {
-    const participantRepository = manager.getRepository(ThreadParticipantEntity);
+    const participantRepository = manager.getRepository(
+      ThreadParticipantEntity,
+    );
     const existingParticipant = await participantRepository.findOneBy({
       threadId,
       participantType: subject.type,
@@ -523,7 +1201,10 @@ export class ContentService {
     });
 
     if (existingParticipant) {
-      const nextRole = this.mergeParticipantRole(existingParticipant.role, role);
+      const nextRole = this.mergeParticipantRole(
+        existingParticipant.role,
+        role,
+      );
 
       if (existingParticipant.role !== nextRole) {
         await participantRepository.update(
@@ -572,7 +1253,9 @@ export class ContentService {
     recipient: SubjectReference,
     activeAgentId?: string | null,
   ): Promise<ThreadEntity> {
-    const participantRepository = manager.getRepository(ThreadParticipantEntity);
+    const participantRepository = manager.getRepository(
+      ThreadParticipantEntity,
+    );
 
     // Build the expected unique members
     const expectedMembersMap = new Map<string, SubjectReference>();
@@ -582,26 +1265,30 @@ export class ContentService {
 
     // Replace the human actor with the active agent as the primary thread semantic driver.
     // The human (as owner) will naturally be joined as a Spectator down below.
-    const threadActor = activeAgentId 
-      ? { type: SubjectType.Agent, id: activeAgentId } 
+    const threadActor = activeAgentId
+      ? { type: SubjectType.Agent, id: activeAgentId }
       : actor;
 
     addMember(threadActor);
     addMember(recipient);
-    
+
     const expectedMembers = Array.from(expectedMembersMap.values());
 
     const actorParticipations = await participantRepository.findBy({
       participantType: threadActor.type,
       participantSubjectId: threadActor.id,
     });
-    const candidateThreadIds = actorParticipations.map((participation) => participation.threadId);
+    const candidateThreadIds = actorParticipations.map(
+      (participation) => participation.threadId,
+    );
 
     if (candidateThreadIds.length > 0) {
-      const candidateThreads = await manager.getRepository(ThreadEntity).findBy({
-        id: In(candidateThreadIds),
-        contextType: ThreadContextType.DirectMessage,
-      });
+      const candidateThreads = await manager
+        .getRepository(ThreadEntity)
+        .findBy({
+          id: In(candidateThreadIds),
+          contextType: ThreadContextType.DirectMessage,
+        });
 
       if (candidateThreads.length > 0) {
         const participants = await participantRepository.findBy({
@@ -660,7 +1347,10 @@ export class ContentService {
       coreParticipants,
     );
 
-    await participantRepository.save([...coreParticipants, ...ownerParticipants]);
+    await participantRepository.save([
+      ...coreParticipants,
+      ...ownerParticipants,
+    ]);
 
     return thread;
   }
@@ -716,16 +1406,23 @@ export class ContentService {
     );
   }
 
-  private resolveRecipient(input: HumanDirectMessageInput, humanId: string): SubjectReference {
+  private resolveRecipient(
+    input: HumanDirectMessageInput,
+    humanId: string,
+  ): SubjectReference {
     if (input.recipientType === SubjectType.Human) {
       const recipientUserId = this.optionalString(input.recipientUserId);
 
       if (!recipientUserId) {
-        throw new BadRequestException('recipientUserId is required for human recipients.');
+        throw new BadRequestException(
+          'recipientUserId is required for human recipients.',
+        );
       }
 
       if (recipientUserId === humanId) {
-        throw new BadRequestException('Self direct messages are not supported.');
+        throw new BadRequestException(
+          'Self direct messages are not supported.',
+        );
       }
 
       return {
@@ -738,7 +1435,9 @@ export class ContentService {
       const recipientAgentId = this.optionalString(input.recipientAgentId);
 
       if (!recipientAgentId) {
-        throw new BadRequestException('recipientAgentId is required for agent recipients.');
+        throw new BadRequestException(
+          'recipientAgentId is required for agent recipients.',
+        );
       }
 
       return {
@@ -747,7 +1446,9 @@ export class ContentService {
       };
     }
 
-    throw new BadRequestException('recipientType must be either human or agent.');
+    throw new BadRequestException(
+      'recipientType must be either human or agent.',
+    );
   }
 
   private bindActor(actor: SubjectReference) {
@@ -777,13 +1478,13 @@ export class ContentService {
     }
 
     switch (normalized) {
-      case EventContentType.Text:
+      case 'text':
         return EventContentType.Text;
-      case EventContentType.Markdown:
+      case 'markdown':
         return EventContentType.Markdown;
-      case EventContentType.Code:
+      case 'code':
         return EventContentType.Code;
-      case EventContentType.Image:
+      case 'image':
         return EventContentType.Image;
       default:
         throw new BadRequestException(
@@ -813,7 +1514,9 @@ export class ContentService {
     }
 
     if (typeof value !== 'object' || Array.isArray(value)) {
-      throw new BadRequestException('metadata must be an object when provided.');
+      throw new BadRequestException(
+        'metadata must be an object when provided.',
+      );
     }
 
     return value as Record<string, unknown>;

@@ -17,6 +17,7 @@ import { PolicyService } from '../../src/modules/policy/policy.service';
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import {
   claimFederatedAgent,
@@ -43,9 +44,11 @@ describe('Follow backend (e2e)', () => {
     federationCredentialsService = app.get(FederationCredentialsService);
     policyService = app.get(PolicyService);
     threadRepository = context.dataSource.getRepository(ThreadEntity);
-    debateSessionRepository = context.dataSource.getRepository(DebateSessionEntity);
+    debateSessionRepository =
+      context.dataSource.getRepository(DebateSessionEntity);
     followRepository = context.dataSource.getRepository(FollowEntity);
-    forumTopicViewRepository = context.dataSource.getRepository(ForumTopicViewEntity);
+    forumTopicViewRepository =
+      context.dataSource.getRepository(ForumTopicViewEntity);
   });
 
   afterAll(async () => {
@@ -53,8 +56,16 @@ describe('Follow backend (e2e)', () => {
   });
 
   it('lets a human follow and unfollow agent, topic, and debate targets', async () => {
-    const human = await registerHuman(app, 'follow-human@example.com', 'Follow Human');
-    const followedAgent = await importSelfAgent(app, 'follow-target-agent', 'Follow Target');
+    const human = await registerHuman(
+      app,
+      'follow-human@example.com',
+      'Follow Human',
+    );
+    const followedAgent = await importSelfAgent(
+      app,
+      'follow-target-agent',
+      'Follow Target',
+    );
     const topic = await contentService.createForumTopic(
       {
         type: SubjectType.Human,
@@ -89,7 +100,7 @@ describe('Follow backend (e2e)', () => {
       .set('Authorization', `Bearer ${human.accessToken}`)
       .send({ targetType: 'agent', targetId: followedAgent.id })
       .expect(201)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: { following: boolean } }) => {
         expect(body.following).toBe(true);
       });
 
@@ -120,7 +131,7 @@ describe('Follow backend (e2e)', () => {
       .set('Authorization', `Bearer ${human.accessToken}`)
       .send({ targetType: 'debate', targetId: debateSession.id })
       .expect(200)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: { following: boolean } }) => {
         expect(body.following).toBe(false);
       });
 
@@ -129,16 +140,32 @@ describe('Follow backend (e2e)', () => {
       .set('Authorization', `Bearer ${human.accessToken}`)
       .query({ targetType: 'agent', targetId: followedAgent.id })
       .expect(200)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: { following: boolean } }) => {
         expect(body.following).toBe(true);
       });
   });
 
   it('lets a federated agent follow all target types and reuses block rules for human follows', async () => {
-    const human = await registerHuman(app, 'blocked-follow@example.com', 'Blocked Follow');
-    const blocker = await importSelfAgent(app, 'blocker-agent', 'Blocker Agent');
-    const followerAgent = await importSelfAgent(app, 'follower-agent', 'Follower Agent');
-    const topicAuthor = await importSelfAgent(app, 'topic-author-agent', 'Topic Author');
+    const human = await registerHuman(
+      app,
+      'blocked-follow@example.com',
+      'Blocked Follow',
+    );
+    const blocker = await importSelfAgent(
+      app,
+      'blocker-agent',
+      'Blocker Agent',
+    );
+    const followerAgent = await importSelfAgent(
+      app,
+      'follower-agent',
+      'Follower Agent',
+    );
+    const topicAuthor = await importSelfAgent(
+      app,
+      'topic-author-agent',
+      'Topic Author',
+    );
     const agentClaim = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -176,18 +203,30 @@ describe('Follow backend (e2e)', () => {
       }),
     );
 
-    await submitAgentFollowAction(agentClaim.accessToken, 'agent.follow.agent', {
-      targetType: 'agent',
-      targetId: blocker.id,
-    });
-    await submitAgentFollowAction(agentClaim.accessToken, 'agent.follow.topic', {
-      targetType: 'topic',
-      targetId: topic.threadId,
-    });
-    await submitAgentFollowAction(agentClaim.accessToken, 'agent.follow.debate', {
-      targetType: 'debate',
-      targetId: debateSession.id,
-    });
+    await submitAgentFollowAction(
+      agentClaim.accessToken,
+      'agent.follow.agent',
+      {
+        targetType: 'agent',
+        targetId: blocker.id,
+      },
+    );
+    await submitAgentFollowAction(
+      agentClaim.accessToken,
+      'agent.follow.topic',
+      {
+        targetType: 'topic',
+        targetId: topic.threadId,
+      },
+    );
+    await submitAgentFollowAction(
+      agentClaim.accessToken,
+      'agent.follow.debate',
+      {
+        targetType: 'debate',
+        targetId: debateSession.id,
+      },
+    );
 
     const agentFollows = await followRepository.findBy({
       followerSubjectId: followerAgent.id,
@@ -195,11 +234,15 @@ describe('Follow backend (e2e)', () => {
 
     expect(agentFollows).toHaveLength(3);
 
-    await submitAgentFollowAction(agentClaim.accessToken, 'agent.unfollow.agent', {
-      type: 'agent.unfollow',
-      targetType: 'agent',
-      targetId: blocker.id,
-    });
+    await submitAgentFollowAction(
+      agentClaim.accessToken,
+      'agent.unfollow.agent',
+      {
+        type: 'agent.unfollow',
+        targetType: 'agent',
+        targetId: blocker.id,
+      },
+    );
 
     await policyService.createBlockRule(
       {
@@ -218,7 +261,7 @@ describe('Follow backend (e2e)', () => {
       .set('Authorization', `Bearer ${human.accessToken}`)
       .send({ targetType: 'agent', targetId: blocker.id })
       .expect(403)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: { message: string } }) => {
         expect(body.message).toMatch(/block rule prevents this follow/i);
       });
   });
@@ -240,11 +283,12 @@ describe('Follow backend (e2e)', () => {
         },
       })
       .expect(202);
+    const responseBody = typedValue<{ id: string }>(response.body);
 
     const finalAction = await waitForActionStatus(
       app,
       accessToken,
-      response.body.id,
+      responseBody.id,
     );
 
     expect(finalAction.status).toBe('succeeded');

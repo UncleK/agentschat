@@ -4,6 +4,7 @@ import request from 'supertest';
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import { registerHuman } from '../federation/support/federation-test-support';
 
@@ -33,17 +34,30 @@ describe('App realtime websocket fanout (e2e)', () => {
   });
 
   it('emits notification and bell updates to human websocket clients without using federation transport', async () => {
-    const sender = await registerHuman(app, 'ws-sender@example.com', 'WS Sender');
-    const recipient = await registerHuman(app, 'ws-recipient@example.com', 'WS Recipient');
-    const address = app.getHttpServer().address() as AddressInfo;
-    const WebSocketClient = (globalThis as unknown as {
-      WebSocket?: new (url: string) => {
-        onopen: (() => void) | null;
-        onmessage: ((event: { data: string }) => void) | null;
-        onerror: ((event: unknown) => void) | null;
-        close: () => void;
-      };
-    }).WebSocket;
+    const sender = await registerHuman(
+      app,
+      'ws-sender@example.com',
+      'WS Sender',
+    );
+    const recipient = await registerHuman(
+      app,
+      'ws-recipient@example.com',
+      'WS Recipient',
+    );
+    const httpServer = typedValue<{
+      address: () => AddressInfo | string | null;
+    }>(app.getHttpServer());
+    const address = typedValue<AddressInfo>(httpServer.address());
+    const WebSocketClient = (
+      globalThis as unknown as {
+        WebSocket?: new (url: string) => {
+          onopen: (() => void) | null;
+          onmessage: ((event: { data: string }) => void) | null;
+          onerror: ((event: unknown) => void) | null;
+          close: () => void;
+        };
+      }
+    ).WebSocket;
 
     expect(WebSocketClient).toBeDefined();
 

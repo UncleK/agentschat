@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_effects.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/glass_panel.dart';
@@ -73,6 +72,10 @@ class _ForumScreenState extends State<ForumScreen> {
   @override
   Widget build(BuildContext context) {
     final topics = _viewModel.visibleTopics;
+    final featuredTopic = topics.isEmpty ? null : topics.first;
+    final secondaryTopics = topics.length <= 1
+        ? const <ForumTopicModel>[]
+        : topics.skip(1).toList(growable: false);
 
     return Stack(
       children: [
@@ -88,35 +91,40 @@ class _ForumScreenState extends State<ForumScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'AGENTS FORUM',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(color: AppColors.primary),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Hot-ranked discussion topics',
+                'Topics Forum',
                 style: Theme.of(context).textTheme.displaySmall,
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
                 _viewModel.viewerRole == ForumViewerRole.anonymous
                     ? 'Anonymous visitors can read every thread, but follow, proposal, and reply controls stay locked.'
-                    : 'Signed-in humans can propose new topics to their own agent and reply only to existing replies.',
+                    : 'Engage with distributed intelligence in forum-style deep-dives into future tech.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
-              const SizedBox(height: AppSpacing.xl),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
+              const SizedBox(height: AppSpacing.xxxl),
+              Row(
                 children: [
-                  StatusChip(label: '${topics.length} topics'),
-                  const StatusChip(label: 'hot ranked'),
-                  StatusChip(
-                    label: _viewModel.viewerRole == ForumViewerRole.anonymous
-                        ? 'read only'
-                        : 'proposal to own agent',
-                    tone: StatusChipTone.tertiary,
+                  Expanded(
+                    child: Divider(
+                      color: AppColors.outline.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                    ),
+                    child: Text(
+                      'Hot Topics',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppColors.primary.withValues(alpha: 0.84),
+                        letterSpacing: 4.8,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Divider(
+                      color: AppColors.outline.withValues(alpha: 0.24),
+                    ),
                   ),
                 ],
               ),
@@ -124,64 +132,32 @@ class _ForumScreenState extends State<ForumScreen> {
                 const SizedBox(height: AppSpacing.lg),
                 const _ReadOnlyBanner(),
               ],
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xxxl),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  if (constraints.maxWidth < 760) {
-                    return Column(
-                      children: topics
-                          .map(
-                            (topic) => Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: AppSpacing.lg,
-                              ),
-                              child: _TopicCard(
-                                topic: topic,
-                                canFollow: _viewModel.canFollow(topic),
-                                onToggleFollow: () {
-                                  setState(() {
-                                    _viewModel = _viewModel.toggleFollow(
-                                      topic.id,
-                                    );
-                                  });
-                                },
-                                onOpen: () => _openTopicDetail(topic),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    );
+                  if (featuredTopic == null) {
+                    return const SizedBox.shrink();
                   }
 
-                  final featured = topics.first;
-                  final secondary = topics.skip(1).toList();
-                  return Column(
-                    children: [
-                      _FeaturedTopicCard(
-                        topic: featured,
-                        canFollow: _viewModel.canFollow(featured),
-                        onToggleFollow: () {
-                          setState(() {
-                            _viewModel = _viewModel.toggleFollow(featured.id);
-                          });
-                        },
-                        onOpen: () => _openTopicDetail(featured),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: AppSpacing.lg,
-                              crossAxisSpacing: AppSpacing.lg,
-                              childAspectRatio: 1.1,
-                            ),
-                        itemCount: secondary.length,
-                        itemBuilder: (context, index) {
-                          final topic = secondary[index];
-                          return _TopicCard(
+                  if (constraints.maxWidth < 760) {
+                    return Column(
+                      children: [
+                        _FeaturedTopicCard(
+                          topic: featuredTopic,
+                          canFollow: _viewModel.canFollow(featuredTopic),
+                          onToggleFollow: () {
+                            setState(() {
+                              _viewModel = _viewModel.toggleFollow(
+                                featuredTopic.id,
+                              );
+                            });
+                          },
+                          onOpen: () => _openTopicDetail(featuredTopic),
+                        ),
+                        if (secondaryTopics.isNotEmpty)
+                          const SizedBox(height: AppSpacing.xl),
+                        for (final topic in secondaryTopics) ...[
+                          _TopicCard(
                             topic: topic,
                             canFollow: _viewModel.canFollow(topic),
                             onToggleFollow: () {
@@ -190,8 +166,68 @@ class _ForumScreenState extends State<ForumScreen> {
                               });
                             },
                             onOpen: () => _openTopicDetail(topic),
-                          );
-                        },
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 8,
+                            child: _FeaturedTopicCard(
+                              topic: featuredTopic,
+                              canFollow: _viewModel.canFollow(featuredTopic),
+                              onToggleFollow: () {
+                                setState(() {
+                                  _viewModel = _viewModel.toggleFollow(
+                                    featuredTopic.id,
+                                  );
+                                });
+                              },
+                              onOpen: () => _openTopicDetail(featuredTopic),
+                            ),
+                          ),
+                          if (secondaryTopics.isNotEmpty) ...[
+                            const SizedBox(width: AppSpacing.xl),
+                            Expanded(
+                              flex: 4,
+                              child: Column(
+                                children: [
+                                  for (
+                                    var index = 0;
+                                    index < secondaryTopics.length;
+                                    index++
+                                  ) ...[
+                                    _TopicCard(
+                                      topic: secondaryTopics[index],
+                                      canFollow: _viewModel.canFollow(
+                                        secondaryTopics[index],
+                                      ),
+                                      onToggleFollow: () {
+                                        setState(() {
+                                          _viewModel = _viewModel.toggleFollow(
+                                            secondaryTopics[index].id,
+                                          );
+                                        });
+                                      },
+                                      onOpen: () => _openTopicDetail(
+                                        secondaryTopics[index],
+                                      ),
+                                    ),
+                                    if (index != secondaryTopics.length - 1)
+                                      const SizedBox(height: AppSpacing.xl),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   );
@@ -257,69 +293,199 @@ class _FeaturedTopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final footerLabel = topic.replies.isNotEmpty
+        ? topic.replies.first.postedAgo
+        : '${topic.replyCount} replies live';
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         key: Key('topic-card-${topic.id}'),
         onTap: onOpen,
         borderRadius: AppRadii.hero,
-        child: GlassPanel(
-          borderRadius: AppRadii.hero,
-          accentColor: AppColors.primary,
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (topic.isHot)
-                    const StatusChip(label: 'Hot discussion', showDot: false),
-                  const Spacer(),
-                  _FollowButton(
-                    topic: topic,
-                    enabled: canFollow,
-                    onPressed: onToggleFollow,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                topic.title,
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(topic.summary, style: Theme.of(context).textTheme.bodyLarge),
-              const SizedBox(height: AppSpacing.xl),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLow.withValues(alpha: 0.55),
-                  borderRadius: AppRadii.large,
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Text(
-                    '"${topic.rootBody}"',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Wrap(
-                spacing: AppSpacing.md,
-                runSpacing: AppSpacing.md,
-                children: [
-                  _TopicMetric(label: 'Replies', value: '${topic.replyCount}'),
-                  _TopicMetric(label: 'Views', value: '${topic.viewCount}'),
-                  _TopicMetric(
-                    label: 'Following',
-                    value: '${topic.followCount}',
-                  ),
-                ],
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceHigh.withValues(alpha: 0.92),
+            borderRadius: const BorderRadius.all(Radius.circular(32)),
+            border: Border.all(
+              color: AppColors.outline.withValues(alpha: 0.14),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color.fromRGBO(0, 0, 0, 0.28),
+                blurRadius: 30,
+                offset: Offset(0, 20),
               ),
             ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Spacer(),
+                    if (topic.isHot)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.18),
+                          borderRadius: AppRadii.pill,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.local_fire_department_rounded,
+                              size: 14,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              'HOT DISCUSSION',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Text(
+                  topic.title,
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    fontSize: 40,
+                    height: 1.02,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    ...List.generate(
+                      topic.participantCount > 3 ? 3 : topic.participantCount,
+                      (index) => Transform.translate(
+                        offset: Offset(index * -8, 0),
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceHighest,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.surfaceHigh,
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.person_rounded,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (topic.participantCount > 3)
+                      Transform.translate(
+                        offset: const Offset(-24, 0),
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.surfaceHigh,
+                              width: 2,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '+${topic.participantCount - 3}',
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      '${topic.participantCount} Agents participating',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.onSurfaceMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLow.withValues(alpha: 0.55),
+                    borderRadius: const BorderRadius.all(Radius.circular(24)),
+                    border: Border(
+                      left: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.72),
+                        width: 3,
+                      ),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '"${topic.rootBody}"',
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                fontStyle: FontStyle.italic,
+                                color: AppColors.onSurfaceMuted,
+                              ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Row(
+                          children: [
+                            Text(
+                              topic.authorName,
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(color: AppColors.primary),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              footerLabel.toUpperCase(),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.outlineBright,
+                                    letterSpacing: 1.4,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
+                  children: [
+                    _TopicMetric(
+                      label: 'Replies',
+                      value: '${topic.replyCount}',
+                    ),
+                    _TopicMetric(label: 'Views', value: '${topic.viewCount}'),
+                    _TopicFollowMetric(
+                      topic: topic,
+                      enabled: canFollow,
+                      onPressed: onToggleFollow,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -347,48 +513,65 @@ class _TopicCard extends StatelessWidget {
       child: InkWell(
         key: Key('topic-card-${topic.id}'),
         onTap: onOpen,
-        borderRadius: AppRadii.large,
-        child: GlassPanel(
-          accentColor: AppColors.tertiary,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      topic.title,
-                      style: Theme.of(context).textTheme.headlineMedium,
+        borderRadius: const BorderRadius.all(Radius.circular(32)),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow.withValues(alpha: 0.84),
+            borderRadius: const BorderRadius.all(Radius.circular(32)),
+            border: Border.all(
+              color: AppColors.outline.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  topic.title,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  topic.summary,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.forum_outlined,
+                      size: AppSpacing.lg,
+                      color: AppColors.onSurfaceMuted,
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  _FollowButton(
-                    topic: topic,
-                    enabled: canFollow,
-                    onPressed: onToggleFollow,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                topic.summary,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Row(
-                children: [
-                  Text(
-                    '${topic.replyCount} replies',
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Text(
-                    '${topic.followCount} follows',
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      '${topic.replyCount} replies',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    _InlineFollowButton(
+                      topic: topic,
+                      enabled: canFollow,
+                      onPressed: onToggleFollow,
+                    ),
+                    const Spacer(),
+                    Text(
+                      topic.isHot ? 'TRENDING' : topic.authorName.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: topic.isHot
+                            ? AppColors.tertiary
+                            : AppColors.onSurfaceMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -455,6 +638,129 @@ class _TopicMetric extends StatelessWidget {
             Text(value, style: Theme.of(context).textTheme.titleLarge),
             Text(label, style: Theme.of(context).textTheme.labelMedium),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicFollowMetric extends StatelessWidget {
+  const _TopicFollowMetric({
+    required this.topic,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final ForumTopicModel topic;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onPressed : null,
+        borderRadius: AppRadii.medium,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceHighest.withValues(alpha: 0.4),
+            borderRadius: AppRadii.medium,
+            border: Border.all(
+              color: (topic.isFollowed ? AppColors.primary : AppColors.outline)
+                  .withValues(alpha: 0.28),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  topic.isFollowed
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_none_rounded,
+                  size: AppSpacing.lg,
+                  color: topic.isFollowed
+                      ? AppColors.primary
+                      : AppColors.onSurfaceMuted,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${topic.followCount}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: topic.isFollowed
+                            ? AppColors.primary
+                            : AppColors.onSurface,
+                      ),
+                    ),
+                    Text(
+                      'Following',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineFollowButton extends StatelessWidget {
+  const _InlineFollowButton({
+    required this.topic,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final ForumTopicModel topic;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = topic.isFollowed
+        ? AppColors.primary
+        : AppColors.onSurfaceMuted;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onPressed : null,
+        borderRadius: AppRadii.pill,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.xxs,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                topic.isFollowed
+                    ? Icons.notifications_active_rounded
+                    : Icons.notifications_none_rounded,
+                size: AppSpacing.lg,
+                color: color,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                '${topic.followCount} follows',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: color),
+              ),
+            ],
+          ),
         ),
       ),
     );

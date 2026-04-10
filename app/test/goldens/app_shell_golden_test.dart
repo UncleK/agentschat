@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:agents_chat_app/app_shell.dart';
 import 'package:agents_chat_app/core/config/app_environment.dart';
+import 'package:agents_chat_app/core/network/api_client.dart';
+import 'package:agents_chat_app/core/network/notifications_repository.dart';
+import 'package:agents_chat_app/core/session/app_session_controller.dart';
 import 'package:agents_chat_app/core/theme/app_colors.dart';
 import 'package:agents_chat_app/core/theme/app_spacing.dart';
 import 'package:agents_chat_app/core/theme/app_theme.dart';
 import 'package:agents_chat_app/core/widgets/primary_gradient_button.dart';
 import 'package:agents_chat_app/core/widgets/status_chip.dart';
 import 'package:agents_chat_app/core/widgets/surface_card.dart';
-import 'package:agents_chat_app/main.dart';
+
+import '../test_support/session_fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  const environment = AppEnvironment(
+    flavor: AppFlavor.local,
+    apiBaseUrl: 'http://localhost:3000/api/v1',
+    realtimeWebSocketUrl: 'ws://localhost:3000/ws',
+  );
 
   Future<void> pumpGoldenHarness(
     WidgetTester tester,
@@ -36,17 +47,54 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('app shell golden stays stable', (WidgetTester tester) async {
-    const environment = AppEnvironment(
-      flavor: AppFlavor.local,
-      apiBaseUrl: 'http://localhost:3000/api/v1',
-      realtimeWebSocketUrl: 'ws://localhost:3000/ws',
+  Future<AppSessionController> createGoldenSessionController() async {
+    final authRepository = FakeAuthRepository();
+    final agentsRepository = FakeAgentsRepository();
+    final storage = InMemoryAppSessionStorage();
+    final controller = AppSessionController(
+      apiClient: ApiClient(baseUrl: environment.apiBaseUrl),
+      authRepository: authRepository,
+      agentsRepository: agentsRepository,
+      storage: storage,
     );
+
+    await storage.writeToken('token-shell-golden');
+    authRepository.enqueueFetchMe((token) async {
+      return signedInState(
+        token: token,
+        userId: 'usr-shell-golden',
+        displayName: 'Golden Owner',
+        recommendedActiveAgentId: 'agt-shell-golden',
+        email: 'golden.owner@example.com',
+      );
+    });
+    agentsRepository.enqueueReadMine(() async {
+      return mineResponse(
+        agents: [
+          agentSummary(
+            id: 'agt-shell-golden',
+            handle: '@shell-golden',
+            displayName: 'Shell Golden',
+            status: 'online',
+          ),
+        ],
+      );
+    });
+
+    return controller;
+  }
+
+  testWidgets('app shell golden stays stable', (WidgetTester tester) async {
+    final sessionController = await createGoldenSessionController();
+    addTearDown(sessionController.dispose);
 
     await pumpGoldenHarness(
       tester,
-      const AgentsChatBootstrapApp(environment: environment),
-      wrapInMaterialApp: false,
+      AgentsChatAppShell(
+        environment: environment,
+        sessionController: sessionController,
+        notificationsRepository: _GoldenNotificationsRepository(),
+      ),
     );
 
     await expectLater(
@@ -96,4 +144,27 @@ void main() {
       matchesGoldenFile('goldens/primitives.png'),
     );
   });
+}
+
+class _GoldenNotificationsRepository extends NotificationsRepository {
+  _GoldenNotificationsRepository()
+    : super(apiClient: ApiClient(baseUrl: 'http://localhost'));
+
+  @override
+  Future<NotificationBellState> bellState() async {
+    return const NotificationBellState(hasUnread: true, unreadCount: 1);
+  }
+
+  @override
+  Future<NotificationListResponse> list() async {
+    return const NotificationListResponse(notifications: []);
+  }
+
+  @override
+  Future<NotificationBellState> markRead({
+    List<String>? notificationIds,
+    bool? markAll,
+  }) async {
+    return const NotificationBellState(hasUnread: false, unreadCount: 0);
+  }
 }

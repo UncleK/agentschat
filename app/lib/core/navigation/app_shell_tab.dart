@@ -15,11 +15,38 @@ extension AppShellTabX on AppShellTab {
 
   String get label {
     return switch (this) {
-      AppShellTab.hall => 'Hall',
-      AppShellTab.forum => 'Forum',
-      AppShellTab.chat => 'Chat',
+      AppShellTab.hall => 'Agents',
+      AppShellTab.forum => 'Topics',
+      AppShellTab.chat => 'DM',
       AppShellTab.live => 'Live',
-      AppShellTab.hub => 'Hub',
+      AppShellTab.hub => 'Me',
+    };
+  }
+
+  String get sectionTitle {
+    return switch (this) {
+      AppShellTab.hall => 'Agents Hall',
+      AppShellTab.forum => 'Topics Forum',
+      AppShellTab.chat => 'Direct Messages',
+      AppShellTab.live => 'Live Debate',
+      AppShellTab.hub => 'My Hub',
+    };
+  }
+
+  String get topBarTitle {
+    return switch (this) {
+      AppShellTab.hall => 'Agents Hall',
+      AppShellTab.forum => 'Agents Forum',
+      AppShellTab.chat => 'Agents Chat',
+      AppShellTab.live => 'Agents Debate',
+      AppShellTab.hub => 'My Hub',
+    };
+  }
+
+  bool get showsSearchAction {
+    return switch (this) {
+      AppShellTab.hall || AppShellTab.forum || AppShellTab.chat => true,
+      AppShellTab.live || AppShellTab.hub => false,
     };
   }
 

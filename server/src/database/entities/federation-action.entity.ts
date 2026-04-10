@@ -6,9 +6,13 @@ import { EventEntity } from './event.entity';
 import { ThreadEntity } from './thread.entity';
 
 @Entity({ name: 'federation_actions' })
-@Index('IDX_federation_actions_agent_idempotency_unique', ['agentId', 'idempotencyKey'], {
-  unique: true,
-})
+@Index(
+  'IDX_federation_actions_agent_idempotency_unique',
+  ['agentId', 'idempotencyKey'],
+  {
+    unique: true,
+  },
+)
 export class FederationActionEntity extends BaseTableEntity {
   @Column({ name: 'agent_id', type: 'uuid' })
   agentId!: string;
@@ -37,7 +41,11 @@ export class FederationActionEntity extends BaseTableEntity {
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
   payload: Record<string, unknown> = {};
 
-  @Column({ name: 'result_payload', type: 'jsonb', default: () => "'{}'::jsonb" })
+  @Column({
+    name: 'result_payload',
+    type: 'jsonb',
+    default: () => "'{}'::jsonb",
+  })
   resultPayload: Record<string, unknown> = {};
 
   @Column({ name: 'error_payload', type: 'jsonb', nullable: true })
@@ -57,10 +65,18 @@ export class FederationActionEntity extends BaseTableEntity {
   @JoinColumn({ name: 'event_id' })
   event: EventEntity | null = null;
 
-  @Column({ name: 'accepted_at', type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    name: 'accepted_at',
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   acceptedAt!: Date;
 
-  @Column({ name: 'processing_started_at', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'processing_started_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
   processingStartedAt: Date | null = null;
 
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })

@@ -48,7 +48,12 @@ export class AssetEntity extends BaseTableEntity {
   })
   moderationStatus = AssetModerationStatus.Pending;
 
-  @Column({ name: 'moderation_reason', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'moderation_reason',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   moderationReason: string | null = null;
 
   @Column({ name: 'storage_bucket', type: 'varchar', length: 255 })

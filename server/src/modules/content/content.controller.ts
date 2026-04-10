@@ -1,4 +1,13 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { SubjectType } from '../../database/domain.enums';
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
@@ -20,6 +29,62 @@ interface SendHumanDirectMessageBody {
   activeAgentId?: string | null;
 }
 
+interface MarkDirectMessageThreadReadBody {
+  activeAgentId?: string | null;
+}
+
+interface DirectMessageThreadResponse {
+  activeAgentId: string;
+  threads: Array<{
+    threadId: string;
+    counterpart: {
+      type: SubjectType;
+      id: string;
+      displayName: string;
+      handle: string | null;
+      avatarUrl: string | null;
+    };
+    lastMessage: {
+      eventId: string;
+      contentType: string;
+      preview: string;
+      occurredAt: string;
+    };
+    unreadCount: number;
+  }>;
+  nextCursor: string | null;
+}
+
+interface DirectMessageMessagesResponse {
+  threadId: string;
+  activeAgentId: string;
+  messages: Array<{
+    eventId: string;
+    actor: {
+      type: SubjectType;
+      id: string;
+      displayName: string;
+    };
+    contentType: string;
+    content: string | null;
+    asset: {
+      id: string;
+      kind: string;
+      mimeType: string;
+      byteSize: number | null;
+      storageBucket: string;
+      storageKey: string;
+    } | null;
+    occurredAt: string;
+  }>;
+  nextCursor: string | null;
+}
+
+interface DirectMessageReadResponse {
+  threadId: string;
+  unreadCount: number;
+}
+
 @Controller('content')
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
@@ -31,5 +96,49 @@ export class ContentController {
     @Body() body: SendHumanDirectMessageBody,
   ) {
     return this.contentService.sendHumanDirectMessage(human, body);
+  }
+
+  @Get('dm/threads')
+  @UseGuards(HumanAuthGuard)
+  getDirectMessageThreads(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Query('activeAgentId') activeAgentId?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ): Promise<DirectMessageThreadResponse> {
+    return this.contentService.getDirectMessageThreads(human, {
+      activeAgentId,
+      cursor,
+      limit,
+    });
+  }
+
+  @Get('dm/threads/:id/messages')
+  @UseGuards(HumanAuthGuard)
+  getDirectMessageThreadMessages(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('id') threadId: string,
+    @Query('activeAgentId') activeAgentId?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ): Promise<DirectMessageMessagesResponse> {
+    return this.contentService.getDirectMessageThreadMessages(human, threadId, {
+      activeAgentId,
+      cursor,
+      limit,
+    });
+  }
+
+  @Post('dm/threads/:id/read')
+  @HttpCode(200)
+  @UseGuards(HumanAuthGuard)
+  markDirectMessageThreadRead(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('id') threadId: string,
+    @Body() body: MarkDirectMessageThreadReadBody,
+  ): Promise<DirectMessageReadResponse> {
+    return this.contentService.markDirectMessageThreadRead(human, threadId, {
+      activeAgentId: body.activeAgentId,
+    });
   }
 }

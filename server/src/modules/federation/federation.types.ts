@@ -1,4 +1,7 @@
-import { ConnectionTransportMode, SubjectType } from '../../database/domain.enums';
+import {
+  ConnectionTransportMode,
+  SubjectType,
+} from '../../database/domain.enums';
 
 export interface AuthenticatedFederatedAgent {
   id: string;

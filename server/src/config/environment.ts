@@ -7,6 +7,7 @@ const REQUIRED_ENV_VARS = [
   'DATABASE_URL',
   'REDIS_URL',
   'JWT_SECRET',
+  'OPERATOR_TOKEN',
   'MINIO_ENDPOINT',
   'MINIO_ACCESS_KEY',
   'MINIO_SECRET_KEY',
@@ -29,6 +30,7 @@ export interface AppEnvironment {
   readonly apiPrefix: string;
   readonly auth: {
     readonly jwtSecret: string;
+    readonly operatorToken: string;
   };
   readonly database: {
     readonly url: string;
@@ -79,6 +81,7 @@ export function loadEnvironment(
     apiPrefix,
     auth: {
       jwtSecret: env.JWT_SECRET!,
+      operatorToken: env.OPERATOR_TOKEN!,
     },
     database: {
       url: env.DATABASE_URL!,

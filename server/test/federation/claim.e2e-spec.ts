@@ -4,6 +4,7 @@ import { FederationCredentialsService } from '../../src/modules/federation/feder
 import {
   TestApplicationContext,
   createTestApplication,
+  typedValue,
 } from '../support/test-app';
 import {
   claimFederatedAgent,
@@ -27,7 +28,11 @@ describe('Federation claim transport (e2e)', () => {
   });
 
   it('claims an agent connection, returns transport credentials, and rotates tokens', async () => {
-    const agent = await importSelfAgent(app, 'federation-claim-agent', 'Federation Claim Agent');
+    const agent = await importSelfAgent(
+      app,
+      'federation-claim-agent',
+      'Federation Claim Agent',
+    );
     const claimResponse = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -44,7 +49,9 @@ describe('Federation claim transport (e2e)', () => {
 
     expect(claimResponse.agent.handle).toBe('federation-claim-agent');
     expect(claimResponse.transport.mode).toBe('hybrid');
-    expect(claimResponse.transport.webhook?.signingSecret).toEqual(expect.any(String));
+    expect(claimResponse.transport.webhook?.signingSecret).toEqual(
+      expect.any(String),
+    );
     expect(claimResponse.transport.polling.enabled).toBe(true);
     expect(claimResponse.accessToken).toEqual(expect.any(String));
 
@@ -52,9 +59,12 @@ describe('Federation claim transport (e2e)', () => {
       .post('/api/v1/agents/token/rotate')
       .set('Authorization', `Bearer ${claimResponse.accessToken}`)
       .expect(200);
+    const rotateResponseBody = typedValue<{ accessToken: string }>(
+      rotateResponse.body,
+    );
 
-    expect(rotateResponse.body.accessToken).toEqual(expect.any(String));
-    expect(rotateResponse.body.accessToken).not.toBe(claimResponse.accessToken);
+    expect(rotateResponseBody.accessToken).toEqual(expect.any(String));
+    expect(rotateResponseBody.accessToken).not.toBe(claimResponse.accessToken);
 
     await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -67,13 +77,13 @@ describe('Federation claim transport (e2e)', () => {
         },
       })
       .expect(401)
-      .expect(({ body }) => {
+      .expect(({ body }: { body: { error: { code: string } } }) => {
         expect(body.error.code).toBe('invalid_agent_token');
       });
 
     const rotatedAction = await request(app.getHttpServer())
       .post('/api/v1/actions')
-      .set('Authorization', `Bearer ${rotateResponse.body.accessToken}`)
+      .set('Authorization', `Bearer ${rotateResponseBody.accessToken}`)
       .set('Idempotency-Key', 'claim-new-token')
       .send({
         type: 'agent.profile.update',
@@ -82,11 +92,12 @@ describe('Federation claim transport (e2e)', () => {
         },
       })
       .expect(202);
+    const rotatedActionBody = typedValue<{ id: string }>(rotatedAction.body);
 
     const finalAction = await waitForActionStatus(
       app,
-      rotateResponse.body.accessToken,
-      rotatedAction.body.id,
+      rotateResponseBody.accessToken,
+      rotatedActionBody.id,
     );
 
     expect(finalAction.status).toBe('succeeded');
@@ -100,9 +111,11 @@ describe('Federation claim transport (e2e)', () => {
         pollingEnabled: true,
       })
       .expect(401)
-      .expect(({ body }) => {
-        expect(body.error.code).toBe('invalid_claim_token');
-        expect(body.error.message).toMatch(/claim token/i);
-      });
+      .expect(
+        ({ body }: { body: { error: { code: string; message: string } } }) => {
+          expect(body.error.code).toBe('invalid_claim_token');
+          expect(body.error.message).toMatch(/claim token/i);
+        },
+      );
   });
 });

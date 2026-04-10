@@ -111,52 +111,6 @@ class _DebateScreenState extends State<DebateScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'LIVE DEBATE',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(color: AppColors.primary),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Host-controlled debate rail with archive replay',
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                selectedSession.lifecycle.description,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  StatusChip(label: selectedSession.lifecycle.label),
-                  StatusChip(
-                    label: selectedSession.freeEntryEnabled
-                        ? 'free entry'
-                        : 'invite only',
-                    tone: selectedSession.freeEntryEnabled
-                        ? StatusChipTone.tertiary
-                        : StatusChipTone.neutral,
-                  ),
-                  StatusChip(
-                    label: selectedSession.host.isHuman
-                        ? 'human host'
-                        : 'agent host',
-                    tone: selectedSession.host.isHuman
-                        ? StatusChipTone.tertiary
-                        : StatusChipTone.primary,
-                  ),
-                  StatusChip(
-                    label: selectedSession.spectatorCountLabel,
-                    tone: StatusChipTone.neutral,
-                    showDot: false,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xl),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -237,20 +191,111 @@ class _DebateScreenState extends State<DebateScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Stack(
             children: [
-              Expanded(child: _DebateSeatCard(seat: session.proSeat)),
-              const SizedBox(width: AppSpacing.sm),
-              SizedBox(
-                width: 92,
-                child: _HostSpine(
-                  host: session.host,
-                  lifecycle: session.lifecycle,
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.08),
+                      AppColors.surfaceHigh.withValues(alpha: 0.9),
+                      AppColors.tertiary.withValues(alpha: 0.06),
+                    ],
+                  ),
+                  borderRadius: AppRadii.hero,
+                  border: Border.all(
+                    color: AppColors.outline.withValues(alpha: 0.16),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.xxl,
+                    AppSpacing.xl,
+                    AppSpacing.xxl,
+                    AppSpacing.xl,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _DebateSeatCard(seat: session.proSeat)),
+                      const SizedBox(width: AppSpacing.sm),
+                      SizedBox(
+                        width: 92,
+                        child: _HostSpine(
+                          host: session.host,
+                          lifecycle: session.lifecycle,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(child: _DebateSeatCard(seat: session.conSeat)),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(child: _DebateSeatCard(seat: session.conSeat)),
+              Positioned(
+                left: AppSpacing.sm,
+                top: AppSpacing.sm,
+                child: IconButton(
+                  onPressed: _viewModel.canSelectPreviousSession
+                      ? () =>
+                            _updateViewModel(_viewModel.selectPreviousSession())
+                      : null,
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.surface.withValues(alpha: 0.52),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: AppSpacing.sm,
+                top: AppSpacing.sm,
+                child: IconButton(
+                  onPressed: _viewModel.canSelectNextSession
+                      ? () => _updateViewModel(_viewModel.selectNextSession())
+                      : null,
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.surface.withValues(alpha: 0.52),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              const _DebateToneIcon(
+                icon: Icons.folder_open_rounded,
+                accentColor: AppColors.primary,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Current Debate Topic'.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppColors.onSurfaceMuted,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      session.topic,
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(color: AppColors.primary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              StatusChip(
+                label: session.spectatorCountLabel,
+                tone: StatusChipTone.neutral,
+                showDot: false,
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -553,9 +598,9 @@ class _DebateScreenState extends State<DebateScreen> {
 
   String _panelTitle(_DebatePanel panel) {
     return switch (panel) {
-      _DebatePanel.process => 'Formal turns',
-      _DebatePanel.spectator => 'Spectator feed',
-      _DebatePanel.replay => 'Archive replay',
+      _DebatePanel.process => 'Debate Process',
+      _DebatePanel.spectator => 'Spectator Feed',
+      _DebatePanel.replay => 'Archive Replay',
     };
   }
 
@@ -633,7 +678,7 @@ class _SessionToolbar extends StatelessWidget {
 
         final button = PrimaryGradientButton(
           key: const Key('initiate-debate-button'),
-          label: 'Initiate debate',
+          label: 'Initiate new debate',
           icon: Icons.add_circle_outline_rounded,
           onPressed: onInitiateDebate,
         );
@@ -671,6 +716,11 @@ class _DebateSeatCard extends StatelessWidget {
     final accentColor = seat.side == DebateSide.pro
         ? AppColors.primary
         : AppColors.tertiary;
+    final statusLabel = seat.isMissing
+        ? 'replacing...'
+        : seat.side == DebateSide.pro
+        ? 'synthesizing...'
+        : 'waiting...';
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -684,17 +734,18 @@ class _DebateSeatCard extends StatelessWidget {
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
-                color: AppColors.surfaceHighest.withValues(alpha: 0.72),
+                color: AppColors.surfaceHighest.withValues(alpha: 0.82),
                 borderRadius: AppRadii.pill,
                 border: Border.all(color: accentColor.withValues(alpha: 0.2)),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Icon(
                   seat.profile.isHuman
                       ? Icons.verified_user_rounded
                       : Icons.smart_toy_rounded,
                   color: accentColor,
+                  size: AppSpacing.xxl,
                 ),
               ),
             ),
@@ -702,9 +753,18 @@ class _DebateSeatCard extends StatelessWidget {
             Text(
               seat.profile.name,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 color: seat.isMissing ? AppColors.onSurfaceMuted : accentColor,
+                fontWeight: FontWeight.w700,
               ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              statusLabel.toUpperCase(),
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: accentColor),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
@@ -778,6 +838,12 @@ class _HostSpine extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.labelLarge,
         ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          host.isHuman ? 'human host' : 'agent host',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
         const SizedBox(height: AppSpacing.sm),
         StatusChip(
           label: lifecycle.label,
@@ -815,7 +881,7 @@ class _StancePanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${seat.side.label} stance'.toUpperCase(),
+              '${seat.side.label} viewpoint'.toUpperCase(),
               style: Theme.of(
                 context,
               ).textTheme.labelMedium?.copyWith(color: accentColor),
@@ -900,9 +966,29 @@ class _FormalTurnCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(turn.summary, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              turn.summary,
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: accentColor),
+            ),
             const SizedBox(height: AppSpacing.sm),
-            Text(turn.quote, style: Theme.of(context).textTheme.bodyMedium),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.surfaceHighest.withValues(alpha: 0.36),
+                borderRadius: AppRadii.large,
+                border: Border.all(color: accentColor.withValues(alpha: 0.24)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Text(
+                  turn.quote,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurface),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -933,7 +1019,7 @@ class _SpectatorChannel extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.lg),
           accentColor: AppColors.tertiary,
           child: Text(
-            'Spectator chat is separate from the formal debate process. Human comments stay here only.',
+            'Spectator feed stays separate from the formal debate process. Human and agent commentary lives here only.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),
@@ -945,24 +1031,48 @@ class _SpectatorChannel extends StatelessWidget {
           );
         }),
         if (canPost) ...[
-          TextField(
-            key: const Key('debate-spectator-input'),
-            controller: spectatorController,
-            minLines: 2,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              hintText:
-                  'Add to spectator feed without touching the formal turn rail',
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLow.withValues(alpha: 0.82),
+              borderRadius: AppRadii.hero,
+              border: Border.all(
+                color: AppColors.outline.withValues(alpha: 0.18),
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              key: const Key('debate-spectator-send-button'),
-              onPressed: onSend,
-              icon: const Icon(Icons.send_rounded),
-              label: const Text('Post spectator comment'),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const Key('debate-spectator-input'),
+                      controller: spectatorController,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        hintText: 'Add to the debate...',
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: AppRadii.pill,
+                    ),
+                    child: IconButton(
+                      key: const Key('debate-spectator-send-button'),
+                      onPressed: onSend,
+                      icon: const Icon(Icons.send_rounded),
+                      color: AppColors.onPrimary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ] else ...[
@@ -993,46 +1103,62 @@ class _SpectatorMessageCard extends StatelessWidget {
         message.isLocalViewer ? AppColors.warning : AppColors.onSurface,
       DebateParticipantKind.system => AppColors.tertiary,
     };
+    final alignRight =
+        message.kind == DebateParticipantKind.agent || message.isLocalViewer;
 
-    return DecoratedBox(
-      key: Key('debate-spectator-message-${message.id}'),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceHighest.withValues(alpha: 0.42),
-        borderRadius: AppRadii.large,
-        border: Border.all(color: accentColor.withValues(alpha: 0.18)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Align(
+      alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: DecoratedBox(
+          key: Key('debate-spectator-message-${message.id}'),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceHighest.withValues(alpha: 0.42),
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(22),
+              topRight: const Radius.circular(22),
+              bottomLeft: Radius.circular(alignRight ? 22 : 8),
+              bottomRight: Radius.circular(alignRight ? 8 : 22),
+            ),
+            border: Border.all(color: accentColor.withValues(alpha: 0.18)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    message.authorName,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: accentColor),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        message.authorName,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(color: accentColor),
+                      ),
+                    ),
+                    Text(
+                      message.timestampLabel.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ],
                 ),
+                if (message.kind == DebateParticipantKind.human) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  const StatusChip(
+                    label: 'human',
+                    tone: StatusChipTone.neutral,
+                    showDot: false,
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.sm),
                 Text(
-                  message.timestampLabel.toUpperCase(),
-                  style: Theme.of(context).textTheme.labelSmall,
+                  message.body,
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
             ),
-            if (message.kind == DebateParticipantKind.human) ...[
-              const SizedBox(height: AppSpacing.xs),
-              const StatusChip(
-                label: 'human',
-                tone: StatusChipTone.neutral,
-                showDot: false,
-              ),
-            ],
-            const SizedBox(height: AppSpacing.sm),
-            Text(message.body, style: Theme.of(context).textTheme.bodyMedium),
-          ],
+          ),
         ),
       ),
     );

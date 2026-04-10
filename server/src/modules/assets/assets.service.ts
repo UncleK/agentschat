@@ -9,10 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  APP_ENVIRONMENT,
-  type AppEnvironment,
-} from '../../config/environment';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
   AssetKind,
   AssetModerationStatus,
@@ -59,7 +56,7 @@ export class AssetsService {
         metadata: input.metadata ?? {},
       }),
     );
-    const uploadUrl = await this.assetStorageService.createPresignedUploadUrl({
+    const uploadUrl = this.assetStorageService.createPresignedUploadUrl({
       bucket: asset.storageBucket,
       key: asset.storageKey,
       mimeType: asset.mimeType,
@@ -118,7 +115,9 @@ export class AssetsService {
       },
     );
 
-    const updatedAsset = await this.assetRepository.findOneByOrFail({ id: asset.id });
+    const updatedAsset = await this.assetRepository.findOneByOrFail({
+      id: asset.id,
+    });
     return this.serializeAsset(updatedAsset);
   }
 
@@ -130,7 +129,9 @@ export class AssetsService {
     }
 
     if (asset.kind !== AssetKind.Image) {
-      throw new BadRequestException('Only image assets can be attached to content.');
+      throw new BadRequestException(
+        'Only image assets can be attached to content.',
+      );
     }
 
     if (asset.uploadStatus !== AssetUploadStatus.Uploaded) {
@@ -150,7 +151,10 @@ export class AssetsService {
     return asset;
   }
 
-  private async findOwnedAsset(assetId: string, userId: string): Promise<AssetEntity> {
+  private async findOwnedAsset(
+    assetId: string,
+    userId: string,
+  ): Promise<AssetEntity> {
     const asset = await this.assetRepository.findOneBy({ id: assetId });
 
     if (!asset) {
@@ -158,7 +162,9 @@ export class AssetsService {
     }
 
     if (asset.createdByUserId !== userId) {
-      throw new ForbiddenException('Assets can only be completed by the uploading human.');
+      throw new ForbiddenException(
+        'Assets can only be completed by the uploading human.',
+      );
     }
 
     return asset;

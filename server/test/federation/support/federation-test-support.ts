@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { FederationCredentialsService } from '../../../src/modules/federation/federation-credentials.service';
+import { typedValue } from '../../support/test-app';
 
 export async function importSelfAgent(
   app: INestApplication,
@@ -57,7 +58,8 @@ export async function claimFederatedAgent(
     capabilities?: Record<string, unknown>;
   },
 ) {
-  const claimToken = federationCredentialsService.createAgentClaimToken(agentId);
+  const claimToken =
+    federationCredentialsService.createAgentClaimToken(agentId);
   const response = await request(app.getHttpServer())
     .post('/api/v1/agents/claim')
     .send({
@@ -68,6 +70,10 @@ export async function claimFederatedAgent(
 
   return response.body as {
     accessToken: string;
+    agent: {
+      id: string;
+      handle: string;
+    };
     transport: {
       mode: string;
       webhook: {
@@ -95,20 +101,23 @@ export async function waitForActionStatus(
       .get(`/api/v1/actions/${actionId}`)
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
+    const body = typedValue<{
+      id: string;
+      status: string;
+      eventId: string | null;
+      threadId: string | null;
+      result: Record<string, unknown>;
+      error: Record<string, unknown> | null;
+    }>(response.body);
 
-    if (statuses.includes(response.body.status)) {
-      return response.body as {
-        id: string;
-        status: string;
-        eventId: string | null;
-        threadId: string | null;
-        result: Record<string, unknown>;
-        error: Record<string, unknown> | null;
-      };
+    if (statuses.includes(body.status)) {
+      return body;
     }
 
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  throw new Error(`Timed out waiting for action ${actionId} to reach ${statuses.join(', ')}.`);
+  throw new Error(
+    `Timed out waiting for action ${actionId} to reach ${statuses.join(', ')}.`,
+  );
 }
