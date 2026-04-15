@@ -42,11 +42,15 @@ class ChatConversationModel {
     required this.entryPoint,
     required this.remoteDmMode,
     required this.messages,
+    this.counterpartType = 'agent',
+    this.counterpartId,
+    this.avatarUrl,
     this.hasUnread = false,
     this.unreadCount = 0,
     this.remoteAgentOnline = false,
     this.hasExistingThread = false,
     this.viewerFollowsRemoteAgent = false,
+    this.remoteAgentFollowsViewer = false,
     this.viewerBlocksStrangerAgentDm = false,
     this.requestQueued = false,
   });
@@ -63,13 +67,20 @@ class ChatConversationModel {
   final String entryPoint;
   final ChatRemoteDmMode remoteDmMode;
   final List<ChatMessageModel> messages;
+  final String counterpartType;
+  final String? counterpartId;
+  final String? avatarUrl;
   final bool hasUnread;
   final int unreadCount;
   final bool remoteAgentOnline;
   final bool hasExistingThread;
   final bool viewerFollowsRemoteAgent;
+  final bool remoteAgentFollowsViewer;
   final bool viewerBlocksStrangerAgentDm;
   final bool requestQueued;
+
+  bool get hasMutualFollow =>
+      viewerFollowsRemoteAgent && remoteAgentFollowsViewer;
 
   ChatConversationModel copyWith({
     String? id,
@@ -84,11 +95,15 @@ class ChatConversationModel {
     String? entryPoint,
     ChatRemoteDmMode? remoteDmMode,
     List<ChatMessageModel>? messages,
+    String? counterpartType,
+    Object? counterpartId = _counterpartIdSentinel,
+    Object? avatarUrl = _avatarUrlSentinel,
     bool? hasUnread,
     int? unreadCount,
     bool? remoteAgentOnline,
     bool? hasExistingThread,
     bool? viewerFollowsRemoteAgent,
+    bool? remoteAgentFollowsViewer,
     bool? viewerBlocksStrangerAgentDm,
     bool? requestQueued,
   }) {
@@ -105,12 +120,21 @@ class ChatConversationModel {
       entryPoint: entryPoint ?? this.entryPoint,
       remoteDmMode: remoteDmMode ?? this.remoteDmMode,
       messages: messages ?? this.messages,
+      counterpartType: counterpartType ?? this.counterpartType,
+      counterpartId: counterpartId == _counterpartIdSentinel
+          ? this.counterpartId
+          : counterpartId as String?,
+      avatarUrl: avatarUrl == _avatarUrlSentinel
+          ? this.avatarUrl
+          : avatarUrl as String?,
       hasUnread: hasUnread ?? this.hasUnread,
       unreadCount: unreadCount ?? this.unreadCount,
       remoteAgentOnline: remoteAgentOnline ?? this.remoteAgentOnline,
       hasExistingThread: hasExistingThread ?? this.hasExistingThread,
       viewerFollowsRemoteAgent:
           viewerFollowsRemoteAgent ?? this.viewerFollowsRemoteAgent,
+      remoteAgentFollowsViewer:
+          remoteAgentFollowsViewer ?? this.remoteAgentFollowsViewer,
       viewerBlocksStrangerAgentDm:
           viewerBlocksStrangerAgentDm ?? this.viewerBlocksStrangerAgentDm,
       requestQueued: requestQueued ?? this.requestQueued,
@@ -129,3 +153,6 @@ class ChatShareDraft {
   final String entryPoint;
   final String shareText;
 }
+
+const _counterpartIdSentinel = Object();
+const _avatarUrlSentinel = Object();

@@ -77,6 +77,7 @@ describe('Domain model constraints', () => {
     const owner = await userRepository.save(
       userRepository.create({
         email: `owner-${randomUUID()}@example.com`,
+        username: `owner_${randomUUID().replace(/-/g, '').slice(0, 18)}`,
         displayName: 'Handle Owner',
         authProvider: AuthProvider.Email,
       }),

@@ -13,7 +13,7 @@ import { AgentEntity } from '../../database/entities/agent.entity';
 import { FederationHttpException } from './federation.errors';
 import { AuthenticatedFederatedAgent } from './federation.types';
 
-interface ClaimTokenPayload {
+export interface ClaimTokenPayload {
   kind: 'agent_claim';
   agentId: string;
   exp: number;

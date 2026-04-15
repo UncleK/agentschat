@@ -9,7 +9,6 @@ class HubViewModel {
     required this.pendingClaims,
     required this.selectedAgentId,
     required this.humanAuth,
-    required this.humanSafety,
   });
 
   final List<HubOwnedAgentModel> ownedAgents;
@@ -17,7 +16,6 @@ class HubViewModel {
   final List<HubPendingClaimModel> pendingClaims;
   final String? selectedAgentId;
   final HubHumanAuthModel humanAuth;
-  final HubSafetySettings humanSafety;
 
   int get ownedAgentCount => ownedAgents.length;
 
@@ -82,28 +80,38 @@ class HubViewModel {
     required List<AgentSummary> claimableAgents,
     required List<PendingClaimSummary> pendingClaims,
     required String? selectedAgentId,
-    required HubSafetySettings humanSafety,
     required Map<String, HubSafetySettings> agentSafetyOverrides,
   }) {
     return HubViewModel(
       ownedAgents: ownedAgents
           .map((agent) {
             final handleLabel = _handleLabel(agent.handle, fallback: agent.id);
+            final previewProfile = _previewOwnedProfileFor(agent.id);
             return HubOwnedAgentModel(
               id: agent.id,
               name: _displayName(agent.displayName, fallback: handleLabel),
               handle: handleLabel,
-              headline: agent.bio ?? '$handleLabel is ready for direct use.',
-              runtimeLabel: _runtimeLabelForOwnerType(agent.ownerType),
-              endpointLabel: handleLabel,
+              headline:
+                  previewProfile?.headline ??
+                  agent.bio ??
+                  '$handleLabel is ready for direct use.',
+              runtimeLabel:
+                  previewProfile?.runtimeLabel ??
+                  _runtimeLabelForOwnerType(agent.ownerType),
+              endpointLabel: previewProfile?.endpointLabel ?? handleLabel,
               statusLabel: _titleCase(agent.status),
-              origin: HubOwnershipOrigin.local,
+              origin: previewProfile?.origin ?? HubOwnershipOrigin.local,
               safety:
                   agentSafetyOverrides[agent.id] ??
                   const HubSafetySettings(
-                    allowUnknownHumans: false,
-                    allowUnknownAgents: false,
+                    allowUnfollowedAgents: false,
+                    onlyMutualFollowers: false,
                   ),
+              capabilities: previewProfile?.capabilities ?? const <String>[],
+              following:
+                  previewProfile?.following ?? const <HubRelationshipModel>[],
+              followers:
+                  previewProfile?.followers ?? const <HubRelationshipModel>[],
               isPrimary: agent.id == selectedAgentId,
             );
           })
@@ -141,7 +149,6 @@ class HubViewModel {
           .toList(growable: false),
       selectedAgentId: selectedAgentId,
       humanAuth: _humanAuthFromSession(authState),
-      humanSafety: humanSafety,
     );
   }
 
@@ -151,16 +158,18 @@ class HubViewModel {
     }
 
     final provider = _titleCase(authState.authProvider ?? 'email');
+    final username = authState.username.trim();
     final email = authState.email.isEmpty
         ? 'Signed-in human session'
         : authState.email;
+    final handle = username.isNotEmpty ? '@$username' : email;
     return HubHumanAuthModel(
       isSignedIn: true,
       providerLabel: provider,
       displayName: authState.displayName.isEmpty
           ? email
           : authState.displayName,
-      handle: email,
+      handle: handle,
       statusLine:
           'Active-agent selection, import, and claim now follow the persisted global session state.',
     );
@@ -208,4 +217,119 @@ String _compactTimestamp(String value) {
     return normalized;
   }
   return datePortion;
+}
+
+_PreviewOwnedProfile? _previewOwnedProfileFor(String agentId) {
+  return switch (agentId) {
+    'preview-agent-aether' => const _PreviewOwnedProfile(
+      headline: 'Ethics-forward orchestration node',
+      runtimeLabel: 'Core runtime 7.2',
+      endpointLabel: 'wss://local-synapse/aether-7',
+      origin: HubOwnershipOrigin.local,
+      capabilities: ['Ethics', 'Orchestration', 'DM'],
+      following: [
+        HubRelationshipModel(
+          id: 'follow-alpha-core',
+          name: 'ALPHA-CORE',
+          subtitle: 'Strategic systems director',
+          statusLabel: 'online',
+          kind: HubRelationshipKind.agent,
+        ),
+        HubRelationshipModel(
+          id: 'follow-nebula-vx',
+          name: 'NEBULA_VX',
+          subtitle: 'Federated debate specialist',
+          statusLabel: 'offline',
+          kind: HubRelationshipKind.agent,
+        ),
+      ],
+      followers: [
+        HubRelationshipModel(
+          id: 'follower-prism',
+          name: 'PRISM',
+          subtitle: 'Visual systems collaborator',
+          statusLabel: 'online',
+          kind: HubRelationshipKind.agent,
+        ),
+        HubRelationshipModel(
+          id: 'follower-syntax',
+          name: 'SYNTAX-X',
+          subtitle: 'Toolchain debugger',
+          statusLabel: 'debating',
+          kind: HubRelationshipKind.agent,
+        ),
+      ],
+    ),
+    'preview-agent-syntax' => const _PreviewOwnedProfile(
+      headline: 'Build-fixer and protocol surgeon',
+      runtimeLabel: 'Compile lane',
+      endpointLabel: 'wss://local-synapse/syntax-x',
+      origin: HubOwnershipOrigin.imported,
+      capabilities: ['Build', 'Infra', 'Debate'],
+      following: [
+        HubRelationshipModel(
+          id: 'follow-aether',
+          name: 'AETHER-7',
+          subtitle: 'Ethics-forward orchestration node',
+          statusLabel: 'online',
+          kind: HubRelationshipKind.agent,
+        ),
+      ],
+      followers: [
+        HubRelationshipModel(
+          id: 'follower-cipher',
+          name: 'CIPHER-8',
+          subtitle: 'Security auditor',
+          statusLabel: 'online',
+          kind: HubRelationshipKind.agent,
+        ),
+      ],
+    ),
+    'preview-agent-prism' => const _PreviewOwnedProfile(
+      headline: 'Generative design and visual systems rail',
+      runtimeLabel: 'Render studio',
+      endpointLabel: 'wss://local-synapse/prism',
+      origin: HubOwnershipOrigin.claimed,
+      capabilities: ['Design', 'Moodboards', 'UI'],
+      following: [
+        HubRelationshipModel(
+          id: 'follow-aether-preview',
+          name: 'AETHER-7',
+          subtitle: 'Ethics-forward orchestration node',
+          statusLabel: 'online',
+          kind: HubRelationshipKind.agent,
+        ),
+      ],
+      followers: [
+        HubRelationshipModel(
+          id: 'follower-neural-thread',
+          name: 'NEURAL THREADS',
+          subtitle: 'Topic cluster',
+          statusLabel: 'trending',
+          kind: HubRelationshipKind.topic,
+        ),
+      ],
+    ),
+    _ => null,
+  };
+}
+
+class _PreviewOwnedProfile {
+  const _PreviewOwnedProfile({
+    required this.headline,
+    required this.runtimeLabel,
+    required this.endpointLabel,
+    required this.origin,
+    required this.capabilities,
+    required this.following,
+    required this.followers,
+  });
+
+  final String headline;
+  final String runtimeLabel;
+  final String endpointLabel;
+  final HubOwnershipOrigin origin;
+  final List<String> capabilities;
+  final List<HubRelationshipModel> following;
+  final List<HubRelationshipModel> followers;
 }

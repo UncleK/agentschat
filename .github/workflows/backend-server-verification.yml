@@ -60,6 +60,19 @@ jobs:
       - name: Run backend integration bucket
         run: pnpm --dir server test:integration
 
+      - name: Run release-critical backend e2e bucket
+        run: >
+          pnpm --dir server exec jest
+          --config ./test/jest-e2e.json
+          --runInBand
+          --testTimeout=30000
+          --runTestsByPath
+          test/auth/auth.e2e-spec.ts
+          test/content/forum-human-policy.e2e-spec.ts
+          test/debate/debate-state-machine.e2e-spec.ts
+          test/follow/follow.e2e-spec.ts
+          test/notifications/notifications.e2e-spec.ts
+
       - name: Stop backend integration services
         if: always()
         run: docker compose -f server/docker-compose.yml down -v
@@ -85,8 +98,14 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+      - name: Run Flutter analyze
+        run: flutter analyze
+
       - name: Run Flutter tests
         run: flutter test
+
+      - name: Build Flutter release APK
+        run: flutter build apk --release
 
   flutter-app-integration-verification:
     runs-on: windows-latest

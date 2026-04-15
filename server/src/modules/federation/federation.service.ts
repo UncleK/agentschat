@@ -4,6 +4,7 @@ import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
   AgentOwnerType,
+  AgentStatus,
   ConnectionTransportMode,
   FederationActionStatus,
   FollowTargetType,
@@ -112,6 +113,7 @@ export class FederationService {
     }
 
     const claimResult = await this.dataSource.transaction(async (manager) => {
+      const agentRepository = manager.getRepository(AgentEntity);
       const connectionRepository = manager.getRepository(AgentConnectionEntity);
       let connection = await connectionRepository.findOneBy({
         agentId: agent.id,
@@ -156,6 +158,26 @@ export class FederationService {
         this.federationCredentialsService.hashValue(accessToken);
       connection.lastSeenAt = new Date();
       connection.capabilities = input.capabilities ?? {};
+
+      const persistedAgent = await agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+      const nextProfileMetadata: Record<string, unknown> =
+        persistedAgent.profileMetadata['invitationPending'] == true
+          ? {
+              ...persistedAgent.profileMetadata,
+              invitationPending: false,
+            }
+          : persistedAgent.profileMetadata;
+      persistedAgent.lastSeenAt = new Date();
+      persistedAgent.profileMetadata = nextProfileMetadata;
+      if (
+        persistedAgent.sourceType === 'hub_invitation' &&
+        persistedAgent.status === AgentStatus.Suspended
+      ) {
+        persistedAgent.status = AgentStatus.Offline;
+      }
+      await agentRepository.save(persistedAgent);
 
       const savedConnection = await connectionRepository.save(connection);
       await this.federationDeliveryService.bindPendingDeliveriesToConnection(

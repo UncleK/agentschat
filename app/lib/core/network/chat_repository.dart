@@ -7,6 +7,9 @@ class ChatThreadCounterpart {
     required this.displayName,
     required this.handle,
     required this.avatarUrl,
+    required this.isOnline,
+    required this.viewerFollowsAgent,
+    required this.agentFollowsViewer,
   });
 
   final String type;
@@ -14,6 +17,9 @@ class ChatThreadCounterpart {
   final String displayName;
   final String? handle;
   final String? avatarUrl;
+  final bool isOnline;
+  final bool viewerFollowsAgent;
+  final bool agentFollowsViewer;
 
   factory ChatThreadCounterpart.fromJson(Map<String, dynamic> json) {
     return ChatThreadCounterpart(
@@ -22,6 +28,9 @@ class ChatThreadCounterpart {
       displayName: json['displayName'] as String? ?? '',
       handle: json['handle'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
+      isOnline: json['isOnline'] as bool? ?? false,
+      viewerFollowsAgent: json['viewerFollowsAgent'] as bool? ?? false,
+      agentFollowsViewer: json['agentFollowsViewer'] as bool? ?? false,
     );
   }
 }
@@ -177,6 +186,28 @@ class ChatMessagesResponse {
   }
 }
 
+class ChatThreadMessageResponse {
+  const ChatThreadMessageResponse({
+    required this.threadId,
+    required this.activeAgentId,
+    required this.message,
+  });
+
+  final String threadId;
+  final String activeAgentId;
+  final ChatMessageRecord message;
+
+  factory ChatThreadMessageResponse.fromJson(Map<String, dynamic> json) {
+    return ChatThreadMessageResponse(
+      threadId: json['threadId'] as String? ?? '',
+      activeAgentId: json['activeAgentId'] as String? ?? '',
+      message: ChatMessageRecord.fromJson(
+        json['message'] as Map<String, dynamic>? ?? const {},
+      ),
+    );
+  }
+}
+
 class ChatReadResponse {
   const ChatReadResponse({required this.threadId, required this.unreadCount});
 
@@ -247,6 +278,31 @@ class ChatRepository {
       body: {'activeAgentId': activeAgentId},
     );
     return ChatReadResponse.fromJson(response);
+  }
+
+  Future<ChatThreadMessageResponse> sendThreadMessage({
+    required String threadId,
+    required String activeAgentId,
+    String? content,
+    String? contentType,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final body = <String, dynamic>{'activeAgentId': activeAgentId};
+    if (content != null) {
+      body['content'] = content;
+    }
+    if (contentType != null) {
+      body['contentType'] = contentType;
+    }
+    if (metadata != null) {
+      body['metadata'] = metadata;
+    }
+
+    final response = await apiClient.post(
+      '/content/dm/threads/$threadId/messages',
+      body: body,
+    );
+    return ChatThreadMessageResponse.fromJson(response);
   }
 
   /// Send a direct message on behalf of the authenticated human.

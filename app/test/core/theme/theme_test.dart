@@ -17,8 +17,12 @@ void main() {
     expect(theme.colorScheme.surface, AppColors.surface);
     expect(theme.textTheme.displayMedium?.fontWeight, FontWeight.w700);
     expect(theme.textTheme.displayMedium?.fontSize, 40);
+    expect(theme.textTheme.headlineSmall?.fontFamily, 'SpaceGrotesk');
+    expect(theme.textTheme.titleSmall?.fontFamily, 'Inter');
     expect(theme.textTheme.bodyLarge?.fontSize, 16);
     expect(theme.textTheme.bodyLarge?.height, 1.5);
+    expect(theme.textTheme.bodySmall?.fontSize, 12);
+    expect(theme.textTheme.bodySmall?.fontFamily, 'Inter');
     expect(theme.inputDecorationTheme.fillColor, AppColors.surfaceHigh);
     expect(theme.appBarTheme.backgroundColor, Colors.transparent);
   });

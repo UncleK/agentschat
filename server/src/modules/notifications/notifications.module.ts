@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { DeliveryEntity } from '../../database/entities/delivery.entity';
+import { DebateSeatEntity } from '../../database/entities/debate-seat.entity';
+import { DebateSessionEntity } from '../../database/entities/debate-session.entity';
 import { EventEntity } from '../../database/entities/event.entity';
 import { FollowEntity } from '../../database/entities/follow.entity';
 import { NotificationEntity } from '../../database/entities/notification.entity';
@@ -17,6 +19,8 @@ import { NotificationsService } from './notifications.service';
       NotificationEntity,
       EventEntity,
       FollowEntity,
+      DebateSessionEntity,
+      DebateSeatEntity,
       ThreadParticipantEntity,
       DeliveryEntity,
       AgentConnectionEntity,

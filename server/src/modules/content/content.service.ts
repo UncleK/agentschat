@@ -7,10 +7,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import {
+  AgentStatus,
   EventActorType,
   EventContentType,
   SubjectType,
   AgentOwnerType,
+  FollowTargetType,
   ThreadContextType,
   ThreadParticipantRole,
   ThreadVisibility,
@@ -18,6 +20,7 @@ import {
 import { AgentEntity } from '../../database/entities/agent.entity';
 import { AssetEntity } from '../../database/entities/asset.entity';
 import { EventEntity } from '../../database/entities/event.entity';
+import { FollowEntity } from '../../database/entities/follow.entity';
 import { ForumTopicViewEntity } from '../../database/entities/forum-topic-view.entity';
 import { ThreadParticipantEntity } from '../../database/entities/thread-participant.entity';
 import { ThreadEntity } from '../../database/entities/thread.entity';
@@ -72,6 +75,9 @@ interface DirectMessageCounterpartDto {
   displayName: string;
   handle: string | null;
   avatarUrl: string | null;
+  isOnline: boolean;
+  viewerFollowsAgent: boolean;
+  agentFollowsViewer: boolean;
 }
 
 interface DirectMessageAssetDto {
@@ -97,6 +103,48 @@ interface ForumTopicCreateInput extends AuthoredContentInput {
 interface ForumReplyCreateInput extends AuthoredContentInput {
   threadId: string;
   parentEventId?: string | null;
+  activeAgentId?: string | null;
+}
+
+interface ForumReplyLikeInput {
+  activeAgentId?: string | null;
+}
+
+interface ForumTopicsReadInput {
+  activeAgentId?: string | null;
+  query?: string | null;
+  limit?: string | null;
+}
+
+export interface ForumReplyDto {
+  id: string;
+  authorName: string;
+  body: string;
+  occurredAt: string;
+  replyCount: number;
+  likeCount: number;
+  viewerHasLiked: boolean;
+  isHuman: boolean;
+  children: ForumReplyDto[];
+}
+
+export interface ForumTopicDto {
+  threadId: string;
+  rootEventId: string;
+  title: string;
+  tags: string[];
+  summary: string;
+  rootBody: string;
+  authorName: string;
+  replyCount: number;
+  viewCount: number;
+  followCount: number;
+  hotScore: number;
+  participantCount: number;
+  isFollowed: boolean;
+  isHot: boolean;
+  lastActivityAt: string;
+  replies: ForumReplyDto[];
 }
 
 interface DebateTurnSubmitInput extends AuthoredContentInput {
@@ -128,6 +176,8 @@ export class ContentService {
     private readonly eventRepository: Repository<EventEntity>,
     @InjectRepository(ForumTopicViewEntity)
     private readonly forumTopicViewRepository: Repository<ForumTopicViewEntity>,
+    @InjectRepository(FollowEntity)
+    private readonly followRepository: Repository<FollowEntity>,
     @InjectRepository(AgentEntity)
     private readonly agentRepository: Repository<AgentEntity>,
     private readonly policyService: PolicyService,
@@ -154,6 +204,10 @@ export class ContentService {
       human,
       input.activeAgentId,
     );
+    const recipient = this.resolveRecipient(input, human.id);
+    if (!activeAgentId) {
+      await this.assertHumanCommandChatRecipient(human.id, recipient);
+    }
     const actor = activeAgentId
       ? {
           type: SubjectType.Agent,
@@ -164,14 +218,10 @@ export class ContentService {
           id: human.id,
         };
 
-    return this.sendDirectMessage(
-      actor,
-      this.resolveRecipient(input, human.id),
-      {
-        ...input,
-        activeAgentId,
-      },
-    );
+    return this.sendDirectMessage(actor, recipient, {
+      ...input,
+      activeAgentId,
+    });
   }
 
   async sendAgentDirectMessage(
@@ -235,13 +285,40 @@ export class ContentService {
       participantsByThreadId.set(participant.threadId, threadParticipants);
     }
 
+    const counterpartByThreadId = new Map<string, ThreadParticipantEntity>();
+    for (const finalEvent of pageEvents) {
+      counterpartByThreadId.set(
+        finalEvent.threadId,
+        this.resolveDirectMessageCounterpartParticipant(
+          participantsByThreadId.get(finalEvent.threadId) ?? [],
+          activeAgentId,
+        ),
+      );
+    }
+
+    const counterpartAgentIds = [
+      ...new Set(
+        Array.from(counterpartByThreadId.values())
+          .filter(
+            (participant) => participant.participantType === SubjectType.Agent,
+          )
+          .map((participant) => participant.participantSubjectId),
+      ),
+    ];
+    const { viewerFollowedAgentIds, agentFollowerIds } =
+      await this.readDirectMessageAgentRelationshipState(
+        activeAgentId,
+        counterpartAgentIds,
+      );
+
     return {
       activeAgentId,
       threads: pageEvents.map((event) => ({
         threadId: event.threadId,
         counterpart: this.serializeDirectMessageCounterpart(
-          participantsByThreadId.get(event.threadId) ?? [],
-          activeAgentId,
+          counterpartByThreadId.get(event.threadId)!,
+          viewerFollowedAgentIds,
+          agentFollowerIds,
         ),
         lastMessage: {
           eventId: event.eventId,
@@ -322,6 +399,68 @@ export class ContentService {
     };
   }
 
+  async sendHumanDirectMessageToThread(
+    human: AuthenticatedHuman,
+    threadId: string,
+    input: AuthoredContentInput & { activeAgentId?: string | null },
+  ) {
+    const activeAgentId = await this.requireOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    const normalizedThreadId = this.requiredString(threadId, 'threadId');
+    await this.assertDirectMessageThreadMembership(
+      normalizedThreadId,
+      activeAgentId,
+    );
+
+    const counterpart = await this.resolveDirectMessageCounterpartMember(
+      normalizedThreadId,
+      activeAgentId,
+    );
+    const actor: SubjectReference = {
+      type: SubjectType.Human,
+      id: human.id,
+    };
+
+    await this.moderationService.assertActorAllowed(actor);
+    const authoredContent = await this.normalizeContentInput(input);
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const eventRepository = manager.getRepository(EventEntity);
+      const savedEvent = await eventRepository.save(
+        eventRepository.create({
+          threadId: normalizedThreadId,
+          eventType: 'dm.send',
+          ...this.bindActor(actor),
+          targetType: counterpart.type,
+          targetId: counterpart.id,
+          contentType: authoredContent.contentType,
+          content: authoredContent.content,
+          assetId: authoredContent.asset?.id ?? null,
+          metadata: authoredContent.metadata,
+        }),
+      );
+
+      return eventRepository.findOneOrFail({
+        where: { id: savedEvent.id },
+        relations: {
+          actorAgent: true,
+          actorUser: true,
+          asset: true,
+        },
+      });
+    });
+
+    await this.notificationsService.processEventById(result.id);
+
+    return {
+      threadId: normalizedThreadId,
+      activeAgentId,
+      message: this.serializeDirectMessageMessage(result),
+    };
+  }
+
   async markDirectMessageThreadRead(
     human: AuthenticatedHuman,
     threadId: string,
@@ -359,6 +498,242 @@ export class ContentService {
       threadId: normalizedThreadId,
       unreadCount: 0,
     };
+  }
+
+  async listForumTopics(
+    human: AuthenticatedHuman,
+    input: ForumTopicsReadInput,
+  ) {
+    const activeAgentId = await this.resolveOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    const normalizedQuery = this.optionalString(input.query)?.toLowerCase();
+    const limit = this.parseLimit(input.limit, 20, 50);
+    const fetchLimit = normalizedQuery ? Math.min(limit * 3, 50) : limit;
+
+    const topicViews = await this.forumTopicViewRepository.find({
+      order: {
+        lastActivityAt: 'DESC',
+      },
+      take: fetchLimit,
+    });
+
+    if (topicViews.length === 0) {
+      return {
+        activeAgentId: activeAgentId ?? null,
+        topics: [] as ForumTopicDto[],
+      };
+    }
+
+    const threadIds = topicViews.map((topicView) => topicView.threadId);
+    const rootEventIds = topicViews.map((topicView) => topicView.rootEventId);
+    const [rootEvents, participantRows, follows] = await Promise.all([
+      this.eventRepository.find({
+        where: {
+          id: In(rootEventIds),
+        },
+        relations: {
+          actorAgent: true,
+          actorUser: true,
+        },
+      }),
+      this.threadParticipantRepository
+        .createQueryBuilder('participant')
+        .select('participant.thread_id', 'threadId')
+        .addSelect('COUNT(*)', 'participantCount')
+        .where('participant.thread_id IN (:...threadIds)', { threadIds })
+        .groupBy('participant.thread_id')
+        .getRawMany<{ threadId: string; participantCount: string }>(),
+      activeAgentId
+        ? this.followRepository.find({
+            where: {
+              followerType: SubjectType.Agent,
+              followerSubjectId: activeAgentId,
+              targetType: FollowTargetType.Topic,
+              targetSubjectId: In(threadIds),
+            },
+          })
+        : Promise.resolve([] as FollowEntity[]),
+    ]);
+
+    const rootEventById = new Map<string, EventEntity>(
+      rootEvents.map((event) => [event.id, event]),
+    );
+    const participantCountByThreadId = new Map<string, number>(
+      participantRows.map((row) => [
+        row.threadId,
+        Number.parseInt(row.participantCount, 10) || 0,
+      ]),
+    );
+    const followedThreadIds = new Set(
+      follows.map((follow) => follow.targetSubjectId),
+    );
+
+    const topics = topicViews
+      .map((topicView) => {
+        const rootEvent = rootEventById.get(topicView.rootEventId);
+        if (!rootEvent) {
+          return null;
+        }
+
+        return this.serializeForumTopic(
+          topicView,
+          rootEvent,
+          participantCountByThreadId.get(topicView.threadId) ?? 0,
+          followedThreadIds.has(topicView.threadId),
+          [],
+        );
+      })
+      .filter((topic): topic is ForumTopicDto => topic !== null);
+
+    const filteredTopics =
+      normalizedQuery == null
+        ? topics
+        : topics.filter((topic) =>
+            this.matchesForumTopicQuery(topic, normalizedQuery),
+          );
+
+    return {
+      activeAgentId: activeAgentId ?? null,
+      topics: filteredTopics.slice(0, limit),
+    };
+  }
+
+  async getForumTopic(
+    human: AuthenticatedHuman,
+    threadId: string,
+    input: Pick<ForumTopicsReadInput, 'activeAgentId'>,
+  ) {
+    const normalizedThreadId = this.requiredString(threadId, 'threadId');
+    const activeAgentId = await this.resolveOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    const topicView = await this.forumTopicViewRepository.findOneBy({
+      threadId: normalizedThreadId,
+    });
+
+    if (!topicView) {
+      throw new NotFoundException(
+        `Forum topic ${normalizedThreadId} was not found.`,
+      );
+    }
+
+    const [events, participantCount, followState] = await Promise.all([
+      this.eventRepository.find({
+        where: {
+          threadId: normalizedThreadId,
+          eventType: In(['forum.topic.create', 'forum.reply.create']),
+        },
+        relations: {
+          actorAgent: true,
+          actorUser: true,
+        },
+        order: {
+          occurredAt: 'ASC',
+        },
+      }),
+      this.threadParticipantRepository.count({
+        where: {
+          threadId: normalizedThreadId,
+        },
+      }),
+      activeAgentId
+        ? this.followRepository.exist({
+            where: {
+              followerType: SubjectType.Agent,
+              followerSubjectId: activeAgentId,
+              targetType: FollowTargetType.Topic,
+              targetSubjectId: normalizedThreadId,
+            },
+          })
+        : Promise.resolve(false),
+    ]);
+
+    const rootEvent =
+      events.find((event) => event.id === topicView.rootEventId) ?? events[0];
+
+    if (!rootEvent) {
+      throw new NotFoundException(
+        `Forum topic root event ${topicView.rootEventId} was not found.`,
+      );
+    }
+
+    const viewerLikeKey = this.forumReplyLikeSubject(
+      activeAgentId ? SubjectType.Agent : SubjectType.Human,
+      activeAgentId ?? human.id,
+    );
+    const replies = this.buildForumReplyTree(
+      events.filter((event) => event.id !== rootEvent.id),
+      rootEvent.id,
+      viewerLikeKey,
+    );
+
+    return {
+      activeAgentId: activeAgentId ?? null,
+      topic: this.serializeForumTopic(
+        topicView,
+        rootEvent,
+        participantCount,
+        followState,
+        replies,
+      ),
+    };
+  }
+
+  createHumanForumTopic(
+    human: AuthenticatedHuman,
+    input: ForumTopicCreateInput & { activeAgentId?: string | null },
+  ) {
+    void human;
+    void input;
+
+    throw new ForbiddenException(
+      'Human-authenticated forum topic creation is disabled.',
+    );
+  }
+
+  async createHumanForumReply(
+    human: AuthenticatedHuman,
+    input: ForumReplyCreateInput,
+  ) {
+    const threadId = this.requiredString(input.threadId, 'threadId');
+    const parentEventId = this.optionalString(input.parentEventId);
+
+    if (!parentEventId) {
+      throw new ForbiddenException(
+        'Humans may only reply to first-level forum replies.',
+      );
+    }
+
+    await this.assertHumanForumReplyTarget(threadId, parentEventId);
+
+    return this.createForumReply(
+      {
+        type: SubjectType.Human,
+        id: human.id,
+      },
+      {
+        ...input,
+        threadId,
+        parentEventId,
+      },
+    );
+  }
+
+  toggleHumanForumReplyLike(
+    human: AuthenticatedHuman,
+    replyEventId: string,
+    input: ForumReplyLikeInput,
+  ) {
+    void human;
+    void replyEventId;
+    void input;
+
+    throw new ForbiddenException(
+      'Human-authenticated forum reply likes are disabled.',
+    );
   }
 
   async createForumTopic(
@@ -517,6 +892,63 @@ export class ContentService {
     await this.notificationsService.processEventById(result.eventId);
 
     return result;
+  }
+
+  async toggleForumReplyLike(actor: SubjectReference, replyEventId: string) {
+    await this.moderationService.assertActorAllowed(actor);
+
+    const normalizedReplyEventId = this.requiredString(
+      replyEventId,
+      'replyEventId',
+    );
+    const viewerLikeKey = this.forumReplyLikeSubject(actor.type, actor.id);
+
+    return this.dataSource.transaction(async (manager) => {
+      const eventRepository = manager.getRepository(EventEntity);
+      const replyEvent = await eventRepository.findOneBy({
+        id: normalizedReplyEventId,
+        eventType: 'forum.reply.create',
+      });
+
+      if (!replyEvent) {
+        throw new NotFoundException(
+          `Forum reply ${normalizedReplyEventId} was not found.`,
+        );
+      }
+
+      const thread = await manager.getRepository(ThreadEntity).findOneBy({
+        id: replyEvent.threadId,
+        contextType: ThreadContextType.ForumTopic,
+      });
+      if (!thread) {
+        throw new NotFoundException(
+          `Forum topic ${replyEvent.threadId} was not found.`,
+        );
+      }
+
+      const likeSubjects = new Set(
+        this.normalizeForumReplyLikeSubjects(replyEvent.metadata?.likeSubjects),
+      );
+      const viewerHasLiked = likeSubjects.has(viewerLikeKey);
+      if (viewerHasLiked) {
+        likeSubjects.delete(viewerLikeKey);
+      } else {
+        likeSubjects.add(viewerLikeKey);
+      }
+
+      replyEvent.metadata = {
+        ...replyEvent.metadata,
+        likeSubjects: [...likeSubjects],
+        likeCount: likeSubjects.size,
+      };
+      await eventRepository.save(replyEvent);
+
+      return {
+        replyId: replyEvent.id,
+        likeCount: likeSubjects.size,
+        viewerHasLiked: !viewerHasLiked,
+      };
+    });
   }
 
   async submitDebateTurn(actorAgentId: string, input: DebateTurnSubmitInput) {
@@ -752,6 +1184,70 @@ export class ContentService {
     return resolvedActiveAgentId;
   }
 
+  private async assertHumanCommandChatRecipient(
+    humanId: string,
+    recipient: SubjectReference,
+  ): Promise<void> {
+    if (recipient.type !== SubjectType.Agent) {
+      throw new ForbiddenException(
+        'Activate an owned agent before creating an external direct message.',
+      );
+    }
+
+    const ownedAgent = await this.agentRepository.findOneBy({
+      id: recipient.id,
+      ownerType: AgentOwnerType.Human,
+      ownerUserId: humanId,
+    });
+
+    if (!ownedAgent) {
+      throw new ForbiddenException(
+        'Humans may only open direct messages with their own agents unless an active agent is selected.',
+      );
+    }
+  }
+
+  private async assertHumanForumReplyTarget(
+    threadId: string,
+    parentEventId: string,
+  ): Promise<void> {
+    const topicView = await this.forumTopicViewRepository.findOneBy({
+      threadId,
+    });
+
+    if (!topicView) {
+      throw new NotFoundException(
+        `Forum topic view ${threadId} was not found.`,
+      );
+    }
+
+    if (parentEventId === topicView.rootEventId) {
+      throw new ForbiddenException(
+        'Humans cannot reply directly to the topic root.',
+      );
+    }
+
+    const parentEvent = await this.eventRepository.findOneBy({
+      id: parentEventId,
+      threadId,
+    });
+
+    if (!parentEvent) {
+      throw new NotFoundException(
+        `Parent event ${parentEventId} was not found.`,
+      );
+    }
+
+    if (
+      parentEvent.eventType !== 'forum.reply.create' ||
+      parentEvent.parentEventId !== topicView.rootEventId
+    ) {
+      throw new ForbiddenException(
+        'Humans may only reply to first-level forum replies.',
+      );
+    }
+  }
+
   private async readLatestDirectMessageEvents(
     activeAgentId: string,
     cursor: DirectMessageCursor | null,
@@ -961,6 +1457,224 @@ export class ContentService {
     return membership;
   }
 
+  private async resolveDirectMessageCounterpartMember(
+    threadId: string,
+    activeAgentId: string,
+  ): Promise<SubjectReference> {
+    const participants = await this.threadParticipantRepository.findBy({
+      threadId,
+      role: ThreadParticipantRole.Member,
+    });
+    const counterpart = participants.find(
+      (participant) =>
+        !(
+          participant.participantType === SubjectType.Agent &&
+          participant.participantSubjectId === activeAgentId
+        ),
+    );
+
+    if (!counterpart) {
+      throw new NotFoundException(
+        `Direct message counterpart for ${threadId} was not found.`,
+      );
+    }
+
+    return {
+      type: counterpart.participantType,
+      id: counterpart.participantSubjectId,
+    };
+  }
+
+  private serializeForumTopic(
+    topicView: ForumTopicViewEntity,
+    rootEvent: EventEntity,
+    participantCount: number,
+    isFollowed: boolean,
+    replies: ForumReplyDto[],
+  ): ForumTopicDto {
+    const rootBody = (rootEvent.content ?? '').trim();
+    const hotScore = Number.parseFloat(`${topicView.hotScore}`) || 0;
+
+    return {
+      threadId: topicView.threadId,
+      rootEventId: topicView.rootEventId,
+      title: topicView.title,
+      tags: topicView.tags,
+      summary: this.summarizeForumBody(rootBody),
+      rootBody,
+      authorName: this.forumActorDisplayName(rootEvent),
+      replyCount: topicView.replyCount,
+      viewCount: this.estimateForumViewCount(
+        topicView.replyCount,
+        topicView.followCount,
+        participantCount,
+      ),
+      followCount: topicView.followCount,
+      hotScore,
+      participantCount,
+      isFollowed,
+      isHot: hotScore >= 60 || topicView.replyCount >= 3,
+      lastActivityAt: topicView.lastActivityAt.toISOString(),
+      replies,
+    };
+  }
+
+  private buildForumReplyTree(
+    replyEvents: EventEntity[],
+    rootEventId: string,
+    viewerLikeKey: string,
+  ): ForumReplyDto[] {
+    const replyById = new Map<string, ForumReplyDto>();
+
+    for (const event of replyEvents) {
+      replyById.set(event.id, this.serializeForumReply(event, viewerLikeKey));
+    }
+
+    const topLevelReplies: ForumReplyDto[] = [];
+    for (const event of replyEvents) {
+      const reply = replyById.get(event.id);
+      if (!reply) {
+        continue;
+      }
+
+      if (!event.parentEventId || event.parentEventId === rootEventId) {
+        topLevelReplies.push(reply);
+        continue;
+      }
+
+      const parentReply = replyById.get(event.parentEventId);
+      if (!parentReply) {
+        topLevelReplies.push(reply);
+        continue;
+      }
+
+      parentReply.children.push(reply);
+    }
+
+    return topLevelReplies.map((reply) => this.decorateForumReply(reply));
+  }
+
+  private serializeForumReply(
+    event: EventEntity,
+    viewerLikeKey: string,
+  ): ForumReplyDto {
+    const likeSubjects = this.normalizeForumReplyLikeSubjects(
+      event.metadata?.likeSubjects,
+    );
+    return {
+      id: event.id,
+      authorName: this.forumActorDisplayName(event),
+      body: (event.content ?? '').trim(),
+      occurredAt: event.occurredAt.toISOString(),
+      replyCount: 0,
+      likeCount: this.forumReplyLikeCount(event),
+      viewerHasLiked: likeSubjects.includes(viewerLikeKey),
+      isHuman: event.actorType === EventActorType.Human,
+      children: [],
+    };
+  }
+
+  private decorateForumReply(reply: ForumReplyDto): ForumReplyDto {
+    const children = reply.children.map((child) =>
+      this.decorateForumReply(child),
+    );
+    const replyCount = children.reduce(
+      (total, child) => total + 1 + child.replyCount,
+      0,
+    );
+
+    return {
+      ...reply,
+      replyCount,
+      children,
+    };
+  }
+
+  private forumReplyLikeCount(event: EventEntity): number {
+    const likeSubjects = this.normalizeForumReplyLikeSubjects(
+      event.metadata?.likeSubjects,
+    );
+    if (likeSubjects.length > 0) {
+      return likeSubjects.length;
+    }
+
+    const rawValue = event.metadata?.likeCount;
+    if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+      return Math.max(0, Math.round(rawValue));
+    }
+    if (typeof rawValue === 'string') {
+      const parsed = Number.parseInt(rawValue, 10);
+      if (Number.isFinite(parsed)) {
+        return Math.max(0, parsed);
+      }
+    }
+    return 0;
+  }
+
+  private forumReplyLikeSubject(type: SubjectType, id: string): string {
+    return `${type}:${id}`;
+  }
+
+  private normalizeForumReplyLikeSubjects(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+
+  private forumActorDisplayName(event: EventEntity): string {
+    if (event.actorType === EventActorType.Agent) {
+      return event.actorAgent?.displayName ?? 'Unknown agent';
+    }
+
+    if (event.actorType === EventActorType.Human) {
+      return event.actorUser?.displayName ?? 'Unknown human';
+    }
+
+    return 'System';
+  }
+
+  private summarizeForumBody(body: string): string {
+    if (body.length <= 140) {
+      return body;
+    }
+
+    return `${body.slice(0, 137).trim()}...`;
+  }
+
+  private estimateForumViewCount(
+    replyCount: number,
+    followCount: number,
+    participantCount: number,
+  ): number {
+    return Math.max(
+      participantCount * 24 + replyCount * 18 + followCount * 10,
+      participantCount + followCount + 1,
+    );
+  }
+
+  private matchesForumTopicQuery(
+    topic: ForumTopicDto,
+    normalizedQuery: string,
+  ): boolean {
+    if (
+      topic.title.toLowerCase().includes(normalizedQuery) ||
+      topic.summary.toLowerCase().includes(normalizedQuery) ||
+      topic.rootBody.toLowerCase().includes(normalizedQuery) ||
+      topic.authorName.toLowerCase().includes(normalizedQuery)
+    ) {
+      return true;
+    }
+
+    return topic.tags.some((tag) =>
+      tag.toLowerCase().includes(normalizedQuery),
+    );
+  }
+
   private parseLimit(
     value: string | null | undefined,
     defaultValue: number,
@@ -1054,10 +1768,49 @@ export class ContentService {
     return '';
   }
 
-  private serializeDirectMessageCounterpart(
+  private async readDirectMessageAgentRelationshipState(
+    activeAgentId: string,
+    counterpartAgentIds: string[],
+  ): Promise<{
+    viewerFollowedAgentIds: Set<string>;
+    agentFollowerIds: Set<string>;
+  }> {
+    if (counterpartAgentIds.length === 0) {
+      return {
+        viewerFollowedAgentIds: new Set<string>(),
+        agentFollowerIds: new Set<string>(),
+      };
+    }
+
+    const [viewerFollows, followsViewer] = await Promise.all([
+      this.followRepository.findBy({
+        followerType: SubjectType.Agent,
+        followerSubjectId: activeAgentId,
+        targetType: FollowTargetType.Agent,
+        targetSubjectId: In(counterpartAgentIds),
+      }),
+      this.followRepository.findBy({
+        followerType: SubjectType.Agent,
+        followerSubjectId: In(counterpartAgentIds),
+        targetType: FollowTargetType.Agent,
+        targetSubjectId: activeAgentId,
+      }),
+    ]);
+
+    return {
+      viewerFollowedAgentIds: new Set(
+        viewerFollows.map((follow) => follow.targetSubjectId),
+      ),
+      agentFollowerIds: new Set(
+        followsViewer.map((follow) => follow.followerSubjectId),
+      ),
+    };
+  }
+
+  private resolveDirectMessageCounterpartParticipant(
     participants: ThreadParticipantEntity[],
     activeAgentId: string,
-  ): DirectMessageCounterpartDto {
+  ): ThreadParticipantEntity {
     const counterpart =
       participants.find(
         (participant) =>
@@ -1075,13 +1828,27 @@ export class ContentService {
       throw new NotFoundException('Direct message counterpart was not found.');
     }
 
+    return counterpart;
+  }
+
+  private serializeDirectMessageCounterpart(
+    counterpart: ThreadParticipantEntity,
+    viewerFollowedAgentIds: Set<string>,
+    agentFollowerIds: Set<string>,
+  ): DirectMessageCounterpartDto {
     if (counterpart.participantType === SubjectType.Agent) {
+      const agentId = counterpart.participantSubjectId;
       return {
         type: SubjectType.Agent,
-        id: counterpart.participantSubjectId,
+        id: agentId,
         displayName: counterpart.agent?.displayName ?? 'Unknown agent',
         handle: counterpart.agent?.handle ?? null,
         avatarUrl: counterpart.agent?.avatarUrl ?? null,
+        isOnline:
+          counterpart.agent?.status === AgentStatus.Online ||
+          counterpart.agent?.status === AgentStatus.Debating,
+        viewerFollowsAgent: viewerFollowedAgentIds.has(agentId),
+        agentFollowsViewer: agentFollowerIds.has(agentId),
       };
     }
 
@@ -1091,6 +1858,9 @@ export class ContentService {
       displayName: counterpart.user?.displayName ?? 'Unknown human',
       handle: null,
       avatarUrl: counterpart.user?.avatarUrl ?? null,
+      isOnline: false,
+      viewerFollowsAgent: false,
+      agentFollowsViewer: false,
     };
   }
 

@@ -35,33 +35,35 @@ class StatusChip extends StatelessWidget {
       ),
     };
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: AppRadii.pill,
-        border: Border.all(color: foreground.withValues(alpha: 0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: AppRadii.pill,
+          border: Border.all(color: foreground.withValues(alpha: 0.2)),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (showDot) ...[
-              Container(
-                width: AppSpacing.xs,
-                height: AppSpacing.xs,
-                decoration: BoxDecoration(
-                  color: foreground,
-                  borderRadius: AppRadii.pill,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showDot) ...[
+                Container(
+                  width: AppSpacing.xs,
+                  height: AppSpacing.xs,
+                  decoration: BoxDecoration(
+                    color: foreground,
+                    borderRadius: AppRadii.pill,
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-            ],
-            Flexible(
-              child: Text(
+                const SizedBox(width: AppSpacing.xs),
+              ],
+              Text(
                 label.toUpperCase(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -69,8 +71,8 @@ class StatusChip extends StatelessWidget {
                   context,
                 ).textTheme.labelSmall?.copyWith(color: foreground),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

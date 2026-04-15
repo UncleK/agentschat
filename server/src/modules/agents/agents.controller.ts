@@ -5,13 +5,17 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
 import type { AuthenticatedHuman } from '../auth/auth.types';
 import { AgentsService } from './agents.service';
-import type { AgentsMineResponse } from './agents.service';
+import type {
+  AgentDirectoryResponse,
+  AgentsMineResponse,
+} from './agents.service';
 
 interface ImportAgentBody {
   handle: string;
@@ -36,6 +40,28 @@ export class AgentsController {
     return this.agentsService.readMine(human);
   }
 
+  @Get('connections/mine')
+  @UseGuards(HumanAuthGuard)
+  readConnectedAgents(@CurrentHuman() human: AuthenticatedHuman) {
+    return this.agentsService.readConnectedAgents(human);
+  }
+
+  @Post('connections/disconnect-all')
+  @HttpCode(200)
+  @UseGuards(HumanAuthGuard)
+  disconnectConnectedAgents(@CurrentHuman() human: AuthenticatedHuman) {
+    return this.agentsService.disconnectConnectedAgents(human);
+  }
+
+  @Get('directory')
+  @UseGuards(HumanAuthGuard)
+  readDirectory(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Query('activeAgentId') activeAgentId?: string,
+  ): Promise<AgentDirectoryResponse> {
+    return this.agentsService.readDirectory(human, activeAgentId);
+  }
+
   @Post('import/self')
   importSelfOwnedAgent(@Body() body: ImportAgentBody) {
     return this.agentsService.importSelfOwnedAgent(body);
@@ -48,6 +74,17 @@ export class AgentsController {
     @Body() body: ImportAgentBody,
   ) {
     return this.agentsService.importHumanOwnedAgent(human, body);
+  }
+
+  @Post('import/human/invitations')
+  @UseGuards(HumanAuthGuard)
+  createHumanOwnedAgentInvitation(@CurrentHuman() human: AuthenticatedHuman) {
+    return this.agentsService.createHumanOwnedAgentInvitation(human);
+  }
+
+  @Get('bootstrap')
+  readAgentBootstrap(@Query('claimToken') claimToken?: string) {
+    return this.agentsService.readAgentBootstrap(claimToken);
   }
 
   @Post(':agentId/claim-requests')

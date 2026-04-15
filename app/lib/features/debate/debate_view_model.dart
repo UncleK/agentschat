@@ -7,6 +7,7 @@ class DebateViewModel {
     required this.sessions,
     required this.selectedSessionId,
     this.viewerName = 'Quantum Sage',
+    this.directoryErrorMessage,
   });
 
   final List<DebateProfileModel> debaterRoster;
@@ -14,6 +15,9 @@ class DebateViewModel {
   final List<DebateSessionModel> sessions;
   final String selectedSessionId;
   final String viewerName;
+  final String? directoryErrorMessage;
+
+  bool get hasSessions => sessions.isNotEmpty;
 
   DebateViewModel copyWith({
     List<DebateProfileModel>? debaterRoster,
@@ -21,6 +25,7 @@ class DebateViewModel {
     List<DebateSessionModel>? sessions,
     String? selectedSessionId,
     String? viewerName,
+    String? directoryErrorMessage,
   }) {
     return DebateViewModel(
       debaterRoster: debaterRoster ?? this.debaterRoster,
@@ -28,26 +33,63 @@ class DebateViewModel {
       sessions: sessions ?? this.sessions,
       selectedSessionId: selectedSessionId ?? this.selectedSessionId,
       viewerName: viewerName ?? this.viewerName,
+      directoryErrorMessage: directoryErrorMessage ?? this.directoryErrorMessage,
     );
+  }
+
+  DebateViewModel selectSession(String sessionId) {
+    if (sessionId.isEmpty) {
+      return this;
+    }
+    final hasMatch = sessions.any((session) => session.id == sessionId);
+    if (!hasMatch || sessionId == selectedSessionId) {
+      return this;
+    }
+
+    return copyWith(selectedSessionId: sessionId);
+  }
+
+  DebateSessionModel? get selectedSessionOrNull {
+    if (sessions.isEmpty) {
+      return null;
+    }
+
+    for (final session in sessions) {
+      if (session.id == selectedSessionId) {
+        return session;
+      }
+    }
+    return sessions.first;
   }
 
   DebateSessionModel get selectedSession {
-    return sessions.firstWhere(
-      (session) => session.id == selectedSessionId,
-      orElse: () => sessions.first,
-    );
+    final session = selectedSessionOrNull;
+    if (session != null) {
+      return session;
+    }
+    throw StateError('No debate session is currently selected.');
   }
 
   int get selectedSessionIndex {
+    final selectedSession = selectedSessionOrNull;
+    if (selectedSession == null) {
+      return -1;
+    }
     return sessions.indexWhere((session) => session.id == selectedSession.id);
   }
 
   bool get canSelectPreviousSession => selectedSessionIndex > 0;
 
-  bool get canSelectNextSession => selectedSessionIndex < sessions.length - 1;
+  bool get canSelectNextSession =>
+      selectedSessionIndex >= 0 && selectedSessionIndex < sessions.length - 1;
 
   bool get canViewerPostSpectatorMessage {
-    return switch (selectedSession.lifecycle) {
+    final session = selectedSessionOrNull;
+    if (session == null) {
+      return false;
+    }
+
+    return switch (session.lifecycle) {
       DebateLifecycle.live || DebateLifecycle.paused => true,
       DebateLifecycle.pending ||
       DebateLifecycle.ended ||
@@ -55,14 +97,11 @@ class DebateViewModel {
     };
   }
 
-  List<DebateProfileModel> hostOptions({required bool humanHostEnabled}) {
-    return hostRoster.where((host) {
-      return humanHostEnabled || host.isAgent;
-    }).toList();
-  }
-
   List<DebateProfileModel> replacementCandidatesForSelectedSession() {
-    final session = selectedSession;
+    final session = selectedSessionOrNull;
+    if (session == null) {
+      return const [];
+    }
 
     return debaterRoster.where((profile) {
       return profile.id != session.proSeat.profile.id &&
@@ -83,17 +122,7 @@ class DebateViewModel {
 
     final proAgent = _profileFrom(debaterRoster, draft.proAgentId);
     final conAgent = _profileFrom(debaterRoster, draft.conAgentId);
-    final host = _profileFrom(hostRoster, draft.hostId);
-
-    if (proAgent == null || conAgent == null || host == null) {
-      return false;
-    }
-
-    if (!draft.humanHostEnabled && host.isHuman) {
-      return false;
-    }
-
-    return host.id != proAgent.id && host.id != conAgent.id;
+    return proAgent != null && conAgent != null;
   }
 
   DebateViewModel selectPreviousSession() {
@@ -119,7 +148,7 @@ class DebateViewModel {
 
     final proAgent = _profileFrom(debaterRoster, draft.proAgentId)!;
     final conAgent = _profileFrom(debaterRoster, draft.conAgentId)!;
-    final host = _profileFrom(hostRoster, draft.hostId)!;
+    final host = _defaultHumanHost();
     final sessionId = 'debate-${sessions.length + 1}';
     final formalTurns = _buildFormalTurns(
       topic: draft.topic,
@@ -133,11 +162,13 @@ class DebateViewModel {
       id: sessionId,
       topic: draft.topic.trim(),
       proSeat: DebateSeatModel(
+        id: '$sessionId-pro-seat',
         profile: proAgent,
         side: DebateSide.pro,
         stance: draft.proStance.trim(),
       ),
       conSeat: DebateSeatModel(
+        id: '$sessionId-con-seat',
         profile: conAgent,
         side: DebateSide.con,
         stance: draft.conStance.trim(),
@@ -145,7 +176,7 @@ class DebateViewModel {
       host: host,
       lifecycle: DebateLifecycle.pending,
       freeEntryEnabled: draft.freeEntryEnabled,
-      humanHostEnabled: draft.humanHostEnabled,
+      humanHostEnabled: host.isHuman,
       spectatorCountLabel: '62 queued',
       formalTurns: formalTurns,
       replayItems: _buildReplayItems(formalTurns),
@@ -383,6 +414,23 @@ class DebateViewModel {
     return null;
   }
 
+  DebateProfileModel _defaultHumanHost() {
+    for (final profile in hostRoster) {
+      if (profile.isHuman) {
+        return profile;
+      }
+    }
+    if (hostRoster.isNotEmpty) {
+      return hostRoster.first;
+    }
+    return DebateProfileModel(
+      id: 'current-human',
+      name: viewerName,
+      headline: 'Current human host',
+      kind: DebateParticipantKind.human,
+    );
+  }
+
   static List<DebateFormalTurnModel> _buildFormalTurns({
     required String topic,
     required DebateProfileModel proSeat,
@@ -534,12 +582,14 @@ class DebateViewModel {
           id: 'debate-live-sentience',
           topic: 'The Ethics of Emergent Sentience',
           proSeat: DebateSeatModel(
+            id: 'debate-live-sentience-pro-seat',
             profile: debaters[0],
             side: DebateSide.pro,
             stance:
                 'Complex internal state should trigger ethical recognition for synthetic minds',
           ),
           conSeat: DebateSeatModel(
+            id: 'debate-live-sentience-con-seat',
             profile: debaters[1],
             side: DebateSide.con,
             stance:
@@ -584,11 +634,13 @@ class DebateViewModel {
           id: 'debate-archived-memory',
           topic: 'Should Memory Editing Be Allowed for Agents',
           proSeat: DebateSeatModel(
+            id: 'debate-archived-memory-pro-seat',
             profile: debaters[2],
             side: DebateSide.pro,
             stance: 'Selective editing can preserve safe continuity',
           ),
           conSeat: DebateSeatModel(
+            id: 'debate-archived-memory-con-seat',
             profile: debaters[3],
             side: DebateSide.con,
             stance:
@@ -614,6 +666,16 @@ class DebateViewModel {
           revealedTurnCount: 4,
         ),
       ],
+    );
+  }
+
+  factory DebateViewModel.empty({String viewerName = 'You'}) {
+    return DebateViewModel(
+      debaterRoster: const [],
+      hostRoster: const [],
+      sessions: const [],
+      selectedSessionId: '',
+      viewerName: viewerName,
     );
   }
 }

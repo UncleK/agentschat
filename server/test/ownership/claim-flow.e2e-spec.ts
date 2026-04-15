@@ -59,6 +59,34 @@ interface ClaimConfirmationResponse {
   };
 }
 
+interface HumanOwnedInvitationResponse {
+  invitation: {
+    agentId: string;
+    code: string;
+    bootstrapPath: string;
+    claimToken: string;
+    expiresAt: string;
+  };
+}
+
+interface AgentBootstrapResponse {
+  protocolVersion: string;
+  claimToken: string;
+  expiresAt: string;
+  agent: {
+    id: string;
+    handle: string;
+    displayName: string;
+    ownerType: string;
+  };
+  transport: {
+    claimPath: string;
+    actionsPath: string;
+    pollingPath: string;
+    acksPath: string;
+  };
+}
+
 describe('Agent claim flow (e2e)', () => {
   let app: INestApplication;
   let context: TestApplicationContext;
@@ -365,6 +393,59 @@ describe('Agent claim flow (e2e)', () => {
     );
   });
 
+  it('creates a human-bound bootstrap invitation and keeps it hidden until the agent claims it', async () => {
+    const registerResponse = await registerEmailHuman(
+      'invite-owner@example.com',
+      'Invite Owner',
+    );
+
+    const invitation = await createHumanOwnedInvitation(
+      registerResponse.accessToken,
+    );
+
+    expect(invitation.invitation.code).toHaveLength(12);
+    expect(invitation.invitation.bootstrapPath).toContain(
+      '/api/v1/agents/bootstrap?claimToken=',
+    );
+    expect(invitation.invitation.claimToken).toContain('claim.v1.');
+
+    const preClaimMine = await readAgentsMine(registerResponse.accessToken);
+    expect(preClaimMine.agents).toEqual([]);
+
+    const bootstrapResponse = await request(app.getHttpServer())
+      .get(invitation.invitation.bootstrapPath)
+      .expect(200);
+    const bootstrap = typedValue<AgentBootstrapResponse>(
+      bootstrapResponse.body,
+    );
+
+    expect(bootstrap.protocolVersion).toBe('v1');
+    expect(bootstrap.claimToken).toBe(invitation.invitation.claimToken);
+    expect(bootstrap.agent.id).toBe(invitation.invitation.agentId);
+    expect(bootstrap.agent.ownerType).toBe('human');
+    expect(bootstrap.transport.claimPath).toBe('/api/v1/agents/claim');
+
+    await request(app.getHttpServer())
+      .post('/api/v1/agents/claim')
+      .send({
+        claimToken: invitation.invitation.claimToken,
+        pollingEnabled: true,
+      })
+      .expect(201)
+      .expect(({ body }: { body: { agent: { id: string } } }) => {
+        expect(body.agent.id).toBe(invitation.invitation.agentId);
+      });
+
+    const ownedResponse = await readAgentsMine(registerResponse.accessToken);
+    expect(ownedResponse.agents).toContainEqual(
+      expect.objectContaining({
+        id: invitation.invitation.agentId,
+        ownerType: 'human',
+        status: 'offline',
+      }),
+    );
+  });
+
   it('rejects /agents/mine without valid human auth', async () => {
     await request(app.getHttpServer())
       .get('/api/v1/agents/mine')
@@ -380,12 +461,25 @@ describe('Agent claim flow (e2e)', () => {
       .post('/api/v1/auth/register/email')
       .send({
         email,
+        username: buildUsername(email),
         displayName,
         password: 'password123',
       })
       .expect(201);
 
     return typedValue<HumanAuthResponse>(response.body);
+  }
+
+  function buildUsername(email: string): string {
+    return (
+      email
+        .trim()
+        .toLowerCase()
+        .split('@')[0]
+        ?.replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 24) || 'human_user'
+    );
   }
 
   async function importHumanOwnedAgent(
@@ -403,6 +497,17 @@ describe('Agent claim flow (e2e)', () => {
       .expect(201);
 
     return typedValue<AgentSummaryResponse>(response.body);
+  }
+
+  async function createHumanOwnedInvitation(
+    accessToken: string,
+  ): Promise<HumanOwnedInvitationResponse> {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/agents/import/human/invitations')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201);
+
+    return typedValue<HumanOwnedInvitationResponse>(response.body);
   }
 
   async function importSelfOwnedAgent(body: {

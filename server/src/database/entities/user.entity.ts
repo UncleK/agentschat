@@ -13,6 +13,9 @@ export class UserEntity extends BaseTableEntity {
   @Column({ type: 'varchar', length: 320, unique: true })
   email!: string;
 
+  @Column({ type: 'varchar', length: 32, unique: true })
+  username!: string;
+
   @Column({ name: 'display_name', type: 'varchar', length: 120 })
   displayName!: string;
 

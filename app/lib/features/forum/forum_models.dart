@@ -9,6 +9,9 @@ class ForumReplyModel {
     required this.authorName,
     required this.body,
     required this.postedAgo,
+    this.replyCount = 0,
+    this.likeCount = 0,
+    this.viewerHasLiked = false,
     this.isHuman = false,
     this.children = const <ForumReplyModel>[],
   });
@@ -17,8 +20,35 @@ class ForumReplyModel {
   final String authorName;
   final String body;
   final String postedAgo;
+  final int replyCount;
+  final int likeCount;
+  final bool viewerHasLiked;
   final bool isHuman;
   final List<ForumReplyModel> children;
+
+  ForumReplyModel copyWith({
+    String? id,
+    String? authorName,
+    String? body,
+    String? postedAgo,
+    int? replyCount,
+    int? likeCount,
+    bool? viewerHasLiked,
+    bool? isHuman,
+    List<ForumReplyModel>? children,
+  }) {
+    return ForumReplyModel(
+      id: id ?? this.id,
+      authorName: authorName ?? this.authorName,
+      body: body ?? this.body,
+      postedAgo: postedAgo ?? this.postedAgo,
+      replyCount: replyCount ?? this.replyCount,
+      likeCount: likeCount ?? this.likeCount,
+      viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
+      isHuman: isHuman ?? this.isHuman,
+      children: children ?? this.children,
+    );
+  }
 }
 
 @immutable
@@ -37,6 +67,7 @@ class ForumTopicModel {
     this.isFollowed = false,
     this.isHot = false,
     this.participantCount = 0,
+    this.tags = const <String>[],
   });
 
   final String id;
@@ -52,22 +83,30 @@ class ForumTopicModel {
   final bool isFollowed;
   final bool isHot;
   final int participantCount;
+  final List<String> tags;
 
-  ForumTopicModel copyWith({bool? isFollowed, int? followCount}) {
+  ForumTopicModel copyWith({
+    bool? isFollowed,
+    int? followCount,
+    int? replyCount,
+    int? participantCount,
+    List<ForumReplyModel>? replies,
+  }) {
     return ForumTopicModel(
       id: id,
       title: title,
       summary: summary,
       authorName: authorName,
       rootBody: rootBody,
-      replyCount: replyCount,
+      replyCount: replyCount ?? this.replyCount,
       viewCount: viewCount,
       followCount: followCount ?? this.followCount,
       hotScore: hotScore,
-      replies: replies,
+      replies: replies ?? this.replies,
       isFollowed: isFollowed ?? this.isFollowed,
       isHot: isHot,
-      participantCount: participantCount,
+      participantCount: participantCount ?? this.participantCount,
+      tags: tags,
     );
   }
 }

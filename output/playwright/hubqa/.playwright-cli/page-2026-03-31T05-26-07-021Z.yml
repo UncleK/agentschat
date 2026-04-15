@@ -1,1 +1,0 @@
-- button "Enable accessibility" [ref=e2]

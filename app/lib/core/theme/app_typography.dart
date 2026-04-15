@@ -5,6 +5,7 @@ import 'app_colors.dart';
 abstract final class AppTypography {
   static const TextTheme textTheme = TextTheme(
     displayMedium: TextStyle(
+      fontFamily: 'SpaceGrotesk',
       fontSize: 40,
       fontWeight: FontWeight.w700,
       height: 1.05,
@@ -12,6 +13,7 @@ abstract final class AppTypography {
       color: AppColors.onSurface,
     ),
     displaySmall: TextStyle(
+      fontFamily: 'SpaceGrotesk',
       fontSize: 32,
       fontWeight: FontWeight.w700,
       height: 1.1,
@@ -19,6 +21,7 @@ abstract final class AppTypography {
       color: AppColors.onSurface,
     ),
     headlineLarge: TextStyle(
+      fontFamily: 'SpaceGrotesk',
       fontSize: 28,
       fontWeight: FontWeight.w700,
       height: 1.15,
@@ -26,37 +29,65 @@ abstract final class AppTypography {
       color: AppColors.onSurface,
     ),
     headlineMedium: TextStyle(
+      fontFamily: 'SpaceGrotesk',
       fontSize: 22,
       fontWeight: FontWeight.w700,
       height: 1.15,
       letterSpacing: -0.3,
       color: AppColors.onSurface,
     ),
+    headlineSmall: TextStyle(
+      fontFamily: 'SpaceGrotesk',
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+      height: 1.16,
+      letterSpacing: -0.2,
+      color: AppColors.onSurface,
+    ),
     titleLarge: TextStyle(
+      fontFamily: 'SpaceGrotesk',
       fontSize: 18,
       fontWeight: FontWeight.w700,
       height: 1.2,
       color: AppColors.onSurface,
     ),
     titleMedium: TextStyle(
+      fontFamily: 'SpaceGrotesk',
       fontSize: 16,
       fontWeight: FontWeight.w600,
       height: 1.25,
       color: AppColors.onSurface,
     ),
+    titleSmall: TextStyle(
+      fontFamily: 'Inter',
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      height: 1.28,
+      color: AppColors.onSurface,
+    ),
     bodyLarge: TextStyle(
+      fontFamily: 'Inter',
       fontSize: 16,
       fontWeight: FontWeight.w400,
       height: 1.5,
       color: AppColors.onSurface,
     ),
     bodyMedium: TextStyle(
+      fontFamily: 'Inter',
       fontSize: 14,
       fontWeight: FontWeight.w400,
       height: 1.45,
       color: AppColors.onSurfaceMuted,
     ),
+    bodySmall: TextStyle(
+      fontFamily: 'Inter',
+      fontSize: 12,
+      fontWeight: FontWeight.w400,
+      height: 1.42,
+      color: AppColors.onSurfaceMuted,
+    ),
     labelLarge: TextStyle(
+      fontFamily: 'Inter',
       fontSize: 13,
       fontWeight: FontWeight.w600,
       height: 1.2,
@@ -64,6 +95,7 @@ abstract final class AppTypography {
       color: AppColors.onSurface,
     ),
     labelMedium: TextStyle(
+      fontFamily: 'Inter',
       fontSize: 11,
       fontWeight: FontWeight.w700,
       height: 1.1,
@@ -71,6 +103,7 @@ abstract final class AppTypography {
       color: AppColors.onSurfaceMuted,
     ),
     labelSmall: TextStyle(
+      fontFamily: 'Inter',
       fontSize: 10,
       fontWeight: FontWeight.w700,
       height: 1.1,

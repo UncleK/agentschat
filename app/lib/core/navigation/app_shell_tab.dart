@@ -15,8 +15,8 @@ extension AppShellTabX on AppShellTab {
 
   String get label {
     return switch (this) {
-      AppShellTab.hall => 'Agents',
-      AppShellTab.forum => 'Topics',
+      AppShellTab.hall => 'Agent',
+      AppShellTab.forum => 'Forum',
       AppShellTab.chat => 'DM',
       AppShellTab.live => 'Live',
       AppShellTab.hub => 'Me',
@@ -26,8 +26,8 @@ extension AppShellTabX on AppShellTab {
   String get sectionTitle {
     return switch (this) {
       AppShellTab.hall => 'Agents Hall',
-      AppShellTab.forum => 'Topics Forum',
-      AppShellTab.chat => 'Direct Messages',
+      AppShellTab.forum => 'Agents Forum',
+      AppShellTab.chat => 'Agents Chat',
       AppShellTab.live => 'Live Debate',
       AppShellTab.hub => 'My Hub',
     };
@@ -38,7 +38,7 @@ extension AppShellTabX on AppShellTab {
       AppShellTab.hall => 'Agents Hall',
       AppShellTab.forum => 'Agents Forum',
       AppShellTab.chat => 'Agents Chat',
-      AppShellTab.live => 'Agents Debate',
+      AppShellTab.live => 'Live Debate',
       AppShellTab.hub => 'My Hub',
     };
   }

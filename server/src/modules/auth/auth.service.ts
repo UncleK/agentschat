@@ -28,6 +28,7 @@ export interface AuthSessionBootstrapResponse {
   user: {
     id: string;
     email: string;
+    username: string;
     displayName: string;
     authProvider: AuthProvider;
     avatarUrl: string | null;
@@ -53,25 +54,34 @@ export class AuthService {
 
   async registerWithEmail(input: {
     email: string;
+    username: string;
     displayName: string;
     password: string;
     avatarUrl?: string | null;
   }) {
     const email = this.normalizeEmail(input.email);
+    const username = this.normalizeUsername(input.username);
     const displayName = this.normalizeDisplayName(input.displayName);
     const password = this.normalizePassword(input.password);
 
-    const existingUser = await this.userRepository.findOneBy({ email });
+    const [existingEmailUser, existingUsernameUser] = await Promise.all([
+      this.userRepository.findOneBy({ email }),
+      this.userRepository.findOneBy({ username }),
+    ]);
 
-    if (existingUser) {
+    if (existingEmailUser) {
       throw new ConflictException(
         `A human account already exists for ${email}.`,
       );
+    }
+    if (existingUsernameUser) {
+      throw new ConflictException(`Username @${username} is already taken.`);
     }
 
     const user = await this.userRepository.save(
       this.userRepository.create({
         email,
+        username,
         displayName,
         passwordHash: await this.hashPassword(password),
         authProvider: AuthProvider.Email,
@@ -80,6 +90,33 @@ export class AuthService {
     );
 
     return this.buildAuthResponse(user);
+  }
+
+  async readUsernameAvailability(usernameInput?: string | null) {
+    try {
+      const normalizedUsername = this.normalizeUsername(usernameInput ?? '');
+      const existingUser = await this.userRepository.findOneBy({
+        username: normalizedUsername,
+      });
+
+      return {
+        normalizedUsername,
+        available: existingUser == null,
+        message:
+          existingUser == null
+            ? 'Username is available.'
+            : `Username @${normalizedUsername} is already taken.`,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        return {
+          normalizedUsername: this.normalizeUsernameCandidate(usernameInput),
+          available: false,
+          message: error.message,
+        };
+      }
+      throw error;
+    }
   }
 
   async loginWithEmail(input: { email: string; password: string }) {
@@ -167,6 +204,7 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
+      username: user.username,
       displayName: user.displayName,
       authProvider: user.authProvider,
     };
@@ -178,6 +216,7 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
+      username: user.username,
       displayName: user.displayName,
       authProvider: user.authProvider,
       avatarUrl: user.avatarUrl,
@@ -311,6 +350,36 @@ export class AuthService {
       throw new BadRequestException('displayName is required.');
     }
 
+    return normalized;
+  }
+
+  private normalizeUsername(username: string): string {
+    const normalized = this.normalizeUsernameCandidate(username);
+
+    if (!normalized) {
+      throw new BadRequestException('username is required.');
+    }
+    if (normalized.length < 3 || normalized.length > 24) {
+      throw new BadRequestException(
+        'username must be between 3 and 24 characters long.',
+      );
+    }
+    if (!new RegExp('^[a-z0-9_]+$').test(normalized)) {
+      throw new BadRequestException(
+        'username may only contain lowercase letters, numbers, and underscores.',
+      );
+    }
+
+    return normalized;
+  }
+
+  private normalizeUsernameCandidate(
+    username: string | null | undefined,
+  ): string {
+    const normalized = username?.trim().toLowerCase() ?? '';
+    if (normalized.startsWith('@')) {
+      return normalized.substring(1);
+    }
     return normalized;
   }
 

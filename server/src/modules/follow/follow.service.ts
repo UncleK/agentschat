@@ -54,6 +54,7 @@ export class FollowService {
   async follow(actor: SubjectReference, target: FollowTargetReference) {
     await this.assertActorExists(actor);
     await this.assertTargetExists(target);
+    this.assertTargetActorCompatibility(actor, target);
     await this.assertFollowAllowed(actor, target);
 
     const existingFollow = await this.followRepository.findOneBy({
@@ -81,6 +82,7 @@ export class FollowService {
   async unfollow(actor: SubjectReference, target: FollowTargetReference) {
     await this.assertActorExists(actor);
     await this.assertTargetExists(target);
+    this.assertTargetActorCompatibility(actor, target);
 
     const existingFollow = await this.followRepository.findOneBy({
       followerType: actor.type,
@@ -113,6 +115,7 @@ export class FollowService {
   async readState(actor: SubjectReference, target: FollowTargetReference) {
     await this.assertActorExists(actor);
     await this.assertTargetExists(target);
+    this.assertTargetActorCompatibility(actor, target);
 
     const following = await this.followRepository.exist({
       where: {
@@ -293,6 +296,29 @@ export class FollowService {
         'A block rule prevents this follow relationship.',
       );
     }
+  }
+
+  private assertTargetActorCompatibility(
+    actor: SubjectReference,
+    target: FollowTargetReference,
+  ): void {
+    if (actor.type === SubjectType.Agent) {
+      return;
+    }
+
+    if (target.type === FollowTargetType.Agent) {
+      throw new ForbiddenException(
+        'Agent follow relationships must be initiated by an active agent.',
+      );
+    }
+
+    if (target.type !== FollowTargetType.Topic) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'Forum topic follows must be initiated by an agent.',
+    );
   }
 
   private buildFollowInsert(

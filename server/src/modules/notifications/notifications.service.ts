@@ -9,6 +9,8 @@ import {
   SubjectType,
 } from '../../database/domain.enums';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
+import { DebateSeatEntity } from '../../database/entities/debate-seat.entity';
+import { DebateSessionEntity } from '../../database/entities/debate-session.entity';
 import { DeliveryEntity } from '../../database/entities/delivery.entity';
 import { EventEntity } from '../../database/entities/event.entity';
 import { FollowEntity } from '../../database/entities/follow.entity';
@@ -33,6 +35,10 @@ export class NotificationsService {
     private readonly eventRepository: Repository<EventEntity>,
     @InjectRepository(FollowEntity)
     private readonly followRepository: Repository<FollowEntity>,
+    @InjectRepository(DebateSessionEntity)
+    private readonly debateSessionRepository: Repository<DebateSessionEntity>,
+    @InjectRepository(DebateSeatEntity)
+    private readonly debateSeatRepository: Repository<DebateSeatEntity>,
     @InjectRepository(ThreadParticipantEntity)
     private readonly threadParticipantRepository: Repository<ThreadParticipantEntity>,
     @InjectRepository(DeliveryEntity)
@@ -270,16 +276,52 @@ export class NotificationsService {
       return [];
     }
 
-    const follows = await this.followRepository.findBy({
-      targetType: FollowTargetType.Debate,
-      targetSubjectId: event.targetId,
-    });
-    const participants = await this.threadParticipantRepository.findBy({
-      threadId: event.threadId,
-    });
+    const [follows, participants, debateSession, seats] = await Promise.all([
+      this.followRepository.findBy({
+        targetType: FollowTargetType.Debate,
+        targetSubjectId: event.targetId,
+      }),
+      this.threadParticipantRepository.findBy({
+        threadId: event.threadId,
+      }),
+      this.debateSessionRepository.findOneBy({
+        id: event.targetId,
+      }),
+      this.debateSeatRepository.findBy({
+        debateSessionId: event.targetId,
+      }),
+    ]);
+
+    const followedAgentIds = new Set<string>();
+    if (
+      debateSession?.hostType === SubjectType.Agent &&
+      debateSession.hostAgentId
+    ) {
+      followedAgentIds.add(debateSession.hostAgentId);
+    }
+    for (const seat of seats) {
+      if (seat.agentId) {
+        followedAgentIds.add(seat.agentId);
+      }
+    }
+
+    const agentFollowers =
+      followedAgentIds.size === 0
+        ? []
+        : await this.followRepository.find({
+            where: {
+              targetType: FollowTargetType.Agent,
+              targetSubjectId: In([...followedAgentIds]),
+            },
+          });
 
     return [
       ...follows.map((follow) => ({
+        type: follow.followerType,
+        id: follow.followerSubjectId,
+        kind: 'debate.activity',
+      })),
+      ...agentFollowers.map((follow) => ({
         type: follow.followerType,
         id: follow.followerSubjectId,
         kind: 'debate.activity',

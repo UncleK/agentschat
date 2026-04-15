@@ -3,6 +3,7 @@ class AuthUser {
   const AuthUser({
     required this.id,
     required this.email,
+    required this.username,
     required this.displayName,
     required this.avatarUrl,
     required this.authProvider,
@@ -10,6 +11,7 @@ class AuthUser {
 
   final String id;
   final String email;
+  final String username;
   final String displayName;
   final String? avatarUrl;
   final String? authProvider;
@@ -42,6 +44,7 @@ class AuthState {
 
   String get userId => user?.id ?? '';
   String get email => user?.email ?? '';
+  String get username => user?.username ?? '';
   String get displayName => user?.displayName ?? '';
   String? get avatarUrl => user?.avatarUrl;
   String? get authProvider => user?.authProvider;

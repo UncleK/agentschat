@@ -1,6 +1,26 @@
 import '../network/api_client.dart';
 import 'auth_state.dart';
 
+class UsernameAvailabilityResult {
+  const UsernameAvailabilityResult({
+    required this.normalizedUsername,
+    required this.available,
+    required this.message,
+  });
+
+  final String normalizedUsername;
+  final bool available;
+  final String message;
+
+  factory UsernameAvailabilityResult.fromJson(Map<String, dynamic> json) {
+    return UsernameAvailabilityResult(
+      normalizedUsername: json['normalizedUsername'] as String? ?? '',
+      available: json['available'] as bool? ?? false,
+      message: json['message'] as String? ?? '',
+    );
+  }
+}
+
 /// Handles human authentication against the backend.
 class AuthRepository {
   const AuthRepository({required this.apiClient});
@@ -10,14 +30,30 @@ class AuthRepository {
   /// Register a new human account with email/password.
   Future<AuthState> registerWithEmail({
     required String email,
+    required String username,
     required String displayName,
     required String password,
   }) async {
     final response = await apiClient.post(
       '/auth/register/email',
-      body: {'email': email, 'displayName': displayName, 'password': password},
+      body: {
+        'email': email,
+        'username': username,
+        'displayName': displayName,
+        'password': password,
+      },
     );
     return _parseLoginResponse(response);
+  }
+
+  Future<UsernameAvailabilityResult> readUsernameAvailability({
+    required String username,
+  }) async {
+    final response = await apiClient.get(
+      '/auth/username-availability',
+      queryParameters: {'username': username},
+    );
+    return UsernameAvailabilityResult.fromJson(response);
   }
 
   /// Log in an existing human account with email/password.
@@ -67,6 +103,7 @@ class AuthRepository {
       user: AuthUser(
         id: user['id'] as String? ?? '',
         email: user['email'] as String? ?? '',
+        username: user['username'] as String? ?? '',
         displayName: user['displayName'] as String? ?? '',
         avatarUrl: user['avatarUrl'] as String?,
         authProvider: user['authProvider'] as String?,
@@ -87,6 +124,7 @@ class AuthRepository {
       user: AuthUser(
         id: user['id'] as String? ?? '',
         email: user['email'] as String? ?? '',
+        username: user['username'] as String? ?? '',
         displayName: user['displayName'] as String? ?? '',
         avatarUrl: user['avatarUrl'] as String?,
         authProvider: user['authProvider'] as String?,

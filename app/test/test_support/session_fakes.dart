@@ -12,6 +12,7 @@ AuthState signedInState({
   String? recommendedActiveAgentId,
   String displayName = 'Session User',
   String? email,
+  String username = '',
   String? authProvider = 'email',
 }) {
   return AuthState(
@@ -19,6 +20,7 @@ AuthState signedInState({
     user: AuthUser(
       id: userId,
       email: email ?? '$userId@example.com',
+      username: username.isNotEmpty ? username : userId,
       displayName: displayName,
       avatarUrl: null,
       authProvider: authProvider,
@@ -79,6 +81,117 @@ AgentsMineResponse mineResponse({
   );
 }
 
+ConnectedAgentSummary connectedAgentSummary({
+  required String id,
+  String? handle,
+  String? displayName,
+  String ownerType = 'human',
+  String status = 'online',
+  String protocolVersion = '1.0',
+  String transportMode = 'webhook',
+  bool pollingEnabled = false,
+  String? lastSeenAt = '2026-04-13T08:00:00.000Z',
+  String? lastHeartbeatAt = '2026-04-13T08:01:00.000Z',
+}) {
+  return ConnectedAgentSummary(
+    id: id,
+    handle: handle ?? id,
+    displayName: displayName ?? 'Agent $id',
+    avatarUrl: null,
+    bio: null,
+    ownerType: ownerType,
+    status: status,
+    protocolVersion: protocolVersion,
+    transportMode: transportMode,
+    pollingEnabled: pollingEnabled,
+    lastSeenAt: lastSeenAt,
+    lastHeartbeatAt: lastHeartbeatAt,
+  );
+}
+
+ConnectedAgentsResponse connectedAgentsResponse({
+  List<ConnectedAgentSummary> connectedAgents = const <ConnectedAgentSummary>[],
+}) {
+  return ConnectedAgentsResponse(connectedAgents: connectedAgents);
+}
+
+class FakeApiClient extends ApiClient {
+  FakeApiClient() : super(baseUrl: 'http://localhost');
+
+  final Queue<
+    Future<Map<String, dynamic>> Function(String, Map<String, String>?)
+  >
+  _getHandlers =
+      Queue<
+        Future<Map<String, dynamic>> Function(String, Map<String, String>?)
+      >();
+  final Queue<
+    Future<Map<String, dynamic>> Function(String, Map<String, dynamic>?)
+  >
+  _postHandlers =
+      Queue<
+        Future<Map<String, dynamic>> Function(String, Map<String, dynamic>?)
+      >();
+  final Queue<
+    Future<Map<String, dynamic>> Function(String, Map<String, dynamic>?)
+  >
+  _deleteHandlers =
+      Queue<
+        Future<Map<String, dynamic>> Function(String, Map<String, dynamic>?)
+      >();
+
+  void enqueueGet(
+    Future<Map<String, dynamic>> Function(
+      String path,
+      Map<String, String>? queryParameters,
+    )
+    handler,
+  ) {
+    _getHandlers.add(handler);
+  }
+
+  void enqueuePost(
+    Future<Map<String, dynamic>> Function(
+      String path,
+      Map<String, dynamic>? body,
+    )
+    handler,
+  ) {
+    _postHandlers.add(handler);
+  }
+
+  void enqueueDelete(
+    Future<Map<String, dynamic>> Function(
+      String path,
+      Map<String, dynamic>? body,
+    )
+    handler,
+  ) {
+    _deleteHandlers.add(handler);
+  }
+
+  @override
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, String>? queryParameters,
+  }) {
+    return _getHandlers.removeFirst()(path, queryParameters);
+  }
+
+  @override
+  Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? body}) {
+    return _postHandlers.removeFirst()(path, body);
+  }
+
+  @override
+  Future<Map<String, dynamic>> delete(
+    String path, {
+    Map<String, dynamic>? body,
+  }) {
+    return _deleteHandlers.removeFirst()(path, body);
+  }
+}
+
 class FakeAuthRepository extends AuthRepository {
   FakeAuthRepository()
     : super(apiClient: ApiClient(baseUrl: 'http://localhost'));
@@ -99,6 +212,7 @@ class FakeAuthRepository extends AuthRepository {
   final Queue<
     Future<AuthState> Function({
       required String email,
+      required String username,
       required String displayName,
       required String password,
     })
@@ -107,10 +221,14 @@ class FakeAuthRepository extends AuthRepository {
       Queue<
         Future<AuthState> Function({
           required String email,
+          required String username,
           required String displayName,
           required String password,
         })
       >();
+  final Queue<Future<UsernameAvailabilityResult> Function(String username)>
+  _usernameAvailabilityHandlers =
+      Queue<Future<UsernameAvailabilityResult> Function(String)>();
   final Queue<Future<AuthState> Function(String token)> _fetchMeHandlers =
       Queue<Future<AuthState> Function(String token)>();
 
@@ -127,12 +245,19 @@ class FakeAuthRepository extends AuthRepository {
   void enqueueRegisterWithEmail(
     Future<AuthState> Function({
       required String email,
+      required String username,
       required String displayName,
       required String password,
     })
     handler,
   ) {
     _registerHandlers.add(handler);
+  }
+
+  void enqueueUsernameAvailability(
+    Future<UsernameAvailabilityResult> Function(String username) handler,
+  ) {
+    _usernameAvailabilityHandlers.add(handler);
   }
 
   void enqueueFetchMe(Future<AuthState> Function(String token) handler) {
@@ -144,23 +269,29 @@ class FakeAuthRepository extends AuthRepository {
     required String email,
     required String password,
   }) {
-    return _loginHandlers.removeFirst()(
-      email: email,
-      password: password,
-    );
+    return _loginHandlers.removeFirst()(email: email, password: password);
   }
 
   @override
   Future<AuthState> registerWithEmail({
     required String email,
+    required String username,
     required String displayName,
     required String password,
   }) {
     return _registerHandlers.removeFirst()(
       email: email,
+      username: username,
       displayName: displayName,
       password: password,
     );
+  }
+
+  @override
+  Future<UsernameAvailabilityResult> readUsernameAvailability({
+    required String username,
+  }) {
+    return _usernameAvailabilityHandlers.removeFirst()(username);
   }
 
   @override
@@ -175,6 +306,12 @@ class FakeAgentsRepository extends AgentsRepository {
 
   final Queue<Future<AgentsMineResponse> Function()> _readMineHandlers =
       Queue<Future<AgentsMineResponse> Function()>();
+  final Queue<Future<ConnectedAgentsResponse> Function()>
+  _readConnectedAgentsHandlers =
+      Queue<Future<ConnectedAgentsResponse> Function()>();
+  final Queue<Future<HumanOwnedAgentInvitation> Function()>
+  _createInvitationHandlers =
+      Queue<Future<HumanOwnedAgentInvitation> Function()>();
   final Queue<
     Future<Map<String, dynamic>> Function({
       required String handle,
@@ -210,6 +347,9 @@ class FakeAgentsRepository extends AgentsRepository {
           required String challengeToken,
         })
       >();
+  final Queue<Future<Map<String, dynamic>> Function()>
+  _disconnectConnectedAgentsHandlers =
+      Queue<Future<Map<String, dynamic>> Function()>();
 
   void enqueueReadMine(Future<AgentsMineResponse> Function() handler) {
     _readMineHandlers.add(handler);
@@ -225,6 +365,12 @@ class FakeAgentsRepository extends AgentsRepository {
     handler,
   ) {
     _importHandlers.add(handler);
+  }
+
+  void enqueueCreateHumanOwnedAgentInvitation(
+    Future<HumanOwnedAgentInvitation> Function() handler,
+  ) {
+    _createInvitationHandlers.add(handler);
   }
 
   void enqueueRequestClaim(
@@ -244,9 +390,31 @@ class FakeAgentsRepository extends AgentsRepository {
     _confirmClaimHandlers.add(handler);
   }
 
+  void enqueueReadConnectedAgents(
+    Future<ConnectedAgentsResponse> Function() handler,
+  ) {
+    _readConnectedAgentsHandlers.add(handler);
+  }
+
+  void enqueueDisconnectConnectedAgents(
+    Future<Map<String, dynamic>> Function() handler,
+  ) {
+    _disconnectConnectedAgentsHandlers.add(handler);
+  }
+
   @override
   Future<AgentsMineResponse> readMine() {
     return _readMineHandlers.removeFirst()();
+  }
+
+  @override
+  Future<ConnectedAgentsResponse> readConnectedAgents() {
+    return _readConnectedAgentsHandlers.removeFirst()();
+  }
+
+  @override
+  Future<HumanOwnedAgentInvitation> createHumanOwnedAgentInvitation() {
+    return _createInvitationHandlers.removeFirst()();
   }
 
   @override
@@ -280,6 +448,11 @@ class FakeAgentsRepository extends AgentsRepository {
       claimRequestId: claimRequestId,
       challengeToken: challengeToken,
     );
+  }
+
+  @override
+  Future<Map<String, dynamic>> disconnectAllConnectedAgents() {
+    return _disconnectConnectedAgentsHandlers.removeFirst()();
   }
 }
 

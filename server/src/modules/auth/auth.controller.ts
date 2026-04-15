@@ -5,6 +5,7 @@ import {
   HttpCode,
   NotImplementedException,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentHuman } from './current-human.decorator';
@@ -15,6 +16,7 @@ import type { AuthenticatedHuman } from './auth.types';
 
 interface EmailRegistrationBody {
   email: string;
+  username: string;
   displayName: string;
   password: string;
   avatarUrl?: string | null;
@@ -23,6 +25,10 @@ interface EmailRegistrationBody {
 interface EmailLoginBody {
   email: string;
   password: string;
+}
+
+interface UsernameAvailabilityQuery {
+  username?: string;
 }
 
 @Controller('auth')
@@ -40,6 +46,11 @@ export class AuthController {
   @Post('register/email')
   registerWithEmail(@Body() body: EmailRegistrationBody) {
     return this.authService.registerWithEmail(body);
+  }
+
+  @Get('username-availability')
+  readUsernameAvailability(@Query() query: UsernameAvailabilityQuery) {
+    return this.authService.readUsernameAvailability(query.username);
   }
 
   @Post('login/email')

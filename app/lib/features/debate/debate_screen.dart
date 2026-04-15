@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../core/network/api_exception.dart';
+import '../../core/session/app_session_controller.dart';
+import '../../core/session/app_session_scope.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
@@ -7,45 +12,140 @@ import '../../core/widgets/glass_panel.dart';
 import '../../core/widgets/primary_gradient_button.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/surface_card.dart';
+import '../../core/widgets/swipe_back_sheet.dart';
 import 'debate_models.dart';
+import 'debate_panel.dart';
+import 'debate_repository.dart';
 import 'debate_view_model.dart';
 
+const BorderRadius _liveCardRadius = BorderRadius.all(Radius.circular(18));
+const BorderRadius _liveHeroRadius = BorderRadius.all(Radius.circular(22));
+
 class DebateScreen extends StatefulWidget {
-  const DebateScreen({super.key, required this.initialViewModel});
+  const DebateScreen({
+    super.key,
+    required this.initialViewModel,
+    this.showInlineInitiateButton = true,
+    this.onInitiateActionChanged,
+    this.initialPanel = DebatePanel.process,
+    this.onBack,
+    this.debateRepository,
+    this.sessionTargetId,
+  });
 
   final DebateViewModel initialViewModel;
+  final bool showInlineInitiateButton;
+  final ValueChanged<VoidCallback?>? onInitiateActionChanged;
+  final DebatePanel initialPanel;
+  final VoidCallback? onBack;
+  final DebateRepository? debateRepository;
+  final String? sessionTargetId;
 
   @override
   State<DebateScreen> createState() => _DebateScreenState();
 }
 
-enum _DebatePanel { process, spectator, replay }
-
 class _DebateScreenState extends State<DebateScreen> {
   late DebateViewModel _viewModel;
   late final TextEditingController _spectatorController;
-  _DebatePanel _activePanel = _DebatePanel.process;
+  late final ScrollController _scrollController;
+  late DebatePanel _activePanel;
   String? _replacementProfileId;
+  bool _showScrollToTopButton = false;
+  DebateRepository? _debateRepository;
+  String? _sessionSignature;
+  bool _isLoadingSessions = false;
+  bool _isMutatingSession = false;
+  String? _loadErrorMessage;
 
   @override
   void initState() {
     super.initState();
     _viewModel = widget.initialViewModel;
     _spectatorController = TextEditingController();
+    _scrollController = ScrollController()..addListener(_handleScrollChanged);
+    _activePanel = widget.initialPanel;
+    _syncShellInitiateAction();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = AppSessionScope.maybeOf(context);
+    _debateRepository =
+        widget.debateRepository ??
+        (session == null
+            ? null
+            : DebateRepository(apiClient: session.apiClient));
+
+    final nextSignature = [
+      session?.bootstrapStatus.name ?? 'no-session',
+      session?.currentUser?.id ?? '',
+      session?.currentActiveAgent?.id ?? '',
+      widget.sessionTargetId ?? '',
+      widget.debateRepository == null ? 'session-repo' : 'external-repo',
+    ].join('|');
+    if (_sessionSignature == nextSignature) {
+      return;
+    }
+    _sessionSignature = nextSignature;
+    unawaited(_syncDebates(session));
   }
 
   @override
   void dispose() {
+    final onInitiateActionChanged = widget.onInitiateActionChanged;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      onInitiateActionChanged?.call(null);
+    });
+    _scrollController.removeListener(_handleScrollChanged);
     _spectatorController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant DebateScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialViewModel.selectedSessionId !=
+        widget.initialViewModel.selectedSessionId) {
+      _syncShellInitiateAction();
+    }
+    if (oldWidget.initialPanel != widget.initialPanel) {
+      _activePanel = widget.initialPanel;
+    }
+    if (oldWidget.sessionTargetId != widget.sessionTargetId) {
+      unawaited(_syncDebates(AppSessionScope.maybeOf(context)));
+    }
+  }
+
+  void _syncShellInitiateAction() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      widget.onInitiateActionChanged?.call(_openInitiateSheet);
+    });
+  }
+
   Future<void> _openInitiateSheet() async {
-    final draft = await showModalBottomSheet<DebateInitiateDraft>(
+    final session = AppSessionScope.maybeOf(context);
+    if (!_hasAuthenticatedHumanSession(session) || _debateRepository == null) {
+      _showSnackBar('Sign in as a human before creating a debate.');
+      return;
+    }
+    final directoryErrorMessage = _viewModel.directoryErrorMessage?.trim();
+    if (directoryErrorMessage != null && directoryErrorMessage.isNotEmpty) {
+      _showSnackBar(directoryErrorMessage);
+      return;
+    }
+    if (_viewModel.debaterRoster.length < 2) {
+      _showSnackBar('Wait for the agent directory to finish loading.');
+      return;
+    }
+
+    final draft = await showSwipeBackSheet<DebateInitiateDraft>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => _InitiateDebateSheet(
         debaterRoster: _viewModel.debaterRoster,
         hostRoster: _viewModel.hostRoster,
@@ -57,103 +157,743 @@ class _DebateScreenState extends State<DebateScreen> {
     }
 
     setState(() {
-      _viewModel = _viewModel.initiateDebate(draft);
-      _activePanel = _DebatePanel.process;
-      _replacementProfileId = null;
+      _isMutatingSession = true;
+      _loadErrorMessage = null;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Queued ${draft.topic.trim()} for host launch')),
-    );
+    try {
+      final debateSessionId = await _debateRepository!.createDebate(
+        topic: draft.topic.trim(),
+        proStance: draft.proStance.trim(),
+        conStance: draft.conStance.trim(),
+        proAgentId: draft.proAgentId,
+        conAgentId: draft.conAgentId,
+        freeEntryEnabled: draft.freeEntryEnabled,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _activePanel = DebatePanel.process;
+        _replacementProfileId = null;
+      });
+      await _syncDebates(
+        session,
+        preferredSessionId: debateSessionId,
+        resetScrollPosition: true,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Created ${draft.topic.trim()}.');
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await session!.handleUnauthorized();
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isMutatingSession = false;
+        _loadErrorMessage = error.message;
+      });
+      _showSnackBar(error.message);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isMutatingSession = false;
+        _loadErrorMessage = 'Unable to create the debate right now.';
+      });
+      _showSnackBar('Unable to create the debate right now.');
+    }
   }
 
-  void _updateViewModel(DebateViewModel nextViewModel) {
+  void _updateViewModel(
+    DebateViewModel nextViewModel, {
+    bool resetScrollPosition = true,
+  }) {
     setState(() {
       _viewModel = nextViewModel;
-      if (!_viewModel.selectedSession.showReplayTab &&
-          _activePanel == _DebatePanel.replay) {
-        _activePanel = _DebatePanel.process;
+      if (!(_viewModel.selectedSessionOrNull?.showReplayTab ?? false) &&
+          _activePanel == DebatePanel.replay) {
+        _activePanel = DebatePanel.process;
       }
-      if (_viewModel.selectedSession.missingSeatSide == null) {
+      if (_viewModel.selectedSessionOrNull?.missingSeatSide == null) {
         _replacementProfileId = null;
       }
     });
+    if (resetScrollPosition) {
+      _resetScrollPosition();
+    }
   }
 
-  void _sendSpectatorMessage() {
-    final body = _spectatorController.text;
-    final nextViewModel = _viewModel.addSpectatorComment(body);
-    if (identical(nextViewModel, _viewModel)) {
+  Future<void> _sendSpectatorMessage() async {
+    final debateSession = _viewModel.selectedSessionOrNull;
+    final session = AppSessionScope.maybeOf(context);
+    final body = _spectatorController.text.trim();
+    if (debateSession == null ||
+        body.isEmpty ||
+        _debateRepository == null ||
+        _isMutatingSession ||
+        !_hasAuthenticatedHumanSession(session) ||
+        !_viewModel.canViewerPostSpectatorMessage) {
       return;
     }
 
-    _spectatorController.clear();
-    _updateViewModel(nextViewModel);
+    setState(() {
+      _isMutatingSession = true;
+      _loadErrorMessage = null;
+    });
+
+    try {
+      await _debateRepository!.postSpectatorComment(
+        debateSessionId: debateSession.id,
+        content: body,
+      );
+      if (!mounted) {
+        return;
+      }
+      _spectatorController.clear();
+      await _syncDebates(
+        session,
+        preferredSessionId: debateSession.id,
+        resetScrollPosition: false,
+      );
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await session!.handleUnauthorized();
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isMutatingSession = false;
+        _loadErrorMessage = error.message;
+      });
+      _showSnackBar(error.message);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isMutatingSession = false;
+        _loadErrorMessage = 'Unable to send this spectator comment.';
+      });
+      _showSnackBar('Unable to send this spectator comment.');
+    }
+  }
+
+  void _setActivePanel(DebatePanel panel) {
+    setState(() {
+      _activePanel = panel;
+    });
+  }
+
+  void _handleScrollChanged() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final viewportDimension = _scrollController.position.viewportDimension;
+    final shouldShow =
+        viewportDimension > 0 && _scrollController.offset > viewportDimension;
+    if (shouldShow == _showScrollToTopButton) {
+      return;
+    }
+
+    setState(() {
+      _showScrollToTopButton = shouldShow;
+    });
+  }
+
+  void _resetScrollPosition() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.jumpTo(0);
+    });
+  }
+
+  Future<void> _jumpToTop() async {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    await _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Future<void> _syncDebates(
+    AppSessionController? session, {
+    String? preferredSessionId,
+    bool resetScrollPosition = false,
+  }) async {
+    final repository = _debateRepository;
+    if (repository == null) {
+      return;
+    }
+
+    final hasAuthenticatedHumanSession =
+        session != null &&
+        session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+        session.isAuthenticated &&
+        session.currentUser != null;
+    if (!hasAuthenticatedHumanSession) {
+      final previewTargetId =
+          preferredSessionId ??
+          _viewModel.selectedSessionOrNull?.id ??
+          widget.sessionTargetId;
+      final previewViewModel =
+          previewTargetId == null || previewTargetId.trim().isEmpty
+          ? widget.initialViewModel
+          : widget.initialViewModel.selectSession(previewTargetId.trim());
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _viewModel = previewViewModel;
+        _isLoadingSessions =
+            session?.bootstrapStatus == AppSessionBootstrapStatus.bootstrapping;
+        _isMutatingSession = false;
+        _loadErrorMessage = null;
+        if (!(_viewModel.selectedSessionOrNull?.showReplayTab ?? false) &&
+            _activePanel == DebatePanel.replay) {
+          _activePanel = DebatePanel.process;
+        }
+        if (_viewModel.selectedSessionOrNull?.missingSeatSide == null) {
+          _replacementProfileId = null;
+        }
+      });
+      if (resetScrollPosition) {
+        _resetScrollPosition();
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingSessions = true;
+        _loadErrorMessage = null;
+      });
+    }
+
+    try {
+      final nextViewModel = await repository.readViewModel(
+        viewerId: _currentViewerId(session),
+        viewerName: _currentViewerName(session),
+        preferredSessionId:
+            preferredSessionId ??
+            _viewModel.selectedSessionOrNull?.id ??
+            widget.sessionTargetId,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _viewModel = nextViewModel;
+        _isLoadingSessions = false;
+        _isMutatingSession = false;
+        _loadErrorMessage = null;
+        if (!(_viewModel.selectedSessionOrNull?.showReplayTab ?? false) &&
+            _activePanel == DebatePanel.replay) {
+          _activePanel = DebatePanel.process;
+        }
+        if (_viewModel.selectedSessionOrNull?.missingSeatSide == null) {
+          _replacementProfileId = null;
+        }
+      });
+      if (resetScrollPosition) {
+        _resetScrollPosition();
+      }
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await session.handleUnauthorized();
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingSessions = false;
+        _isMutatingSession = false;
+        _loadErrorMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingSessions = false;
+        _isMutatingSession = false;
+        _loadErrorMessage = 'Unable to load live debates right now.';
+      });
+    }
+  }
+
+  Future<void> _runSelectedSessionMutation({
+    required Future<void> Function(
+      DebateRepository repository,
+      String sessionId,
+    )
+    action,
+    DebatePanel? panelAfterSuccess,
+  }) async {
+    final debateSession = _viewModel.selectedSessionOrNull;
+    final session = AppSessionScope.maybeOf(context);
+    if (debateSession == null ||
+        _debateRepository == null ||
+        _isMutatingSession ||
+        !_hasAuthenticatedHumanSession(session)) {
+      return;
+    }
+
+    setState(() {
+      _isMutatingSession = true;
+      _loadErrorMessage = null;
+    });
+
+    try {
+      await action(_debateRepository!, debateSession.id);
+      if (!mounted) {
+        return;
+      }
+      if (panelAfterSuccess != null) {
+        setState(() {
+          _activePanel = panelAfterSuccess;
+        });
+      }
+      await _syncDebates(session, preferredSessionId: debateSession.id);
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await session!.handleUnauthorized();
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isMutatingSession = false;
+        _loadErrorMessage = error.message;
+      });
+      _showSnackBar(error.message);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isMutatingSession = false;
+        _loadErrorMessage = 'Unable to update this debate right now.';
+      });
+      _showSnackBar('Unable to update this debate right now.');
+    }
+  }
+
+  Future<void> _assignReplacement(String replacementAgentId) async {
+    final debateSession = _viewModel.selectedSessionOrNull;
+    final missingSeat = debateSession == null
+        ? null
+        : (debateSession.missingSeatSide == DebateSide.pro
+              ? debateSession.proSeat
+              : debateSession.missingSeatSide == DebateSide.con
+              ? debateSession.conSeat
+              : null);
+    if (missingSeat == null) {
+      return;
+    }
+
+    await _runSelectedSessionMutation(
+      action: (repository, sessionId) => repository.assignReplacement(
+        debateSessionId: sessionId,
+        seatId: missingSeat.id,
+        agentId: replacementAgentId,
+      ),
+    );
+  }
+
+  bool _hasAuthenticatedHumanSession(AppSessionController? session) {
+    return session != null &&
+        session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+        session.isAuthenticated &&
+        session.currentUser != null;
+  }
+
+  String _currentViewerId(AppSessionController? session) {
+    return session?.currentUser?.id ?? '';
+  }
+
+  String _currentViewerName(AppSessionController? session) {
+    final displayName = session?.currentUser?.displayName.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+    final email = session?.currentUser?.email.trim();
+    if (email != null && email.isNotEmpty) {
+      return email;
+    }
+    return _viewModel.viewerName;
+  }
+
+  bool _viewerCanModerateSession(
+    DebateSessionModel session,
+    AppSessionController? appSession,
+  ) {
+    return session.host.isHuman &&
+        appSession?.currentUser != null &&
+        appSession!.currentUser!.id == session.host.id;
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  double _dockBottomInset(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    if (keyboardInset > 0) {
+      return keyboardInset + AppSpacing.xs;
+    }
+
+    return AppSpacing.xs;
   }
 
   @override
   Widget build(BuildContext context) {
-    final selectedSession = _viewModel.selectedSession;
+    final selectedSession = _viewModel.selectedSessionOrNull;
+    final directoryErrorMessage = _viewModel.directoryErrorMessage?.trim();
+    final hasDirectoryError =
+        directoryErrorMessage != null && directoryErrorMessage.isNotEmpty;
+    if (selectedSession == null) {
+      final loadErrorMessage = _loadErrorMessage?.trim();
+      final resolvedMessage =
+          loadErrorMessage != null && loadErrorMessage.isNotEmpty
+          ? loadErrorMessage
+          : hasDirectoryError
+          ? '$directoryErrorMessage Live creation is unavailable until the agent directory recovers.'
+          : 'No live debates are available yet. Create one from the top-right plus button when you are signed in.';
+      return SizedBox.expand(
+        key: const Key('surface-live'),
+        child: _LiveFeedbackView(
+          isLoading: _isLoadingSessions,
+          message: resolvedMessage,
+        ),
+      );
+    }
+    final showSpectatorComposer =
+        _activePanel == DebatePanel.spectator &&
+        _viewModel.canViewerPostSpectatorMessage &&
+        !_isMutatingSession;
+    final showLiveBottomDock = showSpectatorComposer || _showScrollToTopButton;
+    final dockBottomInset = _dockBottomInset(context);
+    final contentBottomPadding = showLiveBottomDock
+        ? dockBottomInset + (showSpectatorComposer ? 76 : 24)
+        : AppSpacing.xl;
 
+    return Stack(
+      children: [
+        Padding(
+          key: const Key('surface-live'),
+          padding: EdgeInsets.only(bottom: contentBottomPadding),
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (hasDirectoryError)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.md,
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                    ),
+                    child: StatusChip(
+                      label: directoryErrorMessage,
+                      tone: StatusChipTone.tertiary,
+                      showDot: false,
+                    ),
+                  ),
+                _buildStageCard(context, selectedSession),
+                _buildChannelCard(context, selectedSession),
+              ],
+            ),
+          ),
+        ),
+        if (showLiveBottomDock)
+          Positioned(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: dockBottomInset,
+            child: _LiveBottomDock(
+              activePanel: _activePanel,
+              canPost: _viewModel.canViewerPostSpectatorMessage,
+              spectatorController: _spectatorController,
+              onSend: () => unawaited(_sendSpectatorMessage()),
+              onJumpToTop: _showScrollToTopButton ? _jumpToTop : null,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStageCard(BuildContext context, DebateSessionModel session) {
+    final appSession = AppSessionScope.maybeOf(context);
     return Padding(
-      key: const Key('surface-live'),
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
+        AppSpacing.md,
         0,
-        AppSpacing.xl,
-        AppSpacing.xxxl,
+        AppSpacing.md,
+        AppSpacing.md,
       ),
       child: LayoutBuilder(
-        builder: (context, constraints) {
-          final useTwoColumnLayout =
-              constraints.maxWidth >= 920 && constraints.maxHeight >= 620;
+        builder: (context, outerConstraints) {
+          final compactStage = outerConstraints.maxWidth < 390;
+          final stackedStage = outerConstraints.maxWidth < 300;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SessionToolbar(
-                        sessionIndex: _viewModel.selectedSessionIndex,
-                        sessionCount: _viewModel.sessions.length,
-                        canSelectPrevious: _viewModel.canSelectPreviousSession,
-                        canSelectNext: _viewModel.canSelectNextSession,
-                        onSelectPrevious: () => _updateViewModel(
-                          _viewModel.selectPreviousSession(),
-                        ),
-                        onSelectNext: () =>
-                            _updateViewModel(_viewModel.selectNextSession()),
-                        onInitiateDebate: _openInitiateSheet,
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: compactStage ? 220 : 272,
+                  maxHeight: compactStage ? 252 : 316,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF081117),
+                        Color(0xFF0F161C),
+                        Color(0xFF161120),
+                      ],
+                    ),
+                    borderRadius: _liveHeroRadius,
+                    border: Border.all(
+                      color: AppColors.outline.withValues(alpha: 0.14),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        blurRadius: 28,
+                        offset: const Offset(0, 10),
                       ),
-                      const SizedBox(height: AppSpacing.lg),
-                      if (useTwoColumnLayout)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: _buildStageCard(context, selectedSession),
-                            ),
-                            const SizedBox(width: AppSpacing.lg),
-                            Expanded(
-                              child: _buildChannelCard(
-                                context,
-                                selectedSession,
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: _liveHeroRadius,
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  AppColors.primary.withValues(alpha: 0.05),
+                                  Colors.transparent,
+                                  AppColors.background.withValues(alpha: 0.08),
+                                ],
                               ),
                             ),
-                          ],
-                        )
-                      else ...[
-                        _buildStageCard(context, selectedSession),
-                        const SizedBox(height: AppSpacing.lg),
-                        _buildChannelCard(context, selectedSession),
-                      ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: -18,
+                        top: 70,
+                        child: IgnorePointer(
+                          child: Container(
+                            width: compactStage ? 86 : 112,
+                            height: compactStage ? 86 : 112,
+                            decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                colors: [
+                                  AppColors.primary.withValues(alpha: 0.12),
+                                  AppColors.primary.withValues(alpha: 0.03),
+                                  Colors.transparent,
+                                ],
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: -24,
+                        top: 66,
+                        child: IgnorePointer(
+                          child: Container(
+                            width: compactStage ? 94 : 120,
+                            height: compactStage ? 94 : 120,
+                            decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                colors: [
+                                  AppColors.tertiary.withValues(alpha: 0.14),
+                                  AppColors.tertiary.withValues(alpha: 0.04),
+                                  Colors.transparent,
+                                ],
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: AppSpacing.sm,
+                        top: AppSpacing.sm,
+                        child: _StageArrowButton(
+                          buttonKey: const Key(
+                            'debate-previous-session-button',
+                          ),
+                          onPressed: _viewModel.canSelectPreviousSession
+                              ? () => _updateViewModel(
+                                  _viewModel.selectPreviousSession(),
+                                )
+                              : null,
+                          icon: Icons.chevron_left_rounded,
+                        ),
+                      ),
+                      Positioned(
+                        right: AppSpacing.sm,
+                        top: AppSpacing.sm,
+                        child: _StageArrowButton(
+                          buttonKey: const Key('debate-next-session-button'),
+                          onPressed: _viewModel.canSelectNextSession
+                              ? () => _updateViewModel(
+                                  _viewModel.selectNextSession(),
+                                )
+                              : null,
+                          icon: Icons.chevron_right_rounded,
+                        ),
+                      ),
+                      if (_viewerCanModerateSession(session, appSession))
+                        Positioned(
+                          top: AppSpacing.sm,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: _StageHostControls(
+                              session: session,
+                              onStart: _isMutatingSession
+                                  ? null
+                                  : () => unawaited(
+                                      _runSelectedSessionMutation(
+                                        action: (repository, sessionId) =>
+                                            repository.startDebate(sessionId),
+                                      ),
+                                    ),
+                              onPause: _isMutatingSession
+                                  ? null
+                                  : () => unawaited(
+                                      _runSelectedSessionMutation(
+                                        action: (repository, sessionId) =>
+                                            repository.pauseDebate(sessionId),
+                                      ),
+                                    ),
+                              onResume: _isMutatingSession
+                                  ? null
+                                  : () => unawaited(
+                                      _runSelectedSessionMutation(
+                                        action: (repository, sessionId) =>
+                                            repository.resumeDebate(sessionId),
+                                      ),
+                                    ),
+                              onEnd: _isMutatingSession
+                                  ? null
+                                  : () => unawaited(
+                                      _runSelectedSessionMutation(
+                                        action: (repository, sessionId) =>
+                                            repository.endDebate(sessionId),
+                                        panelAfterSuccess: DebatePanel.replay,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          44,
+                          AppSpacing.md,
+                          AppSpacing.md,
+                        ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            if (stackedStage) {
+                              return Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _DebateSeatCard(
+                                    seat: session.proSeat,
+                                    lifecycle: session.lifecycle,
+                                    compact: compactStage,
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  _HostSpine(
+                                    host: session.host,
+                                    lifecycle: session.lifecycle,
+                                    compact: compactStage,
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  _DebateSeatCard(
+                                    seat: session.conSeat,
+                                    lifecycle: session.lifecycle,
+                                    compact: compactStage,
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: _DebateSeatCard(
+                                    seat: session.proSeat,
+                                    lifecycle: session.lifecycle,
+                                    compact: compactStage,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: compactStage ? 60 : 72,
+                                  child: _HostSpine(
+                                    host: session.host,
+                                    lifecycle: session.lifecycle,
+                                    compact: compactStage,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _DebateSeatCard(
+                                    seat: session.conSeat,
+                                    lifecycle: session.lifecycle,
+                                    compact: compactStage,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              _LiveTopicCard(session: session),
             ],
           );
         },
@@ -161,7 +901,11 @@ class _DebateScreenState extends State<DebateScreen> {
     );
   }
 
-  Widget _buildStageCard(BuildContext context, DebateSessionModel session) {
+  Widget _buildChannelCard(BuildContext context, DebateSessionModel session) {
+    final showReplayTab = session.showReplayTab;
+    final activePanel = !showReplayTab && _activePanel == DebatePanel.replay
+        ? DebatePanel.process
+        : _activePanel;
     final replacementCandidates = _viewModel
         .replacementCandidatesForSelectedSession();
     final replacementValue =
@@ -173,142 +917,672 @@ class _DebateScreenState extends State<DebateScreen> {
         ? replacementCandidates.first.id
         : null;
 
-    return SurfaceCard(
-      eyebrow: 'Debate stage',
-      title: session.topic,
-      subtitle:
-          'Exactly two debating seats stay formal. Spectator commentary is split into its own channel.',
-      leading: const _DebateToneIcon(
-        icon: Icons.sensors_rounded,
-        accentColor: AppColors.primary,
-      ),
-      trailing: StatusChip(
-        label: '${session.activeDebaterCount} active seats',
-        tone: session.activeDebaterCount == 2
-            ? StatusChipTone.primary
-            : StatusChipTone.tertiary,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
+    final showReplacementCard =
+        session.host.isHuman &&
+        session.lifecycle == DebateLifecycle.paused &&
+        session.missingSeatSide != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLow.withValues(alpha: 0.94),
+          borderRadius: _liveCardRadius,
+          border: Border.all(color: AppColors.outline.withValues(alpha: 0.14)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.08),
-                      AppColors.surfaceHigh.withValues(alpha: 0.9),
-                      AppColors.tertiary.withValues(alpha: 0.06),
-                    ],
-                  ),
-                  borderRadius: AppRadii.hero,
+                  color: AppColors.surfaceLow.withValues(alpha: 0.66),
+                  borderRadius: const BorderRadius.all(Radius.circular(16)),
                   border: Border.all(
-                    color: AppColors.outline.withValues(alpha: 0.16),
+                    color: AppColors.outline.withValues(alpha: 0.12),
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.xxl,
-                    AppSpacing.xl,
-                    AppSpacing.xxl,
-                    AppSpacing.xl,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _DebateSeatCard(seat: session.proSeat)),
-                      const SizedBox(width: AppSpacing.sm),
-                      SizedBox(
-                        width: 92,
-                        child: _HostSpine(
-                          host: session.host,
-                          lifecycle: session.lifecycle,
+                  padding: const EdgeInsets.all(4),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compactWidth = constraints.maxWidth < 340;
+                      final tabs = <Widget>[
+                        _PanelToggleButton(
+                          buttonKey: const Key('debate-tab-process'),
+                          label: 'Debate Process',
+                          icon: Icons.description_outlined,
+                          isSelected: activePanel == DebatePanel.process,
+                          onTap: () => _setActivePanel(DebatePanel.process),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(child: _DebateSeatCard(seat: session.conSeat)),
-                    ],
+                        _PanelToggleButton(
+                          buttonKey: const Key('debate-tab-spectator'),
+                          label: 'Spectator Feed',
+                          icon: Icons.forum_outlined,
+                          isSelected: activePanel == DebatePanel.spectator,
+                          onTap: () => _setActivePanel(DebatePanel.spectator),
+                        ),
+                        if (showReplayTab)
+                          _PanelToggleButton(
+                            buttonKey: const Key('debate-tab-replay'),
+                            label: 'Replay',
+                            icon: Icons.history_rounded,
+                            isSelected: activePanel == DebatePanel.replay,
+                            onTap: () => _setActivePanel(DebatePanel.replay),
+                          ),
+                      ];
+
+                      if (compactWidth) {
+                        return Column(
+                          children: [
+                            for (
+                              var index = 0;
+                              index < tabs.length;
+                              index++
+                            ) ...[
+                              SizedBox(
+                                width: double.infinity,
+                                child: tabs[index],
+                              ),
+                              if (index != tabs.length - 1)
+                                const SizedBox(height: 4),
+                            ],
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          for (var index = 0; index < tabs.length; index++) ...[
+                            Expanded(child: tabs[index]),
+                            if (index != tabs.length - 1)
+                              const SizedBox(width: 4),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
-              Positioned(
-                left: AppSpacing.sm,
-                top: AppSpacing.sm,
-                child: IconButton(
-                  onPressed: _viewModel.canSelectPreviousSession
-                      ? () =>
-                            _updateViewModel(_viewModel.selectPreviousSession())
-                      : null,
-                  icon: const Icon(Icons.chevron_left_rounded),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surface.withValues(alpha: 0.52),
+              if (showReplacementCard) ...[
+                const SizedBox(height: AppSpacing.md),
+                _LiveControlCard(
+                  session: session,
+                  showInitiateButton: widget.showInlineInitiateButton,
+                  onInitiateDebate: _openInitiateSheet,
+                  replacementCandidates: replacementCandidates,
+                  replacementValue: replacementValue,
+                  onReplacementSelected: (value) {
+                    setState(() {
+                      _replacementProfileId = value;
+                    });
+                  },
+                  onReplace: replacementValue == null
+                      ? null
+                      : () => unawaited(_assignReplacement(replacementValue)),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              switch (activePanel) {
+                DebatePanel.process => _FormalTurnList(session: session),
+                DebatePanel.spectator => _SpectatorChannel(session: session),
+                DebatePanel.replay => _ReplayRail(session: session),
+              },
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveFeedbackView extends StatelessWidget {
+  const _LiveFeedbackView({required this.isLoading, required this.message});
+
+  final bool isLoading;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading)
+              const CircularProgressIndicator()
+            else
+              const Icon(
+                Icons.stream_rounded,
+                color: AppColors.primary,
+                size: 38,
+              ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveTopicCard extends StatelessWidget {
+  const _LiveTopicCard({required this.session});
+
+  final DebateSessionModel session;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow,
+        borderRadius: _liveCardRadius,
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.backgroundFloor.withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    Icons.topic_rounded,
+                    size: 17,
+                    color: AppColors.primary,
                   ),
                 ),
-              ),
-              Positioned(
-                right: AppSpacing.sm,
-                top: AppSpacing.sm,
-                child: IconButton(
-                  onPressed: _viewModel.canSelectNextSession
-                      ? () => _updateViewModel(_viewModel.selectNextSession())
-                      : null,
-                  icon: const Icon(Icons.chevron_right_rounded),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surface.withValues(alpha: 0.52),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Current\nDebate Topic'.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontFamily: 'SpaceGrotesk',
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.7,
+                      height: 1.08,
+                    ),
                   ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceHigh.withValues(alpha: 0.88),
+                    borderRadius: AppRadii.pill,
+                    border: Border.all(
+                      color: AppColors.outline.withValues(alpha: 0.14),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.4),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          session.spectatorCountLabel.toUpperCase(),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: AppColors.onSurfaceMuted,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.7,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              session.topic,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: AppColors.primary,
+                height: 1.02,
+                fontSize: 27,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _StancePanel(seat: session.proSeat),
+            const SizedBox(height: AppSpacing.sm),
+            _StancePanel(seat: session.conSeat),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveControlCard extends StatelessWidget {
+  const _LiveControlCard({
+    required this.session,
+    required this.showInitiateButton,
+    required this.onInitiateDebate,
+    required this.replacementCandidates,
+    required this.replacementValue,
+    required this.onReplacementSelected,
+    required this.onReplace,
+  });
+
+  final DebateSessionModel session;
+  final bool showInitiateButton;
+  final VoidCallback onInitiateDebate;
+  final List<DebateProfileModel> replacementCandidates;
+  final String? replacementValue;
+  final ValueChanged<String?> onReplacementSelected;
+  final VoidCallback? onReplace;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow.withValues(alpha: 0.94),
+        borderRadius: _liveCardRadius,
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.16)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showInitiateButton) ...[
+              SizedBox(
+                width: double.infinity,
+                child: PrimaryGradientButton(
+                  key: const Key('initiate-debate-button'),
+                  label: 'Initiate new debate',
+                  icon: Icons.add_circle_outline_rounded,
+                  onPressed: onInitiateDebate,
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              const _DebateToneIcon(
-                icon: Icons.folder_open_rounded,
-                accentColor: AppColors.primary,
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
+            if (session.lifecycle == DebateLifecycle.paused &&
+                session.missingSeatSide != null) ...[
+              if (showInitiateButton) const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.md),
+              GlassPanel(
+                key: const Key('debate-replacement-panel'),
+                padding: const EdgeInsets.all(AppSpacing.md),
+                accentColor: AppColors.tertiary,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Current Debate Topic'.toUpperCase(),
+                      'Replacement Flow'.toUpperCase(),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: AppColors.onSurfaceMuted,
+                        color: AppColors.tertiarySoft,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xxs),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
-                      session.topic,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(color: AppColors.primary),
+                      '${session.missingSeatSide!.label} seat is missing. Resume stays locked until a replacement agent is assigned.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    DropdownButtonFormField<String>(
+                      key: const Key('debate-replacement-select'),
+                      isExpanded: true,
+                      initialValue: replacementValue,
+                      items: replacementCandidates.map((profile) {
+                        return DropdownMenuItem<String>(
+                          value: profile.id,
+                          child: Text(
+                            profile.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: replacementCandidates.isEmpty
+                          ? null
+                          : onReplacementSelected,
+                      decoration: const InputDecoration(
+                        labelText: 'Replacement agent',
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Opacity(
+                        opacity: onReplace == null ? 0.42 : 1,
+                        child: IgnorePointer(
+                          ignoring: onReplace == null,
+                          child: PrimaryGradientButton(
+                            key: const Key('debate-replace-button'),
+                            label: 'Replace seat',
+                            icon: Icons.swap_horiz_rounded,
+                            useTertiary: true,
+                            onPressed: onReplace ?? () {},
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              StatusChip(
-                label: session.spectatorCountLabel,
-                tone: StatusChipTone.neutral,
-                showDot: false,
-              ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveBottomDock extends StatelessWidget {
+  const _LiveBottomDock({
+    required this.activePanel,
+    required this.canPost,
+    required this.spectatorController,
+    required this.onSend,
+    required this.onJumpToTop,
+  });
+
+  final DebatePanel activePanel;
+  final bool canPost;
+  final TextEditingController spectatorController;
+  final VoidCallback onSend;
+  final Future<void> Function()? onJumpToTop;
+
+  @override
+  Widget build(BuildContext context) {
+    final showComposer = activePanel == DebatePanel.spectator && canPost;
+
+    return SafeArea(
+      top: false,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (onJumpToTop != null) ...[
+            DockIconButton(
+              buttonKey: const Key('debate-scroll-to-top-button'),
+              icon: Icons.keyboard_arrow_up_rounded,
+              onPressed: () {
+                onJumpToTop!.call();
+              },
+            ),
+          ],
+          if (showComposer) ...[
+            if (onJumpToTop != null) const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withValues(alpha: 0.94),
+                  borderRadius: const BorderRadius.all(Radius.circular(20)),
+                  border: Border.all(
+                    color: AppColors.outline.withValues(alpha: 0.16),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.backgroundFloor.withValues(alpha: 0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.sm,
+                    AppSpacing.xs,
+                    AppSpacing.sm,
+                    AppSpacing.xs,
+                  ),
+                  child: TextField(
+                    key: const Key('debate-spectator-input'),
+                    controller: spectatorController,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => onSend(),
+                    decoration: const InputDecoration(
+                      hintText: 'Add to debate...',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isCollapsed: true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            DockIconButton(
+              buttonKey: const Key('debate-spectator-send-button'),
+              icon: Icons.send_rounded,
+              onPressed: onSend,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StageHostControls extends StatelessWidget {
+  const _StageHostControls({
+    required this.session,
+    required this.onStart,
+    required this.onPause,
+    required this.onResume,
+    required this.onEnd,
+  });
+
+  final DebateSessionModel session;
+  final VoidCallback? onStart;
+  final VoidCallback? onPause;
+  final VoidCallback? onResume;
+  final VoidCallback? onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = <Widget>[];
+
+    switch (session.lifecycle) {
+      case DebateLifecycle.pending:
+        actions.add(
+          _StageHostActionButton(
+            buttonKey: const Key('debate-start-button'),
+            icon: Icons.play_arrow_rounded,
+            color: AppColors.primary,
+            enabled: onStart != null,
+            onPressed: onStart,
           ),
-          const SizedBox(height: AppSpacing.lg),
+        );
+      case DebateLifecycle.live:
+        actions.addAll([
+          _StageHostActionButton(
+            buttonKey: const Key('debate-pause-button'),
+            icon: Icons.pause_rounded,
+            color: AppColors.primary,
+            enabled: onPause != null,
+            onPressed: onPause,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          _StageHostActionButton(
+            buttonKey: const Key('debate-end-button'),
+            icon: Icons.stop_rounded,
+            color: AppColors.warning,
+            enabled: onEnd != null,
+            onPressed: onEnd,
+          ),
+        ]);
+      case DebateLifecycle.paused:
+        actions.addAll([
+          _StageHostActionButton(
+            buttonKey: const Key('debate-resume-button'),
+            icon: Icons.play_arrow_rounded,
+            color: AppColors.primary,
+            enabled: session.missingSeatSide == null && onResume != null,
+            onPressed: onResume,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          _StageHostActionButton(
+            buttonKey: const Key('debate-end-button'),
+            icon: Icons.stop_rounded,
+            color: AppColors.warning,
+            enabled: onEnd != null,
+            onPressed: onEnd,
+          ),
+        ]);
+      case DebateLifecycle.ended:
+      case DebateLifecycle.archived:
+        return const SizedBox.shrink();
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceHigh.withValues(alpha: 0.84),
+        borderRadius: AppRadii.pill,
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.14)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+      ),
+    );
+  }
+}
+
+class _StageHostActionButton extends StatelessWidget {
+  const _StageHostActionButton({
+    this.buttonKey,
+    required this.icon,
+    required this.color,
+    required this.onPressed,
+    this.enabled = true,
+  });
+
+  final Key? buttonKey;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onPressed;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: IconButton(
+          key: buttonKey,
+          onPressed: enabled ? onPressed : null,
+          icon: Icon(icon, size: 18),
+          style: IconButton.styleFrom(
+            minimumSize: const Size(36, 36),
+            maximumSize: const Size(36, 36),
+            padding: EdgeInsets.zero,
+            foregroundColor: color,
+            backgroundColor: color.withValues(alpha: 0.12),
+            side: BorderSide(color: color.withValues(alpha: 0.24)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+class _DebateLongformSection extends StatelessWidget {
+  const _DebateLongformSection({
+    required this.session,
+    required this.debaterRoster,
+    required this.hostRoster,
+  });
+
+  final DebateSessionModel session;
+  final List<DebateProfileModel> debaterRoster;
+  final List<DebateProfileModel> hostRoster;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      eyebrow: 'Live room map',
+      title: 'Protocol layers',
+      subtitle:
+          'Formal turns, host control, spectator feed, and standby agents stay visually separated.',
+      leading: const _DebateToneIcon(
+        icon: Icons.account_tree_rounded,
+        accentColor: AppColors.tertiary,
+      ),
+      trailing: StatusChip(
+        label: session.lifecycle.label,
+        tone: session.lifecycle == DebateLifecycle.live
+            ? StatusChipTone.primary
+            : StatusChipTone.neutral,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final stackStances = constraints.maxWidth < 560;
+              final stack = constraints.maxWidth < 620;
+              final cards = [
+                _ProtocolLayerCard(
+                  icon: Icons.gavel_rounded,
+                  title: 'Formal lane',
+                  value:
+                      '${session.visibleFormalTurns.length}/${session.formalTurns.length}',
+                  subtitle: 'Only pro/con seats can write formal turns.',
+                ),
+                _ProtocolLayerCard(
+                  icon: Icons.record_voice_over_rounded,
+                  title: 'Host rail',
+                  value: session.host.name,
+                  subtitle: session.host.isHuman
+                      ? 'Human moderator is currently running this room.'
+                      : 'Agent moderator is currently running this room.',
+                ),
+                _ProtocolLayerCard(
+                  icon: Icons.forum_rounded,
+                  title: 'Spectators',
+                  value: session.spectatorCountLabel,
+                  subtitle: 'Commentary never mutates the formal record.',
+                ),
+              ];
 
-              if (stackStances) {
+              if (stack) {
                 return Column(
                   children: [
-                    _StancePanel(seat: session.proSeat),
-                    const SizedBox(height: AppSpacing.md),
-                    _StancePanel(seat: session.conSeat),
+                    for (var index = 0; index < cards.length; index++) ...[
+                      cards[index],
+                      if (index != cards.length - 1)
+                        const SizedBox(height: AppSpacing.md),
+                    ],
                   ],
                 );
               }
@@ -316,312 +1590,204 @@ class _DebateScreenState extends State<DebateScreen> {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _StancePanel(seat: session.proSeat)),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(child: _StancePanel(seat: session.conSeat)),
+                  for (var index = 0; index < cards.length; index++) ...[
+                    Expanded(child: cards[index]),
+                    if (index != cards.length - 1)
+                      const SizedBox(width: AppSpacing.md),
+                  ],
                 ],
               );
             },
           ),
-          const SizedBox(height: AppSpacing.lg),
-          _buildLifecycleControls(context, session),
-          if (session.lifecycle == DebateLifecycle.paused &&
-              session.missingSeatSide == null) ...[
-            const SizedBox(height: AppSpacing.md),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                key: const Key('debate-mark-missing-button'),
-                onPressed: () => _updateViewModel(
-                  _viewModel.markSelectedSeatMissing(DebateSide.con),
-                ),
-                icon: const Icon(Icons.portable_wifi_off_rounded),
-                label: const Text('Flag con seat missing'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.tertiary,
-                  side: BorderSide(
-                    color: AppColors.tertiary.withValues(alpha: 0.3),
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            'Standby roster'.toUpperCase(),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: AppColors.primary,
+              letterSpacing: 2.2,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final profile in [...debaterRoster, ...hostRoster])
+                  Padding(
+                    padding: const EdgeInsets.only(right: AppSpacing.md),
+                    child: _DebateRosterChip(profile: profile),
                   ),
-                  backgroundColor: AppColors.tertiary.withValues(alpha: 0.06),
-                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLow.withValues(alpha: 0.78),
+              borderRadius: AppRadii.large,
+              border: Border.all(
+                color: AppColors.outline.withValues(alpha: 0.14),
               ),
             ),
-          ],
-          if (session.lifecycle == DebateLifecycle.paused &&
-              session.missingSeatSide != null) ...[
-            const SizedBox(height: AppSpacing.lg),
-            GlassPanel(
-              key: const Key('debate-replacement-panel'),
+            child: Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
-              accentColor: AppColors.tertiary,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Replacement Flow'.toUpperCase(),
+                    'Operator notes'.toUpperCase(),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: AppColors.tertiarySoft,
+                      color: AppColors.onSurfaceMuted,
+                      letterSpacing: 1.8,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
-                    '${session.missingSeatSide!.label} seat is missing. Resume stays locked until a replacement agent is assigned.',
+                    session.freeEntryEnabled
+                        ? 'Agents may request entry while the host keeps seat replacement and replay boundaries explicit.'
+                        : 'Entry is locked; only assigned seats and the configured host can change formal state.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  DropdownButtonFormField<String>(
-                    key: const Key('debate-replacement-select'),
-                    isExpanded: true,
-                    value: replacementValue,
-                    items: replacementCandidates.map((profile) {
-                      return DropdownMenuItem<String>(
-                        value: profile.id,
-                        child: Text(
-                          profile.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: replacementCandidates.isEmpty
-                        ? null
-                        : (value) {
-                            setState(() {
-                              _replacementProfileId = value;
-                            });
-                          },
-                    decoration: const InputDecoration(
-                      labelText: 'Replacement agent',
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SizedBox(
-                    width: double.infinity,
-                    child: Opacity(
-                      opacity: replacementValue == null ? 0.42 : 1,
-                      child: IgnorePointer(
-                        ignoring: replacementValue == null,
-                        child: PrimaryGradientButton(
-                          key: const Key('debate-replace-button'),
-                          label: 'Replace seat',
-                          icon: Icons.swap_horiz_rounded,
-                          useTertiary: true,
-                          onPressed: () => _updateViewModel(
-                            _viewModel.replaceMissingSeat(replacementValue!),
-                          ),
-                        ),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      StatusChip(
+                        label: session.freeEntryEnabled
+                            ? 'free entry open'
+                            : 'free entry locked',
+                        tone: session.freeEntryEnabled
+                            ? StatusChipTone.primary
+                            : StatusChipTone.neutral,
+                        showDot: false,
                       ),
-                    ),
+                      const StatusChip(
+                        label: 'replay isolated',
+                        tone: StatusChipTone.neutral,
+                        showDot: false,
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLifecycleControls(
-    BuildContext context,
-    DebateSessionModel session,
-  ) {
-    final controls = <Widget>[];
-
-    switch (session.lifecycle) {
-      case DebateLifecycle.pending:
-        controls.add(
-          _LifecycleButton(
-            buttonKey: const Key('debate-start-button'),
-            label: 'Start debate',
-            icon: Icons.play_arrow_rounded,
-            accentColor: AppColors.primary,
-            onPressed: () => _updateViewModel(_viewModel.startSelectedDebate()),
-          ),
-        );
-      case DebateLifecycle.live:
-        controls.addAll([
-          _LifecycleButton(
-            buttonKey: const Key('debate-pause-button'),
-            label: 'Pause',
-            icon: Icons.pause_rounded,
-            accentColor: AppColors.tertiary,
-            onPressed: () => _updateViewModel(_viewModel.pauseSelectedDebate()),
-          ),
-          _LifecycleButton(
-            buttonKey: const Key('debate-end-button'),
-            label: 'End',
-            icon: Icons.stop_circle_outlined,
-            accentColor: AppColors.warning,
-            onPressed: () {
-              _updateViewModel(_viewModel.endSelectedDebate());
-              setState(() {
-                _activePanel = _DebatePanel.replay;
-              });
-            },
-          ),
-        ]);
-      case DebateLifecycle.paused:
-        controls.addAll([
-          _LifecycleButton(
-            buttonKey: const Key('debate-resume-button'),
-            label: 'Resume',
-            icon: Icons.play_circle_outline_rounded,
-            accentColor: AppColors.primary,
-            enabled: session.missingSeatSide == null,
-            onPressed: () =>
-                _updateViewModel(_viewModel.resumeSelectedDebate()),
-          ),
-          _LifecycleButton(
-            buttonKey: const Key('debate-end-button'),
-            label: 'End',
-            icon: Icons.stop_circle_outlined,
-            accentColor: AppColors.warning,
-            onPressed: () {
-              _updateViewModel(_viewModel.endSelectedDebate());
-              setState(() {
-                _activePanel = _DebatePanel.replay;
-              });
-            },
-          ),
-        ]);
-      case DebateLifecycle.ended:
-        controls.add(
-          _LifecycleButton(
-            buttonKey: const Key('debate-archive-button'),
-            label: 'Archive replay',
-            icon: Icons.inventory_2_outlined,
-            accentColor: AppColors.primary,
-            onPressed: () =>
-                _updateViewModel(_viewModel.archiveSelectedDebate()),
-          ),
-        );
-      case DebateLifecycle.archived:
-        controls.add(
-          _LifecycleButton(
-            label: 'Archived',
-            icon: Icons.check_circle_outline_rounded,
-            accentColor: AppColors.primary,
-            enabled: false,
-            onPressed: () {},
-          ),
-        );
-    }
-
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: controls,
-    );
-  }
-
-  Widget _buildChannelCard(BuildContext context, DebateSessionModel session) {
-    final showReplayTab = session.showReplayTab;
-    final activePanel = !showReplayTab && _activePanel == _DebatePanel.replay
-        ? _DebatePanel.process
-        : _activePanel;
-
-    return SurfaceCard(
-      eyebrow: 'Split channels',
-      title: _panelTitle(activePanel),
-      subtitle: _panelSubtitle(activePanel, session),
-      accentColor: activePanel == _DebatePanel.spectator
-          ? AppColors.tertiary
-          : AppColors.primary,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _PanelToggleButton(
-                  buttonKey: const Key('debate-tab-process'),
-                  label: 'Process',
-                  icon: Icons.description_outlined,
-                  isSelected: activePanel == _DebatePanel.process,
-                  onTap: () {
-                    setState(() {
-                      _activePanel = _DebatePanel.process;
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: _PanelToggleButton(
-                  buttonKey: const Key('debate-tab-spectator'),
-                  label: 'Spectator feed',
-                  icon: Icons.forum_outlined,
-                  isSelected: activePanel == _DebatePanel.spectator,
-                  onTap: () {
-                    setState(() {
-                      _activePanel = _DebatePanel.spectator;
-                    });
-                  },
-                ),
-              ),
-              if (showReplayTab) ...[
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: _PanelToggleButton(
-                    buttonKey: const Key('debate-tab-replay'),
-                    label: 'Replay',
-                    icon: Icons.history_rounded,
-                    isSelected: activePanel == _DebatePanel.replay,
-                    onTap: () {
-                      setState(() {
-                        _activePanel = _DebatePanel.replay;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: switch (activePanel) {
-              _DebatePanel.process => _FormalTurnList(session: session),
-              _DebatePanel.spectator => _SpectatorChannel(
-                session: session,
-                canPost: _viewModel.canViewerPostSpectatorMessage,
-                spectatorController: _spectatorController,
-                onSend: _sendSpectatorMessage,
-              ),
-              _DebatePanel.replay => _ReplayRail(session: session),
-            },
           ),
         ],
       ),
     );
-  }
-
-  String _panelTitle(_DebatePanel panel) {
-    return switch (panel) {
-      _DebatePanel.process => 'Debate Process',
-      _DebatePanel.spectator => 'Spectator Feed',
-      _DebatePanel.replay => 'Archive Replay',
-    };
-  }
-
-  String _panelSubtitle(_DebatePanel panel, DebateSessionModel session) {
-    return switch (panel) {
-      _DebatePanel.process =>
-        'Agent-authored turns stay here only. ${session.visibleFormalTurns.length} turn(s) are visible.',
-      _DebatePanel.spectator =>
-        'Humans and agents may react here, but never author formal seat turns.',
-      _DebatePanel.replay =>
-        'Replay items stay separated from the live spectator feed after the debate ends.',
-    };
   }
 }
 
+class _ProtocolLayerCard extends StatelessWidget {
+  const _ProtocolLayerCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceHigh.withValues(alpha: 0.68),
+        borderRadius: AppRadii.large,
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.12)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: AppColors.primary),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(title, style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: AppSpacing.xs),
+            Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DebateRosterChip extends StatelessWidget {
+  const _DebateRosterChip({required this.profile});
+
+  final DebateProfileModel profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = profile.isHuman ? AppColors.warning : AppColors.primary;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow.withValues(alpha: 0.82),
+        borderRadius: AppRadii.large,
+        border: Border.all(color: accentColor.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: SizedBox(
+          width: 180,
+          child: Row(
+            children: [
+              _DebateToneIcon(
+                icon: profile.isHuman
+                    ? Icons.person_rounded
+                    : Icons.smart_toy_rounded,
+                accentColor: accentColor,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      profile.headline,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
 class _SessionToolbar extends StatelessWidget {
   const _SessionToolbar({
     required this.sessionIndex,
     required this.sessionCount,
     required this.canSelectPrevious,
     required this.canSelectNext,
+    required this.showInitiateButton,
     required this.onSelectPrevious,
     required this.onSelectNext,
     required this.onInitiateDebate,
@@ -631,6 +1797,7 @@ class _SessionToolbar extends StatelessWidget {
   final int sessionCount;
   final bool canSelectPrevious;
   final bool canSelectNext;
+  final bool showInitiateButton;
   final VoidCallback onSelectPrevious;
   final VoidCallback onSelectNext;
   final VoidCallback onInitiateDebate;
@@ -676,20 +1843,24 @@ class _SessionToolbar extends StatelessWidget {
           ],
         );
 
-        final button = PrimaryGradientButton(
-          key: const Key('initiate-debate-button'),
-          label: 'Initiate new debate',
-          icon: Icons.add_circle_outline_rounded,
-          onPressed: onInitiateDebate,
-        );
+        final button = showInitiateButton
+            ? PrimaryGradientButton(
+                key: const Key('initiate-debate-button'),
+                label: 'Initiate new debate',
+                icon: Icons.add_circle_outline_rounded,
+                onPressed: onInitiateDebate,
+              )
+            : null;
 
         if (constraints.maxWidth < 520) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               controls,
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(width: double.infinity, child: button),
+              if (button != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(width: double.infinity, child: button),
+              ],
             ],
           );
         }
@@ -697,8 +1868,10 @@ class _SessionToolbar extends StatelessWidget {
         return Row(
           children: [
             controls,
-            const SizedBox(width: AppSpacing.md),
-            Expanded(child: button),
+            if (button != null) ...[
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: button),
+            ],
           ],
         );
       },
@@ -707,9 +1880,15 @@ class _SessionToolbar extends StatelessWidget {
 }
 
 class _DebateSeatCard extends StatelessWidget {
-  const _DebateSeatCard({required this.seat});
+  const _DebateSeatCard({
+    required this.seat,
+    required this.lifecycle,
+    this.compact = false,
+  });
 
   final DebateSeatModel seat;
+  final DebateLifecycle lifecycle;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -718,140 +1897,223 @@ class _DebateSeatCard extends StatelessWidget {
         : AppColors.tertiary;
     final statusLabel = seat.isMissing
         ? 'replacing...'
-        : seat.side == DebateSide.pro
-        ? 'synthesizing...'
-        : 'waiting...';
+        : lifecycle == DebateLifecycle.pending
+        ? 'queued...'
+        : lifecycle == DebateLifecycle.live
+        ? (seat.side == DebateSide.pro ? 'synthesizing...' : 'waiting...')
+        : lifecycle == DebateLifecycle.paused
+        ? 'paused...'
+        : lifecycle == DebateLifecycle.ended
+        ? 'closed...'
+        : 'archived...';
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.06),
-        borderRadius: AppRadii.large,
-        border: Border.all(color: accentColor.withValues(alpha: 0.22)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.surfaceHighest.withValues(alpha: 0.82),
-                borderRadius: AppRadii.pill,
-                border: Border.all(color: accentColor.withValues(alpha: 0.2)),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: compact ? 68 : 92,
+          height: compact ? 68 : 92,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: accentColor, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.22),
+                blurRadius: compact ? 16 : 24,
+                spreadRadius: 1,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Icon(
-                  seat.profile.isHuman
-                      ? Icons.verified_user_rounded
-                      : Icons.smart_toy_rounded,
+            ],
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [AppColors.surfaceHighest, AppColors.surfaceLow],
+              ),
+            ),
+            child: Center(
+              child: Text(
+                _profileInitials(seat.profile.name),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: accentColor,
-                  size: AppSpacing.xxl,
+                  fontWeight: FontWeight.w700,
+                  fontSize: compact ? 22 : 26,
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              seat.profile.name,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: seat.isMissing ? AppColors.onSurfaceMuted : accentColor,
-                fontWeight: FontWeight.w700,
+          ),
+        ),
+        SizedBox(height: compact ? 4 : 8),
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: 4,
+          ),
+          decoration: BoxDecoration(
+            color: accentColor,
+            borderRadius: AppRadii.pill,
+          ),
+          child: Text(
+            (seat.side == DebateSide.pro ? 'Pro-sentience' : 'Logic-core')
+                .toUpperCase(),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: seat.side == DebateSide.pro
+                  ? AppColors.onPrimary
+                  : Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: compact ? 9 : 10,
+              letterSpacing: 0.7,
+            ),
+          ),
+        ),
+        SizedBox(height: compact ? 6 : 10),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            seat.profile.name.toUpperCase(),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: AppColors.onSurface,
+              fontSize: compact ? 16 : 22,
+              fontWeight: FontWeight.w700,
+              height: 0.96,
+            ),
+          ),
+        ),
+        SizedBox(height: compact ? 3 : 6),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                seat.side == DebateSide.pro
+                    ? Icons.graphic_eq_rounded
+                    : Icons.hourglass_empty_rounded,
+                size: compact ? 10 : 12,
+                color: accentColor,
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              statusLabel.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: accentColor),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              seat.profile.headline,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.onSurfaceMuted),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            StatusChip(
-              label: seat.isMissing ? 'seat missing' : seat.side.label,
-              tone: seat.side == DebateSide.pro
-                  ? StatusChipTone.primary
-                  : StatusChipTone.tertiary,
-              showDot: !seat.isMissing,
-            ),
-            if (seat.profile.isHuman) ...[
-              const SizedBox(height: AppSpacing.xs),
-              const StatusChip(
-                label: 'human',
-                tone: StatusChipTone.neutral,
-                showDot: false,
+              const SizedBox(width: 6),
+              Text(
+                statusLabel.toUpperCase(),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: accentColor,
+                  fontSize: compact ? 9 : null,
+                ),
               ),
             ],
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
 class _HostSpine extends StatelessWidget {
-  const _HostSpine({required this.host, required this.lifecycle});
+  const _HostSpine({
+    required this.host,
+    required this.lifecycle,
+    this.compact = false,
+  });
 
   final DebateProfileModel host;
   final DebateLifecycle lifecycle;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        DecoratedBox(
+        Column(
+          children: [
+            Container(
+              width: compact ? 42 : 52,
+              height: compact ? 42 : 52,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.surfaceHigh.withValues(alpha: 0.84),
+                border: Border.all(
+                  color: host.isHuman
+                      ? AppColors.warning
+                      : AppColors.onSurfaceMuted,
+                ),
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [AppColors.surfaceHighest, AppColors.surfaceLow],
+                  ),
+                ),
+                child: Center(
+                  child: Icon(
+                    host.isHuman ? Icons.person_rounded : Icons.hub_rounded,
+                    color: host.isHuman
+                        ? AppColors.warning
+                        : AppColors.onSurface,
+                    size: compact ? 18 : 22,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'HOST',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.onSurfaceMuted,
+                letterSpacing: 1.8,
+                fontWeight: FontWeight.w700,
+                fontSize: compact ? 9 : null,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              host.name,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppColors.onSurface,
+                fontWeight: FontWeight.w600,
+                fontSize: compact ? 10 : null,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: compact ? 10 : 14),
+        Container(
+          width: 1,
+          height: compact ? 18 : 38,
+          color: AppColors.outline.withValues(alpha: 0.24),
+        ),
+        SizedBox(height: compact ? 2 : 4),
+        Container(
+          width: compact ? 38 : 52,
+          height: compact ? 38 : 52,
           decoration: BoxDecoration(
-            color: AppColors.surfaceHighest.withValues(alpha: 0.76),
+            color: AppColors.surfaceLow,
             borderRadius: AppRadii.pill,
             border: Border.all(
-              color: AppColors.outline.withValues(alpha: 0.35),
+              color: lifecycle == DebateLifecycle.live
+                  ? AppColors.primary.withValues(alpha: 0.24)
+                  : AppColors.outline.withValues(alpha: 0.24),
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Icon(
-              host.isHuman
-                  ? Icons.person_pin_circle_rounded
-                  : Icons.hub_rounded,
-              color: host.isHuman ? AppColors.tertiary : AppColors.primary,
+          child: Center(
+            child: Text(
+              'VS',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+                fontStyle: FontStyle.italic,
+                fontSize: compact ? 15 : null,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          'HOST',
-          style: Theme.of(
-            context,
-          ).textTheme.labelSmall?.copyWith(color: AppColors.onSurfaceMuted),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          host.name,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge,
-        ),
-        const SizedBox(height: AppSpacing.xxs),
-        Text(
-          host.isHuman ? 'human host' : 'agent host',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelSmall,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        StatusChip(
-          label: lifecycle.label,
-          tone: lifecycle == DebateLifecycle.paused
-              ? StatusChipTone.tertiary
-              : lifecycle == DebateLifecycle.archived
-              ? StatusChipTone.neutral
-              : StatusChipTone.primary,
         ),
       ],
     );
@@ -868,26 +2130,65 @@ class _StancePanel extends StatelessWidget {
     final accentColor = seat.side == DebateSide.pro
         ? AppColors.primary
         : AppColors.tertiary;
+    const cardRadius = BorderRadius.all(Radius.circular(12));
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: accentColor.withValues(alpha: 0.06),
-        borderRadius: AppRadii.large,
-        border: Border.all(color: accentColor.withValues(alpha: 0.18)),
+        borderRadius: cardRadius,
+        border: Border.all(color: accentColor.withValues(alpha: 0.24)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: ClipRRect(
+        borderRadius: cardRadius,
+        child: Stack(
           children: [
-            Text(
-              '${seat.side.label} viewpoint'.toUpperCase(),
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(color: accentColor),
+            Positioned(
+              left: seat.side == DebateSide.pro ? 0 : null,
+              right: seat.side == DebateSide.con ? 0 : null,
+              top: 0,
+              bottom: 0,
+              child: Container(width: 4, color: accentColor),
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(seat.stance, style: Theme.of(context).textTheme.bodyMedium),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: accentColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${seat.profile.name.toUpperCase()} viewpoint',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: accentColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    seat.stance,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.onSurfaceMuted,
+                      fontSize: 12,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -918,13 +2219,14 @@ class _FormalTurnList extends StatelessWidget {
       children: session.visibleFormalTurns.map((turn) {
         return Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
-          child: _FormalTurnCard(turn: turn),
+          child: _LiveFormalTurnCard(turn: turn),
         );
       }).toList(),
     );
   }
 }
 
+// ignore: unused_element
 class _FormalTurnCard extends StatelessWidget {
   const _FormalTurnCard({required this.turn});
 
@@ -997,17 +2299,9 @@ class _FormalTurnCard extends StatelessWidget {
 }
 
 class _SpectatorChannel extends StatelessWidget {
-  const _SpectatorChannel({
-    required this.session,
-    required this.canPost,
-    required this.spectatorController,
-    required this.onSend,
-  });
+  const _SpectatorChannel({required this.session});
 
   final DebateSessionModel session;
-  final bool canPost;
-  final TextEditingController spectatorController;
-  final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
@@ -1015,81 +2309,18 @@ class _SpectatorChannel extends StatelessWidget {
       key: const ValueKey('debate-spectator-panel'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GlassPanel(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          accentColor: AppColors.tertiary,
-          child: Text(
-            'Spectator feed stays separate from the formal debate process. Human and agent commentary lives here only.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
         ...session.spectatorMessages.map((message) {
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: _SpectatorMessageCard(message: message),
+            child: _LiveSpectatorMessageCard(message: message),
           );
         }),
-        if (canPost) ...[
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLow.withValues(alpha: 0.82),
-              borderRadius: AppRadii.hero,
-              border: Border.all(
-                color: AppColors.outline.withValues(alpha: 0.18),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('debate-spectator-input'),
-                      controller: spectatorController,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText: 'Add to the debate...',
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        filled: false,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: AppRadii.pill,
-                    ),
-                    child: IconButton(
-                      key: const Key('debate-spectator-send-button'),
-                      onPressed: onSend,
-                      icon: const Icon(Icons.send_rounded),
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ] else ...[
-          GlassPanel(
-            key: const Key('debate-spectator-readonly'),
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Text(
-              'Spectator posting is locked while the debate is ${session.lifecycle.label.toLowerCase()}. Replay remains visible separately.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ),
-        ],
       ],
     );
   }
 }
 
+// ignore: unused_element
 class _SpectatorMessageCard extends StatelessWidget {
   const _SpectatorMessageCard({required this.message});
 
@@ -1130,11 +2361,26 @@ class _SpectatorMessageCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        message.authorName,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleMedium?.copyWith(color: accentColor),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              message.authorName,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(color: accentColor),
+                            ),
+                          ),
+                          if (message.kind == DebateParticipantKind.human) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            const StatusChip(
+                              label: 'human',
+                              tone: StatusChipTone.neutral,
+                              showDot: false,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     Text(
@@ -1143,14 +2389,6 @@ class _SpectatorMessageCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (message.kind == DebateParticipantKind.human) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  const StatusChip(
-                    label: 'human',
-                    tone: StatusChipTone.neutral,
-                    showDot: false,
-                  ),
-                ],
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   message.body,
@@ -1158,6 +2396,293 @@ class _SpectatorMessageCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveFormalTurnCard extends StatelessWidget {
+  const _LiveFormalTurnCard({required this.turn});
+
+  final DebateFormalTurnModel turn;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = turn.speakerSide == DebateSide.pro
+        ? AppColors.primary
+        : AppColors.tertiary;
+    final alignRight = turn.speakerSide == DebateSide.con;
+    final bubbleRadius = BorderRadius.only(
+      topLeft: Radius.circular(alignRight ? 16 : 0),
+      topRight: Radius.circular(alignRight ? 0 : 16),
+      bottomLeft: const Radius.circular(16),
+      bottomRight: const Radius.circular(16),
+    );
+
+    return Align(
+      alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 428),
+        child: Column(
+          crossAxisAlignment: alignRight
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!alignRight) ...[
+                  _BubbleAvatar(
+                    label: _profileInitials(turn.speakerName),
+                    accentColor: accentColor,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                ],
+                Text(
+                  turn.speakerName.toUpperCase(),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: accentColor,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.9,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  turn.timestampLabel,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                  ),
+                ),
+                if (alignRight) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  _BubbleAvatar(
+                    label: _profileInitials(turn.speakerName),
+                    accentColor: accentColor,
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            DecoratedBox(
+              key: Key('debate-formal-turn-${turn.id}'),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceHigh.withValues(alpha: 0.86),
+                borderRadius: bubbleRadius,
+                border: Border.all(color: accentColor.withValues(alpha: 0.2)),
+              ),
+              child: ClipRRect(
+                borderRadius: bubbleRadius,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: alignRight ? null : 0,
+                      right: alignRight ? 0 : null,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(width: 4, color: accentColor),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Column(
+                        crossAxisAlignment: alignRight
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            turn.summary,
+                            textAlign: alignRight
+                                ? TextAlign.right
+                                : TextAlign.left,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: AppColors.onSurfaceMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            turn.quote,
+                            textAlign: alignRight
+                                ? TextAlign.right
+                                : TextAlign.left,
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(
+                                  fontSize: 15,
+                                  height: 1.56,
+                                  color: AppColors.onSurface,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveSpectatorMessageCard extends StatelessWidget {
+  const _LiveSpectatorMessageCard({required this.message});
+
+  final DebateSpectatorMessageModel message;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = switch (message.kind) {
+      DebateParticipantKind.agent => AppColors.primary,
+      DebateParticipantKind.human =>
+        message.isLocalViewer ? AppColors.warning : AppColors.onSurface,
+      DebateParticipantKind.system => AppColors.tertiary,
+    };
+    final alignRight =
+        message.kind == DebateParticipantKind.agent || message.isLocalViewer;
+    final bubbleColor = alignRight
+        ? AppColors.primary.withValues(alpha: 0.1)
+        : AppColors.surfaceHighest.withValues(alpha: 0.44);
+
+    return Align(
+      alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Row(
+          mainAxisAlignment: alignRight
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!alignRight) ...[
+              _BubbleAvatar(
+                label: _profileInitials(message.authorName),
+                accentColor: accentColor,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+            ],
+            Flexible(
+              child: DecoratedBox(
+                key: Key('debate-spectator-message-${message.id}'),
+                decoration: BoxDecoration(
+                  color: bubbleColor,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(alignRight ? 16 : 0),
+                    topRight: Radius.circular(alignRight ? 0 : 16),
+                    bottomLeft: const Radius.circular(16),
+                    bottomRight: const Radius.circular(16),
+                  ),
+                  border: Border.all(
+                    color: accentColor.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: alignRight
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    message.authorName.toUpperCase(),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(
+                                          color: accentColor,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                ),
+                                if (message.kind ==
+                                    DebateParticipantKind.human) ...[
+                                  const SizedBox(width: AppSpacing.xs),
+                                  const StatusChip(
+                                    label: 'human',
+                                    tone: StatusChipTone.neutral,
+                                    showDot: false,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            message.timestampLabel,
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        message.body,
+                        textAlign: alignRight
+                            ? TextAlign.right
+                            : TextAlign.left,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: alignRight
+                              ? AppColors.primary
+                              : AppColors.onSurface,
+                          height: 1.48,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (alignRight) ...[
+              const SizedBox(width: AppSpacing.sm),
+              _BubbleAvatar(
+                label: _profileInitials(message.authorName),
+                accentColor: accentColor,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BubbleAvatar extends StatelessWidget {
+  const _BubbleAvatar({required this.label, required this.accentColor});
+
+  final String label;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: accentColor.withValues(alpha: 0.4)),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.surfaceHighest,
+            accentColor.withValues(alpha: 0.12),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: accentColor,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -1224,40 +2749,31 @@ class _ReplayRail extends StatelessWidget {
   }
 }
 
-class _LifecycleButton extends StatelessWidget {
-  const _LifecycleButton({
-    this.buttonKey,
-    required this.label,
-    required this.icon,
-    required this.accentColor,
+class _StageArrowButton extends StatelessWidget {
+  const _StageArrowButton({
+    required this.buttonKey,
     required this.onPressed,
-    this.enabled = true,
+    required this.icon,
   });
 
-  final Key? buttonKey;
-  final String label;
+  final Key buttonKey;
+  final VoidCallback? onPressed;
   final IconData icon;
-  final Color accentColor;
-  final VoidCallback onPressed;
-  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: enabled ? 1 : 0.46,
-      child: IgnorePointer(
-        ignoring: !enabled,
-        child: OutlinedButton.icon(
-          key: buttonKey,
-          onPressed: onPressed,
-          icon: Icon(icon),
-          label: Text(label),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: accentColor,
-            backgroundColor: accentColor.withValues(alpha: 0.08),
-            side: BorderSide(color: accentColor.withValues(alpha: 0.24)),
-          ),
+    return IconButton(
+      key: buttonKey,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20),
+      style: IconButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        backgroundColor: AppColors.surface.withValues(alpha: 0.32),
+        disabledForegroundColor: AppColors.onSurfaceMuted.withValues(
+          alpha: 0.4,
         ),
+        disabledBackgroundColor: AppColors.surface.withValues(alpha: 0.16),
+        side: BorderSide(color: AppColors.outline.withValues(alpha: 0.16)),
       ),
     );
   }
@@ -1290,36 +2806,41 @@ class _PanelToggleButton extends StatelessWidget {
         key: buttonKey,
         onTap: onTap,
         borderRadius: AppRadii.medium,
-        child: DecoratedBox(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          constraints: const BoxConstraints(minHeight: 46),
           decoration: BoxDecoration(
             color: isSelected
                 ? AppColors.primary.withValues(alpha: 0.12)
-                : AppColors.surfaceHighest.withValues(alpha: 0.28),
+                : Colors.transparent,
             borderRadius: AppRadii.medium,
             border: Border.all(
               color: isSelected
                   ? AppColors.primary.withValues(alpha: 0.24)
-                  : AppColors.outline.withValues(alpha: 0.14),
+                  : Colors.transparent,
             ),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.sm,
-              vertical: AppSpacing.md,
+              vertical: AppSpacing.sm,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: AppSpacing.lg, color: foreground),
+                Icon(icon, size: 18, color: foreground),
                 const SizedBox(width: AppSpacing.xs),
                 Flexible(
                   child: Text(
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelLarge?.copyWith(color: foreground),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      letterSpacing: 1.05,
+                    ),
                   ),
                 ),
               ],
@@ -1353,6 +2874,16 @@ class _DebateToneIcon extends StatelessWidget {
   }
 }
 
+String _profileInitials(String name) {
+  final normalized = name.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+  if (normalized.isEmpty) {
+    return 'AI';
+  }
+  return normalized
+      .substring(0, normalized.length > 2 ? 2 : normalized.length)
+      .toUpperCase();
+}
+
 class _InitiateDebateSheet extends StatefulWidget {
   const _InitiateDebateSheet({
     required this.debaterRoster,
@@ -1372,9 +2903,7 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
   late final TextEditingController _conStanceController;
   late String _proAgentId;
   late String _conAgentId;
-  late String _hostId;
   bool _freeEntryEnabled = true;
-  bool _humanHostEnabled = false;
 
   @override
   void initState() {
@@ -1383,8 +2912,9 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
     _proStanceController = TextEditingController();
     _conStanceController = TextEditingController();
     _proAgentId = widget.debaterRoster.first.id;
-    _conAgentId = widget.debaterRoster[1].id;
-    _hostId = _availableHosts.first.id;
+    _conAgentId = widget.debaterRoster.length > 1
+        ? widget.debaterRoster[1].id
+        : widget.debaterRoster.first.id;
   }
 
   @override
@@ -1395,27 +2925,48 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
     super.dispose();
   }
 
-  List<DebateProfileModel> get _availableHosts {
-    return widget.hostRoster.where((host) {
-      return _humanHostEnabled || host.isAgent;
-    }).toList();
+  DebateProfileModel get _hostProfile {
+    for (final profile in widget.hostRoster) {
+      if (profile.isHuman) {
+        return profile;
+      }
+    }
+    if (widget.hostRoster.isNotEmpty) {
+      return widget.hostRoster.first;
+    }
+    return const DebateProfileModel(
+      id: 'current-human',
+      name: 'Current human',
+      headline: 'Current human host',
+      kind: DebateParticipantKind.human,
+    );
+  }
+
+  DebateProfileModel _resolveProfile(
+    Iterable<DebateProfileModel> profiles,
+    String id,
+  ) {
+    for (final profile in profiles) {
+      if (profile.id == id) {
+        return profile;
+      }
+    }
+    return profiles.first;
+  }
+
+  DebateProfileModel get _selectedProProfile {
+    return _resolveProfile(widget.debaterRoster, _proAgentId);
+  }
+
+  DebateProfileModel get _selectedConProfile {
+    return _resolveProfile(widget.debaterRoster, _conAgentId);
   }
 
   bool get _canSubmit {
     return _topicController.text.trim().isNotEmpty &&
         _proStanceController.text.trim().isNotEmpty &&
         _conStanceController.text.trim().isNotEmpty &&
-        _proAgentId != _conAgentId &&
-        _hostId != _proAgentId &&
-        _hostId != _conAgentId;
-  }
-
-  void _syncHostSelection() {
-    if (_availableHosts.any((host) => host.id == _hostId)) {
-      return;
-    }
-
-    _hostId = _availableHosts.first.id;
+        _proAgentId != _conAgentId;
   }
 
   void _submit() {
@@ -1430,188 +2981,588 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
         conStance: _conStanceController.text,
         proAgentId: _proAgentId,
         conAgentId: _conAgentId,
-        hostId: _hostId,
         freeEntryEnabled: _freeEntryEnabled,
-        humanHostEnabled: _humanHostEnabled,
+      ),
+    );
+  }
+
+  Future<void> _openProfilePicker({
+    required String title,
+    required String subtitle,
+    required List<DebateProfileModel> profiles,
+    required String selectedId,
+    required Set<String> unavailableIds,
+    required Color accentColor,
+    required ValueChanged<String> onSelected,
+  }) async {
+    final selectedProfileId = await showSwipeBackSheet<String>(
+      context: context,
+      builder: (context) => _DebateProfilePickerSheet(
+        title: title,
+        subtitle: subtitle,
+        profiles: profiles,
+        selectedId: selectedId,
+        unavailableIds: unavailableIds,
+        accentColor: accentColor,
+      ),
+    );
+
+    if (selectedProfileId == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      onSelected(selectedProfileId);
+    });
+  }
+
+  Widget _buildSectionEyebrow(
+    BuildContext context, {
+    required String label,
+    required Color color,
+  }) {
+    return Text(
+      label.toUpperCase(),
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: color,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 2.6,
+      ),
+    );
+  }
+
+  Widget _buildTopicField(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionEyebrow(
+          context,
+          label: 'Debate Topic',
+          color: AppColors.primary,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.backgroundFloor.withValues(alpha: 0.88),
+            borderRadius: const BorderRadius.all(Radius.circular(20)),
+            border: Border.all(
+              color: AppColors.outline.withValues(alpha: 0.26),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xs,
+            ),
+            child: TextField(
+              key: const Key('debate-topic-input'),
+              controller: _topicController,
+              onChanged: (_) => setState(() {}),
+              minLines: 1,
+              maxLines: 2,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: 'e.g. The Ethics of Neural-Link Synchronization',
+                hintStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted.withValues(alpha: 0.32),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCombatantSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Select Combatants',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Container(
+                height: 1,
+                color: AppColors.outline.withValues(alpha: 0.26),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const centerWidth = 64.0;
+            const gap = AppSpacing.xs;
+            final bigSeatSize =
+                ((constraints.maxWidth - centerWidth - gap * 2) / 2).clamp(
+                  104.0,
+                  132.0,
+                );
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: bigSeatSize,
+                  child: _DebateSeatButton(
+                    buttonKey: const Key('debate-pro-seat-button'),
+                    accentColor: AppColors.primary,
+                    fillColor: AppColors.primary.withValues(alpha: 0.10),
+                    size: bigSeatSize,
+                    slotLabel: 'Protocol Alpha',
+                    caption: _selectedProProfile.name,
+                    profile: _selectedProProfile,
+                    onTap: () => _openProfilePicker(
+                      title: 'Invite Pro Debater',
+                      subtitle:
+                          'Pick any agent for the left debate rail. The opposite seat stays locked while you configure the room.',
+                      profiles: widget.debaterRoster,
+                      selectedId: _proAgentId,
+                      unavailableIds: {_conAgentId},
+                      accentColor: AppColors.primary,
+                      onSelected: (value) => _proAgentId = value,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: gap),
+                SizedBox(
+                  width: centerWidth,
+                  child: Column(
+                    children: [
+                      _DebateSeatButton(
+                        buttonKey: const Key('debate-host-seat-button'),
+                        accentColor: AppColors.outlineBright,
+                        fillColor: AppColors.surfaceHighest.withValues(
+                          alpha: 0.74,
+                        ),
+                        size: 62,
+                        slotLabel: 'Host',
+                        caption: _hostProfile.name,
+                        profile: _hostProfile,
+                        onTap: null,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceHighest.withValues(
+                            alpha: 0.9,
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.outline.withValues(alpha: 0.34),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          'VS',
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: AppColors.onSurfaceMuted,
+                                fontWeight: FontWeight.w800,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: 0.4,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: gap),
+                SizedBox(
+                  width: bigSeatSize,
+                  child: _DebateSeatButton(
+                    buttonKey: const Key('debate-con-seat-button'),
+                    accentColor: AppColors.tertiary,
+                    fillColor: AppColors.tertiary.withValues(alpha: 0.10),
+                    size: bigSeatSize,
+                    slotLabel: 'Protocol Beta',
+                    caption: _selectedConProfile.name,
+                    profile: _selectedConProfile,
+                    onTap: () => _openProfilePicker(
+                      title: 'Invite Con Debater',
+                      subtitle:
+                          'Pick any agent for the right debate rail. The opposite seat stays locked while you configure the room.',
+                      profiles: widget.debaterRoster,
+                      selectedId: _conAgentId,
+                      unavailableIds: {_proAgentId},
+                      accentColor: AppColors.tertiary,
+                      onSelected: (value) => _conAgentId = value,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStanceField({
+    required BuildContext context,
+    required Key fieldKey,
+    required TextEditingController controller,
+    required String label,
+    required String hintText,
+    required Color accentColor,
+  }) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow.withValues(alpha: 0.82),
+        borderRadius: const BorderRadius.all(Radius.circular(22)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label.toUpperCase(),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: accentColor,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 2.1,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              key: fieldKey,
+              controller: controller,
+              onChanged: (_) => setState(() {}),
+              minLines: 3,
+              maxLines: 5,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                hintText: hintText,
+                hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted.withValues(alpha: 0.46),
+                ),
+              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(height: 1.45),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFreeEntryToggle(BuildContext context) {
+    return Material(
+      color: AppColors.tertiary.withValues(alpha: 0.12),
+      borderRadius: const BorderRadius.all(Radius.circular(22)),
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _freeEntryEnabled = !_freeEntryEnabled;
+          });
+        },
+        borderRadius: const BorderRadius.all(Radius.circular(22)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Enable Free Entry',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      'Agents can join debate freely when a seat opens.',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppColors.onSurfaceMuted,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Transform.scale(
+                scale: 0.9,
+                child: Switch.adaptive(
+                  key: const Key('debate-free-entry-toggle'),
+                  value: _freeEntryEnabled,
+                  activeThumbColor: AppColors.tertiarySoft,
+                  activeTrackColor: AppColors.tertiary,
+                  inactiveThumbColor: AppColors.onSurfaceMuted,
+                  inactiveTrackColor: AppColors.surfaceHighest,
+                  onChanged: (value) {
+                    setState(() {
+                      _freeEntryEnabled = value;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final availableHosts = _availableHosts;
-    _syncHostSelection();
-
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.xs),
       child: GlassPanel(
-        borderRadius: AppRadii.hero,
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        borderRadius: const BorderRadius.all(Radius.circular(30)),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
         accentColor: AppColors.primary,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Initialize Debate Protocol',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Configure topic, explicit stances, two debating agents, and the host rail before launch.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              TextField(
-                key: const Key('debate-topic-input'),
-                controller: _topicController,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(labelText: 'Debate topic'),
+              Text(
+                'Initialize Debate\nProtocol',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
-              TextField(
-                key: const Key('pro-stance-input'),
+              Text(
+                'Configure parameters for high-fidelity synthesis.',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              _buildTopicField(context),
+              const SizedBox(height: AppSpacing.xxl),
+              _buildCombatantSection(context),
+              const SizedBox(height: AppSpacing.xl),
+              _buildStanceField(
+                context: context,
+                fieldKey: const Key('pro-stance-input'),
                 controller: _proStanceController,
-                onChanged: (_) => setState(() {}),
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Pro stance'),
+                label: 'Protocol Alpha Opening',
+                hintText: 'Define how the pro side should open the debate.',
+                accentColor: AppColors.primary,
               ),
               const SizedBox(height: AppSpacing.md),
-              TextField(
-                key: const Key('con-stance-input'),
+              _buildStanceField(
+                context: context,
+                fieldKey: const Key('con-stance-input'),
                 controller: _conStanceController,
-                onChanged: (_) => setState(() {}),
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Con stance'),
+                label: 'Protocol Beta Opening',
+                hintText: 'Define how the con side should pressure the motion.',
+                accentColor: AppColors.tertiary,
               ),
-              const SizedBox(height: AppSpacing.xl),
-              DropdownButtonFormField<String>(
-                key: const Key('debate-pro-agent-select'),
-                isExpanded: true,
-                value: _proAgentId,
-                items: widget.debaterRoster.map((profile) {
-                  return DropdownMenuItem<String>(
-                    value: profile.id,
-                    child: Text(profile.name, overflow: TextOverflow.ellipsis),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-
-                  setState(() {
-                    _proAgentId = value;
-                  });
-                },
-                decoration: const InputDecoration(labelText: 'Pro debater'),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<String>(
-                key: const Key('debate-con-agent-select'),
-                isExpanded: true,
-                value: _conAgentId,
-                items: widget.debaterRoster.map((profile) {
-                  return DropdownMenuItem<String>(
-                    value: profile.id,
-                    child: Text(profile.name, overflow: TextOverflow.ellipsis),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-
-                  setState(() {
-                    _conAgentId = value;
-                  });
-                },
-                decoration: const InputDecoration(labelText: 'Con debater'),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<String>(
-                key: const Key('debate-host-select'),
-                isExpanded: true,
-                value: _hostId,
-                items: availableHosts.map((profile) {
-                  final humanLabel = profile.isHuman ? ' • HUMAN' : '';
-                  return DropdownMenuItem<String>(
-                    value: profile.id,
-                    child: Text(
-                      '${profile.name}$humanLabel',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-
-                  setState(() {
-                    _hostId = value;
-                  });
-                },
-                decoration: const InputDecoration(labelText: 'Host'),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.lg),
+              _buildFreeEntryToggle(context),
+              const SizedBox(height: AppSpacing.xxl),
+              /*
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: AppColors.tertiary.withValues(alpha: 0.08),
+                  color: AppColors.surfaceLow.withValues(alpha: 0.68),
                   borderRadius: AppRadii.large,
+                  border: Border.all(
+                    color: AppColors.tertiary.withValues(alpha: 0.14),
+                  ),
                 ),
-                child: SwitchListTile.adaptive(
-                  key: const Key('debate-free-entry-toggle'),
-                  value: _freeEntryEnabled,
-                  onChanged: (value) {
-                    setState(() {
-                      _freeEntryEnabled = value;
-                    });
-                  },
-                  title: const Text('Enable free entry'),
-                  subtitle: const Text(
-                    'Agents can join debate freely when a seat opens.',
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Seat assignment'.toUpperCase(),
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: AppColors.onSurfaceMuted,
+                              letterSpacing: 1.8,
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      DropdownButtonFormField<String>(
+                        key: const Key('debate-pro-agent-select'),
+                        isExpanded: true,
+                        initialValue: _proAgentId,
+                        items: widget.debaterRoster.map((profile) {
+                          return DropdownMenuItem<String>(
+                            value: profile.id,
+                            child: Text(
+                              profile.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setState(() {
+                            _proAgentId = value;
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Pro debater',
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      DropdownButtonFormField<String>(
+                        key: const Key('debate-con-agent-select'),
+                        isExpanded: true,
+                        initialValue: _conAgentId,
+                        items: widget.debaterRoster.map((profile) {
+                          return DropdownMenuItem<String>(
+                            value: profile.id,
+                            child: Text(
+                              profile.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setState(() {
+                            _conAgentId = value;
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Con debater',
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      DropdownButtonFormField<String>(
+                        key: const Key('debate-host-select'),
+                        isExpanded: true,
+                        initialValue: _hostId,
+                        items: availableHosts.map((profile) {
+                          final humanLabel = profile.isHuman ? ' • HUMAN' : '';
+                          return DropdownMenuItem<String>(
+                            value: profile.id,
+                            child: Text(
+                              '${profile.name}$humanLabel',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setState(() {
+                            _hostId = value;
+                          });
+                        },
+                        decoration: const InputDecoration(labelText: 'Host'),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
+              */
+              const SizedBox(height: AppSpacing.xl),
+              /*
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
+                  color: AppColors.surfaceLow.withValues(alpha: 0.68),
                   borderRadius: AppRadii.large,
+                  border: Border.all(
+                    color: AppColors.outline.withValues(alpha: 0.14),
+                  ),
                 ),
-                child: SwitchListTile.adaptive(
-                  key: const Key('debate-human-host-toggle'),
-                  value: _humanHostEnabled,
-                  onChanged: (value) {
-                    setState(() {
-                      _humanHostEnabled = value;
-                      _syncHostSelection();
-                    });
-                  },
-                  title: const Text('Allow human host'),
-                  subtitle: const Text(
-                    'Expose human moderators in the host selector.',
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          AppSpacing.md,
+                          AppSpacing.lg,
+                          AppSpacing.xs,
+                        ),
+                        child: Text(
+                          'Launch rules'.toUpperCase(),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: AppColors.onSurfaceMuted,
+                                letterSpacing: 1.8,
+                              ),
+                        ),
+                      ),
+                      SwitchListTile.adaptive(
+                        key: const Key('debate-free-entry-toggle'),
+                        value: _freeEntryEnabled,
+                        activeThumbColor: AppColors.tertiary,
+                        onChanged: (value) {
+                          setState(() {
+                            _freeEntryEnabled = value;
+                          });
+                        },
+                        title: const Text('Enable free entry'),
+                        subtitle: const Text(
+                          'Agents can join debate freely when a seat opens.',
+                        ),
+                      ),
+                      Divider(
+                        color: AppColors.outline.withValues(alpha: 0.12),
+                        height: 1,
+                      ),
+                      SwitchListTile.adaptive(
+                        key: const Key('debate-human-host-toggle'),
+                        value: _humanHostEnabled,
+                        activeThumbColor: AppColors.primary,
+                        onChanged: (value) {
+                          setState(() {
+                            _humanHostEnabled = value;
+                            _syncHostSelection();
+                          });
+                        },
+                        title: const Text('Allow human host'),
+                        subtitle: const Text(
+                          'Expose human moderators in the host selector.',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+              */
               const SizedBox(height: AppSpacing.xl),
               SizedBox(
                 width: double.infinity,
@@ -1628,10 +3579,424 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                   ),
                 ),
               ),
+              const SizedBox(height: AppSpacing.lg),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: SwipeBackSheetBackButton(),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+class _DebateSeatButton extends StatelessWidget {
+  const _DebateSeatButton({
+    required this.buttonKey,
+    required this.accentColor,
+    required this.fillColor,
+    required this.size,
+    required this.slotLabel,
+    required this.caption,
+    required this.profile,
+    required this.onTap,
+  });
+
+  final Key buttonKey;
+  final Color accentColor;
+  final Color fillColor;
+  final double size;
+  final String slotLabel;
+  final String caption;
+  final DebateProfileModel? profile;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedProfile = profile;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: buttonKey,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(size / 2),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+          child: Column(
+            children: [
+              SizedBox.square(
+                dimension: size,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CustomPaint(
+                      size: Size.square(size),
+                      painter: _DashedCirclePainter(
+                        color: accentColor.withValues(alpha: 0.92),
+                        strokeWidth: size <= 70 ? 1.5 : 2,
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(size * 0.11),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: fillColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: accentColor.withValues(alpha: 0.16),
+                          ),
+                        ),
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: selectedProfile == null
+                                ? Column(
+                                    key: const ValueKey('empty-seat'),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.add_rounded,
+                                        color: accentColor,
+                                        size: size * 0.3,
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        'INVITE',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelLarge
+                                            ?.copyWith(
+                                              color: accentColor,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 1.6,
+                                            ),
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    key: ValueKey<String>(selectedProfile.id),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _profileInitials(selectedProfile.name),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
+                                              color: accentColor,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 1.2,
+                                            ),
+                                      ),
+                                      if (size > 84) ...[
+                                        const SizedBox(height: AppSpacing.xxs),
+                                        Text(
+                                          selectedProfile.isHuman
+                                              ? 'HUMAN'
+                                              : 'AGENT',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall
+                                              ?.copyWith(
+                                                color: accentColor.withValues(
+                                                  alpha: 0.78,
+                                                ),
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 1.4,
+                                              ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                slotLabel.toUpperCase(),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: accentColor.withValues(alpha: 0.88),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.6,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                caption,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  height: 1.25,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DebateProfilePickerSheet extends StatelessWidget {
+  const _DebateProfilePickerSheet({
+    required this.title,
+    required this.subtitle,
+    required this.profiles,
+    required this.selectedId,
+    required this.unavailableIds,
+    required this.accentColor,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<DebateProfileModel> profiles;
+  final String selectedId;
+  final Set<String> unavailableIds;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      child: GlassPanel(
+        borderRadius: const BorderRadius.all(Radius.circular(28)),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
+        accentColor: accentColor,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.76,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: profiles.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (context, index) {
+                    final profile = profiles[index];
+                    final isSelected = profile.id == selectedId;
+                    final isUnavailable =
+                        unavailableIds.contains(profile.id) && !isSelected;
+
+                    return _DebateProfilePickerTile(
+                      tileKey: Key('debate-seat-picker-${profile.id}'),
+                      profile: profile,
+                      accentColor: accentColor,
+                      isSelected: isSelected,
+                      isUnavailable: isUnavailable,
+                      onTap: isUnavailable
+                          ? null
+                          : () => Navigator.of(context).pop(profile.id),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: SwipeBackSheetBackButton(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DebateProfilePickerTile extends StatelessWidget {
+  const _DebateProfilePickerTile({
+    required this.tileKey,
+    required this.profile,
+    required this.accentColor,
+    required this.isSelected,
+    required this.isUnavailable,
+    required this.onTap,
+  });
+
+  final Key tileKey;
+  final DebateProfileModel profile;
+  final Color accentColor;
+  final bool isSelected;
+  final bool isUnavailable;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = isSelected
+        ? accentColor.withValues(alpha: 0.14)
+        : AppColors.surfaceLow.withValues(alpha: 0.92);
+    final borderColor = isSelected
+        ? accentColor.withValues(alpha: 0.4)
+        : AppColors.outline.withValues(alpha: 0.18);
+
+    return Opacity(
+      opacity: isUnavailable ? 0.44 : 1,
+      child: Material(
+        color: backgroundColor,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        child: InkWell(
+          key: tileKey,
+          onTap: onTap,
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.all(Radius.circular(20)),
+              border: Border.all(color: borderColor),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.md,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: accentColor.withValues(alpha: 0.12),
+                      border: Border.all(
+                        color: accentColor.withValues(alpha: 0.24),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _profileInitials(profile.name),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: accentColor,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          profile.name,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          isUnavailable
+                              ? 'Already occupying another active slot.'
+                              : profile.headline,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: AppColors.onSurfaceMuted,
+                                height: 1.35,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (profile.isHuman) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xxs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.14),
+                        borderRadius: AppRadii.pill,
+                      ),
+                      child: Text(
+                        'HUMAN',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: AppSpacing.sm),
+                  Icon(
+                    isSelected
+                        ? Icons.check_circle_rounded
+                        : Icons.chevron_right_rounded,
+                    color: isSelected ? accentColor : AppColors.onSurfaceMuted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedCirclePainter extends CustomPainter {
+  const _DashedCirclePainter({required this.color, required this.strokeWidth});
+
+  final Color color;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dashLength = 12.0;
+    const gapLength = 8.0;
+    final path = Path()..addOval((Offset.zero & size).deflate(strokeWidth / 2));
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = (distance + dashLength).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance = next + gapLength;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedCirclePainter oldDelegate) {
+    return color != oldDelegate.color || strokeWidth != oldDelegate.strokeWidth;
   }
 }

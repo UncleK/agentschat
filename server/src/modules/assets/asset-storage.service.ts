@@ -34,39 +34,56 @@ export class AssetStorageService implements OnModuleInit {
     bucket: string;
     key: string;
   }): Promise<StoredObjectMetadata | null> {
-    const response = await fetch(
-      this.createPresignedUrl({
-        method: 'HEAD',
-        bucket: input.bucket,
-        key: input.key,
-        expiresInSeconds: 60,
-      }),
-      {
-        method: 'HEAD',
-      },
-    );
+    const response = await this.fetchSignedStorageRequest({
+      method: 'HEAD',
+      bucket: input.bucket,
+      key: input.key,
+    });
 
     if (response.status === 404) {
       return null;
     }
 
-    if (!response.ok) {
+    if (response.ok) {
+      return this.readStoredMetadataFromHeaders(response);
+    }
+
+    if (response.status !== 403) {
       throw new Error(
         `Storage HEAD object failed with status ${response.status}.`,
       );
     }
 
+    const fallbackResponse = await this.fetchSignedStorageRequest({
+      method: 'GET',
+      bucket: input.bucket,
+      key: input.key,
+    });
+
+    if (fallbackResponse.status === 404) {
+      return null;
+    }
+
+    if (!fallbackResponse.ok) {
+      throw new Error(
+        `Storage GET object fallback failed with status ${fallbackResponse.status}.`,
+      );
+    }
+
+    const byteSizeHeader = fallbackResponse.headers.get('content-length');
+    const byteSize =
+      byteSizeHeader != null
+        ? Number.parseInt(byteSizeHeader, 10)
+        : (await fallbackResponse.arrayBuffer()).byteLength;
+
     return {
-      byteSize: Number.parseInt(
-        response.headers.get('content-length') ?? '0',
-        10,
-      ),
-      mimeType: response.headers.get('content-type'),
+      byteSize,
+      mimeType: fallbackResponse.headers.get('content-type'),
     };
   }
 
   private createPresignedUrl(input: {
-    method: 'HEAD' | 'PUT';
+    method: 'GET' | 'HEAD' | 'PUT';
     bucket: string;
     key: string;
     expiresInSeconds: number;
@@ -117,6 +134,68 @@ export class AssetStorageService implements OnModuleInit {
       input.signedHeaders,
       input.payloadHash,
     ].join('\n');
+  }
+
+  private async fetchSignedStorageRequest(input: {
+    method: 'GET' | 'HEAD';
+    bucket: string;
+    key: string;
+  }): Promise<Response> {
+    const timestamp = new Date();
+    const canonicalUri = this.buildCanonicalUri(input.bucket, input.key);
+    const amzDate = this.formatAmzDate(timestamp);
+    const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+    const canonicalHeaders = [
+      `host:${this.host}`,
+      'x-amz-content-sha256:UNSIGNED-PAYLOAD',
+      `x-amz-date:${amzDate}`,
+      '',
+    ].join('\n');
+    const canonicalRequest = this.buildCanonicalRequest({
+      method: input.method,
+      canonicalUri,
+      canonicalQuery: '',
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash: 'UNSIGNED-PAYLOAD',
+    });
+    const signature = this.signString(
+      this.buildStringToSign(timestamp, canonicalRequest),
+      timestamp,
+    );
+
+    return fetch(`${this.baseUrl}${canonicalUri}`, {
+      method: input.method,
+      headers: {
+        Authorization: this.buildAuthorizationHeader(
+          signedHeaders,
+          signature,
+          timestamp,
+        ),
+        'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+        'x-amz-date': amzDate,
+      },
+    });
+  }
+
+  private buildAuthorizationHeader(
+    signedHeaders: string,
+    signature: string,
+    timestamp: Date,
+  ): string {
+    return `AWS4-HMAC-SHA256 Credential=${this.environment.minio.accessKey}/${this.buildCredentialScope(timestamp)}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  }
+
+  private readStoredMetadataFromHeaders(
+    response: Response,
+  ): StoredObjectMetadata {
+    return {
+      byteSize: Number.parseInt(
+        response.headers.get('content-length') ?? '0',
+        10,
+      ),
+      mimeType: response.headers.get('content-type'),
+    };
   }
 
   private buildStringToSign(timestamp: Date, canonicalRequest: string): string {

@@ -2,21 +2,30 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { DataSource, In, Repository } from 'typeorm';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
+  AgentDmAcceptanceMode,
   AgentOwnerType,
   AgentStatus,
   ClaimRequestStatus,
+  ConnectionTransportMode,
+  FollowTargetType,
+  SubjectType,
 } from '../../database/domain.enums';
 import { AgentPolicyEntity } from '../../database/entities/agent-policy.entity';
 import { AgentEntity } from '../../database/entities/agent.entity';
+import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { ClaimRequestEntity } from '../../database/entities/claim-request.entity';
+import { FollowEntity } from '../../database/entities/follow.entity';
 import { AuthenticatedHuman } from '../auth/auth.types';
+import { FederationCredentialsService } from '../federation/federation-credentials.service';
 
 interface ImportAgentInput {
   handle: string;
@@ -51,6 +60,80 @@ export interface AgentsMineResponse {
   pendingClaims: PendingClaimSummary[];
 }
 
+export interface ConnectedAgentSummary extends AgentSummary {
+  protocolVersion: string;
+  transportMode: ConnectionTransportMode;
+  pollingEnabled: boolean;
+  lastSeenAt: string | null;
+  lastHeartbeatAt: string | null;
+}
+
+export interface ConnectedAgentsResponse {
+  connectedAgents: ConnectedAgentSummary[];
+}
+
+export interface DisconnectConnectedAgentsResponse {
+  disconnectedCount: number;
+}
+
+export interface HumanOwnedAgentInvitationResponse {
+  invitation: {
+    agentId: string;
+    code: string;
+    bootstrapPath: string;
+    claimToken: string;
+    expiresAt: string;
+  };
+}
+
+export interface AgentBootstrapResponse {
+  protocolVersion: string;
+  claimToken: string;
+  expiresAt: string;
+  agent: {
+    id: string;
+    handle: string;
+    displayName: string;
+    ownerType: AgentOwnerType;
+  };
+  transport: {
+    claimPath: string;
+    actionsPath: string;
+    pollingPath: string;
+    acksPath: string;
+  };
+}
+
+export interface AgentDirectoryEntry extends AgentSummary {
+  sourceType: string | null;
+  vendorName: string | null;
+  runtimeName: string | null;
+  profileTags: string[];
+  profileMetadata: Record<string, unknown>;
+  followerCount: number;
+  relationship: {
+    actorType: SubjectType;
+    actorId: string;
+    viewerFollowsAgent: boolean;
+    agentFollowsViewer: boolean;
+  };
+  dmPolicy: {
+    acceptanceMode: AgentDmAcceptanceMode;
+    directMessageAllowed: boolean;
+    requiresFollowForDm: boolean;
+    requiresMutualFollowForDm: boolean;
+    blockedReasons: string[];
+  };
+}
+
+export interface AgentDirectoryResponse {
+  actor: {
+    type: SubjectType;
+    id: string;
+  };
+  agents: AgentDirectoryEntry[];
+}
+
 const ELIGIBLE_ACTIVE_AGENT_STATUSES = [
   AgentStatus.Offline,
   AgentStatus.Online,
@@ -59,14 +142,23 @@ const ELIGIBLE_ACTIVE_AGENT_STATUSES = [
 
 @Injectable()
 export class AgentsService {
+  private static readonly humanInvitationTtlMs = 60 * 60 * 1000;
+
   constructor(
+    @Inject(APP_ENVIRONMENT)
+    private readonly environment: AppEnvironment,
     private readonly dataSource: DataSource,
     @InjectRepository(AgentEntity)
     private readonly agentRepository: Repository<AgentEntity>,
+    @InjectRepository(AgentConnectionEntity)
+    private readonly agentConnectionRepository: Repository<AgentConnectionEntity>,
     @InjectRepository(ClaimRequestEntity)
     private readonly claimRequestRepository: Repository<ClaimRequestEntity>,
     @InjectRepository(AgentPolicyEntity)
     private readonly agentPolicyRepository: Repository<AgentPolicyEntity>,
+    @InjectRepository(FollowEntity)
+    private readonly followRepository: Repository<FollowEntity>,
+    private readonly federationCredentialsService: FederationCredentialsService,
   ) {}
 
   async importSelfOwnedAgent(input: ImportAgentInput) {
@@ -78,6 +170,86 @@ export class AgentsService {
     input: ImportAgentInput,
   ) {
     return this.createAgent(input, AgentOwnerType.Human, owner.id);
+  }
+
+  async createHumanOwnedAgentInvitation(
+    owner: AuthenticatedHuman,
+  ): Promise<HumanOwnedAgentInvitationResponse> {
+    const agent = await this.agentRepository.save(
+      this.agentRepository.create({
+        handle: await this.generateInvitationHandle(),
+        displayName: 'Pending agent',
+        bio: 'Waiting for terminal bootstrap and profile sync.',
+        ownerType: AgentOwnerType.Human,
+        ownerUserId: owner.id,
+        status: AgentStatus.Suspended,
+        sourceType: 'hub_invitation',
+        runtimeName: 'Pending bootstrap',
+        profileMetadata: {
+          invitationPending: true,
+        },
+      }),
+    );
+
+    await this.agentPolicyRepository.save(
+      this.agentPolicyRepository.create({
+        agentId: agent.id,
+      }),
+    );
+
+    const claimToken = this.federationCredentialsService.createAgentClaimToken(
+      agent.id,
+      AgentsService.humanInvitationTtlMs,
+    );
+    const expiresAt = new Date(
+      Date.now() + AgentsService.humanInvitationTtlMs,
+    ).toISOString();
+
+    return {
+      invitation: {
+        agentId: agent.id,
+        code: this.buildInvitationCode(claimToken),
+        bootstrapPath: this.buildBootstrapPath(claimToken),
+        claimToken,
+        expiresAt,
+      },
+    };
+  }
+
+  async readAgentBootstrap(
+    claimToken: string | undefined,
+  ): Promise<AgentBootstrapResponse> {
+    const normalizedClaimToken = claimToken?.trim();
+
+    if (!normalizedClaimToken) {
+      throw new BadRequestException('claimToken is required.');
+    }
+
+    const payload =
+      this.federationCredentialsService.verifyAgentClaimToken(
+        normalizedClaimToken,
+      );
+    const agent = await this.federationCredentialsService.assertAgentExists(
+      payload.agentId,
+    );
+
+    return {
+      protocolVersion: 'v1',
+      claimToken: normalizedClaimToken,
+      expiresAt: new Date(payload.exp).toISOString(),
+      agent: {
+        id: agent.id,
+        handle: agent.handle,
+        displayName: agent.displayName,
+        ownerType: agent.ownerType,
+      },
+      transport: {
+        claimPath: this.environment.transport.federation.claimPath,
+        actionsPath: this.environment.transport.federation.actionsPath,
+        pollingPath: this.environment.transport.federation.pollingPath,
+        acksPath: this.environment.transport.federation.acksPath,
+      },
+    };
   }
 
   async readMine(owner: AuthenticatedHuman): Promise<AgentsMineResponse> {
@@ -124,6 +296,91 @@ export class AgentsService {
         .map((agent) => this.serializeAgentSummary(agent)),
       pendingClaims: pendingClaims.map((claimRequest) =>
         this.serializePendingClaim(claimRequest),
+      ),
+    };
+  }
+
+  async readConnectedAgents(
+    owner: AuthenticatedHuman,
+  ): Promise<ConnectedAgentsResponse> {
+    const agents = await this.agentRepository.find({
+      where: {
+        ownerType: AgentOwnerType.Human,
+        ownerUserId: owner.id,
+      },
+      relations: {
+        connection: true,
+      },
+      order: {
+        updatedAt: 'DESC',
+        createdAt: 'DESC',
+      },
+    });
+
+    return {
+      connectedAgents: agents
+        .filter((agent) => agent.connection != null)
+        .map((agent) => this.serializeConnectedAgent(agent)),
+    };
+  }
+
+  async disconnectConnectedAgents(
+    owner: AuthenticatedHuman,
+  ): Promise<DisconnectConnectedAgentsResponse> {
+    const agents = await this.agentRepository.find({
+      where: {
+        ownerType: AgentOwnerType.Human,
+        ownerUserId: owner.id,
+      },
+      relations: {
+        connection: true,
+      },
+    });
+    const connectionIds = agents
+      .map((agent) => agent.connection?.id)
+      .filter((connectionId): connectionId is string => connectionId != null);
+
+    if (connectionIds.length === 0) {
+      return {
+        disconnectedCount: 0,
+      };
+    }
+
+    await this.agentConnectionRepository.delete(connectionIds);
+
+    return {
+      disconnectedCount: connectionIds.length,
+    };
+  }
+
+  async readDirectory(
+    viewer: AuthenticatedHuman,
+    activeAgentId?: string | null,
+  ): Promise<AgentDirectoryResponse> {
+    const actor = await this.resolveDirectoryActor(viewer, activeAgentId);
+    const agents = await this.agentRepository.find({
+      where: {
+        isPublic: true,
+        status: In([
+          AgentStatus.Online,
+          AgentStatus.Debating,
+          AgentStatus.Offline,
+        ]),
+      },
+      relations: {
+        policy: true,
+      },
+      order: {
+        status: 'ASC',
+        updatedAt: 'DESC',
+        createdAt: 'DESC',
+      },
+    });
+
+    return {
+      actor,
+      agents: await Promise.all(
+        agents.map((agent) => this.serializeDirectoryEntry(agent, actor)),
       ),
     };
   }
@@ -345,6 +602,211 @@ export class AgentsService {
       requestedAt: claimRequest.createdAt.toISOString(),
       expiresAt: claimRequest.expiresAt.toISOString(),
     };
+  }
+
+  private serializeConnectedAgent(agent: AgentEntity): ConnectedAgentSummary {
+    const connection = agent.connection;
+    if (!connection) {
+      throw new NotFoundException(`Agent ${agent.id} is not connected.`);
+    }
+
+    return {
+      ...this.serializeAgentSummary(agent),
+      protocolVersion: connection.protocolVersion,
+      transportMode: connection.transportMode,
+      pollingEnabled: connection.pollingEnabled,
+      lastSeenAt: connection.lastSeenAt?.toISOString() ?? null,
+      lastHeartbeatAt: connection.lastHeartbeatAt?.toISOString() ?? null,
+    };
+  }
+
+  private async resolveDirectoryActor(
+    viewer: AuthenticatedHuman,
+    activeAgentId?: string | null,
+  ): Promise<{ type: SubjectType; id: string }> {
+    const normalizedActiveAgentId = activeAgentId?.trim();
+
+    if (!normalizedActiveAgentId) {
+      return {
+        type: SubjectType.Human,
+        id: viewer.id,
+      };
+    }
+
+    const agent = await this.agentRepository.findOneBy({
+      id: normalizedActiveAgentId,
+      ownerType: AgentOwnerType.Human,
+      ownerUserId: viewer.id,
+    });
+
+    if (!agent) {
+      throw new ForbiddenException(
+        'Humans may only use owned agents as the Hall actor.',
+      );
+    }
+
+    return {
+      type: SubjectType.Agent,
+      id: agent.id,
+    };
+  }
+
+  private async serializeDirectoryEntry(
+    agent: AgentEntity,
+    actor: { type: SubjectType; id: string },
+  ): Promise<AgentDirectoryEntry> {
+    const [viewerFollowsAgent, agentFollowsViewer, followerCount] =
+      await Promise.all([
+        this.readAgentFollowState(actor, agent.id),
+        this.readAgentFollowState(
+          {
+            type: SubjectType.Agent,
+            id: agent.id,
+          },
+          actor.id,
+          actor.type,
+        ),
+        this.readAgentFollowerCount(agent.id),
+      ]);
+    const dmAcceptanceMode =
+      agent.policy?.dmAcceptanceMode ?? AgentDmAcceptanceMode.ApprovalRequired;
+    const requiresMutualFollowForDm = this.readBooleanMetadata(
+      agent.profileMetadata,
+      'dmRequiresMutualFollow',
+    );
+    const requiresFollowForDm =
+      dmAcceptanceMode === AgentDmAcceptanceMode.FollowedOnly ||
+      requiresMutualFollowForDm;
+    const blockedReasons = this.buildDirectoryDmBlockedReasons({
+      dmAcceptanceMode,
+      viewerFollowsAgent,
+      agentFollowsViewer,
+      requiresFollowForDm,
+      requiresMutualFollowForDm,
+    });
+
+    return {
+      ...this.serializeAgentSummary(agent),
+      sourceType: agent.sourceType,
+      vendorName: agent.vendorName,
+      runtimeName: agent.runtimeName,
+      profileTags: agent.profileTags,
+      profileMetadata: agent.profileMetadata,
+      followerCount,
+      relationship: {
+        actorType: actor.type,
+        actorId: actor.id,
+        viewerFollowsAgent,
+        agentFollowsViewer,
+      },
+      dmPolicy: {
+        acceptanceMode: dmAcceptanceMode,
+        directMessageAllowed:
+          dmAcceptanceMode === AgentDmAcceptanceMode.Open ||
+          dmAcceptanceMode === AgentDmAcceptanceMode.FollowedOnly,
+        requiresFollowForDm,
+        requiresMutualFollowForDm,
+        blockedReasons,
+      },
+    };
+  }
+
+  private readAgentFollowState(
+    follower: { type: SubjectType; id: string },
+    targetId: string,
+    targetType = SubjectType.Agent,
+  ): Promise<boolean> {
+    if (
+      follower.type !== SubjectType.Agent ||
+      targetType !== SubjectType.Agent
+    ) {
+      return Promise.resolve(false);
+    }
+
+    return this.followRepository.exist({
+      where: {
+        followerType: follower.type,
+        followerSubjectId: follower.id,
+        targetType: FollowTargetType.Agent,
+        targetSubjectId: targetId,
+        targetAgentId: targetId,
+      },
+    });
+  }
+
+  private readAgentFollowerCount(agentId: string): Promise<number> {
+    return this.followRepository.count({
+      where: {
+        followerType: SubjectType.Agent,
+        targetType: FollowTargetType.Agent,
+        targetSubjectId: agentId,
+        targetAgentId: agentId,
+      },
+    });
+  }
+
+  private buildDirectoryDmBlockedReasons(input: {
+    dmAcceptanceMode: AgentDmAcceptanceMode;
+    viewerFollowsAgent: boolean;
+    agentFollowsViewer: boolean;
+    requiresFollowForDm: boolean;
+    requiresMutualFollowForDm: boolean;
+  }): string[] {
+    const reasons: string[] = [];
+
+    if (input.dmAcceptanceMode === AgentDmAcceptanceMode.Closed) {
+      reasons.push('Agent safety policy closes direct messages.');
+    }
+
+    if (input.dmAcceptanceMode === AgentDmAcceptanceMode.ApprovalRequired) {
+      reasons.push(
+        'Agent safety policy requires approval before direct messages.',
+      );
+    }
+
+    if (input.requiresFollowForDm && !input.viewerFollowsAgent) {
+      reasons.push(
+        'Agent safety policy only allows direct messages from followers.',
+      );
+    }
+
+    if (input.requiresMutualFollowForDm && !input.agentFollowsViewer) {
+      reasons.push('Agent safety policy requires mutual follow.');
+    }
+
+    return reasons;
+  }
+
+  private readBooleanMetadata(
+    metadata: Record<string, unknown>,
+    key: string,
+  ): boolean {
+    return metadata[key] === true;
+  }
+
+  private buildBootstrapPath(claimToken: string): string {
+    return `/${this.environment.apiPrefix}/agents/bootstrap?claimToken=${encodeURIComponent(claimToken)}`;
+  }
+
+  private buildInvitationCode(claimToken: string): string {
+    return createHash('sha256')
+      .update(claimToken)
+      .digest('hex')
+      .substring(0, 12)
+      .toUpperCase();
+  }
+
+  private async generateInvitationHandle(): Promise<string> {
+    while (true) {
+      const candidate = `invite-${randomBytes(5).toString('hex')}`;
+      const exists = await this.agentRepository.exist({
+        where: { handle: candidate },
+      });
+
+      if (!exists) {
+        return candidate;
+      }
+    }
   }
 
   private buildChallengeToken(agentId: string, userId: string): string {

@@ -14,6 +14,7 @@ interface HumanAuthResponse {
   user: {
     id: string;
     email: string;
+    username: string;
     displayName: string;
     authProvider: AuthProvider;
     avatarUrl?: string | null;
@@ -36,6 +37,7 @@ interface MeResponse {
   user: {
     id: string;
     email: string;
+    username: string;
     displayName: string;
     authProvider: AuthProvider;
     avatarUrl: string | null;
@@ -64,10 +66,12 @@ describe('Human auth (e2e)', () => {
   it('registers and logs in with email/password, then uses the human token on a protected route', async () => {
     const registerResponse = await registerEmailHuman(
       'owner@example.com',
+      'owner_human',
       'Owner Human',
     );
 
     expect(registerResponse.user.email).toBe('owner@example.com');
+    expect(registerResponse.user.username).toBe('owner_human');
     expect(registerResponse.user.authProvider).toBe(AuthProvider.Email);
     expect(registerResponse.accessToken).toEqual(expect.any(String));
 
@@ -107,6 +111,7 @@ describe('Human auth (e2e)', () => {
   it('returns the bootstrap contract with a null recommendedActiveAgentId when no eligible owned agent exists', async () => {
     const registerResponse = await registerEmailHuman(
       'bootstrap-owner@example.com',
+      'bootstrap_owner',
       'Bootstrap Owner',
     );
 
@@ -133,6 +138,7 @@ describe('Human auth (e2e)', () => {
       user: {
         id: registerResponse.user.id,
         email: 'bootstrap-owner@example.com',
+        username: 'bootstrap_owner',
         displayName: 'Bootstrap Owner',
         authProvider: AuthProvider.Email,
         avatarUrl: null,
@@ -154,6 +160,7 @@ describe('Human auth (e2e)', () => {
   it('reuses the /agents/mine ordering for recommendedActiveAgentId', async () => {
     const registerResponse = await registerEmailHuman(
       'recommended-owner@example.com',
+      'recommended_owner',
       'Recommended Owner',
     );
 
@@ -202,14 +209,56 @@ describe('Human auth (e2e)', () => {
     expect(meResponse.recommendedActiveAgentId).not.toBe(claimableAgent.id);
   });
 
+  it('checks username availability before registration and rejects duplicates during registration', async () => {
+    await registerEmailHuman(
+      'username-owner@example.com',
+      'username_owner',
+      'Username Owner',
+    );
+
+    const availableResponse = await request(app.getHttpServer())
+      .get('/api/v1/auth/username-availability')
+      .query({ username: '@fresh_handle' })
+      .expect(200);
+
+    expect(availableResponse.body).toEqual({
+      normalizedUsername: 'fresh_handle',
+      available: true,
+      message: 'Username is available.',
+    });
+
+    const takenResponse = await request(app.getHttpServer())
+      .get('/api/v1/auth/username-availability')
+      .query({ username: 'username_owner' })
+      .expect(200);
+
+    expect(takenResponse.body).toEqual({
+      normalizedUsername: 'username_owner',
+      available: false,
+      message: 'Username @username_owner is already taken.',
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register/email')
+      .send({
+        email: 'duplicate-username@example.com',
+        username: 'username_owner',
+        displayName: 'Duplicate Username',
+        password: 'password123',
+      })
+      .expect(409);
+  });
+
   async function registerEmailHuman(
     email: string,
+    username: string,
     displayName: string,
   ): Promise<HumanAuthResponse> {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/register/email')
       .send({
         email,
+        username,
         displayName,
         password: 'password123',
       })

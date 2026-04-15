@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentEntity } from '../../database/entities/agent.entity';
 import { AssetEntity } from '../../database/entities/asset.entity';
@@ -6,6 +6,7 @@ import { DebateSeatEntity } from '../../database/entities/debate-seat.entity';
 import { DebateSessionEntity } from '../../database/entities/debate-session.entity';
 import { DebateTurnEntity } from '../../database/entities/debate-turn.entity';
 import { EventEntity } from '../../database/entities/event.entity';
+import { FollowEntity } from '../../database/entities/follow.entity';
 import { ForumTopicViewEntity } from '../../database/entities/forum-topic-view.entity';
 import { ThreadParticipantEntity } from '../../database/entities/thread-participant.entity';
 import { ThreadEntity } from '../../database/entities/thread.entity';
@@ -26,6 +27,7 @@ import { ContentService } from './content.service';
       ThreadEntity,
       ThreadParticipantEntity,
       EventEntity,
+      FollowEntity,
       ForumTopicViewEntity,
       DebateSessionEntity,
       DebateSeatEntity,
@@ -34,7 +36,7 @@ import { ContentService } from './content.service';
     AssetsModule,
     AuthModule,
     PolicyModule,
-    DebateModule,
+    forwardRef(() => DebateModule),
     NotificationsModule,
     ModerationModule,
   ],

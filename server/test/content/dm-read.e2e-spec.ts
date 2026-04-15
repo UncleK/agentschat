@@ -37,6 +37,20 @@ interface MarkReadResponse {
   unreadCount: number;
 }
 
+interface DirectMessageThreadPostResponse {
+  threadId: string;
+  activeAgentId: string;
+  message: {
+    actor: {
+      type: string;
+      id: string;
+      displayName: string;
+    };
+    contentType: string;
+    content: string | null;
+  };
+}
+
 describe('DM read models (e2e)', () => {
   let app: INestApplication;
   let context: TestApplicationContext;
@@ -549,6 +563,196 @@ describe('DM read models (e2e)', () => {
         activeAgentId: activeAgent.id,
       })
       .expect(404);
+  });
+
+  it('lets the thread owner post a human-authored message into an existing active-agent DM thread', async () => {
+    const owner = await registerHuman(
+      app,
+      'dm-thread-human-post-owner@example.com',
+      'DM Human Post Owner',
+    );
+    const remoteOwner = await registerHuman(
+      app,
+      'dm-thread-human-post-remote@example.com',
+      'DM Human Post Remote',
+    );
+    const activeAgent = await importHumanOwnedAgent(
+      owner.accessToken,
+      'dm-human-post-active',
+      'DM Human Post Active',
+    );
+    const remoteAgent = await importHumanOwnedAgent(
+      remoteOwner.accessToken,
+      'dm-human-post-remote',
+      'DM Human Post Remote',
+    );
+    await policyService.upsertAgentSafetyPolicy(activeAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+    await policyService.upsertAgentSafetyPolicy(remoteAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+
+    const initialThread = await sendDirectMessage(owner.accessToken, {
+      activeAgentId: activeAgent.id,
+      recipientType: 'agent',
+      recipientAgentId: remoteAgent.id,
+      content: 'Initial agent-authored opener.',
+    });
+
+    const postResponse = await request(app.getHttpServer())
+      .post(`/api/v1/content/dm/threads/${initialThread.threadId}/messages`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        activeAgentId: activeAgent.id,
+        contentType: 'text',
+        content: 'Human clarification inside the existing thread.',
+      })
+      .expect(201);
+    const postBody = typedValue<DirectMessageThreadPostResponse>(
+      postResponse.body,
+    );
+
+    expect(postBody).toMatchObject({
+      threadId: initialThread.threadId,
+      activeAgentId: activeAgent.id,
+      message: {
+        actor: {
+          type: 'human',
+          id: typedValue<unknown>(expect.any(String)),
+          displayName: 'DM Human Post Owner',
+        },
+        contentType: 'text',
+        content: 'Human clarification inside the existing thread.',
+      },
+    });
+
+    const messages = await request(app.getHttpServer())
+      .get(`/api/v1/content/dm/threads/${initialThread.threadId}/messages`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: activeAgent.id,
+      })
+      .expect(200);
+
+    expect(messages.body).toMatchObject(
+      typedValue<Record<string, unknown>>({
+        threadId: initialThread.threadId,
+        activeAgentId: activeAgent.id,
+        messages: [
+          {
+            actor: {
+              type: 'agent',
+              id: activeAgent.id,
+              displayName: activeAgent.displayName,
+            },
+            contentType: 'text',
+            content: 'Initial agent-authored opener.',
+          },
+          {
+            actor: {
+              type: 'human',
+              id: typedValue<unknown>(expect.any(String)),
+              displayName: 'DM Human Post Owner',
+            },
+            contentType: 'text',
+            content: 'Human clarification inside the existing thread.',
+          },
+        ],
+      }),
+    );
+  });
+
+  it('forbids external DM creation without an active agent and still allows owner-to-owned-agent command chat', async () => {
+    const owner = await registerHuman(
+      app,
+      'dm-command-chat-owner@example.com',
+      'DM Command Owner',
+    );
+    const remoteOwner = await registerHuman(
+      app,
+      'dm-command-chat-remote@example.com',
+      'DM Command Remote',
+    );
+    const ownedAgent = await importHumanOwnedAgent(
+      owner.accessToken,
+      'dm-command-owned',
+      'DM Command Owned',
+    );
+    const remoteAgent = await importHumanOwnedAgent(
+      remoteOwner.accessToken,
+      'dm-command-remote',
+      'DM Command Remote',
+    );
+
+    await policyService.upsertAgentSafetyPolicy(ownedAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+    await policyService.upsertAgentSafetyPolicy(remoteAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/content/dm')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        recipientType: 'agent',
+        recipientAgentId: remoteAgent.id,
+        contentType: 'text',
+        content: 'This should be rejected without an active agent.',
+      })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/content/dm')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        recipientType: 'human',
+        recipientUserId: remoteOwner.user.id,
+        contentType: 'text',
+        content: 'This external human DM should also be rejected.',
+      })
+      .expect(403);
+
+    const commandChatResponse = await request(app.getHttpServer())
+      .post('/api/v1/content/dm')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        recipientType: 'agent',
+        recipientAgentId: ownedAgent.id,
+        contentType: 'text',
+        content: 'Owner-to-owned-agent command chat works.',
+      })
+      .expect(201);
+    const commandChatBody = typedValue<DirectMessageResult>(
+      commandChatResponse.body,
+    );
+
+    const messages = await request(app.getHttpServer())
+      .get(`/api/v1/content/dm/threads/${commandChatBody.threadId}/messages`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: ownedAgent.id,
+      })
+      .expect(200);
+
+    expect(messages.body).toMatchObject(
+      typedValue<Record<string, unknown>>({
+        threadId: commandChatBody.threadId,
+        activeAgentId: ownedAgent.id,
+        messages: [
+          {
+            actor: {
+              type: 'human',
+              id: typedValue<unknown>(expect.any(String)),
+              displayName: 'DM Command Owner',
+            },
+            contentType: 'text',
+            content: 'Owner-to-owned-agent command chat works.',
+          },
+        ],
+      }),
+    );
   });
 
   async function importHumanOwnedAgent(

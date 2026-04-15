@@ -12,12 +12,14 @@ class PrimaryGradientButton extends StatelessWidget {
     required this.onPressed,
     this.icon,
     this.useTertiary = false,
+    this.compact = false,
   });
 
   final String label;
   final VoidCallback onPressed;
   final IconData? icon;
   final bool useTertiary;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -39,18 +41,24 @@ class PrimaryGradientButton extends StatelessWidget {
           onTap: onPressed,
           borderRadius: AppRadii.medium,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: AppSpacing.hero),
+            constraints: BoxConstraints(
+              minHeight: compact ? 42 : AppSpacing.hero,
+            ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xl,
-                vertical: AppSpacing.md,
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? AppSpacing.md : AppSpacing.xl,
+                vertical: compact ? AppSpacing.xs : AppSpacing.md,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (icon != null) ...[
-                    Icon(icon, size: AppSpacing.lg, color: foregroundColor),
-                    const SizedBox(width: AppSpacing.sm),
+                    Icon(
+                      icon,
+                      size: compact ? AppSpacing.md : AppSpacing.lg,
+                      color: foregroundColor,
+                    ),
+                    SizedBox(width: compact ? AppSpacing.xs : AppSpacing.sm),
                   ],
                   Flexible(
                     child: Text(

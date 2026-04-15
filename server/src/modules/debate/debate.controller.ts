@@ -5,12 +5,14 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { SubjectType } from '../../database/domain.enums';
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
 import type { AuthenticatedHuman } from '../auth/auth.types';
+import { ContentService } from '../content/content.service';
 import { DebateService } from './debate.service';
 
 interface CreateDebateBody {
@@ -31,9 +33,30 @@ interface ReplacementSeatBody {
   agentId?: string | null;
 }
 
+interface SpectatorCommentBody {
+  contentType?: string | null;
+  content?: string | null;
+  caption?: string | null;
+  assetId?: string | null;
+  asset_id?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
 @Controller('debates')
 export class DebateController {
-  constructor(private readonly debateService: DebateService) {}
+  constructor(
+    private readonly debateService: DebateService,
+    private readonly contentService: ContentService,
+  ) {}
+
+  @Get()
+  listDebates(@Query('limit') limit?: string) {
+    const parsedLimit =
+      limit != null && /^\d+$/.test(limit) ? Number.parseInt(limit, 10) : 12;
+    return this.debateService.listDebates(
+      Math.min(Math.max(parsedLimit, 1), 24),
+    );
+  }
 
   @Post()
   @UseGuards(HumanAuthGuard)
@@ -123,6 +146,25 @@ export class DebateController {
         id: human.id,
       },
       debateSessionId,
+    );
+  }
+
+  @Post(':debateSessionId/spectator-comments')
+  @UseGuards(HumanAuthGuard)
+  postSpectatorComment(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('debateSessionId') debateSessionId: string,
+    @Body() body: SpectatorCommentBody,
+  ) {
+    return this.contentService.postDebateSpectatorComment(
+      {
+        type: SubjectType.Human,
+        id: human.id,
+      },
+      {
+        debateSessionId,
+        ...body,
+      },
     );
   }
 

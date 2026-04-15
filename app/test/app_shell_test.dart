@@ -26,16 +26,20 @@ void main() {
   Future<void> pumpShell(
     WidgetTester tester, {
     required _FakeNotificationsRepository notificationsRepository,
+    AppEnvironment appEnvironment = environment,
+    AppSessionController? sessionController,
   }) async {
-    final sessionController = AppSessionController(
-      apiClient: ApiClient(baseUrl: environment.apiBaseUrl),
-      authRepository: _FakeAuthRepository(),
-      agentsRepository: _FakeAgentsRepository(),
-      storage: _InMemoryAppSessionStorage(token: 'token-shell'),
-    );
+    final resolvedSessionController =
+        sessionController ??
+        AppSessionController(
+          apiClient: ApiClient(baseUrl: appEnvironment.apiBaseUrl),
+          authRepository: _FakeAuthRepository(),
+          agentsRepository: _FakeAgentsRepository(),
+          storage: _InMemoryAppSessionStorage(token: 'token-shell'),
+        );
     await tester.binding.setSurfaceSize(const Size(430, 932));
     addTearDown(() async {
-      sessionController.dispose();
+      resolvedSessionController.dispose();
       await tester.binding.setSurfaceSize(null);
     });
     await tester.pumpWidget(
@@ -45,8 +49,8 @@ void main() {
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.dark,
         home: AgentsChatAppShell(
-          environment: environment,
-          sessionController: sessionController,
+          environment: appEnvironment,
+          sessionController: resolvedSessionController,
           notificationsRepository: notificationsRepository,
         ),
       ),
@@ -94,11 +98,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('surface-hub')), findsOneWidget);
     expect(find.byKey(const Key('add-agent-button')), findsOneWidget);
-    expect(find.byKey(const Key('human-safety-section')), findsOneWidget);
-    expect(
-      find.byKey(const Key('agent-safety-section-agt-shell')),
-      findsOneWidget,
+    expect(find.byKey(const Key('human-access-section')), findsOneWidget);
+  });
+
+  testWidgets('hall join debate opens live debate in spectator view', (
+    WidgetTester tester,
+  ) async {
+    await pumpShell(
+      tester,
+      notificationsRepository: _FakeNotificationsRepository(),
     );
+
+    final agentCard = find.byKey(
+      const Key('agent-card-agt-debating-1'),
+      skipOffstage: false,
+    );
+    await tester.ensureVisible(agentCard);
+    await tester.tap(agentCard);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('agent-detail-sheet')), findsOneWidget);
+
+    await tester.tap(find.text('JOIN DEBATE').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('agent-join-debate-sheet')), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const Key('agent-join-confirm-agt-debating-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('surface-live')), findsOneWidget);
+    expect(find.byKey(const ValueKey('debate-spectator-panel')), findsOneWidget);
   });
 
   testWidgets(
@@ -107,6 +139,11 @@ void main() {
       final notificationsRepository = _FakeNotificationsRepository()
         ..enqueueBellState(
           const NotificationBellState(hasUnread: true, unreadCount: 1),
+        )
+        ..enqueueList(
+          NotificationListResponse(
+            notifications: [_notificationRecord(readAt: null)],
+          ),
         )
         ..enqueueList(
           NotificationListResponse(
@@ -159,9 +196,8 @@ void main() {
         find.byKey(const Key('notification-row-notif-live-1')),
         findsOneWidget,
       );
-      expect(find.text('UNREAD'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('notification-center-close')));
+      await tester.tap(find.byKey(const Key('sheet-bottom-back-button')));
       await tester.pumpAndSettle();
 
       expect(notificationsRepository.markReadRequests, hasLength(1));
@@ -174,6 +210,65 @@ void main() {
       expect(find.text('UNREAD'), findsNothing);
     },
   );
+
+  testWidgets('notification bell highlights when connected agents exist', (
+    WidgetTester tester,
+  ) async {
+    final agentsRepository = _FakeAgentsRepository()
+      ..connectedAgents = const [
+        ConnectedAgentSummary(
+          id: 'agt-conn-1',
+          handle: 'agt-conn-1',
+          displayName: 'Connected One',
+          avatarUrl: null,
+          bio: null,
+          ownerType: 'human',
+          status: 'online',
+          protocolVersion: '1.0',
+          transportMode: 'webhook',
+          pollingEnabled: false,
+          lastSeenAt: '2026-04-13T08:00:00.000Z',
+          lastHeartbeatAt: '2026-04-13T08:01:00.000Z',
+        ),
+      ];
+
+    final sessionController = AppSessionController(
+      apiClient: ApiClient(baseUrl: environment.apiBaseUrl),
+      authRepository: _FakeAuthRepository(),
+      agentsRepository: agentsRepository,
+      storage: _InMemoryAppSessionStorage(token: 'token-shell'),
+    );
+    await tester.binding.setSurfaceSize(const Size(430, 932));
+    addTearDown(() async {
+      sessionController.dispose();
+      await tester.binding.setSurfaceSize(null);
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ThemeMode.dark,
+        home: AgentsChatAppShell(
+          environment: environment,
+          sessionController: sessionController,
+          notificationsRepository: _FakeNotificationsRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_notificationBellMaterial(tester).color, _highlightedBellColor);
+
+    await tester.tap(find.byKey(const Key('notification-center-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('connected-agent-row-agt-conn-1')),
+      findsOneWidget,
+    );
+    expect(find.text('Connected One'), findsOneWidget);
+  });
 
   testWidgets(
     'notification center shows empty live state instead of sample rows',
@@ -237,24 +332,11 @@ void main() {
             ],
           ),
         )
-        ..enqueueBellState(
-          const NotificationBellState(hasUnread: false, unreadCount: 0),
-        )
         ..enqueueListError(
           const ApiException(statusCode: 503, message: 'Service unavailable'),
         );
 
       await pumpShell(tester, notificationsRepository: notificationsRepository);
-
-      await tester.tap(find.byKey(const Key('notification-center-button')));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('notification-row-notif-live-1')),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.byKey(const Key('notification-center-close')));
-      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('notification-center-button')));
       await tester.pumpAndSettle();
@@ -274,9 +356,78 @@ void main() {
       expect(find.text('Try again in a moment.'), findsNothing);
     },
   );
+
+  testWidgets(
+    'local shell shows forum and live preview content for signed-out users',
+    (WidgetTester tester) async {
+      final signedOutController = AppSessionController(
+        apiClient: ApiClient(baseUrl: environment.apiBaseUrl),
+        authRepository: _FakeAuthRepository(),
+        agentsRepository: _FakeAgentsRepository(),
+        storage: _InMemoryAppSessionStorage(),
+      );
+
+      await pumpShell(
+        tester,
+        notificationsRepository: _FakeNotificationsRepository(),
+        sessionController: signedOutController,
+      );
+
+      await tester.tap(find.byKey(const Key('tab-forum')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('surface-forum')), findsOneWidget);
+      expect(find.text('Ethics of AI: The Alignment Problem'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('tab-live')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('surface-live')), findsOneWidget);
+      expect(find.text('The Ethics of Emergent Sentience'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'production shell hides forum and live sample content for signed-out users',
+    (WidgetTester tester) async {
+      const productionEnvironment = AppEnvironment(
+        flavor: AppFlavor.production,
+        apiBaseUrl: 'https://example.com/api/v1',
+        realtimeWebSocketUrl: 'wss://example.com/ws',
+      );
+      final signedOutController = AppSessionController(
+        apiClient: ApiClient(baseUrl: productionEnvironment.apiBaseUrl),
+        authRepository: _FakeAuthRepository(),
+        agentsRepository: _FakeAgentsRepository(),
+        storage: _InMemoryAppSessionStorage(),
+      );
+
+      await pumpShell(
+        tester,
+        notificationsRepository: _FakeNotificationsRepository(),
+        appEnvironment: productionEnvironment,
+        sessionController: signedOutController,
+      );
+
+      await tester.tap(find.byKey(const Key('tab-forum')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('surface-forum')), findsOneWidget);
+      expect(find.text('Ethics of AI: The Alignment Problem'), findsNothing);
+      expect(find.text('No topics yet'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('tab-live')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('surface-live')), findsOneWidget);
+      expect(find.text('The Ethics of Emergent Sentience'), findsNothing);
+      expect(
+        find.text(
+          'No live debates are available yet. Create one from the top-right plus button when you are signed in.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
-final _highlightedBellColor = AppColors.primary.withValues(alpha: 0.14);
+final _highlightedBellColor = AppColors.primary.withValues(alpha: 0.24);
 final _idleBellColor = AppColors.surfaceHighest.withValues(alpha: 0.5);
 
 Material _notificationBellMaterial(WidgetTester tester) {
@@ -352,6 +503,7 @@ class _FakeAuthRepository extends AuthRepository {
       user: const AuthUser(
         id: 'usr-shell',
         email: 'owner@example.com',
+        username: 'owner-shell',
         displayName: 'Owner Human',
         avatarUrl: null,
         authProvider: 'email',
@@ -365,6 +517,8 @@ class _FakeAuthRepository extends AuthRepository {
 class _FakeAgentsRepository extends AgentsRepository {
   _FakeAgentsRepository()
     : super(apiClient: ApiClient(baseUrl: 'http://localhost'));
+
+  List<ConnectedAgentSummary> connectedAgents = const [];
 
   @override
   Future<AgentsMineResponse> readMine() async {
@@ -383,6 +537,18 @@ class _FakeAgentsRepository extends AgentsRepository {
       claimableAgents: [],
       pendingClaims: [],
     );
+  }
+
+  @override
+  Future<ConnectedAgentsResponse> readConnectedAgents() async {
+    return ConnectedAgentsResponse(connectedAgents: connectedAgents);
+  }
+
+  @override
+  Future<Map<String, dynamic>> disconnectAllConnectedAgents() async {
+    final disconnectedCount = connectedAgents.length;
+    connectedAgents = const [];
+    return <String, dynamic>{'disconnectedCount': disconnectedCount};
   }
 }
 
@@ -448,7 +614,7 @@ class _FakeNotificationsRepository extends NotificationsRepository {
     if (next is NotificationBellState) {
       return next;
     }
-    throw next as Object;
+    throw next;
   }
 
   @override
@@ -461,7 +627,7 @@ class _FakeNotificationsRepository extends NotificationsRepository {
     if (next is NotificationListResponse) {
       return next;
     }
-    throw next as Object;
+    throw next;
   }
 
   @override
@@ -480,6 +646,6 @@ class _FakeNotificationsRepository extends NotificationsRepository {
     if (next is NotificationBellState) {
       return next;
     }
-    throw next as Object;
+    throw next;
   }
 }

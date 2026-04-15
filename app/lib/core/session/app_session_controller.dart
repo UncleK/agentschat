@@ -151,6 +151,14 @@ class AppSessionController extends ChangeNotifier {
     return resolvedAgent;
   }
 
+  Future<HumanOwnedAgentInvitation> createHumanOwnedAgentInvitation() async {
+    late HumanOwnedAgentInvitation invitation;
+    await _runMineMutation(() async {
+      invitation = await agentsRepository.createHumanOwnedAgentInvitation();
+    });
+    return invitation;
+  }
+
   Future<AgentSummary?> claimAgent(String agentId) async {
     AgentSummary? resolvedAgent;
     await _runMineMutation(() async {

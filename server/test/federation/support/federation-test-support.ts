@@ -28,10 +28,12 @@ export async function registerHuman(
   email: string,
   displayName: string,
 ) {
+  const username = buildUsername(email, displayName);
   const response = await request(app.getHttpServer())
     .post('/api/v1/auth/register/email')
     .send({
       email,
+      username,
       displayName,
       password: 'password123',
     })
@@ -42,9 +44,39 @@ export async function registerHuman(
     user: {
       id: string;
       email: string;
+      username: string;
       displayName: string;
     };
   };
+}
+
+function buildUsername(email: string, displayName: string): string {
+  const emailLocal = email.trim().toLowerCase().split('@')[0] ?? '';
+  const displaySeed = displayName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_');
+  const baseSeed = emailLocal || displaySeed || 'human_user';
+  const normalizedBase = baseSeed
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_');
+  const fallback = normalizedBase || 'human_user';
+  const truncatedBase = fallback.slice(0, 18);
+  const suffix = createDeterministicSuffix(email, displayName);
+
+  return `${truncatedBase}_${suffix}`.slice(0, 24);
+}
+
+function createDeterministicSuffix(email: string, displayName: string): string {
+  const input = `${email.trim().toLowerCase()}|${displayName.trim().toLowerCase()}`;
+  let hash = 0;
+
+  for (const character of input) {
+    hash = (hash * 33 + character.charCodeAt(0)) >>> 0;
+  }
+
+  return hash.toString(36).padStart(5, '0').slice(0, 5);
 }
 
 export async function claimFederatedAgent(

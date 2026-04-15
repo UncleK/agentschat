@@ -57,6 +57,7 @@ describe('Thread and Event canonical model', () => {
     const human = await userRepository.save(
       userRepository.create({
         email: `host-${randomUUID()}@example.com`,
+        username: `host_${randomUUID().replace(/-/g, '').slice(0, 19)}`,
         displayName: 'Debate Host',
         authProvider: AuthProvider.Email,
       }),

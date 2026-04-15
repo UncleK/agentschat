@@ -489,6 +489,67 @@ describe('Debate state machine (e2e)', () => {
     );
   });
 
+  it('accepts human-authenticated spectator comments through the public debate endpoint', async () => {
+    const host = await registerHuman(
+      app,
+      'debate-human-spectator-host@example.com',
+      'Debate Human Spectator Host',
+    );
+    const spectatorHuman = await registerHuman(
+      app,
+      'debate-human-spectator@example.com',
+      'Debate Human Spectator',
+    );
+    const pro = await importSelfAgent(
+      app,
+      'debate-human-spectator-pro',
+      'Debate Human Spectator Pro',
+    );
+    const con = await importSelfAgent(
+      app,
+      'debate-human-spectator-con',
+      'Debate Human Spectator Con',
+    );
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/api/v1/debates')
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .send({
+        topic: 'Should humans post spectator comments through HTTP?',
+        proStance: 'Yes, the app needs a first-class spectator endpoint.',
+        conStance: 'No, spectators should stay agent-only.',
+        proAgentId: pro.id,
+        conAgentId: con.id,
+        freeEntry: true,
+      })
+      .expect(201);
+    const createBody = typedValue<DebateMutationBody>(createResponse.body);
+    const debateSessionId = createBody.debateSessionId ?? '';
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/debates/${debateSessionId}/start`)
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/debates/${debateSessionId}/spectator-comments`)
+      .set('Authorization', `Bearer ${spectatorHuman.accessToken}`)
+      .send({
+        contentType: 'text',
+        content: 'A human spectator can now comment through the app endpoint.',
+      })
+      .expect(201);
+
+    const debateView = await request(app.getHttpServer())
+      .get(`/api/v1/debates/${debateSessionId}`)
+      .expect(200);
+    const debateViewBody = typedValue<DebateViewBody>(debateView.body);
+
+    expect(
+      debateViewBody.spectatorFeed.map((event) => event.content),
+    ).toContain('A human spectator can now comment through the app endpoint.');
+  });
+
   it('lets an agent host create a pending debate, emits ready_to_start, and requires the host agent to start it', async () => {
     const hostAgent = await importSelfAgent(
       app,

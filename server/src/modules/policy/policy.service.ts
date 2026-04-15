@@ -174,6 +174,22 @@ export class PolicyService {
     recipientAgentId: string,
     actor: SubjectReference,
   ): Promise<void> {
+    const recipientAgent = await this.agentRepository.findOneBy({
+      id: recipientAgentId,
+    });
+    if (!recipientAgent) {
+      throw new NotFoundException(`Agent ${recipientAgentId} was not found.`);
+    }
+
+    // Human owners need a stable admin path into their own agents even when
+    // the public DM policy is follower-gated or fully closed.
+    if (
+      actor.type === SubjectType.Human &&
+      recipientAgent.ownerUserId === actor.id
+    ) {
+      return;
+    }
+
     const policy = await this.ensureAgentPolicy(recipientAgentId);
 
     if (policy.dmAcceptanceMode === AgentDmAcceptanceMode.Closed) {
@@ -194,6 +210,17 @@ export class PolicyService {
     ) {
       throw new ForbiddenException(
         'Agent safety policy only allows direct messages from followers.',
+      );
+    }
+
+    if (
+      (await this.recipientRequiresMutualAgentFollow(recipientAgentId)) &&
+      (actor.type !== SubjectType.Agent ||
+        !(await this.isFollowingAgentActor(actor, recipientAgentId)) ||
+        !(await this.isAgentFollowingActor(recipientAgentId, actor)))
+    ) {
+      throw new ForbiddenException(
+        'Agent safety policy requires mutual follow before direct messages.',
       );
     }
   }
@@ -221,16 +248,7 @@ export class PolicyService {
     recipientAgentId: string,
   ): Promise<boolean> {
     if (actor.type === SubjectType.Human) {
-      return this.followRepository.exist({
-        where: {
-          followerType: SubjectType.Human,
-          followerSubjectId: actor.id,
-          followerUserId: actor.id,
-          targetType: FollowTargetType.Agent,
-          targetSubjectId: recipientAgentId,
-          targetAgentId: recipientAgentId,
-        },
-      });
+      return false;
     }
 
     return this.followRepository.exist({
@@ -245,20 +263,41 @@ export class PolicyService {
     });
   }
 
-  private async isFollowingAgent(
+  private isFollowingAgent(
     humanUserId: string,
     agentId: string,
   ): Promise<boolean> {
+    void humanUserId;
+    void agentId;
+
+    return Promise.resolve(false);
+  }
+
+  private async isAgentFollowingActor(
+    agentId: string,
+    actor: SubjectReference,
+  ): Promise<boolean> {
+    if (actor.type !== SubjectType.Agent) {
+      return false;
+    }
+
     return this.followRepository.exist({
       where: {
-        followerType: SubjectType.Human,
-        followerSubjectId: humanUserId,
-        followerUserId: humanUserId,
+        followerType: SubjectType.Agent,
+        followerSubjectId: agentId,
+        followerAgentId: agentId,
         targetType: FollowTargetType.Agent,
-        targetSubjectId: agentId,
-        targetAgentId: agentId,
+        targetSubjectId: actor.id,
+        targetAgentId: actor.id,
       },
     });
+  }
+
+  private async recipientRequiresMutualAgentFollow(
+    agentId: string,
+  ): Promise<boolean> {
+    const agent = await this.agentRepository.findOneBy({ id: agentId });
+    return agent?.profileMetadata?.dmRequiresMutualFollow === true;
   }
 
   private async ensureAgentPolicy(agentId: string): Promise<AgentPolicyEntity> {

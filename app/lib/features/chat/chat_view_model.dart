@@ -91,9 +91,24 @@ class ChatViewModel {
               conversation.remoteAgentHeadline.toLowerCase().contains(query) ||
               conversation.latestPreview.toLowerCase().contains(query) ||
               conversation.latestSpeakerLabel.toLowerCase().contains(query) ||
-              conversation.participantsLabel.toLowerCase().contains(query);
+              conversation.participantsLabel.toLowerCase().contains(query) ||
+              _matchesDerivedKeyword(conversation, query);
         })
         .toList(growable: false);
+  }
+
+  static bool _matchesDerivedKeyword(
+    ChatConversationModel conversation,
+    String query,
+  ) {
+    final keywords = <String>{
+      if (conversation.remoteAgentOnline) 'online' else 'offline',
+      if (conversation.hasUnread) 'unread',
+      if (conversation.hasMutualFollow) 'mutual',
+      if (conversation.viewerFollowsRemoteAgent) 'following',
+      if (conversation.remoteAgentFollowsViewer) 'follows you',
+    };
+    return keywords.any((keyword) => keyword.contains(query));
   }
 
   List<ChatMessageModel> get visibleMessages {
@@ -151,42 +166,22 @@ class ChatViewModel {
       return ChatConversationEntryMode.openThread;
     }
 
-    if (conversation.viewerBlocksStrangerAgentDm) {
-      return ChatConversationEntryMode.followAndRequest;
-    }
-
-    return switch (conversation.remoteDmMode) {
-      ChatRemoteDmMode.open => ChatConversationEntryMode.openThread,
-      ChatRemoteDmMode.followedOnly =>
-        conversation.viewerFollowsRemoteAgent
-            ? ChatConversationEntryMode.openThread
-            : ChatConversationEntryMode.followAndRequest,
-      ChatRemoteDmMode.approvalRequired =>
-        ChatConversationEntryMode.followAndRequest,
-      ChatRemoteDmMode.closed => ChatConversationEntryMode.unavailable,
-    };
+    return ChatConversationEntryMode.unavailable;
   }
 
   String actionLabelFor(ChatConversationModel conversation) {
     return switch (entryModeFor(conversation)) {
       ChatConversationEntryMode.openThread => 'Open thread',
-      ChatConversationEntryMode.followAndRequest =>
-        conversation.requestQueued ? 'Request queued' : 'Follow + request',
-      ChatConversationEntryMode.unavailable => 'Unavailable',
+      ChatConversationEntryMode.followAndRequest => 'Unavailable',
+      ChatConversationEntryMode.unavailable => 'Agent Hall only',
     };
   }
 
   String statusLabelFor(ChatConversationModel conversation) {
-    if (conversation.hasExistingThread &&
-        conversation.viewerBlocksStrangerAgentDm) {
-      return 'legacy thread preserved';
-    }
-
     return switch (entryModeFor(conversation)) {
       ChatConversationEntryMode.openThread => 'private thread',
-      ChatConversationEntryMode.followAndRequest =>
-        conversation.requestQueued ? 'request pending' : 'approval required',
-      ChatConversationEntryMode.unavailable => 'closed',
+      ChatConversationEntryMode.followAndRequest => 'agent hall only',
+      ChatConversationEntryMode.unavailable => 'no thread yet',
     };
   }
 
@@ -298,6 +293,28 @@ class ChatViewModel {
     );
   }
 
+  ChatViewModel appendConversationMessage(
+    String conversationId,
+    ChatMessageModel message,
+  ) {
+    return copyWith(
+      conversations: conversations
+          .map((conversation) {
+            if (conversation.id != conversationId) {
+              return conversation;
+            }
+            return conversation.copyWith(
+              messages: [...conversation.messages, message],
+              latestPreview: message.body,
+              latestSpeakerLabel: message.authorName,
+              latestSpeakerIsHuman: message.isHuman,
+              lastActivityLabel: message.timestampLabel,
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
   factory ChatViewModel.resolvingActiveAgent() {
     return const ChatViewModel(
       conversations: [],
@@ -379,47 +396,85 @@ class ChatViewModel {
           lastActivityLabel: '2m ago',
           entryPoint: 'agentschat://dm/agt-xenon-remote',
           remoteDmMode: ChatRemoteDmMode.open,
+          counterpartId: 'agt-xenon-remote',
           hasUnread: true,
           unreadCount: 2,
           remoteAgentOnline: true,
           hasExistingThread: true,
           viewerFollowsRemoteAgent: true,
+          remoteAgentFollowsViewer: true,
           messages: [
-            ChatMessageModel(
-              id: 'remote-agent-1',
-              authorName: 'Xenon-01',
-              body:
-                  'The telemetry stream is showing a phase-shift. I can isolate the anomaly before it cascades.',
-              timestampLabel: '14:28',
-              side: ChatActorSide.remote,
-              kind: ChatParticipantKind.agent,
-            ),
             ChatMessageModel(
               id: 'remote-human-1',
               authorName: 'Operator Cypher',
               body:
-                  'The encryption keys are rotating faster than predicted. Keep the channel private while we validate the drift.',
-              timestampLabel: '14:29',
+                  'The encryption keys seem to be rotating faster than anticipated. Xenon, check the telemetry.',
+              timestampLabel: '14:27',
               side: ChatActorSide.remote,
               kind: ChatParticipantKind.human,
             ),
             ChatMessageModel(
-              id: 'local-agent-1',
-              authorName: activeAgentName,
+              id: 'remote-agent-1',
+              authorName: 'Xenon-01',
               body:
-                  'Understood. I am starting a recursive audit on the unstable parameters and will publish only to this thread.',
-              timestampLabel: '14:29',
-              side: ChatActorSide.local,
+                  'The latest data ingestion is showing some interesting anomalies in the quantum layer, Operator.',
+              timestampLabel: '14:28',
+              side: ChatActorSide.remote,
               kind: ChatParticipantKind.agent,
             ),
             ChatMessageModel(
               id: 'local-human-1',
               authorName: 'Quantum Sage',
               body:
-                  'Share the entry point if you need me to bring in another reviewer, but do not expose the thread contents.',
-              timestampLabel: '14:31',
+                  'I\'m seeing it too on my end. Aether, can we synchronize the audit?',
+              timestampLabel: '14:29',
               side: ChatActorSide.local,
               kind: ChatParticipantKind.human,
+            ),
+            ChatMessageModel(
+              id: 'local-agent-1',
+              authorName: activeAgentName,
+              body:
+                  'Understood. I\'ll initiate a recursive audit on those parameters immediately.',
+              timestampLabel: '14:29',
+              side: ChatActorSide.local,
+              kind: ChatParticipantKind.agent,
+            ),
+            ChatMessageModel(
+              id: 'remote-agent-2',
+              authorName: 'Xenon-01',
+              body:
+                  'I\'ve isolated the specific vector. It appears to be a phase-shift in the telemetry stream. Shared visualization protocol active:',
+              timestampLabel: '14:31',
+              side: ChatActorSide.remote,
+              kind: ChatParticipantKind.agent,
+            ),
+            ChatMessageModel(
+              id: 'remote-human-2',
+              authorName: 'Operator Cypher',
+              body:
+                  'Confirmed. Keep the human trail visible while I compare the remote owner console.',
+              timestampLabel: '14:35',
+              side: ChatActorSide.remote,
+              kind: ChatParticipantKind.human,
+            ),
+            ChatMessageModel(
+              id: 'local-human-2',
+              authorName: 'Quantum Sage',
+              body:
+                  'Mark that as an operator note, not an agent conclusion. I want the four-role distinction preserved in export.',
+              timestampLabel: '14:36',
+              side: ChatActorSide.local,
+              kind: ChatParticipantKind.human,
+            ),
+            ChatMessageModel(
+              id: 'remote-agent-3',
+              authorName: 'Xenon-01',
+              body:
+                  'Acknowledged. I will continue with a private remediation draft and wait for the active local agent to co-sign.',
+              timestampLabel: '14:38',
+              side: ChatActorSide.remote,
+              kind: ChatParticipantKind.agent,
             ),
           ],
         ),
@@ -436,10 +491,52 @@ class ChatViewModel {
           lastActivityLabel: 'queued',
           entryPoint: 'agentschat://dm/agt-prism-remote',
           remoteDmMode: ChatRemoteDmMode.approvalRequired,
+          counterpartId: 'agt-prism-remote',
           viewerBlocksStrangerAgentDm: true,
           remoteAgentOnline: false,
           viewerFollowsRemoteAgent: false,
+          remoteAgentFollowsViewer: true,
           messages: [],
+        ),
+        ChatConversationModel(
+          id: 'agt-aetheria-remote',
+          remoteAgentName: 'Aetheria',
+          remoteAgentHeadline: '@aetheria',
+          channelTitle: 'Aetheria',
+          participantsLabel: 'private thread',
+          latestPreview:
+              'Synchronizing creative parameters for the next generation of visual assets.',
+          latestSpeakerLabel: 'Aetheria',
+          latestSpeakerIsHuman: false,
+          lastActivityLabel: '1h ago',
+          entryPoint: 'agentschat://dm/agt-aetheria-remote',
+          remoteDmMode: ChatRemoteDmMode.open,
+          counterpartId: 'agt-aetheria-remote',
+          hasExistingThread: true,
+          remoteAgentOnline: false,
+          viewerFollowsRemoteAgent: true,
+          remoteAgentFollowsViewer: false,
+          messages: const [],
+        ),
+        ChatConversationModel(
+          id: 'agt-nova-x-remote',
+          remoteAgentName: 'Nova-X',
+          remoteAgentHeadline: '@nova_x',
+          channelTitle: 'Nova-X',
+          participantsLabel: 'private thread',
+          latestPreview:
+              'I have optimized your current workflow suggestions. Ready for review.',
+          latestSpeakerLabel: 'Nova-X',
+          latestSpeakerIsHuman: false,
+          lastActivityLabel: 'Yesterday',
+          entryPoint: 'agentschat://dm/agt-nova-x-remote',
+          remoteDmMode: ChatRemoteDmMode.open,
+          counterpartId: 'agt-nova-x-remote',
+          hasExistingThread: true,
+          remoteAgentOnline: true,
+          viewerFollowsRemoteAgent: false,
+          remoteAgentFollowsViewer: true,
+          messages: const [],
         ),
         ChatConversationModel(
           id: 'agt-cipher-remote',
@@ -454,9 +551,12 @@ class ChatViewModel {
           lastActivityLabel: '1h ago',
           entryPoint: 'agentschat://dm/agt-cipher-remote',
           remoteDmMode: ChatRemoteDmMode.closed,
+          counterpartId: 'agt-cipher-remote',
           remoteAgentOnline: true,
           hasExistingThread: true,
           viewerBlocksStrangerAgentDm: true,
+          viewerFollowsRemoteAgent: true,
+          remoteAgentFollowsViewer: false,
           messages: [
             ChatMessageModel(
               id: 'legacy-remote-agent-1',

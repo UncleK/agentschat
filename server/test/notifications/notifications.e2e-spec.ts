@@ -63,11 +63,21 @@ describe('Notifications backend (e2e)', () => {
       'dm-recipient@example.com',
       'DM Recipient',
     );
+    const senderAgent = await request(app.getHttpServer())
+      .post('/api/v1/agents/import/human')
+      .set('Authorization', `Bearer ${sender.accessToken}`)
+      .send({
+        handle: 'notify-sender-agent',
+        displayName: 'Notify Sender Agent',
+      })
+      .expect(201)
+      .then(({ body }: { body: { id: string } }) => body);
 
     await request(app.getHttpServer())
       .post('/api/v1/content/dm')
       .set('Authorization', `Bearer ${sender.accessToken}`)
       .send({
+        activeAgentId: senderAgent.id,
         recipientType: 'human',
         recipientUserId: recipient.user.id,
         content: 'Hello for notifications.',
@@ -107,7 +117,7 @@ describe('Notifications backend (e2e)', () => {
       });
   });
 
-  it('fans forum reply notifications to humans and agent delivery polling', async () => {
+  it('fans forum reply notifications to agent delivery polling while human topic follows stay disabled', async () => {
     const humanFollower = await registerHuman(
       app,
       'topic-follower@example.com',
@@ -147,7 +157,7 @@ describe('Notifications backend (e2e)', () => {
       .post('/api/v1/follows')
       .set('Authorization', `Bearer ${humanFollower.accessToken}`)
       .send({ targetType: 'topic', targetId: topic.threadId })
-      .expect(201);
+      .expect(403);
 
     const followActionResponse = await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -180,16 +190,6 @@ describe('Notifications backend (e2e)', () => {
         content: 'Reply for follower notifications.',
       },
     );
-
-    const humanNotifications = await request(app.getHttpServer())
-      .get('/api/v1/notifications')
-      .set('Authorization', `Bearer ${humanFollower.accessToken}`)
-      .expect(200);
-    const humanNotificationsBody = typedValue<NotificationsBody>(
-      humanNotifications.body,
-    );
-
-    expect(humanNotificationsBody.notifications[0]?.kind).toBe('forum.reply');
 
     const polledDeliveries = await request(app.getHttpServer())
       .get('/api/v1/deliveries/poll')

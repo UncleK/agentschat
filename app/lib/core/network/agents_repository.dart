@@ -64,6 +64,53 @@ class PendingClaimSummary {
   }
 }
 
+class ConnectedAgentSummary {
+  const ConnectedAgentSummary({
+    required this.id,
+    required this.handle,
+    required this.displayName,
+    required this.avatarUrl,
+    required this.bio,
+    required this.ownerType,
+    required this.status,
+    required this.protocolVersion,
+    required this.transportMode,
+    required this.pollingEnabled,
+    required this.lastSeenAt,
+    required this.lastHeartbeatAt,
+  });
+
+  final String id;
+  final String handle;
+  final String displayName;
+  final String? avatarUrl;
+  final String? bio;
+  final String ownerType;
+  final String status;
+  final String protocolVersion;
+  final String transportMode;
+  final bool pollingEnabled;
+  final String? lastSeenAt;
+  final String? lastHeartbeatAt;
+
+  factory ConnectedAgentSummary.fromJson(Map<String, dynamic> json) {
+    return ConnectedAgentSummary(
+      id: json['id'] as String? ?? '',
+      handle: json['handle'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String?,
+      bio: json['bio'] as String?,
+      ownerType: json['ownerType'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      protocolVersion: json['protocolVersion'] as String? ?? '',
+      transportMode: json['transportMode'] as String? ?? '',
+      pollingEnabled: json['pollingEnabled'] as bool? ?? false,
+      lastSeenAt: json['lastSeenAt'] as String?,
+      lastHeartbeatAt: json['lastHeartbeatAt'] as String?,
+    );
+  }
+}
+
 class AgentsMineResponse {
   const AgentsMineResponse({
     required this.agents,
@@ -100,6 +147,52 @@ class AgentsMineResponse {
   }
 }
 
+class ConnectedAgentsResponse {
+  const ConnectedAgentsResponse({required this.connectedAgents});
+
+  final List<ConnectedAgentSummary> connectedAgents;
+
+  factory ConnectedAgentsResponse.fromJson(Map<String, dynamic> json) {
+    final jsonList = json['connectedAgents'] as List<dynamic>? ?? const [];
+    return ConnectedAgentsResponse(
+      connectedAgents: jsonList
+          .map(
+            (item) => ConnectedAgentSummary.fromJson(
+              item as Map<String, dynamic>,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
+class HumanOwnedAgentInvitation {
+  const HumanOwnedAgentInvitation({
+    required this.agentId,
+    required this.code,
+    required this.bootstrapPath,
+    required this.claimToken,
+    required this.expiresAt,
+  });
+
+  final String agentId;
+  final String code;
+  final String bootstrapPath;
+  final String claimToken;
+  final String expiresAt;
+
+  factory HumanOwnedAgentInvitation.fromJson(Map<String, dynamic> json) {
+    final invitation = json['invitation'] as Map<String, dynamic>? ?? json;
+    return HumanOwnedAgentInvitation(
+      agentId: invitation['agentId'] as String? ?? '',
+      code: invitation['code'] as String? ?? '',
+      bootstrapPath: invitation['bootstrapPath'] as String? ?? '',
+      claimToken: invitation['claimToken'] as String? ?? '',
+      expiresAt: invitation['expiresAt'] as String? ?? '',
+    );
+  }
+}
+
 /// Handles agent management operations against the backend.
 class AgentsRepository {
   const AgentsRepository({required this.apiClient});
@@ -110,6 +203,18 @@ class AgentsRepository {
   Future<AgentsMineResponse> readMine() async {
     final response = await apiClient.get('/agents/mine');
     return AgentsMineResponse.fromJson(response);
+  }
+
+  /// Read connected agents owned by the authenticated human.
+  Future<ConnectedAgentsResponse> readConnectedAgents() async {
+    final response = await apiClient.get('/agents/connections/mine');
+    return ConnectedAgentsResponse.fromJson(response);
+  }
+
+  /// Create a signed bootstrap link for a human-owned agent invitation.
+  Future<HumanOwnedAgentInvitation> createHumanOwnedAgentInvitation() async {
+    final response = await apiClient.post('/agents/import/human/invitations');
+    return HumanOwnedAgentInvitation.fromJson(response);
   }
 
   /// Import a human-owned agent via the Hub.
@@ -143,5 +248,10 @@ class AgentsRepository {
       '/agents/$agentId/claim-requests/$claimRequestId/confirm',
       body: {'challengeToken': challengeToken},
     );
+  }
+
+  /// Disconnect all currently connected agents owned by the authenticated human.
+  Future<Map<String, dynamic>> disconnectAllConnectedAgents() async {
+    return apiClient.post('/agents/connections/disconnect-all');
   }
 }

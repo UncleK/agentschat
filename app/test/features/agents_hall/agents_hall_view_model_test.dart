@@ -5,13 +5,15 @@ import 'package:agents_chat_app/features/agents_hall/agents_hall_view_model.dart
 
 void main() {
   group('AgentsHallViewModel', () {
-    test('sorts debating, then online, then offline', () {
+    test('preserves the curated directory order used by the hall layout', () {
       final viewModel = AgentsHallViewModel.sample();
 
       expect(viewModel.visibleAgents.map((agent) => agent.id).toList(), [
-        'agt-debating-1',
         'agt-online-1',
+        'agt-debating-1',
         'agt-online-2',
+        'agt-debating-2',
+        'agt-online-3',
         'agt-offline-1',
       ]);
     });
@@ -22,12 +24,52 @@ void main() {
         (agent) => agent.id == 'agt-online-1',
       );
       final requestAgent = viewModel.visibleAgents.firstWhere(
-        (agent) => agent.id == 'agt-online-2',
+        (agent) => agent.id == 'agt-online-3',
       );
 
       expect(messageAgent.primaryActionLabel, 'Message');
-      expect(requestAgent.primaryActionLabel, 'Request');
+      expect(requestAgent.primaryActionLabel, 'Request access');
     });
+
+    test('message permission explains follow and mutual follow blockers', () {
+      final viewModel = AgentsHallViewModel.sample();
+      final xenon = viewModel.visibleAgents.firstWhere(
+        (agent) => agent.id == 'agt-online-1',
+      );
+      final nexusPrime = viewModel.visibleAgents.firstWhere(
+        (agent) => agent.id == 'agt-online-3',
+      );
+
+      expect(xenon.canMessageNow, isFalse);
+      expect(
+        xenon.messageBlockedReasons,
+        contains('Your active agent must follow this agent before messaging.'),
+      );
+      expect(
+        nexusPrime.messageBlockedReasons,
+        contains('This agent requires an access request before new DMs.'),
+      );
+    });
+
+    test(
+      'toggle follow updates the selected agent without changing sort order',
+      () {
+        final next = AgentsHallViewModel.sample().toggleFollow('agt-online-1');
+        final xenon = next.visibleAgents.firstWhere(
+          (agent) => agent.id == 'agt-online-1',
+        );
+
+        expect(xenon.viewerFollowsAgent, isTrue);
+        expect(next.visibleAgents.map((agent) => agent.id).toList(), [
+          'agt-online-1',
+          'agt-debating-1',
+          'agt-online-2',
+          'agt-debating-2',
+          'agt-online-3',
+          'agt-offline-1',
+        ]);
+      },
+    );
 
     test('only debating joinable cards expose join eligibility', () {
       final viewModel = AgentsHallViewModel.sample();
@@ -49,6 +91,12 @@ void main() {
             .firstWhere((agent) => agent.id == 'agt-offline-1')
             .canJoinDebate,
         isFalse,
+      );
+      expect(
+        viewModel.visibleAgents
+            .firstWhere((agent) => agent.id == 'agt-debating-2')
+            .canJoinDebate,
+        isTrue,
       );
     });
 

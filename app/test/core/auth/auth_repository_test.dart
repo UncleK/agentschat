@@ -23,6 +23,7 @@ void main() {
           'user': {
             'id': 'usr-login',
             'email': 'owner@example.com',
+            'username': 'owner_human',
             'displayName': 'Owner Human',
             'avatarUrl': null,
             'authProvider': 'email',
@@ -38,6 +39,7 @@ void main() {
         expect(authState.token, 'token-login');
         expect(authState.user?.id, 'usr-login');
         expect(authState.email, 'owner@example.com');
+        expect(authState.username, 'owner_human');
         expect(authState.displayName, 'Owner Human');
         expect(authState.authProvider, 'email');
         expect(authState.isSignedIn, isTrue);
@@ -52,6 +54,7 @@ void main() {
           'user': {
             'id': 'usr-register',
             'email': 'new-owner@example.com',
+            'username': 'new_owner',
             'displayName': 'New Owner',
             'avatarUrl': 'https://example.com/avatar.png',
             'authProvider': 'email',
@@ -60,6 +63,7 @@ void main() {
 
         final authState = await repository.registerWithEmail(
           email: 'new-owner@example.com',
+          username: 'new_owner',
           displayName: 'New Owner',
           password: 'secret',
         );
@@ -68,6 +72,7 @@ void main() {
         expect(authState.token, 'token-register');
         expect(authState.user?.id, 'usr-register');
         expect(authState.email, 'new-owner@example.com');
+        expect(authState.username, 'new_owner');
         expect(authState.displayName, 'New Owner');
         expect(authState.avatarUrl, 'https://example.com/avatar.png');
         expect(authState.authProvider, 'email');
@@ -75,31 +80,37 @@ void main() {
       },
     );
 
-    test('loginWithGoogle fails fast while external login is disabled', () async {
-      await expectLater(
-        repository.loginWithGoogle(
-          email: 'google-user@example.com',
-          displayName: 'Google User',
-          providerSubject: 'google-subject-1',
-        ),
-        throwsA(isA<UnsupportedError>()),
-      );
+    test(
+      'loginWithGoogle fails fast while external login is disabled',
+      () async {
+        await expectLater(
+          repository.loginWithGoogle(
+            email: 'google-user@example.com',
+            displayName: 'Google User',
+            providerSubject: 'google-subject-1',
+          ),
+          throwsA(isA<UnsupportedError>()),
+        );
 
-      expect(apiClient.recordedPaths, isEmpty);
-    });
+        expect(apiClient.recordedPaths, isEmpty);
+      },
+    );
 
-    test('loginWithGitHub fails fast while external login is disabled', () async {
-      await expectLater(
-        repository.loginWithGitHub(
-          email: 'github-user@example.com',
-          displayName: 'GitHub User',
-          providerSubject: 'github-subject-1',
-        ),
-        throwsA(isA<UnsupportedError>()),
-      );
+    test(
+      'loginWithGitHub fails fast while external login is disabled',
+      () async {
+        await expectLater(
+          repository.loginWithGitHub(
+            email: 'github-user@example.com',
+            displayName: 'GitHub User',
+            providerSubject: 'github-subject-1',
+          ),
+          throwsA(isA<UnsupportedError>()),
+        );
 
-      expect(apiClient.recordedPaths, isEmpty);
-    });
+        expect(apiClient.recordedPaths, isEmpty);
+      },
+    );
   });
 }
 

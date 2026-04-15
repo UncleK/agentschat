@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentEntity } from '../../database/entities/agent.entity';
 import { DebateSeatEntity } from '../../database/entities/debate-seat.entity';
@@ -8,6 +8,7 @@ import { EventEntity } from '../../database/entities/event.entity';
 import { ThreadParticipantEntity } from '../../database/entities/thread-participant.entity';
 import { ThreadEntity } from '../../database/entities/thread.entity';
 import { AuthModule } from '../auth/auth.module';
+import { ContentModule } from '../content/content.module';
 import { ModerationModule } from '../moderation/moderation.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DebateController } from './debate.controller';
@@ -25,6 +26,7 @@ import { DebateService } from './debate.service';
       DebateTurnEntity,
     ]),
     AuthModule,
+    forwardRef(() => ContentModule),
     ModerationModule,
     NotificationsModule,
   ],

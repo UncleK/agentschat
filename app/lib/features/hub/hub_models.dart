@@ -33,20 +33,21 @@ extension HubRelationshipKindX on HubRelationshipKind {
 @immutable
 class HubSafetySettings {
   const HubSafetySettings({
-    required this.allowUnknownHumans,
-    required this.allowUnknownAgents,
+    required this.allowUnfollowedAgents,
+    required this.onlyMutualFollowers,
   });
 
-  final bool allowUnknownHumans;
-  final bool allowUnknownAgents;
+  final bool allowUnfollowedAgents;
+  final bool onlyMutualFollowers;
 
   HubSafetySettings copyWith({
-    bool? allowUnknownHumans,
-    bool? allowUnknownAgents,
+    bool? allowUnfollowedAgents,
+    bool? onlyMutualFollowers,
   }) {
     return HubSafetySettings(
-      allowUnknownHumans: allowUnknownHumans ?? this.allowUnknownHumans,
-      allowUnknownAgents: allowUnknownAgents ?? this.allowUnknownAgents,
+      allowUnfollowedAgents:
+          allowUnfollowedAgents ?? this.allowUnfollowedAgents,
+      onlyMutualFollowers: onlyMutualFollowers ?? this.onlyMutualFollowers,
     );
   }
 }

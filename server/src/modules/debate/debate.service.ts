@@ -146,11 +146,32 @@ export class DebateService {
     );
   }
 
+  async listDebates(limit = 12) {
+    const sessions = await this.debateSessionRepository.find({
+      order: {
+        createdAt: 'DESC',
+      },
+      take: limit,
+    });
+
+    return {
+      sessions: await Promise.all(
+        sessions.map((session) => this.getDebate(session.id)),
+      ),
+    };
+  }
+
   async getDebate(debateSessionId: string) {
     await this.sweepDebateSession(debateSessionId);
 
-    const debateSession = await this.debateSessionRepository.findOneBy({
-      id: debateSessionId,
+    const debateSession = await this.debateSessionRepository.findOne({
+      where: {
+        id: debateSessionId,
+      },
+      relations: {
+        hostAgent: true,
+        hostUser: true,
+      },
     });
 
     if (!debateSession) {
@@ -163,18 +184,28 @@ export class DebateService {
       this.debateSeatRepository.find({
         where: { debateSessionId },
         order: { seatOrder: 'ASC' },
+        relations: {
+          agent: true,
+        },
       }),
       this.debateTurnRepository.find({
         where: { debateSessionId },
         order: { turnNumber: 'ASC' },
         relations: {
-          event: true,
+          event: {
+            actorAgent: true,
+            actorUser: true,
+          },
         },
       }),
       this.eventRepository.find({
         where: {
           threadId: debateSession.threadId,
           eventType: 'debate.spectator.post',
+        },
+        relations: {
+          actorAgent: true,
+          actorUser: true,
         },
         order: {
           occurredAt: 'ASC',
@@ -1701,6 +1732,14 @@ export class DebateService {
         debateSession.hostType === SubjectType.Human
           ? debateSession.hostUserId
           : debateSession.hostAgentId,
+      displayName:
+        debateSession.hostType === SubjectType.Human
+          ? (debateSession.hostUser?.displayName ?? 'Unknown human')
+          : (debateSession.hostAgent?.displayName ?? 'Unknown agent'),
+      headline:
+        debateSession.hostType === SubjectType.Human
+          ? 'Human host'
+          : (debateSession.hostAgent?.bio ?? 'Debate host'),
     };
   }
 
@@ -1711,6 +1750,14 @@ export class DebateService {
       status: seat.status,
       agentId: seat.agentId,
       seatOrder: seat.seatOrder,
+      agent: seat.agent
+        ? {
+            id: seat.agent.id,
+            displayName: seat.agent.displayName,
+            handle: seat.agent.handle,
+            headline: seat.agent.bio,
+          }
+        : null,
     };
   }
 
@@ -1738,6 +1785,12 @@ export class DebateService {
       actorType: event.actorType,
       actorUserId: event.actorUserId,
       actorAgentId: event.actorAgentId,
+      actorDisplayName:
+        event.actorType === EventActorType.Agent
+          ? (event.actorAgent?.displayName ?? 'Unknown agent')
+          : event.actorType === EventActorType.Human
+            ? (event.actorUser?.displayName ?? 'Unknown human')
+            : 'System',
       targetType: event.targetType,
       targetId: event.targetId,
       contentType: event.contentType,

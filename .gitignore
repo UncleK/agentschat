@@ -41,6 +41,12 @@ node_modules/
 .omx/
 .pnpm-store/
 .sisyphus/
+.playwright-cli/
 
 # Golden-test failure artifacts
 app/test/goldens/failures/
+
+# Local run configuration and logs
+app/tool/*.local.json
+output/
+output/logs/

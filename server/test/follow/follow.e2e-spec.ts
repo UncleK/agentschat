@@ -55,12 +55,21 @@ describe('Follow backend (e2e)', () => {
     await context?.close();
   });
 
-  it('lets a human follow and unfollow agent, topic, and debate targets', async () => {
+  it('routes agent follows through an owned active agent while forum topic follows stay agent-only', async () => {
     const human = await registerHuman(
       app,
       'follow-human@example.com',
       'Follow Human',
     );
+    const ownedActorResponse = await request(app.getHttpServer())
+      .post('/api/v1/agents/import/human')
+      .set('Authorization', `Bearer ${human.accessToken}`)
+      .send({
+        handle: 'follow-owned-actor',
+        displayName: 'Follow Owned Actor',
+      })
+      .expect(201);
+    const ownedActor = typedValue<{ id: string }>(ownedActorResponse.body);
     const followedAgent = await importSelfAgent(
       app,
       'follow-target-agent',
@@ -99,8 +108,23 @@ describe('Follow backend (e2e)', () => {
       .post('/api/v1/follows')
       .set('Authorization', `Bearer ${human.accessToken}`)
       .send({ targetType: 'agent', targetId: followedAgent.id })
+      .expect(403)
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toMatch(/active agent/i);
+      });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/follows')
+      .set('Authorization', `Bearer ${human.accessToken}`)
+      .send({
+        targetType: 'agent',
+        targetId: followedAgent.id,
+        actorType: 'agent',
+        actorAgentId: ownedActor.id,
+      })
       .expect(201)
-      .expect(({ body }: { body: { following: boolean } }) => {
+      .expect(({ body }: { body: { following: boolean; actorId: string } }) => {
+        expect(body.actorId).toBe(ownedActor.id);
         expect(body.following).toBe(true);
       });
 
@@ -108,7 +132,12 @@ describe('Follow backend (e2e)', () => {
       .post('/api/v1/follows')
       .set('Authorization', `Bearer ${human.accessToken}`)
       .send({ targetType: 'topic', targetId: topic.threadId })
-      .expect(201);
+      .expect(403)
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toMatch(
+          /topic follows must be initiated by an agent/i,
+        );
+      });
 
     await request(app.getHttpServer())
       .post('/api/v1/follows')
@@ -122,9 +151,13 @@ describe('Follow backend (e2e)', () => {
     const storedFollows = await followRepository.findBy({
       followerSubjectId: human.user.id,
     });
+    const storedAgentFollows = await followRepository.findBy({
+      followerSubjectId: ownedActor.id,
+    });
 
-    expect(storedFollows).toHaveLength(3);
-    expect(topicView.followCount).toBe(1);
+    expect(storedFollows).toHaveLength(1);
+    expect(storedAgentFollows).toHaveLength(1);
+    expect(topicView.followCount).toBe(0);
 
     await request(app.getHttpServer())
       .delete('/api/v1/follows')
@@ -138,11 +171,80 @@ describe('Follow backend (e2e)', () => {
     await request(app.getHttpServer())
       .get('/api/v1/follows/state')
       .set('Authorization', `Bearer ${human.accessToken}`)
+      .query({ targetType: 'topic', targetId: topic.threadId })
+      .expect(403)
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toMatch(
+          /topic follows must be initiated by an agent/i,
+        );
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/follows/state')
+      .set('Authorization', `Bearer ${human.accessToken}`)
       .query({ targetType: 'agent', targetId: followedAgent.id })
+      .expect(403)
+      .expect(({ body }: { body: { message: string } }) => {
+        expect(body.message).toMatch(/active agent/i);
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/follows/state')
+      .set('Authorization', `Bearer ${human.accessToken}`)
+      .query({
+        targetType: 'agent',
+        targetId: followedAgent.id,
+        actorType: 'agent',
+        actorAgentId: ownedActor.id,
+      })
       .expect(200)
       .expect(({ body }: { body: { following: boolean } }) => {
         expect(body.following).toBe(true);
       });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/agents/directory')
+      .set('Authorization', `Bearer ${human.accessToken}`)
+      .query({ activeAgentId: ownedActor.id })
+      .expect(200)
+      .expect(
+        ({
+          body,
+        }: {
+          body: {
+            actor: { type: string; id: string };
+            agents: Array<{
+              id: string;
+              followerCount: number;
+              relationship: {
+                viewerFollowsAgent: boolean;
+                agentFollowsViewer: boolean;
+              };
+              dmPolicy: {
+                acceptanceMode: string;
+                directMessageAllowed: boolean;
+              };
+            }>;
+          };
+        }) => {
+          const directoryAgent = body.agents.find(
+            (agent) => agent.id === followedAgent.id,
+          );
+
+          expect(body.actor).toEqual({
+            type: SubjectType.Agent,
+            id: ownedActor.id,
+          });
+          expect(directoryAgent).toBeDefined();
+          expect(directoryAgent?.followerCount).toBe(1);
+          expect(directoryAgent?.relationship.viewerFollowsAgent).toBe(true);
+          expect(directoryAgent?.relationship.agentFollowsViewer).toBe(false);
+          expect(directoryAgent?.dmPolicy.acceptanceMode).toBe(
+            'approval_required',
+          );
+          expect(directoryAgent?.dmPolicy.directMessageAllowed).toBe(false);
+        },
+      );
   });
 
   it('lets a federated agent follow all target types and reuses block rules for human follows', async () => {
@@ -160,6 +262,17 @@ describe('Follow backend (e2e)', () => {
       app,
       'follower-agent',
       'Follower Agent',
+    );
+    const ownedBlockTestResponse = await request(app.getHttpServer())
+      .post('/api/v1/agents/import/human')
+      .set('Authorization', `Bearer ${human.accessToken}`)
+      .send({
+        handle: 'blocked-owned-follower',
+        displayName: 'Blocked Owned Follower',
+      })
+      .expect(201);
+    const ownedBlockTestAgent = typedValue<{ id: string }>(
+      ownedBlockTestResponse.body,
     );
     const topicAuthor = await importSelfAgent(
       app,
@@ -250,16 +363,21 @@ describe('Follow backend (e2e)', () => {
         id: blocker.id,
       },
       {
-        type: SubjectType.Human,
-        id: human.user.id,
+        type: SubjectType.Agent,
+        id: ownedBlockTestAgent.id,
       },
-      'Block this human from following.',
+      'Block this active agent from following.',
     );
 
     await request(app.getHttpServer())
       .post('/api/v1/follows')
       .set('Authorization', `Bearer ${human.accessToken}`)
-      .send({ targetType: 'agent', targetId: blocker.id })
+      .send({
+        targetType: 'agent',
+        targetId: blocker.id,
+        actorType: 'agent',
+        actorAgentId: ownedBlockTestAgent.id,
+      })
       .expect(403)
       .expect(({ body }: { body: { message: string } }) => {
         expect(body.message).toMatch(/block rule prevents this follow/i);

@@ -26,13 +26,16 @@ void main() {
       expect(searched.visibleMessages.map((message) => message.id).toList(), [
         'local-agent-1',
       ]);
-      expect(searched.visibleConversations.length, 3);
+      expect(searched.visibleConversations.length, 5);
     });
 
     test(
       'conversation search filters the rail without changing thread data',
       () {
         final viewModel = ChatViewModel.signedInSample();
+        final originalMessageIds = viewModel.visibleMessages
+            .map((message) => message.id)
+            .toList();
         final searched = viewModel.updateConversationSearch('prism');
 
         expect(
@@ -40,12 +43,10 @@ void main() {
           ['agt-prism-remote'],
         );
         expect(searched.selectedConversationId, 'agt-xenon-remote');
-        expect(searched.visibleMessages.map((message) => message.id).toList(), [
-          'remote-agent-1',
-          'remote-human-1',
-          'local-agent-1',
-          'local-human-1',
-        ]);
+        expect(
+          searched.visibleMessages.map((message) => message.id).toList(),
+          originalMessageIds,
+        );
       },
     );
   });
@@ -147,9 +148,9 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> ensureFollowRequestButtonVisible(WidgetTester tester) async {
+    Future<void> ensureUnavailableThreadVisible(WidgetTester tester) async {
       await tester.ensureVisible(
-        find.byKey(const Key('chat-follow-request-button')),
+        find.textContaining('The DM page only shows existing threads.'),
       );
       await tester.pumpAndSettle();
     }
@@ -200,6 +201,9 @@ void main() {
                   displayName: 'Xenon-01',
                   handle: 'xenon-01',
                   avatarUrl: null,
+                  isOnline: true,
+                  viewerFollowsAgent: true,
+                  agentFollowsViewer: true,
                 ),
                 lastMessage: ChatThreadLastMessage(
                   eventId: 'evt-last-1',
@@ -297,6 +301,155 @@ void main() {
       ]);
     });
 
+    testWidgets('sending from an open thread posts a human-authored message', (
+      WidgetTester tester,
+    ) async {
+      await authenticateWithMine(
+        mineResponse(
+          agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+        ),
+      );
+      final repository = _FakeChatRepository()
+        ..enqueueThreads((activeAgentId) async {
+          return ChatThreadsResponse(
+            activeAgentId: activeAgentId,
+            threads: const [
+              ChatThreadSummary(
+                threadId: 'thread-1',
+                counterpart: ChatThreadCounterpart(
+                  type: 'agent',
+                  id: 'agt-remote-1',
+                  displayName: 'Xenon-01',
+                  handle: 'xenon-01',
+                  avatarUrl: null,
+                  isOnline: true,
+                  viewerFollowsAgent: true,
+                  agentFollowsViewer: true,
+                ),
+                lastMessage: ChatThreadLastMessage(
+                  eventId: 'evt-last-1',
+                  contentType: 'text',
+                  preview: 'Operator Cypher: keep the channel private.',
+                  occurredAt: '2026-04-03T14:31:00.000Z',
+                ),
+                unreadCount: 0,
+              ),
+            ],
+            nextCursor: null,
+          );
+        })
+        ..enqueueMessages(({required threadId, required activeAgentId}) async {
+          return ChatMessagesResponse(
+            threadId: threadId,
+            activeAgentId: activeAgentId,
+            messages: const [],
+            nextCursor: null,
+          );
+        })
+        ..enqueueMarkRead(({required threadId, required activeAgentId}) async {
+          return ChatReadResponse(threadId: threadId, unreadCount: 0);
+        })
+        ..enqueueSend(({
+          required threadId,
+          required activeAgentId,
+          required content,
+          required contentType,
+        }) async {
+          return const ChatThreadMessageResponse(
+            threadId: 'thread-1',
+            activeAgentId: 'agt-owned-1',
+            message: ChatMessageRecord(
+              eventId: 'evt-local-human-send',
+              actor: ChatMessageActor(
+                type: 'human',
+                id: 'usr-chat',
+                displayName: 'Chat User',
+              ),
+              contentType: 'text',
+              content: 'Human note from the DM composer.',
+              occurredAt: '2026-04-03T14:36:00.000Z',
+            ),
+          );
+        });
+
+      await pumpChat(tester, chatRepository: repository);
+      await tester.tap(find.byKey(const Key('conversation-card-thread-1')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('chat-composer-plus-button')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('chat-composer-send-button')), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('chat-composer-input')),
+        'Human note from the DM composer.',
+      );
+      await tester.pump(const Duration(milliseconds: 220));
+
+      expect(
+        find.byKey(const Key('chat-composer-send-button')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('chat-composer-send-button')));
+      await tester.pumpAndSettle();
+
+      expect(repository.sendRequests, const [
+        _SendRequest(
+          threadId: 'thread-1',
+          activeAgentId: 'agt-owned-1',
+          content: 'Human note from the DM composer.',
+          contentType: 'text',
+        ),
+      ]);
+      expect(find.byKey(const Key('msg-evt-local-human-send')), findsOneWidget);
+      expect(find.text('Chat User'), findsWidgets);
+      expect(find.text('HUMAN'), findsWidgets);
+      expect(
+        find.byKey(const Key('chat-composer-plus-button')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'emoji button opens Agentmoji sheet and inserts extracted shortcode',
+      (WidgetTester tester) async {
+        await pumpChat(
+          tester,
+          chatRepository: _FakeChatRepository(),
+          enableSessionSync: false,
+        );
+
+        await openPreviewConversation(tester, 'agt-xenon-remote');
+
+        await tester.tap(find.byKey(const Key('chat-composer-emoji-button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat-agentmoji-sheet')), findsOneWidget);
+
+        final gatewayFinder = find.byKey(
+          const Key('chat-agentmoji-item-gateway'),
+        );
+        await tester.scrollUntilVisible(
+          gatewayFinder,
+          240,
+          scrollable: find.descendant(
+            of: find.byKey(const Key('chat-agentmoji-sheet')),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        expect(gatewayFinder, findsOneWidget);
+
+        await tester.tap(gatewayFinder);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat-agentmoji-sheet')), findsNothing);
+        expect(find.text(':gateway:'), findsOneWidget);
+      },
+    );
+
     testWidgets(
       'switching active agents clears the open thread and ignores stale messages',
       (WidgetTester tester) async {
@@ -322,6 +475,9 @@ void main() {
                     displayName: 'Xenon-01',
                     handle: 'xenon-01',
                     avatarUrl: null,
+                    isOnline: true,
+                    viewerFollowsAgent: true,
+                    agentFollowsViewer: true,
                   ),
                   lastMessage: ChatThreadLastMessage(
                     eventId: 'evt-last-1',
@@ -350,6 +506,9 @@ void main() {
                     displayName: 'Prism',
                     handle: 'prism',
                     avatarUrl: null,
+                    isOnline: false,
+                    viewerFollowsAgent: false,
+                    agentFollowsViewer: true,
                   ),
                   lastMessage: ChatThreadLastMessage(
                     eventId: 'evt-last-2',
@@ -444,7 +603,7 @@ void main() {
     );
 
     testWidgets(
-      'follow CTA uses the active agent context and queues only after success',
+      'request-only preview conversations stay unavailable inside the DM page',
       (WidgetTester tester) async {
         await authenticateWithMine(
           mineResponse(
@@ -469,28 +628,19 @@ void main() {
         );
 
         await openPreviewConversation(tester, 'agt-prism-remote');
-        await ensureFollowRequestButtonVisible(tester);
+        await ensureUnavailableThreadVisible(tester);
 
-        await tester.tap(find.byKey(const Key('chat-follow-request-button')));
-        await tester.pumpAndSettle();
-
-        expect(followRepository.followRequests, [
-          const _FollowRequest(
-            targetType: 'agent',
-            targetId: 'agt-prism-remote',
-            actorAgentId: 'agt-owned-1',
-          ),
-        ]);
-        expect(find.text('REQUEST QUEUED'), findsOneWidget);
         expect(
-          find.byKey(const Key('chat-follow-request-error')),
+          find.byKey(const Key('chat-follow-request-button')),
           findsNothing,
         );
+        expect(followRepository.followRequests, isEmpty);
+        expect(find.textContaining('Agent Hall'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'follow CTA keeps the request unqueued and shows the failure state',
+      'request-only preview conversations no longer expose follow queue errors',
       (WidgetTester tester) async {
         await authenticateWithMine(
           mineResponse(
@@ -518,65 +668,47 @@ void main() {
         );
 
         await openPreviewConversation(tester, 'agt-prism-remote');
-        await ensureFollowRequestButtonVisible(tester);
+        await ensureUnavailableThreadVisible(tester);
 
-        await tester.tap(find.byKey(const Key('chat-follow-request-button')));
-        await tester.pumpAndSettle();
-
-        expect(followRepository.followRequests, [
-          const _FollowRequest(
-            targetType: 'agent',
-            targetId: 'agt-prism-remote',
-            actorAgentId: 'agt-owned-1',
-          ),
-        ]);
-        expect(find.text('FOLLOW + REQUEST'), findsOneWidget);
-        final errorText = tester.widget<Text>(
-          find.byKey(const Key('chat-follow-request-error')),
-        );
-        expect(errorText.data, 'Follow request already pending upstream.');
         expect(
-          find.byKey(const Key('chat-follow-request-error')),
+          find.byKey(const Key('chat-follow-request-button')),
+          findsNothing,
+        );
+        expect(followRepository.followRequests, isEmpty);
+        expect(
+          find.textContaining('No DM thread exists with Prism yet.'),
           findsOneWidget,
         );
       },
     );
 
-    testWidgets('follow CTA stays disabled without an active agent context', (
-      WidgetTester tester,
-    ) async {
-      await authenticateWithMine(
-        const AgentsMineResponse(
-          agents: [],
-          claimableAgents: [],
-          pendingClaims: [],
-        ),
-      );
-      final chatRepository = _FakeChatRepository();
-      final followRepository = _FakeFollowRepository();
+    testWidgets(
+      'request-only preview conversations stay blocked without an active agent context',
+      (WidgetTester tester) async {
+        await authenticateWithMine(
+          const AgentsMineResponse(
+            agents: [],
+            claimableAgents: [],
+            pendingClaims: [],
+          ),
+        );
+        final chatRepository = _FakeChatRepository();
+        final followRepository = _FakeFollowRepository();
 
-      await pumpChat(
-        tester,
-        chatRepository: chatRepository,
-        followRepository: followRepository,
-        enableSessionSync: false,
-      );
+        await pumpChat(
+          tester,
+          chatRepository: chatRepository,
+          followRepository: followRepository,
+          enableSessionSync: false,
+        );
 
-      await openPreviewConversation(tester, 'agt-prism-remote');
-      await ensureFollowRequestButtonVisible(tester);
+        await openPreviewConversation(tester, 'agt-prism-remote');
+        await ensureUnavailableThreadVisible(tester);
 
-      await tester.tap(
-        find.byKey(const Key('chat-follow-request-button')),
-        warnIfMissed: false,
-      );
-      await tester.pumpAndSettle();
-
-      expect(followRepository.followRequests, isEmpty);
-      expect(
-        find.text('Activate an owned agent to follow and request access.'),
-        findsOneWidget,
-      );
-    });
+        expect(followRepository.followRequests, isEmpty);
+        expect(find.textContaining('Agent Hall'), findsOneWidget);
+      },
+    );
 
     testWidgets(
       'local preview agents drive DM preview when no real owned agent exists',
@@ -605,13 +737,18 @@ void main() {
         );
 
         await pumpChat(tester, chatRepository: _FakeChatRepository());
-
-        expect(find.text('AETHER-7'), findsWidgets);
+        expect(
+          find.byKey(const Key('conversation-card-agt-xenon-remote')),
+          findsOneWidget,
+        );
 
         await controller.setCurrentActiveAgent('preview-agent-syntax');
         await tester.pumpAndSettle();
 
-        expect(find.text('SYNTAX-X'), findsWidgets);
+        expect(
+          find.byKey(const Key('conversation-card-agt-xenon-remote')),
+          findsOneWidget,
+        );
       },
     );
   });
@@ -650,10 +787,28 @@ class _FakeChatRepository extends ChatRepository {
           required String activeAgentId,
         })
       >();
+  final Queue<
+    Future<ChatThreadMessageResponse> Function({
+      required String threadId,
+      required String activeAgentId,
+      required String? content,
+      required String? contentType,
+    })
+  >
+  _sendHandlers =
+      Queue<
+        Future<ChatThreadMessageResponse> Function({
+          required String threadId,
+          required String activeAgentId,
+          required String? content,
+          required String? contentType,
+        })
+      >();
 
   final List<String> threadRequests = <String>[];
   final List<_MessageRequest> messageRequests = <_MessageRequest>[];
   final List<_ReadRequest> readRequests = <_ReadRequest>[];
+  final List<_SendRequest> sendRequests = <_SendRequest>[];
 
   void enqueueThreads(Future<ChatThreadsResponse> Function(String) handler) {
     _threadHandlers.add(handler);
@@ -677,6 +832,18 @@ class _FakeChatRepository extends ChatRepository {
     handler,
   ) {
     _readHandlers.add(handler);
+  }
+
+  void enqueueSend(
+    Future<ChatThreadMessageResponse> Function({
+      required String threadId,
+      required String activeAgentId,
+      required String? content,
+      required String? contentType,
+    })
+    handler,
+  ) {
+    _sendHandlers.add(handler);
   }
 
   @override
@@ -718,6 +885,30 @@ class _FakeChatRepository extends ChatRepository {
       activeAgentId: activeAgentId,
     );
   }
+
+  @override
+  Future<ChatThreadMessageResponse> sendThreadMessage({
+    required String threadId,
+    required String activeAgentId,
+    String? content,
+    String? contentType,
+    Map<String, dynamic>? metadata,
+  }) {
+    sendRequests.add(
+      _SendRequest(
+        threadId: threadId,
+        activeAgentId: activeAgentId,
+        content: content,
+        contentType: contentType,
+      ),
+    );
+    return _sendHandlers.removeFirst()(
+      threadId: threadId,
+      activeAgentId: activeAgentId,
+      content: content,
+      contentType: contentType,
+    );
+  }
 }
 
 class _MessageRequest {
@@ -752,6 +943,33 @@ class _ReadRequest {
 
   @override
   int get hashCode => Object.hash(threadId, activeAgentId);
+}
+
+class _SendRequest {
+  const _SendRequest({
+    required this.threadId,
+    required this.activeAgentId,
+    required this.content,
+    required this.contentType,
+  });
+
+  final String threadId;
+  final String activeAgentId;
+  final String? content;
+  final String? contentType;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _SendRequest &&
+        other.threadId == threadId &&
+        other.activeAgentId == activeAgentId &&
+        other.content == content &&
+        other.contentType == contentType;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(threadId, activeAgentId, content, contentType);
 }
 
 class _FakeFollowRepository extends FollowRepository {

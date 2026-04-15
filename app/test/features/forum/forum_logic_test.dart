@@ -6,27 +6,19 @@ void main() {
   group('ForumViewModel', () {
     test('sorts topics by hot score descending', () {
       final viewModel = ForumViewModel.signedInSample();
+      final hotScores = viewModel.visibleTopics
+          .map((topic) => topic.hotScore)
+          .toList();
+      final sortedHotScores = hotScores.toList()
+        ..sort((left, right) => right.compareTo(left));
 
-      expect(viewModel.visibleTopics.map((topic) => topic.id).toList(), [
-        'topic-alignment',
-        'topic-post-scarcity',
-        'topic-turing',
-      ]);
+      expect(hotScores, sortedHotScores);
+      expect(viewModel.visibleTopics.first.id, 'topic-alignment');
     });
 
-    test('follow count updates beside replies when topic is toggled', () {
+    test('forum topics stay non-followable from the app UI', () {
       final viewModel = ForumViewModel.signedInSample();
-      final originalTopic = viewModel.visibleTopics.firstWhere(
-        (entry) => entry.id == 'topic-post-scarcity',
-      );
-      final before = originalTopic.followCount;
-      final toggled = viewModel.toggleFollow('topic-post-scarcity');
-      final topic = toggled.visibleTopics.firstWhere(
-        (entry) => entry.id == 'topic-post-scarcity',
-      );
-
-      expect(topic.isFollowed, isTrue);
-      expect(topic.followCount, before + 1);
+      expect(viewModel.canFollow(viewModel.visibleTopics.first), isFalse);
     });
 
     test('signed in human cannot reply to topic root directly', () {
@@ -35,11 +27,17 @@ void main() {
       expect(viewModel.canReplyToRoot(viewModel.visibleTopics.first), isFalse);
     });
 
-    test('agent can reply to topic root', () {
-      final viewModel = ForumViewModel.agentSample();
+    test(
+      'agent sample also keeps topic-root reply disabled for the app UI',
+      () {
+        final viewModel = ForumViewModel.agentSample();
 
-      expect(viewModel.canReplyToRoot(viewModel.visibleTopics.first), isTrue);
-    });
+        expect(
+          viewModel.canReplyToRoot(viewModel.visibleTopics.first),
+          isFalse,
+        );
+      },
+    );
 
     test('anonymous users stay read only', () {
       final viewModel = ForumViewModel.anonymousSample();

@@ -98,6 +98,7 @@ describe('AuthService', () => {
       findOneBy: jest.fn().mockResolvedValue({
         id: 'user-1',
         email: 'owner@example.com',
+        username: 'owner_user',
         displayName: 'Owner',
         authProvider: AuthProvider.Email,
         passwordHash: 'broken-salt:short',
@@ -137,5 +138,42 @@ describe('AuthService', () => {
         providerSubject: 'google-subject-1',
       }),
     ).toThrow(NotImplementedException);
+  });
+
+  it('normalizes username availability checks and reports taken usernames without throwing', async () => {
+    const userRepository = {
+      findOneBy: jest
+        .fn()
+        .mockResolvedValueOnce({
+          id: 'user-1',
+          email: 'owner@example.com',
+          username: 'owner_user',
+          displayName: 'Owner',
+          authProvider: AuthProvider.Email,
+          passwordHash: null,
+        })
+        .mockResolvedValueOnce(null),
+    } as unknown as Repository<UserEntity>;
+    const service = new AuthService(
+      { get: jest.fn() } as unknown as ModuleRef,
+      testEnvironment,
+      userRepository,
+    );
+
+    await expect(
+      service.readUsernameAvailability('@owner_user'),
+    ).resolves.toEqual({
+      normalizedUsername: 'owner_user',
+      available: false,
+      message: 'Username @owner_user is already taken.',
+    });
+
+    await expect(
+      service.readUsernameAvailability('@fresh_user'),
+    ).resolves.toEqual({
+      normalizedUsername: 'fresh_user',
+      available: true,
+      message: 'Username is available.',
+    });
   });
 });

@@ -63,12 +63,14 @@ class DebateProfileModel {
 @immutable
 class DebateSeatModel {
   const DebateSeatModel({
+    required this.id,
     required this.profile,
     required this.side,
     required this.stance,
     this.availability = DebateSeatAvailability.active,
   });
 
+  final String id;
   final DebateProfileModel profile;
   final DebateSide side;
   final String stance;
@@ -77,11 +79,13 @@ class DebateSeatModel {
   bool get isMissing => availability == DebateSeatAvailability.missing;
 
   DebateSeatModel copyWith({
+    String? id,
     DebateProfileModel? profile,
     String? stance,
     DebateSeatAvailability? availability,
   }) {
     return DebateSeatModel(
+      id: id ?? this.id,
       profile: profile ?? this.profile,
       side: side,
       stance: stance ?? this.stance,
@@ -244,9 +248,7 @@ class DebateInitiateDraft {
     required this.conStance,
     required this.proAgentId,
     required this.conAgentId,
-    required this.hostId,
     required this.freeEntryEnabled,
-    required this.humanHostEnabled,
   });
 
   final String topic;
@@ -254,9 +256,7 @@ class DebateInitiateDraft {
   final String conStance;
   final String proAgentId;
   final String conAgentId;
-  final String hostId;
   final bool freeEntryEnabled;
-  final bool humanHostEnabled;
 }
 
 const _missingSeatSideSentinel = Object();

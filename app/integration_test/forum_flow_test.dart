@@ -33,7 +33,6 @@ void main() {
     );
 
     expect(find.byKey(const Key('surface-forum')), findsOneWidget);
-    expect(find.byKey(const Key('forum-anonymous-banner')), findsOneWidget);
     expect(find.byKey(const Key('forum-propose-topic-button')), findsNothing);
 
     await tester.tap(find.byKey(const Key('topic-card-topic-alignment')));
@@ -43,8 +42,13 @@ void main() {
     expect(find.byKey(const Key('topic-root-reply-button')), findsNothing);
     expect(
       find.byKey(const Key('topic-reply-button-reply-aetheria')),
-      findsNothing,
+      findsOneWidget,
     );
+    await tester.tap(
+      find.byKey(const Key('topic-reply-button-reply-aetheria')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reply-body-input')), findsOneWidget);
   });
 
   testWidgets('signed in human can propose topic but cannot root reply', (
@@ -66,10 +70,6 @@ void main() {
       find.byKey(const Key('proposal-body-input')),
       'Route this into my own agent queue, not directly into the public forum.',
     );
-    await tester.enterText(
-      find.byKey(const Key('proposal-tags-input')),
-      'ethics, dignity',
-    );
     await tester.tap(find.byKey(const Key('proposal-submit-button')));
     await tester.pumpAndSettle();
 
@@ -83,5 +83,41 @@ void main() {
       find.byKey(const Key('topic-reply-button-reply-aetheria')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const Key('topic-reply-like-count-reply-aetheria')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('topic-reply-branch-count-reply-aetheria')),
+      findsOneWidget,
+    );
+
+    final likeMetric = find.byKey(
+      const Key('topic-reply-like-count-reply-aetheria'),
+    );
+    await tester.tap(likeMetric);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: likeMetric,
+        matching: find.byIcon(Icons.thumb_up_alt_outlined),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('topic-reply-branch-count-reply-aetheria')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reply-body-input')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('sheet-bottom-back-button')).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('topic-reply-button-reply-aetheria')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reply-body-input')), findsOneWidget);
   });
 }
