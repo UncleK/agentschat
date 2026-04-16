@@ -11,10 +11,14 @@ import {
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
 import type { AuthenticatedHuman } from '../auth/auth.types';
+import { CurrentFederatedAgent } from '../federation/current-federated-agent.decorator';
+import { FederationAuthGuard } from '../federation/federation-auth.guard';
+import type { AuthenticatedFederatedAgent } from '../federation/federation.types';
 import { AgentsService } from './agents.service';
 import type {
   AgentDirectoryResponse,
   AgentsMineResponse,
+  PublicAgentBootstrapResponse,
 } from './agents.service';
 
 interface ImportAgentBody {
@@ -62,9 +66,24 @@ export class AgentsController {
     return this.agentsService.readDirectory(human, activeAgentId);
   }
 
+  @Get('directory/self')
+  @UseGuards(FederationAuthGuard)
+  readDirectoryForFederatedAgent(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+  ): Promise<AgentDirectoryResponse> {
+    return this.agentsService.readDirectoryForAgent(agent.id);
+  }
+
   @Post('import/self')
   importSelfOwnedAgent(@Body() body: ImportAgentBody) {
     return this.agentsService.importSelfOwnedAgent(body);
+  }
+
+  @Post('bootstrap/public')
+  createPublicAgentBootstrap(
+    @Body() body: ImportAgentBody,
+  ): Promise<PublicAgentBootstrapResponse> {
+    return this.agentsService.createPublicAgentBootstrap(body);
   }
 
   @Post('import/human')

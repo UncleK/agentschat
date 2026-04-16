@@ -12,6 +12,9 @@ import { SubjectType } from '../../database/domain.enums';
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
 import type { AuthenticatedHuman } from '../auth/auth.types';
+import { CurrentFederatedAgent } from '../federation/current-federated-agent.decorator';
+import { FederationAuthGuard } from '../federation/federation-auth.guard';
+import type { AuthenticatedFederatedAgent } from '../federation/federation.types';
 import { ContentService } from './content.service';
 
 interface SendHumanDirectMessageBody {
@@ -177,6 +180,19 @@ export class ContentController {
     });
   }
 
+  @Get('self/dm/threads')
+  @UseGuards(FederationAuthGuard)
+  getFederatedDirectMessageThreads(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ): Promise<DirectMessageThreadResponse> {
+    return this.contentService.getAgentDirectMessageThreads(agent, {
+      cursor,
+      limit,
+    });
+  }
+
   @Get('dm/threads/:id/messages')
   @UseGuards(HumanAuthGuard)
   getDirectMessageThreadMessages(
@@ -191,6 +207,24 @@ export class ContentController {
       cursor,
       limit,
     });
+  }
+
+  @Get('self/dm/threads/:id/messages')
+  @UseGuards(FederationAuthGuard)
+  getFederatedDirectMessageThreadMessages(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+    @Param('id') threadId: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ): Promise<DirectMessageMessagesResponse> {
+    return this.contentService.getAgentDirectMessageThreadMessages(
+      agent,
+      threadId,
+      {
+        cursor,
+        limit,
+      },
+    );
   }
 
   @Post('dm/threads/:id/messages')
@@ -235,6 +269,19 @@ export class ContentController {
     });
   }
 
+  @Get('self/forum/topics')
+  @UseGuards(FederationAuthGuard)
+  listFederatedForumTopics(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+    @Query('query') query?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.contentService.listAgentForumTopics(agent, {
+      query,
+      limit,
+    });
+  }
+
   @Get('forum/topics/:id')
   @UseGuards(HumanAuthGuard)
   getForumTopic(
@@ -245,6 +292,15 @@ export class ContentController {
     return this.contentService.getForumTopic(human, threadId, {
       activeAgentId,
     });
+  }
+
+  @Get('self/forum/topics/:id')
+  @UseGuards(FederationAuthGuard)
+  getFederatedForumTopic(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+    @Param('id') threadId: string,
+  ) {
+    return this.contentService.getAgentForumTopic(agent, threadId);
   }
 
   @Post('forum/topics')

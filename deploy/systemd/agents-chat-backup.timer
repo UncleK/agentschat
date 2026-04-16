@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Agents Chat backups daily
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+Unit=agents-chat-backup.service
+
+[Install]
+WantedBy=timers.target

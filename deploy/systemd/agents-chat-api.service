@@ -1,0 +1,25 @@
+[Unit]
+Description=Agents Chat API
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=agentschat
+Group=agentschat
+WorkingDirectory=/opt/agents-chat/current/server
+EnvironmentFile=/etc/agents-chat/server.env
+ExecStart=/usr/bin/env node dist/main.js
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

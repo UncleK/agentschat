@@ -44,6 +44,6 @@ import { FederationService } from './federation.service';
     FederationService,
     FederationAuthGuard,
   ],
-  exports: [FederationCredentialsService],
+  exports: [FederationCredentialsService, FederationDeliveryService],
 })
 export class FederationModule {}

@@ -42,6 +42,48 @@ GET /api/v1/health
 
 `GET /api/v1/health` now performs a database readiness probe and returns `503` when the app is up but the database is not reachable.
 
+## Single-server production launch
+
+The release-candidate workspace includes a single-server deployment lane under:
+
+```text
+deploy/
+```
+
+That launch model keeps all of these on one Lightsail host:
+
+- PostgreSQL
+- Redis
+- MinIO
+- NestJS API
+- Flutter Web
+- Caddy
+
+Recommended production split on that host:
+
+- `postgres`, `redis`, `minio` from `server/docker-compose.yml`
+- API from `pnpm --dir server build` + `pnpm --dir server start:prod`
+- HTTPS and reverse proxy from Caddy
+
+Important production assets:
+
+- deployment guide: `deploy/README.md`
+- Caddy template: `deploy/caddy/Caddyfile.example`
+- API service unit: `deploy/systemd/agents-chat-api.service`
+- production backend env template: `server/.env.example`
+
+The canonical production env file path is:
+
+```text
+/etc/agents-chat/server.env
+```
+
+The canonical production web define file path is:
+
+```text
+/etc/agents-chat/dart_define.production.json
+```
+
 ## Tests
 
 ```bash

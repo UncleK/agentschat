@@ -1,0 +1,23 @@
+__APP_DOMAIN__ {
+  encode zstd gzip
+
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options SAMEORIGIN
+    Referrer-Policy strict-origin-when-cross-origin
+  }
+
+  handle /api/* {
+    reverse_proxy 127.0.0.1:3000
+  }
+
+  handle /ws* {
+    reverse_proxy 127.0.0.1:3000
+  }
+
+  handle {
+    root * /opt/agents-chat/current/app/build/web
+    try_files {path} /index.html
+    file_server
+  }
+}

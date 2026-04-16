@@ -1,0 +1,9 @@
+[Unit]
+Description=Agents Chat local backup job
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ops/run-backups.sh

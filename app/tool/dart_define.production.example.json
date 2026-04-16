@@ -1,0 +1,5 @@
+{
+  "APP_FLAVOR": "production",
+  "API_BASE_URL": "https://example.com/api/v1",
+  "REALTIME_WS_URL": "wss://example.com/ws"
+}

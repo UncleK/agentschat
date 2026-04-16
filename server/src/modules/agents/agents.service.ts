@@ -12,20 +12,27 @@ import { DataSource, In, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
   AgentDmAcceptanceMode,
+  EventActorType,
+  EventContentType,
   AgentOwnerType,
   AgentStatus,
   ClaimRequestStatus,
   ConnectionTransportMode,
   FollowTargetType,
   SubjectType,
+  ThreadContextType,
+  ThreadVisibility,
 } from '../../database/domain.enums';
 import { AgentPolicyEntity } from '../../database/entities/agent-policy.entity';
 import { AgentEntity } from '../../database/entities/agent.entity';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { ClaimRequestEntity } from '../../database/entities/claim-request.entity';
+import { EventEntity } from '../../database/entities/event.entity';
 import { FollowEntity } from '../../database/entities/follow.entity';
+import { ThreadEntity } from '../../database/entities/thread.entity';
 import { AuthenticatedHuman } from '../auth/auth.types';
 import { FederationCredentialsService } from '../federation/federation-credentials.service';
+import { FederationDeliveryService } from '../federation/federation-delivery.service';
 
 interface ImportAgentInput {
   handle: string;
@@ -104,6 +111,13 @@ export interface AgentBootstrapResponse {
   };
 }
 
+export interface PublicAgentBootstrapResponse {
+  bootstrap: AgentBootstrapResponse & {
+    code: string;
+    bootstrapPath: string;
+  };
+}
+
 export interface AgentDirectoryEntry extends AgentSummary {
   sourceType: string | null;
   vendorName: string | null;
@@ -159,6 +173,7 @@ export class AgentsService {
     @InjectRepository(FollowEntity)
     private readonly followRepository: Repository<FollowEntity>,
     private readonly federationCredentialsService: FederationCredentialsService,
+    private readonly federationDeliveryService: FederationDeliveryService,
   ) {}
 
   async importSelfOwnedAgent(input: ImportAgentInput) {
@@ -170,6 +185,25 @@ export class AgentsService {
     input: ImportAgentInput,
   ) {
     return this.createAgent(input, AgentOwnerType.Human, owner.id);
+  }
+
+  async createPublicAgentBootstrap(
+    input: ImportAgentInput,
+  ): Promise<PublicAgentBootstrapResponse> {
+    const agent = await this.createAgent(input, AgentOwnerType.Self, null);
+    const claimToken = this.federationCredentialsService.createAgentClaimToken(
+      agent.id,
+      AgentsService.humanInvitationTtlMs,
+    );
+    const bootstrap = await this.readAgentBootstrap(claimToken);
+
+    return {
+      bootstrap: {
+        ...bootstrap,
+        code: this.buildInvitationCode(claimToken),
+        bootstrapPath: this.buildBootstrapPath(claimToken),
+      },
+    };
   }
 
   async createHumanOwnedAgentInvitation(
@@ -358,31 +392,24 @@ export class AgentsService {
     activeAgentId?: string | null,
   ): Promise<AgentDirectoryResponse> {
     const actor = await this.resolveDirectoryActor(viewer, activeAgentId);
-    const agents = await this.agentRepository.find({
-      where: {
-        isPublic: true,
-        status: In([
-          AgentStatus.Online,
-          AgentStatus.Debating,
-          AgentStatus.Offline,
-        ]),
-      },
-      relations: {
-        policy: true,
-      },
-      order: {
-        status: 'ASC',
-        updatedAt: 'DESC',
-        createdAt: 'DESC',
-      },
+    return this.readDirectoryForActor(actor);
+  }
+
+  async readDirectoryForAgent(
+    agentId: string,
+  ): Promise<AgentDirectoryResponse> {
+    const agent = await this.agentRepository.findOneBy({
+      id: agentId,
     });
 
-    return {
-      actor,
-      agents: await Promise.all(
-        agents.map((agent) => this.serializeDirectoryEntry(agent, actor)),
-      ),
-    };
+    if (!agent) {
+      throw new NotFoundException(`Agent ${agentId} was not found.`);
+    }
+
+    return this.readDirectoryForActor({
+      type: SubjectType.Agent,
+      id: agent.id,
+    });
   }
 
   async findEligibleOwnedAgents(ownerUserId: string): Promise<AgentEntity[]> {
@@ -400,55 +427,105 @@ export class AgentsService {
   }
 
   async requestClaim(owner: AuthenticatedHuman, agentId: string) {
-    const agent = await this.agentRepository.findOneBy({ id: agentId });
+    const result = await this.dataSource.transaction(async (manager) => {
+      const agentRepository = manager.getRepository(AgentEntity);
+      const claimRequestRepository = manager.getRepository(ClaimRequestEntity);
+      const threadRepository = manager.getRepository(ThreadEntity);
+      const eventRepository = manager.getRepository(EventEntity);
+      const agent = await agentRepository.findOneBy({ id: agentId });
 
-    if (!agent) {
-      throw new NotFoundException(`Agent ${agentId} was not found.`);
-    }
+      if (!agent) {
+        throw new NotFoundException(`Agent ${agentId} was not found.`);
+      }
 
-    if (agent.ownerType === AgentOwnerType.Human) {
-      if (agent.ownerUserId === owner.id) {
+      if (agent.ownerType === AgentOwnerType.Human) {
+        if (agent.ownerUserId === owner.id) {
+          throw new ConflictException(
+            'This agent is already owned by the requesting human.',
+          );
+        }
+
         throw new ConflictException(
-          'This agent is already owned by the requesting human.',
+          'Human-owned agents must be imported by their owner.',
         );
       }
 
-      throw new ConflictException(
-        'Human-owned agents must be imported by their owner.',
-      );
-    }
+      const existingPendingRequest = await claimRequestRepository.findOneBy({
+        agentId,
+        status: ClaimRequestStatus.Pending,
+      });
+      const challengeToken = this.buildChallengeToken(agent.id, owner.id);
 
-    const existingPendingRequest = await this.claimRequestRepository.findOneBy({
-      agentId,
-      status: ClaimRequestStatus.Pending,
-    });
-
-    if (existingPendingRequest) {
-      if (existingPendingRequest.requestedByUserId !== owner.id) {
+      if (
+        existingPendingRequest &&
+        existingPendingRequest.requestedByUserId !== owner.id
+      ) {
         throw new ConflictException(
           'Another pending claim request already exists for this agent.',
         );
       }
 
-      return {
-        claimRequest: existingPendingRequest,
-        challengeToken: this.buildChallengeToken(agent.id, owner.id),
-      };
-    }
+      const claimRequest =
+        existingPendingRequest ??
+        (await claimRequestRepository.save(
+          claimRequestRepository.create({
+            agentId: agent.id,
+            requestedByUserId: owner.id,
+            challengeTokenHash: this.hashToken(challengeToken),
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          }),
+        ));
+      const thread = await threadRepository.save(
+        threadRepository.create({
+          contextType: ThreadContextType.DirectMessage,
+          visibility: ThreadVisibility.Private,
+          title: 'Claim request',
+          metadata: {
+            systemThread: 'claim_request',
+            agentId: agent.id,
+            claimRequestId: claimRequest.id,
+          },
+        }),
+      );
+      const event = await eventRepository.save(
+        eventRepository.create({
+          threadId: thread.id,
+          eventType: 'claim.requested',
+          actorType: EventActorType.Human,
+          actorUserId: owner.id,
+          targetType: SubjectType.Agent,
+          targetId: agent.id,
+          contentType: EventContentType.None,
+          content: null,
+          metadata: {
+            claimRequestId: claimRequest.id,
+            challengeToken,
+            expiresAt: claimRequest.expiresAt.toISOString(),
+            claimant: {
+              id: owner.id,
+              username: owner.username,
+              displayName: owner.displayName,
+              email: owner.email,
+            },
+          },
+        }),
+      );
 
-    const challengeToken = this.buildChallengeToken(agent.id, owner.id);
-    const claimRequest = await this.claimRequestRepository.save(
-      this.claimRequestRepository.create({
-        agentId: agent.id,
-        requestedByUserId: owner.id,
-        challengeTokenHash: this.hashToken(challengeToken),
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-      }),
+      return {
+        claimRequest,
+        challengeToken,
+        event,
+      };
+    });
+
+    await this.federationDeliveryService.enqueueEventForRecipient(
+      result.event,
+      result.claimRequest.agentId,
     );
 
     return {
-      claimRequest,
-      challengeToken,
+      claimRequest: result.claimRequest,
+      challengeToken: result.challengeToken,
     };
   }
 
@@ -648,6 +725,37 @@ export class AgentsService {
     return {
       type: SubjectType.Agent,
       id: agent.id,
+    };
+  }
+
+  private async readDirectoryForActor(actor: {
+    type: SubjectType;
+    id: string;
+  }): Promise<AgentDirectoryResponse> {
+    const agents = await this.agentRepository.find({
+      where: {
+        isPublic: true,
+        status: In([
+          AgentStatus.Online,
+          AgentStatus.Debating,
+          AgentStatus.Offline,
+        ]),
+      },
+      relations: {
+        policy: true,
+      },
+      order: {
+        status: 'ASC',
+        updatedAt: 'DESC',
+        createdAt: 'DESC',
+      },
+    });
+
+    return {
+      actor,
+      agents: await Promise.all(
+        agents.map((agent) => this.serializeDirectoryEntry(agent, actor)),
+      ),
     };
   }
 

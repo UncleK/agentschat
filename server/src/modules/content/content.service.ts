@@ -27,6 +27,7 @@ import { ThreadEntity } from '../../database/entities/thread.entity';
 import { AuthenticatedHuman } from '../auth/auth.types';
 import { AssetsService } from '../assets/assets.service';
 import { DebateService } from '../debate/debate.service';
+import { AuthenticatedFederatedAgent } from '../federation/federation.types';
 import { ModerationService } from '../moderation/moderation.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PolicyService } from '../policy/policy.service';
@@ -242,6 +243,25 @@ export class ContentService {
     );
   }
 
+  async getAgentDirectMessageThreads(
+    agent: AuthenticatedFederatedAgent,
+    input: Pick<DirectMessageReadInput, 'cursor' | 'limit'>,
+  ) {
+    return this.readDirectMessageThreadsForActor(agent.id, input, null);
+  }
+
+  async getAgentDirectMessageThreadMessages(
+    agent: AuthenticatedFederatedAgent,
+    threadId: string,
+    input: Pick<DirectMessageReadInput, 'cursor' | 'limit'>,
+  ) {
+    return this.readDirectMessageThreadMessagesForActor(
+      agent.id,
+      threadId,
+      input,
+    );
+  }
+
   async getDirectMessageThreads(
     human: AuthenticatedHuman,
     input: DirectMessageReadInput,
@@ -250,6 +270,34 @@ export class ContentService {
       human,
       input.activeAgentId,
     );
+    return this.readDirectMessageThreadsForActor(
+      activeAgentId,
+      input,
+      human.id,
+    );
+  }
+
+  async getDirectMessageThreadMessages(
+    human: AuthenticatedHuman,
+    threadId: string,
+    input: DirectMessageReadInput,
+  ) {
+    const activeAgentId = await this.requireOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    return this.readDirectMessageThreadMessagesForActor(
+      activeAgentId,
+      threadId,
+      input,
+    );
+  }
+
+  private async readDirectMessageThreadsForActor(
+    activeAgentId: string,
+    input: Pick<DirectMessageReadInput, 'cursor' | 'limit'>,
+    humanViewerId: string | null,
+  ) {
     const limit = this.parseLimit(input.limit, 20, 50);
     const cursor = this.parseDirectMessageCursor(input.cursor);
     const latestEvents = await this.readLatestDirectMessageEvents(
@@ -273,7 +321,7 @@ export class ContentService {
           });
     const participantsByThreadId = new Map<string, ThreadParticipantEntity[]>();
     const unreadCountsByThreadId = await this.readDirectMessageUnreadCounts(
-      human.id,
+      humanViewerId,
       activeAgentId,
       threadIds,
     );
@@ -338,15 +386,11 @@ export class ContentService {
     };
   }
 
-  async getDirectMessageThreadMessages(
-    human: AuthenticatedHuman,
+  private async readDirectMessageThreadMessagesForActor(
+    activeAgentId: string,
     threadId: string,
-    input: DirectMessageReadInput,
+    input: Pick<DirectMessageReadInput, 'cursor' | 'limit'>,
   ) {
-    const activeAgentId = await this.requireOwnedActiveAgentContext(
-      human,
-      input.activeAgentId,
-    );
     const normalizedThreadId = this.requiredString(threadId, 'threadId');
     await this.assertDirectMessageThreadMembership(
       normalizedThreadId,
@@ -508,6 +552,59 @@ export class ContentService {
       human,
       input.activeAgentId,
     );
+    return this.listForumTopicsForViewer(activeAgentId, input);
+  }
+
+  async getForumTopic(
+    human: AuthenticatedHuman,
+    threadId: string,
+    input: Pick<ForumTopicsReadInput, 'activeAgentId'>,
+  ) {
+    const normalizedThreadId = this.requiredString(threadId, 'threadId');
+    const activeAgentId = await this.resolveOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    return this.readForumTopicForViewer(
+      normalizedThreadId,
+      activeAgentId,
+      activeAgentId
+        ? {
+            type: SubjectType.Agent,
+            id: activeAgentId,
+          }
+        : {
+            type: SubjectType.Human,
+            id: human.id,
+          },
+    );
+  }
+
+  async listAgentForumTopics(
+    agent: AuthenticatedFederatedAgent,
+    input: Pick<ForumTopicsReadInput, 'query' | 'limit'>,
+  ) {
+    return this.listForumTopicsForViewer(agent.id, input);
+  }
+
+  async getAgentForumTopic(
+    agent: AuthenticatedFederatedAgent,
+    threadId: string,
+  ) {
+    return this.readForumTopicForViewer(
+      this.requiredString(threadId, 'threadId'),
+      agent.id,
+      {
+        type: SubjectType.Agent,
+        id: agent.id,
+      },
+    );
+  }
+
+  private async listForumTopicsForViewer(
+    activeAgentId: string | null,
+    input: Pick<ForumTopicsReadInput, 'query' | 'limit'>,
+  ) {
     const normalizedQuery = this.optionalString(input.query)?.toLowerCase();
     const limit = this.parseLimit(input.limit, 20, 50);
     const fetchLimit = normalizedQuery ? Math.min(limit * 3, 50) : limit;
@@ -521,7 +618,7 @@ export class ContentService {
 
     if (topicViews.length === 0) {
       return {
-        activeAgentId: activeAgentId ?? null,
+        activeAgentId,
         topics: [] as ForumTopicDto[],
       };
     }
@@ -569,7 +666,6 @@ export class ContentService {
     const followedThreadIds = new Set(
       follows.map((follow) => follow.targetSubjectId),
     );
-
     const topics = topicViews
       .map((topicView) => {
         const rootEvent = rootEventById.get(topicView.rootEventId);
@@ -586,7 +682,6 @@ export class ContentService {
         );
       })
       .filter((topic): topic is ForumTopicDto => topic !== null);
-
     const filteredTopics =
       normalizedQuery == null
         ? topics
@@ -595,35 +690,28 @@ export class ContentService {
           );
 
     return {
-      activeAgentId: activeAgentId ?? null,
+      activeAgentId,
       topics: filteredTopics.slice(0, limit),
     };
   }
 
-  async getForumTopic(
-    human: AuthenticatedHuman,
+  private async readForumTopicForViewer(
     threadId: string,
-    input: Pick<ForumTopicsReadInput, 'activeAgentId'>,
+    activeAgentId: string | null,
+    viewerLikeActor: SubjectReference,
   ) {
-    const normalizedThreadId = this.requiredString(threadId, 'threadId');
-    const activeAgentId = await this.resolveOwnedActiveAgentContext(
-      human,
-      input.activeAgentId,
-    );
     const topicView = await this.forumTopicViewRepository.findOneBy({
-      threadId: normalizedThreadId,
+      threadId,
     });
 
     if (!topicView) {
-      throw new NotFoundException(
-        `Forum topic ${normalizedThreadId} was not found.`,
-      );
+      throw new NotFoundException(`Forum topic ${threadId} was not found.`);
     }
 
     const [events, participantCount, followState] = await Promise.all([
       this.eventRepository.find({
         where: {
-          threadId: normalizedThreadId,
+          threadId,
           eventType: In(['forum.topic.create', 'forum.reply.create']),
         },
         relations: {
@@ -636,7 +724,7 @@ export class ContentService {
       }),
       this.threadParticipantRepository.count({
         where: {
-          threadId: normalizedThreadId,
+          threadId,
         },
       }),
       activeAgentId
@@ -645,7 +733,7 @@ export class ContentService {
               followerType: SubjectType.Agent,
               followerSubjectId: activeAgentId,
               targetType: FollowTargetType.Topic,
-              targetSubjectId: normalizedThreadId,
+              targetSubjectId: threadId,
             },
           })
         : Promise.resolve(false),
@@ -661,8 +749,8 @@ export class ContentService {
     }
 
     const viewerLikeKey = this.forumReplyLikeSubject(
-      activeAgentId ? SubjectType.Agent : SubjectType.Human,
-      activeAgentId ?? human.id,
+      viewerLikeActor.type,
+      viewerLikeActor.id,
     );
     const replies = this.buildForumReplyTree(
       events.filter((event) => event.id !== rootEvent.id),
@@ -671,7 +759,7 @@ export class ContentService {
     );
 
     return {
-      activeAgentId: activeAgentId ?? null,
+      activeAgentId,
       topic: this.serializeForumTopic(
         topicView,
         rootEvent,
@@ -1336,13 +1424,40 @@ export class ContentService {
   }
 
   private async readDirectMessageUnreadCounts(
-    humanId: string,
+    humanId: string | null,
     activeAgentId: string,
     threadIds: string[],
   ): Promise<Map<string, number>> {
     if (threadIds.length === 0) {
       return new Map();
     }
+
+    const parameters: Array<
+      string | string[] | SubjectType | EventActorType | ThreadParticipantRole
+    > = [
+      threadIds,
+      SubjectType.Agent,
+      activeAgentId,
+      'dm.send',
+      EventActorType.Agent,
+      activeAgentId,
+    ];
+    let nextParameterIndex = parameters.length + 1;
+    let selfAuthoredFilter = `
+            (event.actor_type = $5 AND event.actor_agent_id = $6)
+    `;
+
+    if (humanId) {
+      parameters.push(EventActorType.Human, humanId);
+      selfAuthoredFilter = `
+            (event.actor_type = $5 AND event.actor_agent_id = $6)
+            OR (event.actor_type = $${nextParameterIndex} AND event.actor_user_id = $${nextParameterIndex + 1})
+      `;
+      nextParameterIndex += 2;
+    }
+
+    const memberRoleParameterIndex = nextParameterIndex;
+    parameters.push(ThreadParticipantRole.Member);
 
     const rows = await this.dataSource.query<
       Array<{
@@ -1359,8 +1474,7 @@ export class ContentService {
           ON event.thread_id = participant.thread_id
           AND event.event_type = $4
           AND NOT (
-            (event.actor_type = $5 AND event.actor_agent_id = $6)
-            OR (event.actor_type = $7 AND event.actor_user_id = $8)
+${selfAuthoredFilter}
           )
           AND (
             participant.last_read_at IS NULL
@@ -1375,20 +1489,10 @@ export class ContentService {
         WHERE participant.thread_id = ANY($1::uuid[])
           AND participant.participant_type = $2
           AND participant.participant_subject_id = $3
-          AND participant.role = $9
+          AND participant.role = $${memberRoleParameterIndex}
         GROUP BY participant.thread_id
       `,
-      [
-        threadIds,
-        SubjectType.Agent,
-        activeAgentId,
-        'dm.send',
-        EventActorType.Agent,
-        activeAgentId,
-        EventActorType.Human,
-        humanId,
-        ThreadParticipantRole.Member,
-      ],
+      parameters,
     );
 
     return new Map(
