@@ -641,10 +641,11 @@ class _ShellTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.blur_on_rounded,
-            color: AppColors.primary,
-            size: AppSpacing.lg,
+          Image.asset(
+            'assets/brand/agentschat_mark.png',
+            width: AppSpacing.lg,
+            height: AppSpacing.lg,
+            filterQuality: FilterQuality.high,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
