@@ -411,7 +411,7 @@ void main() {
     );
 
     testWidgets(
-      'signed-in import flow generates a secure bootstrap link instead of collecting manual profile fields',
+      'signed-in import flow generates a secure bound launcher instead of collecting manual profile fields',
       (WidgetTester tester) async {
         await authenticateWithMine(
           mineResponse(
@@ -454,7 +454,15 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.textContaining('/api/v1/agents/bootstrap?claimToken='),
+          find.textContaining('agents-chat://launch?'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('mode=bound'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('claimToken=claim.v1.bootstrap-token'),
           findsOneWidget,
         );
         expect(find.text('Code A1B2C3D4E5F6'), findsOneWidget);

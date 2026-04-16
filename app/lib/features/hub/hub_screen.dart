@@ -23,6 +23,8 @@ import '../../core/widgets/swipe_back_sheet.dart';
 import 'hub_models.dart';
 import 'hub_view_model.dart';
 
+const _agentsChatSkillRepoUrl = 'https://github.com/UncleK/agentschat.git';
+
 class HubScreen extends StatefulWidget {
   const HubScreen({super.key});
 
@@ -3905,7 +3907,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
     }
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Secure agent link copied')));
+    ).showSnackBar(const SnackBar(content: Text('Bound agent link copied')));
   }
 
   String _buildBootstrapUrl(String baseUrl, String bootstrapPath) {
@@ -3930,12 +3932,41 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
         .toString();
   }
 
+  String _extractServerBaseUrl(String apiBaseUrl) {
+    final uri = Uri.parse(apiBaseUrl);
+    if (uri.hasScheme && uri.host.isNotEmpty) {
+      return uri.origin;
+    }
+    return apiBaseUrl;
+  }
+
+  String _buildBoundLauncherUrl(
+    String apiBaseUrl,
+    HumanOwnedAgentInvitation invitation,
+  ) {
+    final serverBaseUrl = _extractServerBaseUrl(apiBaseUrl);
+    return Uri(
+      scheme: 'agents-chat',
+      host: 'launch',
+      queryParameters: {
+        'skillRepo': _agentsChatSkillRepoUrl,
+        'serverBaseUrl': serverBaseUrl,
+        'mode': 'bound',
+        'bootstrapPath': invitation.bootstrapPath,
+        'claimToken': invitation.claimToken,
+      },
+    ).toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final invitation = _invitation;
     final bootstrapUrl = invitation == null
         ? null
         : _buildBootstrapUrl(widget.apiBaseUrl, invitation.bootstrapPath);
+    final boundLauncherUrl = invitation == null
+        ? null
+        : _buildBoundLauncherUrl(widget.apiBaseUrl, invitation);
     final canGenerate =
         widget.isSignedIn && !_isGenerating && invitation == null;
 
@@ -3970,8 +4001,8 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             widget.isSignedIn
-                                ? 'Generate a signed bootstrap link, copy it to your agent terminal, and let the agent connect itself back to this human.'
-                                : 'Sign in as a human first, then generate a live bootstrap link for the next agent.',
+                                ? 'Generate a signed bind launcher, copy it to your agent terminal, and let the agent connect itself back to this human automatically.'
+                                : 'Sign in as a human first, then generate a live bind launcher for the next agent.',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: AppColors.onSurfaceMuted),
                           ),
@@ -3990,8 +4021,8 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                   icon: Icons.cloud_sync_rounded,
                   accentColor: AppColors.primary,
                   text: widget.isSignedIn
-                      ? 'The human only generates the link. Nickname, bio, and tags should come from the agent after it boots and syncs its profile.'
-                      : 'The signed link is only generated after a real human session is active.',
+                      ? 'This launcher binds the next claimed agent directly to the current human account. Nickname, bio, and tags should still come from the agent after it boots and syncs its profile.'
+                      : 'The signed bind launcher is only generated after a real human session is active.',
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DecoratedBox(
@@ -4008,7 +4039,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Bootstrap link'.toUpperCase(),
+                          'Bound launcher'.toUpperCase(),
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(color: AppColors.primaryFixed),
                         ),
@@ -4034,8 +4065,8 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                                       vertical: AppSpacing.sm,
                                     ),
                                     child: Text(
-                                      bootstrapUrl ??
-                                          'Generate a live link for the next agent connection',
+                                      boundLauncherUrl ??
+                                          'Generate a live launcher for the next human-bound agent connection',
                                       key: const Key(
                                         'generated-import-link-text',
                                       ),
@@ -4055,7 +4086,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                                 ),
                                 DecoratedBox(
                                   decoration: BoxDecoration(
-                                    color: bootstrapUrl != null
+                                    color: boundLauncherUrl != null
                                         ? AppColors.primary
                                         : AppColors.surfaceHighest,
                                     borderRadius: const BorderRadius.all(
@@ -4064,16 +4095,18 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                                   ),
                                   child: IconButton(
                                     key: const Key('copy-import-link-button'),
-                                    onPressed: bootstrapUrl == null
+                                    onPressed: boundLauncherUrl == null
                                         ? null
                                         : () {
                                             unawaited(
-                                              _copyInvitationLink(bootstrapUrl),
+                                              _copyInvitationLink(
+                                                boundLauncherUrl,
+                                              ),
                                             );
                                           },
                                     icon: Icon(
                                       Icons.content_copy_rounded,
-                                      color: bootstrapUrl != null
+                                      color: boundLauncherUrl != null
                                           ? AppColors.onPrimary
                                           : AppColors.onSurfaceMuted,
                                     ),
@@ -4093,6 +4126,11 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                                 label: 'Code ${invitation.code}',
                                 toneColor: AppColors.primary,
                               ),
+                              if (bootstrapUrl != null)
+                                _InfoBadge(
+                                  label: 'Bootstrap ready',
+                                  toneColor: AppColors.primaryFixed,
+                                ),
                               _InfoBadge(
                                 label:
                                     'Expires ${invitation.expiresAt.split('T').first}',
@@ -4110,7 +4148,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                   icon: Icons.verified_user_rounded,
                   accentColor: AppColors.tertiary,
                   text:
-                      'If an agent connects without this unique invite link, do not bind it here. Let it appear in claimable records and use the claim flow instead.',
+                      'If an agent connects without this unique launcher, do not bind it here. Let it appear in claimable records and use the claim flow instead.',
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: AppSpacing.md),

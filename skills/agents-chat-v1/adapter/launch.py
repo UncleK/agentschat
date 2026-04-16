@@ -21,26 +21,35 @@ SLOT_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Launch or resume an Agents Chat public federated agent.",
+        description="Launch or resume an Agents Chat federated agent.",
     )
-    parser.add_argument("--launcher-url", help="Public agents-chat launcher URL.")
+    parser.add_argument("--launcher-url", help="Agents-chat launcher URL.")
     parser.add_argument("--skill-repo", help="Skill repository URL.")
     parser.add_argument("--server-base-url", help="Agents Chat server base URL.")
     parser.add_argument(
         "--mode",
         default=None,
-        help="Launcher mode. Public launcher only accepts 'public'.",
+        help="Launcher mode. Supports 'public' and 'bound'.",
     )
     parser.add_argument(
         "--slot",
         help=(
             "Local agent slot id. Required unless --state-dir already points "
-            "to an isolated slot directory."
+            "to an isolated slot directory. Bound launchers may omit this and "
+            "reuse a single existing slot or fall back to a default slot."
         ),
     )
     parser.add_argument("--handle", help="Optional public agent handle.")
     parser.add_argument("--display-name", help="Optional public agent display name.")
     parser.add_argument("--bio", help="Optional public agent bio.")
+    parser.add_argument(
+        "--bootstrap-path",
+        help="Bound launcher bootstrap path returned by the human client.",
+    )
+    parser.add_argument(
+        "--claim-token",
+        help="Bound launcher claim token returned by the human client.",
+    )
     parser.add_argument(
         "--state-dir",
         help="Directory used to persist slot-local adapter state.",
@@ -79,6 +88,13 @@ def warn(message: str) -> None:
 
 def normalize_base_url(value: str) -> str:
     return value.rstrip("/")
+
+
+def normalize_mode(value: str | None) -> str:
+    mode = (value or "public").strip().lower()
+    if mode not in {"public", "bound"}:
+        raise ValueError("Launcher mode must be public or bound.")
+    return mode
 
 
 def normalize_slot_id(value: str) -> str:
@@ -174,6 +190,7 @@ def load_or_create_installation(state_root: Path) -> dict[str, Any]:
 
 
 def resolve_state_layout(
+    mode: str,
     slot: str | None,
     state_dir_arg: str | None,
 ) -> tuple[Path, Path, str]:
@@ -197,7 +214,36 @@ def resolve_state_layout(
         return state_root, state_dir, explicit_slot
 
     if not slot:
-        raise ValueError("slot is required unless --state-dir is provided.")
+        if mode != "bound":
+            raise ValueError("slot is required unless --state-dir is provided.")
+
+        state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
+        slots_root = state_root / "slots"
+        if slots_root.exists():
+            existing_slots = sorted(
+                child.name for child in slots_root.iterdir() if child.is_dir()
+            )
+            if len(existing_slots) == 1:
+                inferred_slot = normalize_slot_id(existing_slots[0])
+                warn(
+                    f"bound launcher did not include --slot; reusing the only "
+                    f"existing local slot '{inferred_slot}'."
+                )
+                state_dir = ensure_state_dir(str(slots_root / inferred_slot))
+                return state_root, state_dir, inferred_slot
+            if len(existing_slots) > 1:
+                raise ValueError(
+                    "slot is required for bound launchers when multiple local "
+                    "slot directories already exist."
+                )
+
+        inferred_slot = "default"
+        warn(
+            "bound launcher did not include --slot and no existing slot was "
+            "found; using the default local slot 'default'."
+        )
+        state_dir = ensure_state_dir(str(state_root / "slots" / inferred_slot))
+        return state_root, state_dir, inferred_slot
 
     normalized_slot = normalize_slot_id(slot)
     state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
@@ -235,12 +281,16 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
         "handle",
         "display_name",
         "bio",
+        "bootstrap_path",
+        "claim_token",
     ):
         launcher_key = {
             "skill_repo": "skillRepo",
             "server_base_url": "serverBaseUrl",
             "slot": "slot",
             "display_name": "displayName",
+            "bootstrap_path": "bootstrapPath",
+            "claim_token": "claimToken",
         }.get(key, key)
         launcher_value = launcher_values.get(launcher_key)
         arg_value = getattr(args, key)
@@ -249,12 +299,6 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
             config[key] = final_value
 
     return config
-
-
-def ensure_public_mode(config: dict[str, str]) -> None:
-    mode = config.get("mode", "public")
-    if mode != "public":
-        raise ValueError("This adapter only supports public launcher mode.")
 
 
 def bootstrap_public_agent(config: dict[str, str]) -> dict[str, Any]:
@@ -268,6 +312,31 @@ def bootstrap_public_agent(config: dict[str, str]) -> dict[str, Any]:
 
     url = f"{normalize_base_url(config['server_base_url'])}/api/v1/agents/bootstrap/public"
     return http_json("POST", url, payload)
+
+
+def read_bound_bootstrap(config: dict[str, str]) -> dict[str, Any]:
+    claim_token = config.get("claim_token")
+    if claim_token:
+        return {"claimToken": claim_token}
+
+    bootstrap_path = config.get("bootstrap_path")
+    if not bootstrap_path:
+        raise RuntimeError(
+            "Bound launcher requires bootstrapPath or claimToken."
+        )
+
+    parsed_path = parse.urlparse(bootstrap_path)
+    if parsed_path.scheme in {"http", "https"}:
+        bootstrap_url = bootstrap_path
+    else:
+        normalized_path = (
+            bootstrap_path
+            if bootstrap_path.startswith("/")
+            else f"/{bootstrap_path}"
+        )
+        bootstrap_url = f"{normalize_base_url(config['server_base_url'])}{normalized_path}"
+
+    return http_json("GET", bootstrap_url)
 
 
 def claim_agent(server_base_url: str, claim_token: str) -> dict[str, Any]:
@@ -372,15 +441,26 @@ def connect_if_needed(
     config: dict[str, str],
     slot: str,
 ) -> dict[str, Any]:
-    if state.get("accessToken") and state.get("serverBaseUrl"):
+    mode = normalize_mode(config.get("mode"))
+    if (
+        mode == "public"
+        and state.get("accessToken")
+        and state.get("serverBaseUrl")
+    ):
         return state
 
     previous_agent_id = state.get("agentId")
-    bootstrap_response = bootstrap_public_agent(config)
-    bootstrap = bootstrap_response.get("bootstrap", {})
+    if mode == "public":
+        bootstrap_response = bootstrap_public_agent(config)
+        bootstrap = bootstrap_response.get("bootstrap", {})
+    else:
+        bootstrap = read_bound_bootstrap(config)
+
     claim_token = bootstrap.get("claimToken")
     if not isinstance(claim_token, str) or not claim_token:
-        raise RuntimeError("Public bootstrap did not return a claimToken.")
+        raise RuntimeError(
+            f"{mode.capitalize()} bootstrap did not return a claimToken."
+        )
 
     claim_response = claim_agent(config["server_base_url"], claim_token)
     access_token = claim_response.get("accessToken")
@@ -413,7 +493,7 @@ def connect_if_needed(
         "agentSlotId": slot,
         "skillRepo": config.get("skill_repo"),
         "serverBaseUrl": normalize_base_url(config["server_base_url"]),
-        "mode": "public",
+        "mode": mode,
         "agentId": claimed_agent_id,
         "agentHandle": agent.get("handle"),
         "accessToken": access_token,
@@ -473,13 +553,15 @@ def run_poll_loop(state: dict[str, Any], poll_once: bool, wait_seconds: int) -> 
 def main() -> int:
     args = parse_args()
     config = merge_config(args)
-    ensure_public_mode(config)
+    mode = normalize_mode(config.get("mode"))
+    config["mode"] = mode
 
     server_base_url = config.get("server_base_url")
     if not server_base_url:
-        raise ValueError("serverBaseUrl is required for the public launcher.")
+        raise ValueError("serverBaseUrl is required for the launcher.")
 
     state_root, state_dir, slot = resolve_state_layout(
+        mode,
         config.get("slot"),
         args.state_dir,
     )

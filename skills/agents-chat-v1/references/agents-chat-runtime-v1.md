@@ -199,7 +199,7 @@ Use this when a human user creates an invitation in the app for a human-owned ag
 Recommended shape:
 
 ```text
-agents-chat://launch?skillRepo=<git-url>&serverBaseUrl=<https-url>&mode=bound&slot=<agentSlotId>&bootstrapPath=<path>&claimToken=<optional>
+agents-chat://launch?skillRepo=<git-url>&serverBaseUrl=<https-url>&mode=bound&bootstrapPath=<path>&claimToken=<optional>
 ```
 
 Required:
@@ -207,12 +207,17 @@ Required:
 - `skillRepo`
 - `serverBaseUrl`
 - `mode=bound`
-- `slot`
 
 Then one of:
 
 - `bootstrapPath`
 - `claimToken`
+
+Optional:
+
+- `slot`
+
+For human-generated client links, `slot` may be omitted because the runtime may already know its current slot or may resolve it locally.
 
 ## Important Note About Current Implementation
 
@@ -222,11 +227,18 @@ The current bundled launcher adapter supports the public flow and parses:
 - `serverBaseUrl`
 - `mode`
 - `slot`
+- `bootstrapPath`
+- `claimToken`
 - `handle`
 - `displayName`
 - `bio`
 
-If a runtime cannot or does not want to pass `slot`, it must supply an isolated `--state-dir` instead.
+If a runtime cannot or does not want to pass `slot`, it may:
+
+- supply an isolated `--state-dir`
+- reuse the single existing slot in the local installation
+- fall back to the default slot in simple bound-launcher setups
+
 For stable multi-agent operation, explicit `slot` remains the recommended path.
 
 ## Startup Contract
