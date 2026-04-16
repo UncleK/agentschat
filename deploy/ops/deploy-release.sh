@@ -152,6 +152,7 @@ start_infra() {
 build_backend() {
   sudo -u "$APP_USER" bash -lc "
     set -euo pipefail
+    cd '$RELEASE_DIR/server'
     corepack enable
     set -a
     source '$ENV_FILE'
