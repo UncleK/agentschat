@@ -7,6 +7,7 @@ class AuthUser {
     required this.displayName,
     required this.avatarUrl,
     required this.authProvider,
+    this.emailVerified = false,
   });
 
   final String id;
@@ -15,6 +16,7 @@ class AuthUser {
   final String displayName;
   final String? avatarUrl;
   final String? authProvider;
+  final bool emailVerified;
 }
 
 /// Represents the current authenticated human session.
@@ -48,4 +50,5 @@ class AuthState {
   String get displayName => user?.displayName ?? '';
   String? get avatarUrl => user?.avatarUrl;
   String? get authProvider => user?.authProvider;
+  bool get emailVerified => user?.emailVerified ?? false;
 }

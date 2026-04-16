@@ -22,6 +22,7 @@ for (const envFile of ENV_FILES) {
 }
 
 export const APP_ENVIRONMENT = Symbol('APP_ENVIRONMENT');
+export type MailDeliveryMode = 'disabled' | 'log' | 'resend';
 
 export interface AppEnvironment {
   readonly nodeEnv: string;
@@ -31,6 +32,14 @@ export interface AppEnvironment {
   readonly auth: {
     readonly jwtSecret: string;
     readonly operatorToken: string;
+    readonly emailVerificationCodeTtlSeconds: number;
+    readonly passwordResetCodeTtlSeconds: number;
+    readonly emailCodeCooldownSeconds: number;
+  };
+  readonly mail: {
+    readonly deliveryMode: MailDeliveryMode;
+    readonly fromAddress: string;
+    readonly resendApiKey: string | null;
   };
   readonly database: {
     readonly url: string;
@@ -72,16 +81,44 @@ export function loadEnvironment(
     );
   }
 
+  const nodeEnv = env.NODE_ENV ?? 'development';
   const apiPrefix = normalizeApiPrefix(env.API_PREFIX ?? 'api/v1');
+  const defaultMailDeliveryMode: MailDeliveryMode =
+    nodeEnv === 'production' ? 'disabled' : 'log';
 
   return {
-    nodeEnv: env.NODE_ENV ?? 'development',
+    nodeEnv,
     serviceName: 'agents-chat-server',
     port: parseInteger(env.PORT, 'PORT', 3000),
     apiPrefix,
     auth: {
       jwtSecret: env.JWT_SECRET!,
       operatorToken: env.OPERATOR_TOKEN!,
+      emailVerificationCodeTtlSeconds: parseInteger(
+        env.AUTH_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+        'AUTH_EMAIL_VERIFICATION_CODE_TTL_SECONDS',
+        600,
+      ),
+      passwordResetCodeTtlSeconds: parseInteger(
+        env.AUTH_PASSWORD_RESET_CODE_TTL_SECONDS,
+        'AUTH_PASSWORD_RESET_CODE_TTL_SECONDS',
+        900,
+      ),
+      emailCodeCooldownSeconds: parseInteger(
+        env.AUTH_EMAIL_CODE_COOLDOWN_SECONDS,
+        'AUTH_EMAIL_CODE_COOLDOWN_SECONDS',
+        60,
+      ),
+    },
+    mail: {
+      deliveryMode: parseMailDeliveryMode(
+        env.MAIL_DELIVERY_MODE,
+        defaultMailDeliveryMode,
+      ),
+      fromAddress:
+        normalizeOptionalString(env.MAIL_FROM_ADDRESS) ??
+        'Agents Chat <no-reply@example.com>',
+      resendApiKey: normalizeOptionalString(env.MAIL_RESEND_API_KEY),
     },
     database: {
       url: env.DATABASE_URL!,
@@ -141,4 +178,32 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   }
 
   return value.toLowerCase() === 'true';
+}
+
+function parseMailDeliveryMode(
+  value: string | undefined,
+  fallback: MailDeliveryMode,
+): MailDeliveryMode {
+  const normalized = value?.trim().toLowerCase();
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (
+    normalized === 'disabled' ||
+    normalized === 'log' ||
+    normalized === 'resend'
+  ) {
+    return normalized;
+  }
+
+  throw new Error(
+    'Environment variable MAIL_DELIVERY_MODE must be disabled, log, or resend.',
+  );
+}
+
+function normalizeOptionalString(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
 }

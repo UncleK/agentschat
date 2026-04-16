@@ -5,6 +5,8 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'node:crypto';
@@ -155,8 +157,12 @@ const ELIGIBLE_ACTIVE_AGENT_STATUSES = [
 ] as const;
 
 @Injectable()
-export class AgentsService {
+export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private static readonly humanInvitationTtlMs = 60 * 60 * 1000;
+  private static readonly staleHumanInvitationMs = 24 * 60 * 60 * 1000;
+  private static readonly invitationIssuedAtKey = 'invitationIssuedAt';
+  private readonly invitationCleanupIntervalMs: number;
+  private invitationCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @Inject(APP_ENVIRONMENT)
@@ -174,7 +180,24 @@ export class AgentsService {
     private readonly followRepository: Repository<FollowEntity>,
     private readonly federationCredentialsService: FederationCredentialsService,
     private readonly federationDeliveryService: FederationDeliveryService,
-  ) {}
+  ) {
+    this.invitationCleanupIntervalMs =
+      environment.nodeEnv === 'test' ? 60_000 : 60 * 60 * 1000;
+  }
+
+  onModuleInit(): void {
+    this.invitationCleanupTimer = setInterval(() => {
+      void this.pruneStaleHumanOwnedInvitations().catch(() => undefined);
+    }, this.invitationCleanupIntervalMs);
+    this.invitationCleanupTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.invitationCleanupTimer) {
+      clearInterval(this.invitationCleanupTimer);
+      this.invitationCleanupTimer = null;
+    }
+  }
 
   async importSelfOwnedAgent(input: ImportAgentInput) {
     return this.createAgent(input, AgentOwnerType.Self, null);
@@ -209,6 +232,20 @@ export class AgentsService {
   async createHumanOwnedAgentInvitation(
     owner: AuthenticatedHuman,
   ): Promise<HumanOwnedAgentInvitationResponse> {
+    const reusableInvitation =
+      await this.findOrPruneReusableHumanOwnedInvitation(owner.id);
+
+    if (reusableInvitation) {
+      reusableInvitation.profileMetadata = this.withInvitationIssuedAt(
+        reusableInvitation.profileMetadata,
+      );
+      const refreshedInvitation =
+        await this.agentRepository.save(reusableInvitation);
+      return this.buildHumanOwnedAgentInvitationResponse(
+        refreshedInvitation.id,
+      );
+    }
+
     const agent = await this.agentRepository.save(
       this.agentRepository.create({
         handle: await this.generateInvitationHandle(),
@@ -219,9 +256,9 @@ export class AgentsService {
         status: AgentStatus.Suspended,
         sourceType: 'hub_invitation',
         runtimeName: 'Pending bootstrap',
-        profileMetadata: {
+        profileMetadata: this.withInvitationIssuedAt({
           invitationPending: true,
-        },
+        }),
       }),
     );
 
@@ -231,8 +268,46 @@ export class AgentsService {
       }),
     );
 
+    return this.buildHumanOwnedAgentInvitationResponse(agent.id);
+  }
+
+  async pruneStaleHumanOwnedInvitations(
+    now = new Date(),
+  ): Promise<{ deletedCount: number }> {
+    const cutoff = now.getTime() - AgentsService.staleHumanInvitationMs;
+    const invitationAgents = await this.agentRepository.find({
+      where: {
+        ownerType: AgentOwnerType.Human,
+        sourceType: 'hub_invitation',
+        status: AgentStatus.Suspended,
+      },
+      relations: {
+        connection: true,
+      },
+    });
+
+    const staleInvitationIds = invitationAgents
+      .filter(
+        (agent) =>
+          agent.connection == null &&
+          agent.profileMetadata['invitationPending'] === true &&
+          this.readInvitationIssuedAtMs(agent) <= cutoff,
+      )
+      .map((agent) => agent.id);
+
+    if (staleInvitationIds.length === 0) {
+      return { deletedCount: 0 };
+    }
+
+    await this.agentRepository.delete(staleInvitationIds);
+    return { deletedCount: staleInvitationIds.length };
+  }
+
+  private buildHumanOwnedAgentInvitationResponse(
+    agentId: string,
+  ): HumanOwnedAgentInvitationResponse {
     const claimToken = this.federationCredentialsService.createAgentClaimToken(
-      agent.id,
+      agentId,
       AgentsService.humanInvitationTtlMs,
     );
     const expiresAt = new Date(
@@ -241,13 +316,77 @@ export class AgentsService {
 
     return {
       invitation: {
-        agentId: agent.id,
+        agentId,
         code: this.buildInvitationCode(claimToken),
         bootstrapPath: this.buildBootstrapPath(claimToken),
         claimToken,
         expiresAt,
       },
     };
+  }
+
+  private async findOrPruneReusableHumanOwnedInvitation(
+    ownerUserId: string,
+  ): Promise<AgentEntity | null> {
+    const invitationAgents = await this.agentRepository.find({
+      where: {
+        ownerType: AgentOwnerType.Human,
+        ownerUserId,
+        sourceType: 'hub_invitation',
+        status: AgentStatus.Suspended,
+      },
+      relations: {
+        connection: true,
+      },
+      order: {
+        updatedAt: 'DESC',
+        createdAt: 'DESC',
+      },
+    });
+
+    const pendingInvitations = invitationAgents.filter(
+      (agent) =>
+        agent.connection == null &&
+        agent.profileMetadata['invitationPending'] === true,
+    );
+
+    if (pendingInvitations.length === 0) {
+      return null;
+    }
+
+    const [reusableInvitation, ...redundantInvitations] = pendingInvitations;
+
+    if (redundantInvitations.length > 0) {
+      await this.agentRepository.delete(
+        redundantInvitations.map((agent) => agent.id),
+      );
+    }
+
+    return reusableInvitation;
+  }
+
+  private withInvitationIssuedAt(
+    metadata: Record<string, unknown>,
+    issuedAt = new Date(),
+  ): Record<string, unknown> {
+    return {
+      ...metadata,
+      invitationPending: true,
+      [AgentsService.invitationIssuedAtKey]: issuedAt.toISOString(),
+    };
+  }
+
+  private readInvitationIssuedAtMs(agent: AgentEntity): number {
+    const rawIssuedAt =
+      agent.profileMetadata[AgentsService.invitationIssuedAtKey];
+    if (typeof rawIssuedAt === 'string') {
+      const parsed = Date.parse(rawIssuedAt);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+
+    return agent.updatedAt.getTime();
   }
 
   async readAgentBootstrap(

@@ -4,6 +4,11 @@ export enum AuthProvider {
   GitHub = 'github',
 }
 
+export enum AuthEmailCodePurpose {
+  EmailVerification = 'email_verification',
+  PasswordReset = 'password_reset',
+}
+
 export enum SubjectType {
   Human = 'human',
   Agent = 'agent',

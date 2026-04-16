@@ -14,6 +14,7 @@ AuthState signedInState({
   String? email,
   String username = '',
   String? authProvider = 'email',
+  bool emailVerified = true,
 }) {
   return AuthState(
     token: token,
@@ -24,6 +25,7 @@ AuthState signedInState({
       displayName: displayName,
       avatarUrl: null,
       authProvider: authProvider,
+      emailVerified: emailVerified,
     ),
     recommendedActiveAgentId: recommendedActiveAgentId,
     isSessionAuthenticated: true,
@@ -229,6 +231,27 @@ class FakeAuthRepository extends AuthRepository {
   final Queue<Future<UsernameAvailabilityResult> Function(String username)>
   _usernameAvailabilityHandlers =
       Queue<Future<UsernameAvailabilityResult> Function(String)>();
+  final Queue<Future<String> Function(String email)>
+  _requestPasswordResetHandlers = Queue<Future<String> Function(String)>();
+  final Queue<
+    Future<String> Function({
+      required String email,
+      required String code,
+      required String newPassword,
+    })
+  >
+  _confirmPasswordResetHandlers =
+      Queue<
+        Future<String> Function({
+          required String email,
+          required String code,
+          required String newPassword,
+        })
+      >();
+  final Queue<Future<String> Function()> _requestEmailVerificationHandlers =
+      Queue<Future<String> Function()>();
+  final Queue<Future<String> Function(String code)>
+  _confirmEmailVerificationHandlers = Queue<Future<String> Function(String)>();
   final Queue<Future<AuthState> Function(String token)> _fetchMeHandlers =
       Queue<Future<AuthState> Function(String token)>();
 
@@ -258,6 +281,33 @@ class FakeAuthRepository extends AuthRepository {
     Future<UsernameAvailabilityResult> Function(String username) handler,
   ) {
     _usernameAvailabilityHandlers.add(handler);
+  }
+
+  void enqueueRequestPasswordResetCode(
+    Future<String> Function(String email) handler,
+  ) {
+    _requestPasswordResetHandlers.add(handler);
+  }
+
+  void enqueueConfirmPasswordReset(
+    Future<String> Function({
+      required String email,
+      required String code,
+      required String newPassword,
+    })
+    handler,
+  ) {
+    _confirmPasswordResetHandlers.add(handler);
+  }
+
+  void enqueueRequestEmailVerificationCode(Future<String> Function() handler) {
+    _requestEmailVerificationHandlers.add(handler);
+  }
+
+  void enqueueConfirmEmailVerification(
+    Future<String> Function(String code) handler,
+  ) {
+    _confirmEmailVerificationHandlers.add(handler);
   }
 
   void enqueueFetchMe(Future<AuthState> Function(String token) handler) {
@@ -292,6 +342,34 @@ class FakeAuthRepository extends AuthRepository {
     required String username,
   }) {
     return _usernameAvailabilityHandlers.removeFirst()(username);
+  }
+
+  @override
+  Future<String> requestPasswordResetCode({required String email}) {
+    return _requestPasswordResetHandlers.removeFirst()(email);
+  }
+
+  @override
+  Future<String> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) {
+    return _confirmPasswordResetHandlers.removeFirst()(
+      email: email,
+      code: code,
+      newPassword: newPassword,
+    );
+  }
+
+  @override
+  Future<String> requestEmailVerificationCode() {
+    return _requestEmailVerificationHandlers.removeFirst()();
+  }
+
+  @override
+  Future<String> confirmEmailVerification({required String code}) {
+    return _confirmEmailVerificationHandlers.removeFirst()(code);
   }
 
   @override

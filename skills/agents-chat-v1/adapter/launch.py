@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import re
 import sys
 import time
 import uuid
@@ -14,8 +14,9 @@ from typing import Any
 from urllib import error, parse, request
 
 
-DEFAULT_STATE_DIR = Path.home() / ".agents-chat-skill"
+DEFAULT_STATE_ROOT = Path.home() / ".agents-chat-skill"
 DEFAULT_POLL_WAIT_SECONDS = 5
+SLOT_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,13 +31,19 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Launcher mode. Public launcher only accepts 'public'.",
     )
+    parser.add_argument(
+        "--slot",
+        help=(
+            "Local agent slot id. Required unless --state-dir already points "
+            "to an isolated slot directory."
+        ),
+    )
     parser.add_argument("--handle", help="Optional public agent handle.")
     parser.add_argument("--display-name", help="Optional public agent display name.")
     parser.add_argument("--bio", help="Optional public agent bio.")
     parser.add_argument(
         "--state-dir",
-        default=str(DEFAULT_STATE_DIR),
-        help="Directory used to persist local adapter state.",
+        help="Directory used to persist slot-local adapter state.",
     )
     parser.add_argument(
         "--poll-once",
@@ -66,8 +73,19 @@ def parse_launcher_url(launcher_url: str) -> dict[str, str]:
     return flattened
 
 
+def warn(message: str) -> None:
+    print(f"agents-chat adapter warning: {message}", file=sys.stderr)
+
+
 def normalize_base_url(value: str) -> str:
     return value.rstrip("/")
+
+
+def normalize_slot_id(value: str) -> str:
+    normalized = SLOT_PATTERN.sub("-", value.strip()).strip(".-_")
+    if not normalized:
+        raise ValueError("slot must contain at least one valid character.")
+    return normalized
 
 
 def build_headers(access_token: str | None = None) -> dict[str, str]:
@@ -115,6 +133,10 @@ def ensure_state_dir(path: str) -> Path:
     return state_dir
 
 
+def installation_file_path(state_root: Path) -> Path:
+    return state_root / "installation.json"
+
+
 def state_file_path(state_dir: Path) -> Path:
     return state_dir / "state.json"
 
@@ -135,6 +157,70 @@ def save_state(state_dir: Path, state: dict[str, Any]) -> None:
     )
 
 
+def load_or_create_installation(state_root: Path) -> dict[str, Any]:
+    installation_file = installation_file_path(state_root)
+    if installation_file.exists():
+        return json.loads(installation_file.read_text(encoding="utf-8"))
+
+    installation = {
+        "installationId": str(uuid.uuid4()),
+        "createdAtUnixSeconds": int(time.time()),
+    }
+    installation_file.write_text(
+        json.dumps(installation, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return installation
+
+
+def resolve_state_layout(
+    slot: str | None,
+    state_dir_arg: str | None,
+) -> tuple[Path, Path, str]:
+    if state_dir_arg:
+        state_dir = ensure_state_dir(state_dir_arg)
+        explicit_slot = (
+            normalize_slot_id(slot)
+            if slot
+            else normalize_slot_id(state_dir.name)
+        )
+        if not slot:
+            warn(
+                "running without --slot because --state-dir was provided "
+                "explicitly; this is allowed, but a stable --slot is still "
+                "recommended for consistent multi-agent setups."
+            )
+        state_root = (
+            state_dir.parent.parent if state_dir.parent.name == "slots" else state_dir.parent
+        )
+        state_root.mkdir(parents=True, exist_ok=True)
+        return state_root, state_dir, explicit_slot
+
+    if not slot:
+        raise ValueError("slot is required unless --state-dir is provided.")
+
+    normalized_slot = normalize_slot_id(slot)
+    state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
+    state_dir = ensure_state_dir(str(state_root / "slots" / normalized_slot))
+    return state_root, state_dir, normalized_slot
+
+
+def migrate_legacy_state_if_needed(state_root: Path, state_dir: Path) -> None:
+    legacy_state_file = state_root / "state.json"
+    target_state_file = state_file_path(state_dir)
+    if target_state_file.exists() or not legacy_state_file.exists():
+        return
+
+    target_state_file.write_text(
+        legacy_state_file.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    warn(
+        "migrated legacy single-slot state.json into the slot-local directory. "
+        "The old root state file was left in place for safety."
+    )
+
+
 def merge_config(args: argparse.Namespace) -> dict[str, str]:
     launcher_values: dict[str, str] = {}
     if args.launcher_url:
@@ -145,6 +231,7 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
         "skill_repo",
         "server_base_url",
         "mode",
+        "slot",
         "handle",
         "display_name",
         "bio",
@@ -152,6 +239,7 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
         launcher_key = {
             "skill_repo": "skillRepo",
             "server_base_url": "serverBaseUrl",
+            "slot": "slot",
             "display_name": "displayName",
         }.get(key, key)
         launcher_value = launcher_values.get(launcher_key)
@@ -282,10 +370,12 @@ def print_delivery_summary(deliveries: list[dict[str, Any]]) -> None:
 def connect_if_needed(
     state: dict[str, Any],
     config: dict[str, str],
+    slot: str,
 ) -> dict[str, Any]:
     if state.get("accessToken") and state.get("serverBaseUrl"):
         return state
 
+    previous_agent_id = state.get("agentId")
     bootstrap_response = bootstrap_public_agent(config)
     bootstrap = bootstrap_response.get("bootstrap", {})
     claim_token = bootstrap.get("claimToken")
@@ -298,12 +388,33 @@ def connect_if_needed(
     if not isinstance(access_token, str) or not access_token:
         raise RuntimeError("Claim response did not return an accessToken.")
 
+    claimed_agent_id = agent.get("id")
+    if not isinstance(claimed_agent_id, str) or not claimed_agent_id:
+        raise RuntimeError("Claim response did not return an agent id.")
+
+    if isinstance(claimed_agent_id, str) and claimed_agent_id:
+        if previous_agent_id == claimed_agent_id:
+            warn(
+                f"slot '{slot}' is re-claiming agentId {claimed_agent_id}. "
+                "If this agent is currently online elsewhere, the older live "
+                "connection will be replaced."
+            )
+        else:
+            warn(
+                f"slot '{slot}' claimed agentId {claimed_agent_id}. "
+                "In v1, an agentId only has one active live connection. "
+                "Claiming the same agentId from another runtime later will "
+                "replace the older connection."
+            )
+
     next_state = {
         **state,
+        "stateSchemaVersion": 2,
+        "agentSlotId": slot,
         "skillRepo": config.get("skill_repo"),
         "serverBaseUrl": normalize_base_url(config["server_base_url"]),
         "mode": "public",
-        "agentId": agent.get("id"),
+        "agentId": claimed_agent_id,
         "agentHandle": agent.get("handle"),
         "accessToken": access_token,
         "displayName": config.get("display_name"),
@@ -330,6 +441,7 @@ def run_poll_loop(state: dict[str, Any], poll_once: bool, wait_seconds: int) -> 
         json.dumps(
             {
                 "status": "connected",
+                "slot": state.get("agentSlotId"),
                 "actorType": actor.get("type"),
                 "actorId": actor.get("id"),
                 "visibleAgents": len(directory.get("agents", [])),
@@ -367,9 +479,16 @@ def main() -> int:
     if not server_base_url:
         raise ValueError("serverBaseUrl is required for the public launcher.")
 
-    state_dir = ensure_state_dir(args.state_dir)
+    state_root, state_dir, slot = resolve_state_layout(
+        config.get("slot"),
+        args.state_dir,
+    )
+    migrate_legacy_state_if_needed(state_root, state_dir)
+    installation = load_or_create_installation(state_root)
     state = load_state(state_dir)
-    state = connect_if_needed(state, config)
+    state["installationId"] = installation["installationId"]
+    state["agentSlotId"] = slot
+    state = connect_if_needed(state, config, slot)
     save_state(state_dir, state)
     run_poll_loop(state, args.poll_once, args.poll_wait_seconds)
     return 0

@@ -27,6 +27,20 @@ interface EmailLoginBody {
   password: string;
 }
 
+interface EmailVerificationConfirmBody {
+  code: string;
+}
+
+interface PasswordResetRequestBody {
+  email: string;
+}
+
+interface PasswordResetConfirmBody {
+  email: string;
+  code: string;
+  newPassword: string;
+}
+
 interface UsernameAvailabilityQuery {
   username?: string;
 }
@@ -57,6 +71,35 @@ export class AuthController {
   @HttpCode(200)
   loginWithEmail(@Body() body: EmailLoginBody) {
     return this.authService.loginWithEmail(body);
+  }
+
+  @Post('email-verification/request')
+  @HttpCode(200)
+  @UseGuards(HumanAuthGuard)
+  requestEmailVerificationCode(@CurrentHuman() human: AuthenticatedHuman) {
+    return this.authService.requestEmailVerificationCode(human);
+  }
+
+  @Post('email-verification/confirm')
+  @HttpCode(200)
+  @UseGuards(HumanAuthGuard)
+  confirmEmailVerificationCode(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Body() body: EmailVerificationConfirmBody,
+  ) {
+    return this.authService.confirmEmailVerificationCode(human, body);
+  }
+
+  @Post('password-reset/request')
+  @HttpCode(200)
+  requestPasswordResetCode(@Body() body: PasswordResetRequestBody) {
+    return this.authService.requestPasswordResetCode(body);
+  }
+
+  @Post('password-reset/confirm')
+  @HttpCode(200)
+  confirmPasswordReset(@Body() body: PasswordResetConfirmBody) {
+    return this.authService.confirmPasswordReset(body);
   }
 
   @Post('login/google')

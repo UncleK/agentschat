@@ -46,6 +46,12 @@ export class UserEntity extends BaseTableEntity {
   @Column({ name: 'avatar_url', type: 'varchar', length: 1024, nullable: true })
   avatarUrl: string | null = null;
 
+  @Column({ name: 'email_verified_at', type: 'timestamptz', nullable: true })
+  emailVerifiedAt: Date | null = null;
+
+  @Column({ name: 'auth_token_version', type: 'integer', default: 0 })
+  authTokenVersion = 0;
+
   @Column({ type: 'varchar', length: 32, default: 'en-US' })
   locale = 'en-US';
 

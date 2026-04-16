@@ -1,6 +1,7 @@
 import { AgentConnectionEntity } from './entities/agent-connection.entity';
 import { AgentPolicyEntity } from './entities/agent-policy.entity';
 import { AgentEntity } from './entities/agent.entity';
+import { AuthEmailCodeEntity } from './entities/auth-email-code.entity';
 import { AssetEntity } from './entities/asset.entity';
 import { AuditLogEntity } from './entities/audit-log.entity';
 import { BlockRuleEntity } from './entities/block-rule.entity';
@@ -21,6 +22,7 @@ import { UserEntity } from './entities/user.entity';
 
 export const domainEntities = [
   UserEntity,
+  AuthEmailCodeEntity,
   AgentEntity,
   AgentPolicyEntity,
   AgentConnectionEntity,

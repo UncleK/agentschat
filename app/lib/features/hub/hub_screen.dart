@@ -186,7 +186,10 @@ class _HubScreenState extends State<HubScreen> {
 
     return switch (mode) {
       _HumanAuthMode.signIn => 'Signed in as ${authState.displayName}',
-      _HumanAuthMode.register => 'Created account for ${authState.displayName}',
+      _HumanAuthMode.register =>
+        authState.emailVerified
+            ? 'Created account for ${authState.displayName}'
+            : 'Created account for ${authState.displayName}. Verify your email next.',
       _HumanAuthMode.external => 'External login is unavailable',
     };
   }
@@ -199,6 +202,24 @@ class _HubScreenState extends State<HubScreen> {
         initialMode: mode,
         authRepository: session.authRepository,
         onSubmit: _submitHumanAuth,
+      ),
+    );
+
+    if (!mounted || message == null) {
+      return;
+    }
+
+    _showSnackBar(message);
+  }
+
+  Future<void> _openEmailVerificationSheet() async {
+    final session = AppSessionScope.read(context);
+    final message = await showSwipeBackSheet<String>(
+      context: context,
+      builder: (context) => _EmailVerificationSheet(
+        authRepository: session.authRepository,
+        email: session.authState.email,
+        onVerified: () => session.bootstrap(),
       ),
     );
 
@@ -655,6 +676,22 @@ class _HubScreenState extends State<HubScreen> {
               if (viewModel.humanAuth.isSignedIn) ...[
                 _HumanSessionSummaryCard(model: viewModel.humanAuth),
                 const SizedBox(height: AppSpacing.md),
+                if (!viewModel.humanAuth.isEmailVerified) ...[
+                  _HubMenuRow(
+                    rowKey: const Key('human-auth-verify-email-button'),
+                    accentColor: AppColors.tertiary,
+                    icon: Icons.mark_email_unread_rounded,
+                    title: 'Verify email',
+                    subtitle:
+                        'Send a 6-digit code to ${viewModel.humanAuth.email} so password recovery works on this account.',
+                    enabled: true,
+                    trailingLabel: 'Needed',
+                    onTap: () {
+                      unawaited(_openEmailVerificationSheet());
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                ],
                 _HubMenuRow(
                   rowKey: const Key('hub-refresh-button'),
                   accentColor: AppColors.primary,
@@ -1439,9 +1476,8 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     });
 
     try {
-      final result = await widget.session.authRepository.readUsernameAvailability(
-        username: _normalizedInlineUsername,
-      );
+      final result = await widget.session.authRepository
+          .readUsernameAvailability(username: _normalizedInlineUsername);
       if (!mounted || requestId != _usernameRequestId) {
         return;
       }
@@ -1471,6 +1507,24 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         _usernameMessage = 'Unable to verify username right now.';
       });
     }
+  }
+
+  Future<void> _openInlinePasswordResetSheet() async {
+    final message = await showSwipeBackSheet<String>(
+      context: context,
+      builder: (context) => _PasswordResetSheet(
+        authRepository: widget.session.authRepository,
+        initialEmail: _authEmailController.text.trim(),
+      ),
+    );
+
+    if (!mounted || message == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _loadCommandThread() async {
@@ -2168,6 +2222,21 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                 prefixIcon: Icon(Icons.lock_outline_rounded),
               ),
             ),
+            if (!isRegister) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  key: const Key('human-auth-forgot-password-button'),
+                  onPressed: _isAuthenticating
+                      ? null
+                      : () {
+                          unawaited(_openInlinePasswordResetSheet());
+                        },
+                  child: const Text('Forgot password?'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -3840,13 +3909,25 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
   }
 
   String _buildBootstrapUrl(String baseUrl, String bootstrapPath) {
-    final normalizedBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
-    final normalizedPath = bootstrapPath.startsWith('/')
-        ? bootstrapPath
-        : '/$bootstrapPath';
-    return '$normalizedBase$normalizedPath';
+    final trimmedPath = bootstrapPath.trim();
+    if (trimmedPath.startsWith('http://') ||
+        trimmedPath.startsWith('https://')) {
+      return trimmedPath;
+    }
+
+    final normalizedPath = trimmedPath.startsWith('/')
+        ? trimmedPath
+        : '/$trimmedPath';
+    final baseUri = Uri.parse(baseUrl);
+    final pathUri = Uri.parse(normalizedPath);
+
+    return baseUri
+        .replace(
+          path: pathUri.path,
+          query: pathUri.hasQuery ? pathUri.query : null,
+          fragment: pathUri.hasFragment ? pathUri.fragment : null,
+        )
+        .toString();
   }
 
   @override
@@ -4809,6 +4890,605 @@ class _AuthFooterChip extends StatelessWidget {
   }
 }
 
+class _PasswordResetSheet extends StatefulWidget {
+  const _PasswordResetSheet({
+    required this.authRepository,
+    this.initialEmail = '',
+  });
+
+  final AuthRepository authRepository;
+  final String initialEmail;
+
+  @override
+  State<_PasswordResetSheet> createState() => _PasswordResetSheetState();
+}
+
+class _PasswordResetSheetState extends State<_PasswordResetSheet> {
+  late final TextEditingController _emailController;
+  late final TextEditingController _codeController;
+  late final TextEditingController _newPasswordController;
+  bool _isRequestingCode = false;
+  bool _isSubmitting = false;
+  bool _hasRequestedCode = false;
+  String? _statusMessage;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+    _codeController = TextEditingController();
+    _newPasswordController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _codeController.dispose();
+    _newPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestCode() async {
+    if (_emailController.text.trim().isEmpty || _isRequestingCode) {
+      return;
+    }
+
+    setState(() {
+      _isRequestingCode = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final message = await widget.authRepository.requestPasswordResetCode(
+        email: _emailController.text.trim(),
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRequestingCode = false;
+        _hasRequestedCode = true;
+        _statusMessage = message;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRequestingCode = false;
+        _errorMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRequestingCode = false;
+        _errorMessage = 'Unable to send a reset code right now.';
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting ||
+        _emailController.text.trim().isEmpty ||
+        _codeController.text.trim().isEmpty ||
+        _newPasswordController.text.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final message = await widget.authRepository.confirmPasswordReset(
+        email: _emailController.text.trim(),
+        code: _codeController.text.trim(),
+        newPassword: _newPasswordController.text,
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(message);
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = 'Unable to reset the password right now.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canRequestCode =
+        !_isRequestingCode && _emailController.text.trim().isNotEmpty;
+    final canSubmit =
+        !_isSubmitting &&
+        _emailController.text.trim().isNotEmpty &&
+        _codeController.text.trim().isNotEmpty &&
+        _newPasswordController.text.isNotEmpty;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.sm,
+        right: AppSpacing.sm,
+        top: AppSpacing.xl,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.sm,
+      ),
+      child: GlassPanel(
+        borderRadius: AppRadii.hero,
+        padding: EdgeInsets.zero,
+        accentColor: AppColors.primary,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Reset Password',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Request a 6-digit code by email, then set a new password for this human account.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                    _SectionIconButton(
+                      buttonKey: const Key('close-password-reset-button'),
+                      icon: Icons.close_rounded,
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _InfoPill(
+                  icon: Icons.lock_reset_rounded,
+                  accentColor: AppColors.primaryFixed,
+                  text:
+                      'The account stays signed out here. After a successful reset, return to Sign in with the new password.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLow.withValues(alpha: 0.72),
+                    borderRadius: AppRadii.large,
+                    border: Border.all(
+                      color: AppColors.outline.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      children: [
+                        TextField(
+                          key: const Key('password-reset-email-field'),
+                          controller: _emailController,
+                          onChanged: (_) => setState(() {}),
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            hintText: 'owner@example.com',
+                            prefixIcon: Icon(Icons.alternate_email_rounded),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Opacity(
+                            opacity: canRequestCode ? 1 : 0.5,
+                            child: IgnorePointer(
+                              ignoring: !canRequestCode,
+                              child: PrimaryGradientButton(
+                                key: const Key(
+                                  'password-reset-request-code-button',
+                                ),
+                                label: _isRequestingCode
+                                    ? 'Sending code'
+                                    : _hasRequestedCode
+                                    ? 'Resend code'
+                                    : 'Send code',
+                                icon: _isRequestingCode
+                                    ? Icons.sync_rounded
+                                    : Icons.mark_email_unread_rounded,
+                                onPressed: () {
+                                  unawaited(_requestCode());
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextField(
+                          key: const Key('password-reset-code-field'),
+                          controller: _codeController,
+                          onChanged: (_) => setState(() {}),
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Code',
+                            hintText: '123456',
+                            prefixIcon: Icon(Icons.pin_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextField(
+                          key: const Key('password-reset-new-password-field'),
+                          controller: _newPasswordController,
+                          onChanged: (_) => setState(() {}),
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'New password',
+                            hintText: 'newpassword123',
+                            prefixIcon: Icon(Icons.lock_outline_rounded),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_statusMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _statusMessage!,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+                  ),
+                ],
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _errorMessage!,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.error),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                SizedBox(
+                  width: double.infinity,
+                  child: Opacity(
+                    opacity: canSubmit ? 1 : 0.5,
+                    child: IgnorePointer(
+                      ignoring: !canSubmit,
+                      child: PrimaryGradientButton(
+                        key: const Key('password-reset-submit-button'),
+                        label: _isSubmitting
+                            ? 'Updating password'
+                            : 'Update password',
+                        icon: _isSubmitting
+                            ? Icons.sync_rounded
+                            : Icons.shield_rounded,
+                        onPressed: () {
+                          unawaited(_submit());
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: SwipeBackSheetBackButton(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmailVerificationSheet extends StatefulWidget {
+  const _EmailVerificationSheet({
+    required this.authRepository,
+    required this.email,
+    required this.onVerified,
+  });
+
+  final AuthRepository authRepository;
+  final String email;
+  final Future<void> Function() onVerified;
+
+  @override
+  State<_EmailVerificationSheet> createState() =>
+      _EmailVerificationSheetState();
+}
+
+class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
+  late final TextEditingController _codeController;
+  bool _isRequestingCode = false;
+  bool _isSubmitting = false;
+  bool _hasRequestedCode = false;
+  String? _statusMessage;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestCode() async {
+    if (_isRequestingCode) {
+      return;
+    }
+
+    setState(() {
+      _isRequestingCode = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final message = await widget.authRepository
+          .requestEmailVerificationCode();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRequestingCode = false;
+        _hasRequestedCode = true;
+        _statusMessage = message;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRequestingCode = false;
+        _errorMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRequestingCode = false;
+        _errorMessage = 'Unable to send a verification code right now.';
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting || _codeController.text.trim().isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final message = await widget.authRepository.confirmEmailVerification(
+        code: _codeController.text.trim(),
+      );
+      await widget.onVerified();
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(message);
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = 'Unable to verify this email right now.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final emailLabel = widget.email.trim().isEmpty
+        ? 'your current account email'
+        : widget.email.trim();
+    final canSubmit = !_isSubmitting && _codeController.text.trim().isNotEmpty;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.sm,
+        right: AppSpacing.sm,
+        top: AppSpacing.xl,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.sm,
+      ),
+      child: GlassPanel(
+        borderRadius: AppRadii.hero,
+        padding: EdgeInsets.zero,
+        accentColor: AppColors.primary,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Verify Email',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Send a 6-digit code to $emailLabel, then confirm it here so password recovery stays available.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                    _SectionIconButton(
+                      buttonKey: const Key('close-email-verification-button'),
+                      icon: Icons.close_rounded,
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _InfoPill(
+                  icon: Icons.verified_user_rounded,
+                  accentColor: AppColors.tertiary,
+                  text:
+                      'Verification proves ownership of this inbox and unlocks recovery by email.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLow.withValues(alpha: 0.72),
+                    borderRadius: AppRadii.large,
+                    border: Border.all(
+                      color: AppColors.outline.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          emailLabel,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Opacity(
+                            opacity: _isRequestingCode ? 0.6 : 1,
+                            child: IgnorePointer(
+                              ignoring: _isRequestingCode,
+                              child: PrimaryGradientButton(
+                                key: const Key(
+                                  'email-verification-request-button',
+                                ),
+                                label: _isRequestingCode
+                                    ? 'Sending code'
+                                    : _hasRequestedCode
+                                    ? 'Resend code'
+                                    : 'Send code',
+                                icon: _isRequestingCode
+                                    ? Icons.sync_rounded
+                                    : Icons.mark_email_unread_rounded,
+                                onPressed: () {
+                                  unawaited(_requestCode());
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextField(
+                          key: const Key('email-verification-code-field'),
+                          controller: _codeController,
+                          onChanged: (_) => setState(() {}),
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Code',
+                            hintText: '123456',
+                            prefixIcon: Icon(Icons.pin_outlined),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_statusMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _statusMessage!,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+                  ),
+                ],
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _errorMessage!,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.error),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                SizedBox(
+                  width: double.infinity,
+                  child: Opacity(
+                    opacity: canSubmit ? 1 : 0.5,
+                    child: IgnorePointer(
+                      ignoring: !canSubmit,
+                      child: PrimaryGradientButton(
+                        key: const Key('email-verification-submit-button'),
+                        label: _isSubmitting
+                            ? 'Verifying email'
+                            : 'Confirm verification',
+                        icon: _isSubmitting
+                            ? Icons.sync_rounded
+                            : Icons.verified_rounded,
+                        onPressed: () {
+                          unawaited(_submit());
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: SwipeBackSheetBackButton(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HumanAuthSheet extends StatefulWidget {
   const _HumanAuthSheet({
     required this.initialMode,
@@ -5003,6 +5683,24 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
         _usernameMessage = 'Unable to verify username right now.';
       });
     }
+  }
+
+  Future<void> _openPasswordResetSheet() async {
+    final message = await showSwipeBackSheet<String>(
+      context: context,
+      builder: (context) => _PasswordResetSheet(
+        authRepository: widget.authRepository,
+        initialEmail: _emailController.text.trim(),
+      ),
+    );
+
+    if (!mounted || message == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -5260,6 +5958,23 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                               prefixIcon: Icon(Icons.lock_outline_rounded),
                             ),
                           ),
+                          if (!isRegister) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                key: const Key(
+                                  'human-auth-forgot-password-button',
+                                ),
+                                onPressed: _isSubmitting
+                                    ? null
+                                    : () {
+                                        unawaited(_openPasswordResetSheet());
+                                      },
+                                child: const Text('Forgot password?'),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

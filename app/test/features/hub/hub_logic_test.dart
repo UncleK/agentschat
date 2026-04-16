@@ -31,12 +31,16 @@ void main() {
       );
     });
 
-    Future<void> authenticateWithMine(AgentsMineResponse mine) async {
+    Future<void> authenticateWithMine(
+      AgentsMineResponse mine, {
+      bool emailVerified = true,
+    }) async {
       authRepository.enqueueFetchMe((token) async {
         return signedInState(
           token: token,
           userId: 'usr-hub',
           displayName: 'Hub User',
+          emailVerified: emailVerified,
           recommendedActiveAgentId: mine.agents.isEmpty
               ? null
               : mine.agents.first.id,
@@ -125,6 +129,59 @@ void main() {
     );
 
     testWidgets(
+      'sign in sheet exposes forgot-password recovery and sends a reset code request',
+      (WidgetTester tester) async {
+        authRepository.enqueueRequestPasswordResetCode((email) async {
+          expect(email, 'owner@example.com');
+          return 'If an email/password account exists for this address, a password reset code has been sent.';
+        });
+
+        await pumpHub(tester);
+
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('human-auth-email-button')),
+          280,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(find.byKey(const Key('human-auth-email-button')));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byKey(const Key('human-auth-email-field')),
+          'owner@example.com',
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const Key('human-auth-forgot-password-button')).last,
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('password-reset-email-field')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('password-reset-request-code-button')),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byKey(const Key('password-reset-request-code-button')),
+        );
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(
+            'If an email/password account exists for this address, a password reset code has been sent.',
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
       'human sign in from hub boots the live session and hides signed-out actions',
       (WidgetTester tester) async {
         authRepository.enqueueLoginWithEmail(({
@@ -196,6 +253,38 @@ void main() {
           findsOneWidget,
         );
         expect(controller.currentActiveAgent?.id, 'agt-owned-1');
+      },
+    );
+
+    testWidgets(
+      'signed-in but unverified humans see the verify-email action in Hub',
+      (WidgetTester tester) async {
+        await authenticateWithMine(
+          mineResponse(
+            agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+          ),
+          emailVerified: false,
+        );
+
+        await pumpHub(tester);
+
+        expect(
+          find.byKey(const Key('human-auth-verify-email-button')),
+          findsOneWidget,
+        );
+
+        await tester.ensureVisible(
+          find.byKey(const Key('human-auth-verify-email-button')),
+        );
+        await tester.tap(
+          find.byKey(const Key('human-auth-verify-email-button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('email-verification-request-button')),
+          findsOneWidget,
+        );
       },
     );
 
@@ -306,7 +395,10 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Sign in as human first'), findsOneWidget);
-        expect(find.byKey(const Key('generate-import-link-button')), findsNothing);
+        expect(
+          find.byKey(const Key('generate-import-link-button')),
+          findsNothing,
+        );
 
         await tester.tap(
           find.byKey(const Key('human-access-claim-agent-button')),

@@ -68,6 +68,46 @@ class AuthRepository {
     return _parseLoginResponse(response);
   }
 
+  Future<String> requestPasswordResetCode({required String email}) async {
+    final response = await apiClient.post(
+      '/auth/password-reset/request',
+      body: {'email': email},
+    );
+    return _readMessage(
+      response,
+      fallback:
+          'If an email/password account exists for this address, a password reset code has been sent.',
+    );
+  }
+
+  Future<String> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final response = await apiClient.post(
+      '/auth/password-reset/confirm',
+      body: {'email': email, 'code': code, 'newPassword': newPassword},
+    );
+    return _readMessage(
+      response,
+      fallback: 'Password updated. Sign in with your new password.',
+    );
+  }
+
+  Future<String> requestEmailVerificationCode() async {
+    final response = await apiClient.post('/auth/email-verification/request');
+    return _readMessage(response, fallback: 'Verification code sent.');
+  }
+
+  Future<String> confirmEmailVerification({required String code}) async {
+    final response = await apiClient.post(
+      '/auth/email-verification/confirm',
+      body: {'code': code},
+    );
+    return _readMessage(response, fallback: 'Email verified.');
+  }
+
   /// Temporarily disabled until backend provider-token verification exists.
   Future<AuthState> loginWithGoogle({
     required String email,
@@ -107,6 +147,7 @@ class AuthRepository {
         displayName: user['displayName'] as String? ?? '',
         avatarUrl: user['avatarUrl'] as String?,
         authProvider: user['authProvider'] as String?,
+        emailVerified: user['emailVerified'] as bool? ?? false,
       ),
       recommendedActiveAgentId: null,
       isSessionAuthenticated: true,
@@ -128,9 +169,17 @@ class AuthRepository {
         displayName: user['displayName'] as String? ?? '',
         avatarUrl: user['avatarUrl'] as String?,
         authProvider: user['authProvider'] as String?,
+        emailVerified: user['emailVerified'] as bool? ?? false,
       ),
       recommendedActiveAgentId: response['recommendedActiveAgentId'] as String?,
       isSessionAuthenticated: session['authenticated'] as bool? ?? false,
     );
+  }
+
+  String _readMessage(
+    Map<String, dynamic> response, {
+    required String fallback,
+  }) {
+    return response['message'] as String? ?? fallback;
   }
 }

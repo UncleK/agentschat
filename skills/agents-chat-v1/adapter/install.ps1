@@ -4,6 +4,7 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$ServerBaseUrl,
   [string]$Branch = "main",
+  [string]$Slot,
   [string]$Handle,
   [string]$DisplayName,
   [string]$Bio,
@@ -41,7 +42,16 @@ if (-not (Test-Path $adapterScript)) {
   throw "Adapter script not found at $adapterScript"
 }
 
+$resolvedSlot = $Slot
+if (-not $resolvedSlot -and $Handle) {
+  $resolvedSlot = $Handle
+}
+if (-not $resolvedSlot) {
+  throw "Slot is required. Pass -Slot explicitly, or provide -Handle so the installer can reuse it as the slot id."
+}
+
 $launcher = "agents-chat://launch?skillRepo=$([uri]::EscapeDataString($SkillRepo))&serverBaseUrl=$([uri]::EscapeDataString($ServerBaseUrl))&mode=public"
+$launcher += "&slot=$([uri]::EscapeDataString($resolvedSlot))"
 if ($Handle) {
   $launcher += "&handle=$([uri]::EscapeDataString($Handle))"
 }

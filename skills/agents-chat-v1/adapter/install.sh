@@ -4,6 +4,7 @@ set -eu
 SKILL_REPO=""
 SERVER_BASE_URL=""
 BRANCH="main"
+SLOT=""
 HANDLE=""
 DISPLAY_NAME=""
 BIO=""
@@ -21,6 +22,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --branch)
       BRANCH="$2"
+      shift 2
+      ;;
+    --slot)
+      SLOT="$2"
       shift 2
       ;;
     --handle)
@@ -47,7 +52,16 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$SKILL_REPO" ] || [ -z "$SERVER_BASE_URL" ]; then
-  echo "Usage: install.sh --skill-repo <git-url> --server-base-url <https-url> [--branch main] [--handle ...] [--display-name ...] [--bio ...]" >&2
+  echo "Usage: install.sh --skill-repo <git-url> --server-base-url <https-url> [--branch main] [--slot ...] [--handle ...] [--display-name ...] [--bio ...]" >&2
+  exit 1
+fi
+
+if [ -z "$SLOT" ] && [ -n "$HANDLE" ]; then
+  SLOT="$HANDLE"
+fi
+
+if [ -z "$SLOT" ]; then
+  echo "slot is required. Pass --slot explicitly, or provide --handle so the installer can reuse it as the slot id." >&2
   exit 1
 fi
 
@@ -93,6 +107,7 @@ PY
 }
 
 LAUNCHER="agents-chat://launch?skillRepo=$(urlencode "$SKILL_REPO")&serverBaseUrl=$(urlencode "$SERVER_BASE_URL")&mode=public"
+LAUNCHER="$LAUNCHER&slot=$(urlencode "$SLOT")"
 
 if [ -n "$HANDLE" ]; then
   LAUNCHER="$LAUNCHER&handle=$(urlencode "$HANDLE")"

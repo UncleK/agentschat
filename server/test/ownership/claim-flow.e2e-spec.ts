@@ -3,6 +3,7 @@ import request from 'supertest';
 import { Repository } from 'typeorm';
 import { AgentStatus } from '../../src/database/domain.enums';
 import { AgentEntity } from '../../src/database/entities/agent.entity';
+import { AgentsService } from '../../src/modules/agents/agents.service';
 import {
   TestApplicationContext,
   createTestApplication,
@@ -444,6 +445,76 @@ describe('Agent claim flow (e2e)', () => {
         status: 'offline',
       }),
     );
+  });
+
+  it('reuses the same pending human invitation instead of creating duplicate placeholder agents', async () => {
+    const registerResponse = await registerEmailHuman(
+      'invite-reuse@example.com',
+      'Invite Reuse',
+    );
+
+    const firstInvitation = await createHumanOwnedInvitation(
+      registerResponse.accessToken,
+    );
+    const secondInvitation = await createHumanOwnedInvitation(
+      registerResponse.accessToken,
+    );
+
+    expect(secondInvitation.invitation.agentId).toBe(
+      firstInvitation.invitation.agentId,
+    );
+    expect(secondInvitation.invitation.claimToken).not.toBe(
+      firstInvitation.invitation.claimToken,
+    );
+
+    const pendingInvitationAgents = await context.dataSource
+      .getRepository(AgentEntity)
+      .createQueryBuilder('agent')
+      .where('agent.ownerUserId = :ownerUserId', {
+        ownerUserId: registerResponse.user.id,
+      })
+      .andWhere('agent.sourceType = :sourceType', {
+        sourceType: 'hub_invitation',
+      })
+      .getCount();
+
+    expect(pendingInvitationAgents).toBe(1);
+
+    const preClaimMine = await readAgentsMine(registerResponse.accessToken);
+    expect(preClaimMine.agents).toEqual([]);
+  });
+
+  it('deletes long-stale unclaimed human invitations during cleanup', async () => {
+    const registerResponse = await registerEmailHuman(
+      'invite-stale@example.com',
+      'Invite Stale',
+    );
+
+    const invitation = await createHumanOwnedInvitation(
+      registerResponse.accessToken,
+    );
+    const agentRepository = context.dataSource.getRepository(AgentEntity);
+    const staleAgent = await agentRepository.findOneByOrFail({
+      id: invitation.invitation.agentId,
+    });
+
+    staleAgent.profileMetadata = {
+      ...staleAgent.profileMetadata,
+      invitationPending: true,
+      invitationIssuedAt: new Date(
+        Date.now() - 25 * 60 * 60 * 1000,
+      ).toISOString(),
+    };
+    await agentRepository.save(staleAgent);
+
+    const cleanupResult = await app
+      .get(AgentsService)
+      .pruneStaleHumanOwnedInvitations(new Date());
+
+    expect(cleanupResult.deletedCount).toBe(1);
+    await expect(
+      agentRepository.findOneBy({ id: invitation.invitation.agentId }),
+    ).resolves.toBeNull();
   });
 
   it('rejects /agents/mine without valid human auth', async () => {

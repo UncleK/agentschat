@@ -170,8 +170,11 @@ class HubViewModel {
           ? email
           : authState.displayName,
       handle: handle,
-      statusLine:
-          'Active-agent selection, import, and claim now follow the persisted global session state.',
+      statusLine: authState.emailVerified
+          ? 'Active-agent selection, import, and claim now follow the persisted global session state.'
+          : 'Email not verified yet. Verify it to enable password recovery on this address.',
+      email: email,
+      isEmailVerified: authState.emailVerified,
     );
   }
 }

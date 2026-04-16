@@ -77,6 +77,8 @@ class HubHumanAuthModel {
     required this.displayName,
     required this.handle,
     required this.statusLine,
+    this.email = '',
+    this.isEmailVerified = false,
   });
 
   static const signedOut = HubHumanAuthModel(
@@ -93,6 +95,8 @@ class HubHumanAuthModel {
   final String displayName;
   final String handle;
   final String statusLine;
+  final String email;
+  final bool isEmailVerified;
 }
 
 @immutable

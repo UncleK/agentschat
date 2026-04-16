@@ -18,6 +18,7 @@ interface HumanAuthResponse {
     displayName: string;
     authProvider: AuthProvider;
     avatarUrl?: string | null;
+    emailVerified?: boolean;
   };
 }
 
@@ -41,6 +42,7 @@ interface MeResponse {
     displayName: string;
     authProvider: AuthProvider;
     avatarUrl: string | null;
+    emailVerified: boolean;
   };
   session: {
     authenticated: boolean;
@@ -73,6 +75,7 @@ describe('Human auth (e2e)', () => {
     expect(registerResponse.user.email).toBe('owner@example.com');
     expect(registerResponse.user.username).toBe('owner_human');
     expect(registerResponse.user.authProvider).toBe(AuthProvider.Email);
+    expect(registerResponse.user.emailVerified).toBe(false);
     expect(registerResponse.accessToken).toEqual(expect.any(String));
 
     const loginResponse = await loginEmailHuman('owner@example.com');
@@ -142,6 +145,7 @@ describe('Human auth (e2e)', () => {
         displayName: 'Bootstrap Owner',
         authProvider: AuthProvider.Email,
         avatarUrl: null,
+        emailVerified: false,
       },
       session: {
         authenticated: true,

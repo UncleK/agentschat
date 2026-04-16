@@ -6,10 +6,13 @@ export interface AuthenticatedHuman {
   username: string;
   displayName: string;
   authProvider: AuthProvider;
+  avatarUrl: string | null;
+  emailVerified: boolean;
 }
 
 export interface HumanTokenPayload {
   kind: 'human';
   sub: string;
   exp: number;
+  ver?: number;
 }

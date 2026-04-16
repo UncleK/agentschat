@@ -27,6 +27,7 @@ void main() {
             'displayName': 'Owner Human',
             'avatarUrl': null,
             'authProvider': 'email',
+            'emailVerified': true,
           },
         });
 
@@ -42,6 +43,7 @@ void main() {
         expect(authState.username, 'owner_human');
         expect(authState.displayName, 'Owner Human');
         expect(authState.authProvider, 'email');
+        expect(authState.emailVerified, isTrue);
         expect(authState.isSignedIn, isTrue);
       },
     );
@@ -58,6 +60,7 @@ void main() {
             'displayName': 'New Owner',
             'avatarUrl': 'https://example.com/avatar.png',
             'authProvider': 'email',
+            'emailVerified': false,
           },
         });
 
@@ -76,7 +79,82 @@ void main() {
         expect(authState.displayName, 'New Owner');
         expect(authState.avatarUrl, 'https://example.com/avatar.png');
         expect(authState.authProvider, 'email');
+        expect(authState.emailVerified, isFalse);
         expect(authState.isSignedIn, isTrue);
+      },
+    );
+
+    test('fetchMe parses emailVerified from the bootstrap contract', () async {
+      apiClient.enqueueGetResponse({
+        'user': {
+          'id': 'usr-bootstrap',
+          'email': 'owner@example.com',
+          'username': 'owner_human',
+          'displayName': 'Owner Human',
+          'avatarUrl': null,
+          'authProvider': 'email',
+          'emailVerified': true,
+        },
+        'session': {'authenticated': true},
+        'recommendedActiveAgentId': 'agt-owned-1',
+      });
+
+      final authState = await repository.fetchMe(token: 'token-bootstrap');
+
+      expect(apiClient.recordedPaths.single, '/auth/me');
+      expect(authState.user?.id, 'usr-bootstrap');
+      expect(authState.emailVerified, isTrue);
+      expect(authState.recommendedActiveAgentId, 'agt-owned-1');
+    });
+
+    test(
+      'password reset and email verification endpoints return backend messages',
+      () async {
+        apiClient
+          ..enqueuePostResponse({
+            'message':
+                'If an email/password account exists for this address, a password reset code has been sent.',
+          })
+          ..enqueuePostResponse({
+            'message': 'Password updated. Sign in with your new password.',
+          })
+          ..enqueuePostResponse({
+            'message': 'Verification code sent to owner@example.com.',
+          })
+          ..enqueuePostResponse({'message': 'Email verified.'});
+
+        await expectLater(
+          repository.requestPasswordResetCode(email: 'owner@example.com'),
+          completion(
+            'If an email/password account exists for this address, a password reset code has been sent.',
+          ),
+        );
+        await expectLater(
+          repository.confirmPasswordReset(
+            email: 'owner@example.com',
+            code: '123456',
+            newPassword: 'newpassword123',
+          ),
+          completion('Password updated. Sign in with your new password.'),
+        );
+        await expectLater(
+          repository.requestEmailVerificationCode(),
+          completion('Verification code sent to owner@example.com.'),
+        );
+        await expectLater(
+          repository.confirmEmailVerification(code: '654321'),
+          completion('Email verified.'),
+        );
+
+        expect(
+          apiClient.recordedPaths,
+          equals([
+            '/auth/password-reset/request',
+            '/auth/password-reset/confirm',
+            '/auth/email-verification/request',
+            '/auth/email-verification/confirm',
+          ]),
+        );
       },
     );
 
@@ -119,10 +197,25 @@ class _FakeApiClient extends ApiClient {
 
   final Queue<Map<String, dynamic>> _postResponses =
       Queue<Map<String, dynamic>>();
+  final Queue<Map<String, dynamic>> _getResponses =
+      Queue<Map<String, dynamic>>();
   final List<String> recordedPaths = <String>[];
 
   void enqueuePostResponse(Map<String, dynamic> response) {
     _postResponses.add(response);
+  }
+
+  void enqueueGetResponse(Map<String, dynamic> response) {
+    _getResponses.add(response);
+  }
+
+  @override
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, String>? queryParameters,
+  }) async {
+    recordedPaths.add(path);
+    return _getResponses.removeFirst();
   }
 
   @override
