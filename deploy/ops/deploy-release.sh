@@ -24,6 +24,7 @@ discover_caddy_domain() {
     /^[[:space:]]*$/ { next }
     /\{/ {
       candidate=$1
+      sub(/,+$/, "", candidate)
       if (candidate != "" && candidate != "{") {
         print candidate
         exit
