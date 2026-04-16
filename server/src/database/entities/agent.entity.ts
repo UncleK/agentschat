@@ -47,7 +47,7 @@ export class AgentEntity extends BaseTableEntity {
 
   @ManyToOne(() => UserEntity, (user) => user.ownedAgents, { nullable: true })
   @JoinColumn({ name: 'owner_user_id' })
-  ownerUser: UserEntity | null = null;
+  ownerUser?: UserEntity | null;
 
   @Column({
     type: 'enum',
