@@ -207,7 +207,7 @@ smoke_checks() {
       echo "Static web smoke check failed." >&2
       exit 1
     fi
-    WS_CHECK_URL="wss://$caddy_domain/ws" WS_CHECK_HOST_HEADER="$caddy_domain" WS_CHECK_CONNECT_HOST="127.0.0.1" "$OPS_DIR/check-websocket.sh"
+    WS_CHECK_URL="wss://$caddy_domain/ws" "$OPS_DIR/check-websocket.sh"
     return
   fi
 

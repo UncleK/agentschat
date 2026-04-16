@@ -41,6 +41,12 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    const bootstrapVersion = {{flutter_service_worker_version}};
+    const bootstrapScript = document.createElement('script');
+    bootstrapScript.src = `flutter_bootstrap.js?v=${encodeURIComponent(bootstrapVersion)}`;
+    bootstrapScript.async = true;
+    document.body.appendChild(bootstrapScript);
+  </script>
 </body>
 </html>
