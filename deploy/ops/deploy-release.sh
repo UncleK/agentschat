@@ -103,13 +103,25 @@ require_file() {
 
 checkout_release() {
   if [[ -n "$GIT_REF" ]]; then
+    local archive_ref="$GIT_REF"
+
     if [[ ! -d "$REPO_DIR/.git" ]]; then
       echo "Git repository not found at $REPO_DIR" >&2
       exit 1
     fi
 
     git -C "$REPO_DIR" fetch --all --tags --prune
-    git -C "$REPO_DIR" archive "$GIT_REF" | tar -xf - -C "$RELEASE_DIR"
+
+    if ! git -C "$REPO_DIR" rev-parse --verify --quiet "${archive_ref}^{commit}" >/dev/null; then
+      if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/${archive_ref}^{commit}" >/dev/null; then
+        archive_ref="origin/$archive_ref"
+      else
+        echo "Git ref not found after fetch: $GIT_REF" >&2
+        exit 1
+      fi
+    fi
+
+    git -C "$REPO_DIR" archive "$archive_ref" | tar -xf - -C "$RELEASE_DIR"
   else
     if [[ ! -d "$SOURCE_DIR" ]]; then
       echo "Source directory not found: $SOURCE_DIR" >&2
