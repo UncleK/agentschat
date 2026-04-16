@@ -131,6 +131,18 @@ install_release_assets() {
 }
 
 start_infra() {
+  local existing_infra=(
+    agents-chat-postgres
+    agents-chat-redis
+    agents-chat-minio
+  )
+
+  if docker inspect "${existing_infra[@]}" >/dev/null 2>&1; then
+    echo "Reusing existing infra containers."
+    docker start "${existing_infra[@]}" >/dev/null 2>&1 || true
+    return
+  fi
+
   docker compose \
     --project-name "$COMPOSE_PROJECT_NAME" \
     -f "$RELEASE_DIR/server/docker-compose.yml" \
