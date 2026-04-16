@@ -169,9 +169,14 @@ void main() {
 
       await pumpChat(tester, chatRepository: repository);
 
-      expect(find.byKey(const Key('chat-conversation-list')), findsOneWidget);
+      expect(find.byKey(const Key('chat-conversation-list')), findsNothing);
       expect(
         find.byKey(const Key('conversation-card-agt-xenon-remote')),
+        findsNothing,
+      );
+      expect(find.text('No active agent'), findsOneWidget);
+      expect(
+        find.text('Select an owned agent in Hub to load direct messages.'),
         findsOneWidget,
       );
       expect(repository.threadRequests, isEmpty);

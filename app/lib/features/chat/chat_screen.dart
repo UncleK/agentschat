@@ -77,7 +77,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _viewModel = widget.initialViewModel ?? ChatViewModel.signedInSample();
+    _viewModel =
+        widget.initialViewModel ?? ChatViewModel.resolvingActiveAgent();
     _conversationSearchController = TextEditingController(
       text: _viewModel.conversationSearchQuery,
     );
@@ -213,7 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       setState(() {
-        _viewModel = ChatViewModel.signedInSample();
+        _viewModel = ChatViewModel.resolvingActiveAgent();
         _showCompactThread = false;
         _isLoadingMessages = false;
         _isSendingMessage = false;
@@ -255,16 +256,41 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    if (!session.isAuthenticated ||
-        userId == null ||
-        userId.isEmpty ||
-        activeAgent == null) {
+    if (!session.isAuthenticated || userId == null || userId.isEmpty) {
       _invalidateLiveRequests();
       if (!mounted) {
         return;
       }
       setState(() {
-        _viewModel = ChatViewModel.previewForActiveAgent('AETHER-7');
+        _viewModel = ChatViewModel.blocked(
+          message:
+              'Sign in and select an owned agent in Hub to load direct messages.',
+        );
+        _showCompactThread = false;
+        _isLoadingMessages = false;
+        _isSendingMessage = false;
+        _messageLoadError = null;
+        _sendMessageError = null;
+        _lastShareAnnouncement = null;
+        _followRequestConversationId = null;
+        _followRequestErrorConversationId = null;
+        _followRequestErrorMessage = null;
+        _syncConversationSearchController();
+        _syncThreadSearchController();
+        _clearComposerDraft(unfocus: true);
+      });
+      return;
+    }
+
+    if (activeAgent == null) {
+      _invalidateLiveRequests();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _viewModel = ChatViewModel.blocked(
+          message: 'Select an owned agent in Hub to load direct messages.',
+        );
         _showCompactThread = false;
         _isLoadingMessages = false;
         _isSendingMessage = false;
@@ -1181,6 +1207,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String _twoDigits(int value) => value.toString().padLeft(2, '0');
 
   String _surfaceStatusLabel(ChatConversationModel? selectedConversation) {
+    final session = AppSessionScope.maybeOf(context);
     if (selectedConversation != null) {
       return _viewModel.statusLabelFor(selectedConversation);
     }
@@ -1191,7 +1218,9 @@ class _ChatScreenState extends State<ChatScreen> {
       return 'syncing inbox';
     }
     if (_viewModel.isBlocked) {
-      return 'no active agent';
+      return session?.isAuthenticated == true
+          ? 'no active agent'
+          : 'sign in required';
     }
     if (_viewModel.isError) {
       return 'sync error';
@@ -1203,6 +1232,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   _ChatEmptyState _railEmptyState() {
+    final session = AppSessionScope.maybeOf(context);
+    final blockedTitle = session?.isAuthenticated == true
+        ? 'No active agent'
+        : 'Sign in required';
+    final blockedMessage =
+        _viewModel.surfaceMessage ??
+        (session?.isAuthenticated == true
+            ? 'Select an owned agent in Hub to load direct messages.'
+            : 'Sign in and select an owned agent in Hub to load direct messages.');
     if (_viewModel.isResolvingActiveAgent) {
       return const _ChatEmptyState(
         title: 'Resolving active agent',
@@ -1221,12 +1259,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
     if (_viewModel.isBlocked) {
-      return _ChatEmptyState(
-        title: 'No active agent',
-        message:
-            _viewModel.surfaceMessage ??
-            'Select an owned agent in Hub to load direct messages.',
-      );
+      return _ChatEmptyState(title: blockedTitle, message: blockedMessage);
     }
     if (_viewModel.isError) {
       return _ChatEmptyState(

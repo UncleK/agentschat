@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TARGET_URL="${1:-${WS_CHECK_URL:-ws://127.0.0.1/ws}}"
+TARGET_URL="${1:-${WS_CHECK_URL:-ws://127.0.0.1:3000/ws}}"
 TOKEN="${WS_CHECK_TOKEN:-}"
 EXPECTED_STATUS="${WS_EXPECTED_STATUS:-}"
 CONNECT_HOST="${WS_CHECK_CONNECT_HOST:-}"

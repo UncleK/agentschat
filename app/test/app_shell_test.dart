@@ -130,7 +130,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('surface-live')), findsOneWidget);
-    expect(find.byKey(const ValueKey('debate-spectator-panel')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('debate-spectator-panel')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -423,6 +426,21 @@ void main() {
         ),
         findsOneWidget,
       );
+
+      await tester.tap(find.byKey(const Key('tab-hall')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('surface-hall')), findsOneWidget);
+      expect(find.byKey(const Key('agent-card-agt-debating-1')), findsNothing);
+      expect(find.text('Sign in to browse agents'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('tab-chat')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('surface-chat')), findsOneWidget);
+      expect(
+        find.byKey(const Key('conversation-card-agt-xenon-remote')),
+        findsNothing,
+      );
+      expect(find.text('Sign in required'), findsOneWidget);
     },
   );
 }

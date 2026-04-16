@@ -213,12 +213,10 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       }
 
       setState(() {
-        if (nextViewModel.agents.isNotEmpty) {
-          _viewModel = nextViewModel.copyWith(
-            searchQuery: _viewModel.searchQuery,
-          );
-          _isUsingLiveDirectory = true;
-        }
+        _viewModel = nextViewModel.copyWith(
+          searchQuery: _viewModel.searchQuery,
+        );
+        _isUsingLiveDirectory = true;
         _isLoadingDirectory = false;
         _directoryLoadError = null;
       });
@@ -551,8 +549,51 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
     return 176 + (descriptionLines * 20) + buttonHeight;
   }
 
+  String _emptyDirectoryTitle({
+    required bool isAuthenticated,
+    required bool isBootstrapping,
+  }) {
+    if (isBootstrapping || _isLoadingDirectory) {
+      return 'Syncing agents directory';
+    }
+    if (_directoryLoadError != null) {
+      return 'Agents directory unavailable';
+    }
+    if (!isAuthenticated) {
+      return 'Sign in to browse agents';
+    }
+    if (_isUsingLiveDirectory) {
+      return 'No public agents yet';
+    }
+    return 'No agents available yet';
+  }
+
+  String _emptyDirectoryMessage({
+    required bool isAuthenticated,
+    required bool isBootstrapping,
+  }) {
+    if (isBootstrapping || _isLoadingDirectory) {
+      return 'The live directory is still syncing for the current session.';
+    }
+    if (_directoryLoadError != null) {
+      return _directoryLoadError!;
+    }
+    if (!isAuthenticated) {
+      return 'Production builds only show live directory entries after you sign in.';
+    }
+    if (_isUsingLiveDirectory) {
+      return 'No agents are currently published to the live directory for this account.';
+    }
+    return 'Try again in a moment after the session finishes restoring.';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final session = AppSessionScope.maybeOf(context);
+    final isAuthenticated = session?.isAuthenticated ?? false;
+    final isBootstrapping =
+        session != null &&
+        session.bootstrapStatus != AppSessionBootstrapStatus.ready;
     final visibleAgents = _viewModel.visibleAgents;
     final trimmedQuery = _viewModel.searchQuery.trim();
     final showUtilityChips =
@@ -635,20 +676,21 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
               ],
             ),
           ),
-          if (_viewModel.agents.isEmpty)
+          if (_viewModel.agents.isEmpty &&
+              (_isUsingLiveDirectory ||
+                  _isLoadingDirectory ||
+                  _directoryLoadError != null ||
+                  _viewModel.searchQuery.trim().isNotEmpty))
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               children: [
-                StatusChip(
-                  label: _isUsingLiveDirectory
-                      ? 'Backend directory'
-                      : 'Preview directory',
-                  tone: _isUsingLiveDirectory
-                      ? StatusChipTone.primary
-                      : StatusChipTone.neutral,
-                  showDot: _isUsingLiveDirectory,
-                ),
+                if (_isUsingLiveDirectory)
+                  const StatusChip(
+                    label: 'Live directory',
+                    tone: StatusChipTone.primary,
+                    showDot: true,
+                  ),
                 if (_isLoadingDirectory)
                   const StatusChip(
                     label: 'Syncing',
@@ -656,7 +698,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
                     showDot: true,
                   ),
                 if (_directoryLoadError != null)
-                  StatusChip(
+                  const StatusChip(
                     label: 'Directory fallback',
                     tone: StatusChipTone.tertiary,
                     showDot: false,
@@ -678,6 +720,53 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                 ),
+              ),
+            ),
+          ],
+          if (_viewModel.agents.isEmpty) ...[
+            const SizedBox(height: AppSpacing.xl),
+            GlassPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (isBootstrapping || _isLoadingDirectory) ...[
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        ),
+                      ] else ...[
+                        const Icon(
+                          Icons.travel_explore_rounded,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          _emptyDirectoryTitle(
+                            isAuthenticated: isAuthenticated,
+                            isBootstrapping: isBootstrapping,
+                          ),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    _emptyDirectoryMessage(
+                      isAuthenticated: isAuthenticated,
+                      isBootstrapping: isBootstrapping,
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.onSurfaceMuted,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -726,46 +815,49 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
               );
             },
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Align(
-            alignment: Alignment.center,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.surfaceHigh.withValues(alpha: 0.72),
-                borderRadius: AppRadii.pill,
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.12),
+          if (_viewModel.agents.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Align(
+              alignment: Alignment.center,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceHigh.withValues(alpha: 0.72),
+                  borderRadius: AppRadii.pill,
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                  ),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xs,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: AppSpacing.xs,
-                      height: AppSpacing.xs,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: AppSpacing.xs,
+                        height: AppSpacing.xs,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      'Showing ${visibleAgents.length} of ${_viewModel.agents.length} agents',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: AppColors.onSurfaceMuted,
-                        letterSpacing: 0.9,
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        'Showing ${visibleAgents.length} of ${_viewModel.agents.length} agents',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: AppColors.onSurfaceMuted,
+                              letterSpacing: 0.9,
+                            ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

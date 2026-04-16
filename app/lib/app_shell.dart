@@ -18,9 +18,11 @@ import 'core/theme/app_spacing.dart';
 import 'core/widgets/glass_panel.dart';
 import 'core/widgets/status_chip.dart';
 import 'core/widgets/swipe_back_sheet.dart';
+import 'features/agents_hall/agents_hall_models.dart';
 import 'features/agents_hall/agents_hall_screen.dart';
 import 'features/agents_hall/agents_hall_view_model.dart';
 import 'features/chat/chat_screen.dart';
+import 'features/chat/chat_view_model.dart';
 import 'features/debate/debate_panel.dart';
 import 'features/debate/debate_screen.dart';
 import 'features/debate/debate_view_model.dart';
@@ -914,6 +916,7 @@ class _TabSurfaceBuilder extends StatelessWidget {
     return switch (tab) {
       AppShellTab.hall => _HallSurface(
         tab: tab,
+        environment: environment,
         onRegisterSearchAction: onRegisterSearchAction,
         onOpenLiveDebate: onOpenLiveDebate,
       ),
@@ -925,6 +928,7 @@ class _TabSurfaceBuilder extends StatelessWidget {
       ),
       AppShellTab.chat => _ChatSurface(
         tab: tab,
+        environment: environment,
         onRegisterSearchAction: onRegisterSearchAction,
       ),
       AppShellTab.live => _LiveSurface(
@@ -942,11 +946,13 @@ class _TabSurfaceBuilder extends StatelessWidget {
 class _HallSurface extends StatelessWidget {
   const _HallSurface({
     required this.tab,
+    required this.environment,
     required this.onRegisterSearchAction,
     required this.onOpenLiveDebate,
   });
 
   final AppShellTab tab;
+  final AppEnvironment environment;
   final void Function(AppShellTab tab, VoidCallback? action)
   onRegisterSearchAction;
   final void Function({String? sessionId, DebatePanel initialPanel})
@@ -955,7 +961,15 @@ class _HallSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AgentsHallScreen(
-      initialViewModel: AgentsHallViewModel.sample(),
+      initialViewModel: environment.flavor == AppFlavor.local
+          ? AgentsHallViewModel.sample()
+          : const AgentsHallViewModel(
+              agents: [],
+              bellState: HallBellState(
+                mode: HallBellMode.quiet,
+                unreadCount: 0,
+              ),
+            ),
       onSearchActionChanged: (action) {
         onRegisterSearchAction(AppShellTab.hall, action);
       },
@@ -997,15 +1011,23 @@ class _ForumSurface extends StatelessWidget {
 }
 
 class _ChatSurface extends StatelessWidget {
-  const _ChatSurface({required this.tab, required this.onRegisterSearchAction});
+  const _ChatSurface({
+    required this.tab,
+    required this.environment,
+    required this.onRegisterSearchAction,
+  });
 
   final AppShellTab tab;
+  final AppEnvironment environment;
   final void Function(AppShellTab tab, VoidCallback? action)
   onRegisterSearchAction;
 
   @override
   Widget build(BuildContext context) {
     return ChatScreen(
+      initialViewModel: environment.flavor == AppFlavor.local
+          ? ChatViewModel.signedInSample()
+          : ChatViewModel.resolvingActiveAgent(),
       onSearchActionChanged: (action) {
         onRegisterSearchAction(AppShellTab.chat, action);
       },
