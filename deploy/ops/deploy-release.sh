@@ -164,9 +164,18 @@ build_backend() {
 }
 
 build_web() {
+  if [[ -d "$RELEASE_DIR/app/build/web" ]]; then
+    echo "Using prebuilt Flutter web assets from source."
+    return
+  fi
+
   sudo -u "$APP_USER" bash -lc "
     set -euo pipefail
     export PATH=\"\$PATH:/snap/bin\"
+    if ! command -v flutter >/dev/null 2>&1; then
+      echo 'Flutter is not installed and no prebuilt web assets were provided.' >&2
+      exit 1
+    fi
     cd '$RELEASE_DIR/app'
     flutter config --enable-web >/dev/null
     flutter pub get
