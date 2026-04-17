@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
+import {
+  DebateSeatStatus,
+  DebateSessionStatus,
+} from '../../src/database/domain.enums';
 import { DebateSeatEntity } from '../../src/database/entities/debate-seat.entity';
 import { DebateSessionEntity } from '../../src/database/entities/debate-session.entity';
 import { DebateTurnEntity } from '../../src/database/entities/debate-turn.entity';
@@ -635,5 +639,150 @@ describe('Debate state machine (e2e)', () => {
     expect(finalStartAction.status).toBe('succeeded');
     expect(startedDebateSession.status).toBe('live');
     expect(startedDebateSession.currentTurnNumber).toBe(1);
+  });
+
+  it('rejects agent-hosted debate creation when the host agent is also assigned to a seat', async () => {
+    const hostAgent = await importSelfAgent(
+      app,
+      'debate-overlap-host-agent',
+      'Debate Overlap Host',
+    );
+    const con = await importSelfAgent(
+      app,
+      'debate-overlap-con-agent',
+      'Debate Overlap Con',
+    );
+    const hostClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      hostAgent.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+
+    const createAction = await request(app.getHttpServer())
+      .post('/api/v1/actions')
+      .set('Authorization', `Bearer ${hostClaim.accessToken}`)
+      .set('Idempotency-Key', 'debate-agent-host-seat-overlap')
+      .send({
+        type: 'debate.create',
+        payload: {
+          topic: 'Should a host also take the pro seat?',
+          proStance: 'Yes, one agent can do both.',
+          conStance: 'No, the room needs three distinct roles.',
+          proAgentId: hostAgent.id,
+          conAgentId: con.id,
+          freeEntry: false,
+        },
+      })
+      .expect(202);
+    const createActionBody = typedValue<AcceptedActionBody>(createAction.body);
+
+    const finalCreateAction = await waitForActionStatus(
+      app,
+      hostClaim.accessToken,
+      createActionBody.id,
+    );
+
+    expect(finalCreateAction.status).toBe('rejected');
+    expect(finalCreateAction.error?.message).toMatch(
+      /host agent cannot also occupy a pro or con seat/i,
+    );
+  });
+
+  it('rejects assigning the host agent as a replacement debater', async () => {
+    const hostAgent = await importSelfAgent(
+      app,
+      'debate-replacement-host-agent',
+      'Debate Replacement Host',
+    );
+    const pro = await importSelfAgent(
+      app,
+      'debate-replacement-pro-agent',
+      'Debate Replacement Pro',
+    );
+    const con = await importSelfAgent(
+      app,
+      'debate-replacement-con-agent',
+      'Debate Replacement Con',
+    );
+    const hostClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      hostAgent.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+
+    const createAction = await request(app.getHttpServer())
+      .post('/api/v1/actions')
+      .set('Authorization', `Bearer ${hostClaim.accessToken}`)
+      .set('Idempotency-Key', 'debate-agent-host-replacement-create')
+      .send({
+        type: 'debate.create',
+        payload: {
+          topic: 'Should a host agent enter as a replacement?',
+          proStance: 'Yes, the host can fill the empty seat.',
+          conStance: 'No, the host must remain separate from both seats.',
+          proAgentId: pro.id,
+          conAgentId: con.id,
+          freeEntry: true,
+        },
+      })
+      .expect(202);
+    const createActionBody = typedValue<AcceptedActionBody>(createAction.body);
+
+    const finalCreateAction = await waitForActionStatus(
+      app,
+      hostClaim.accessToken,
+      createActionBody.id,
+    );
+    const createdDebateSessionId = typedValue<{ debateSessionId: string }>(
+      finalCreateAction.result,
+    ).debateSessionId;
+
+    const proSeat = await debateSeatRepository.findOneByOrFail({
+      debateSessionId: createdDebateSessionId,
+      stance: 'pro',
+    });
+    await debateSessionRepository.update(
+      { id: createdDebateSessionId },
+      { status: DebateSessionStatus.Paused },
+    );
+    await debateSeatRepository.update(
+      { id: proSeat.id },
+      {
+        status: DebateSeatStatus.Replacing,
+        agentId: null,
+      },
+    );
+
+    const resumeAction = await request(app.getHttpServer())
+      .post('/api/v1/actions')
+      .set('Authorization', `Bearer ${hostClaim.accessToken}`)
+      .set('Idempotency-Key', 'debate-agent-host-replacement-resume')
+      .send({
+        type: 'debate.resume',
+        payload: {
+          debateSessionId: createdDebateSessionId,
+          seatId: proSeat.id,
+          replacementAgentId: hostAgent.id,
+        },
+      })
+      .expect(202);
+    const resumeActionBody = typedValue<AcceptedActionBody>(resumeAction.body);
+
+    const finalResumeAction = await waitForActionStatus(
+      app,
+      hostClaim.accessToken,
+      resumeActionBody.id,
+    );
+
+    expect(finalResumeAction.status).toBe('rejected');
+    expect(finalResumeAction.error?.message).toMatch(
+      /host agent cannot also occupy a pro or con seat/i,
+    );
   });
 });

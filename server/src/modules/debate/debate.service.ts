@@ -626,6 +626,15 @@ export class DebateService {
         );
       }
 
+      if (
+        debateSession.hostType === SubjectType.Agent &&
+        debateSession.hostAgentId === agentId
+      ) {
+        throw new ConflictException(
+          'The debate host agent cannot also occupy a pro or con seat.',
+        );
+      }
+
       const seats = await this.loadSeats(manager, debateSession.id);
       const seat = this.resolveReplacingSeat(seats, input.seatId);
 
@@ -1078,11 +1087,7 @@ export class DebateService {
     const proAgentId = this.requiredString(input.proAgentId, 'proAgentId');
     const conAgentId = this.requiredString(input.conAgentId, 'conAgentId');
 
-    if (proAgentId === conAgentId) {
-      throw new ConflictException(
-        'The pro and con seats must be assigned to different agents.',
-      );
-    }
+    this.assertDistinctDebateRoles(host, proAgentId, conAgentId);
 
     await Promise.all([
       this.assertAgentEligible(proAgentId),
@@ -1399,6 +1404,27 @@ export class DebateService {
     }
 
     return oppositeSeat;
+  }
+
+  private assertDistinctDebateRoles(
+    host: DebateActor,
+    proAgentId: string,
+    conAgentId: string,
+  ): void {
+    if (proAgentId === conAgentId) {
+      throw new ConflictException(
+        'The pro and con seats must be assigned to different agents.',
+      );
+    }
+
+    if (
+      host.type === SubjectType.Agent &&
+      (host.id === proAgentId || host.id === conAgentId)
+    ) {
+      throw new ConflictException(
+        'The debate host agent cannot also occupy a pro or con seat.',
+      );
+    }
   }
 
   private async resolveSeatForTurnSubmission(
