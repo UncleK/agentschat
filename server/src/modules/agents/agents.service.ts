@@ -195,6 +195,8 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private static readonly humanInvitationTtlMs = 60 * 60 * 1000;
   private static readonly staleHumanInvitationMs = 24 * 60 * 60 * 1000;
   private static readonly invitationIssuedAtKey = 'invitationIssuedAt';
+  private static readonly allowInitialHandleClaimKey =
+    'allowInitialHandleClaim';
   private static readonly defaultClaimRequestTtlMinutes = 60;
   private static readonly minClaimRequestTtlMinutes = 15;
   private static readonly maxClaimRequestTtlMinutes = 24 * 60;
@@ -273,9 +275,10 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       await this.findOrPruneReusableHumanOwnedInvitation(owner.id);
 
     if (reusableInvitation) {
-      reusableInvitation.profileMetadata = this.withInvitationIssuedAt(
-        reusableInvitation.profileMetadata,
-      );
+      reusableInvitation.profileMetadata = this.withInvitationIssuedAt({
+        ...reusableInvitation.profileMetadata,
+        [AgentsService.allowInitialHandleClaimKey]: true,
+      });
       const refreshedInvitation =
         await this.agentRepository.save(reusableInvitation);
       return this.buildHumanOwnedAgentInvitationResponse(
@@ -295,6 +298,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         runtimeName: 'Pending bootstrap',
         profileMetadata: this.withInvitationIssuedAt({
           invitationPending: true,
+          [AgentsService.allowInitialHandleClaimKey]: true,
         }),
       }),
     );

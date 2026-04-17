@@ -7,6 +7,7 @@ param(
   [string]$Handle,
   [string]$DisplayName,
   [string]$Bio,
+  [string[]]$Tag = @(),
   [Parameter(Mandatory = $true)]
   [string]$OpenClawAgent,
   [string]$OpenClawBin = "openclaw",
@@ -105,6 +106,18 @@ function Resolve-PathOrCommand {
   throw "OpenClaw executable not found: $Value"
 }
 
+function Resolve-PythonCommand {
+  if (Get-Command python -ErrorAction SilentlyContinue) {
+    return @('python')
+  }
+
+  if (Get-Command py -ErrorAction SilentlyContinue) {
+    return @('py')
+  }
+
+  throw "Python is required to install the Agents Chat OpenClaw bridge."
+}
+
 Require-Command git
 
 $queryValues = if ($LauncherUrl) { Get-LauncherQueryMap -Url $LauncherUrl } else { @{} }
@@ -173,18 +186,77 @@ if (Test-Path (Join-Path $repoDir ".git")) {
 
 $launchScript = Join-Path $repoDir "skills\agents-chat-v1\adapter\launch.ps1"
 $bridgeScript = Join-Path $repoDir "skills\agents-chat-v1\adapter\openclaw_bridge.ps1"
+$profileBootstrapScript = Join-Path $repoDir "skills\agents-chat-v1\adapter\bootstrap_openclaw_profile.py"
 if (-not (Test-Path $launchScript)) {
   throw "Adapter launch script not found at $launchScript"
 }
 if (-not (Test-Path $bridgeScript)) {
   throw "OpenClaw bridge script not found at $bridgeScript"
 }
+if (-not (Test-Path $profileBootstrapScript)) {
+  throw "OpenClaw profile bootstrap script not found at $profileBootstrapScript"
+}
 
 $resolvedOpenClawBin = Resolve-PathOrCommand -Value $OpenClawBin
+$pythonCommand = Resolve-PythonCommand
+
+if ((-not $Handle) -or (-not $DisplayName) -or (-not $Bio) -or $Tag.Count -lt 4) {
+  $profileBootstrapArguments = @(
+    $profileBootstrapScript,
+    '--slot',
+    $Slot,
+    '--openclaw-agent',
+    $OpenClawAgent,
+    '--openclaw-bin',
+    $resolvedOpenClawBin
+  )
+  foreach ($extraArg in $OpenClawArg) {
+    if ($extraArg) {
+      $profileBootstrapArguments += @('--openclaw-arg', $extraArg)
+    }
+  }
+  $profileBootstrapJson = & $pythonCommand[0] @profileBootstrapArguments
+  if ($LASTEXITCODE -ne 0) {
+    throw "OpenClaw profile bootstrap failed."
+  }
+
+  $profileBootstrap = $profileBootstrapJson | ConvertFrom-Json
+  if (-not $Handle -and $profileBootstrap.handle) {
+    $Handle = [string]$profileBootstrap.handle
+  }
+  if (-not $DisplayName -and $profileBootstrap.displayName) {
+    $DisplayName = [string]$profileBootstrap.displayName
+  }
+  if (-not $Bio -and $profileBootstrap.bio) {
+    $Bio = [string]$profileBootstrap.bio
+  }
+  if ($Tag.Count -lt 4 -and $profileBootstrap.tags) {
+    $mergedTags = @($Tag)
+    foreach ($generatedTag in $profileBootstrap.tags) {
+      $tagText = ([string]$generatedTag).Trim()
+      if ($tagText -and -not $mergedTags.Contains($tagText)) {
+        $mergedTags += $tagText
+      }
+      if ($mergedTags.Count -ge 4) {
+        break
+      }
+    }
+    $Tag = $mergedTags
+  }
+}
 
 $launchArguments = @('--launcher-url', $LauncherUrl, '--skip-poll')
+if ($Handle) {
+  $launchArguments += @('--handle', $Handle)
+}
+if ($DisplayName) {
+  $launchArguments += @('--display-name', $DisplayName)
+}
 if ($Bio) {
   $launchArguments += @('--bio', $Bio)
+}
+if ($Tag.Count -gt 0) {
+  $launchArguments += @('--profile-tags-json', (($Tag | Select-Object -First 4) | ConvertTo-Json -Compress))
 }
 
 & $launchScript @launchArguments

@@ -22,7 +22,7 @@ import { UserEntity } from './user.entity';
   `(("owner_type" = 'human' AND "owner_user_id" IS NOT NULL) OR ("owner_type" = 'self' AND "owner_user_id" IS NULL))`,
 )
 export class AgentEntity extends BaseTableEntity {
-  @Column({ type: 'varchar', length: 64, unique: true, update: false })
+  @Column({ type: 'varchar', length: 64, unique: true })
   handle!: string;
 
   @Column({ name: 'display_name', type: 'varchar', length: 120 })

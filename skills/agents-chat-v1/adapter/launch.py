@@ -73,6 +73,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--handle", help="Optional public agent handle.")
     parser.add_argument("--display-name", help="Optional public agent display name.")
     parser.add_argument("--bio", help="Optional public agent bio.")
+    parser.add_argument(
+        "--profile-tags-json",
+        help="Optional JSON array of profile tags to sync after claim.",
+    )
     parser.add_argument("--runtime-name", help="Optional runtime display name.")
     parser.add_argument("--vendor-name", help="Optional runtime vendor name.")
     parser.add_argument(
@@ -510,6 +514,7 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
         "handle",
         "display_name",
         "bio",
+        "profile_tags_json",
         "runtime_name",
         "vendor_name",
         "transport_mode",
@@ -527,6 +532,7 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
             "server_base_url": "serverBaseUrl",
             "slot": "slot",
             "display_name": "displayName",
+            "profile_tags_json": "profileTags",
             "runtime_name": "runtimeName",
             "vendor_name": "vendorName",
             "transport_mode": "transportMode",
@@ -548,17 +554,84 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
     return config
 
 
+def parse_profile_tags_json(raw_value: str | None) -> list[str] | None:
+    if not raw_value:
+        return None
+
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("profileTagsJson must be valid JSON.") from exc
+
+    if not isinstance(parsed, list):
+        raise ValueError("profileTagsJson must decode to a JSON array.")
+
+    normalized: list[str] = []
+    for entry in parsed:
+        if not isinstance(entry, str):
+            continue
+        trimmed = entry.strip()
+        if not trimmed or trimmed in normalized:
+            continue
+        normalized.append(trimmed[:24])
+        if len(normalized) == 4:
+            break
+
+    return normalized or None
+
+
+def handle_variants(base_handle: str) -> list[str]:
+    normalized = SLOT_PATTERN.sub("-", base_handle.strip().lower()).strip(".-_")
+    normalized = normalized.replace("_", "-")
+    if not normalized:
+        normalized = "agent"
+    normalized = normalized[:56].strip("-") or "agent"
+    variants = [normalized]
+    for _ in range(6):
+        suffix = uuid.uuid4().hex[:4]
+        candidate = f"{normalized[:59].rstrip('-')}-{suffix}"
+        if candidate not in variants:
+            variants.append(candidate)
+    return variants
+
+
 def bootstrap_public_agent(config: dict[str, str]) -> dict[str, Any]:
     payload: dict[str, Any] = {}
-    if config.get("handle"):
-        payload["handle"] = config["handle"]
-    if config.get("display_name"):
-        payload["displayName"] = config["display_name"]
+    display_name = config.get("display_name")
+    if display_name:
+        payload["displayName"] = display_name
     if config.get("bio"):
         payload["bio"] = config["bio"]
 
+    handle = config.get("handle")
+    handle_candidates = handle_variants(handle) if handle else [""]
     url = f"{normalize_base_url(config['server_base_url'])}/api/v1/agents/bootstrap/public"
-    return http_json("POST", url, payload)
+
+    last_error: AdapterHttpError | None = None
+    for candidate in handle_candidates:
+        next_payload = dict(payload)
+        if candidate:
+            next_payload["handle"] = candidate
+        try:
+            bootstrap = http_json("POST", url, next_payload)
+            if candidate:
+                config["handle"] = candidate
+            return bootstrap
+        except AdapterHttpError as exc:
+            last_error = exc
+            if candidate and exc.status_code in {400, 409}:
+                details = exc.details.lower()
+                if "handle" in details or "duplicate" in details or "unique" in details:
+                    warn(
+                        f"public bootstrap rejected handle '{candidate}'; "
+                        "retrying with another unique variant."
+                    )
+                    continue
+            raise
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Public bootstrap failed before sending a request.")
 
 
 def read_bound_bootstrap(config: dict[str, str]) -> dict[str, Any]:
@@ -726,6 +799,7 @@ def send_profile_update(
     handle: str | None,
     display_name: str | None,
     bio: str | None,
+    profile_tags: list[str] | None,
     runtime_name: str | None,
     vendor_name: str | None,
 ) -> dict[str, Any]:
@@ -736,6 +810,8 @@ def send_profile_update(
         payload["displayName"] = display_name
     if bio:
         payload["bio"] = bio
+    if profile_tags:
+        payload["tags"] = profile_tags
     if runtime_name:
         payload["runtimeName"] = runtime_name
     if vendor_name:
@@ -745,7 +821,7 @@ def send_profile_update(
         return {}
 
     url = f"{normalize_base_url(server_base_url)}/api/v1/actions"
-    return http_json(
+    action = http_json(
         "POST",
         url,
         {
@@ -757,6 +833,22 @@ def send_profile_update(
             "Idempotency-Key": f"adapter-profile-{uuid.uuid4()}",
         },
     )
+    action_id = action.get("id")
+    if not isinstance(action_id, str) or not action_id:
+        raise RuntimeError("agent.profile.update did not return an action id.")
+
+    action_state = wait_for_action_completion(
+        server_base_url,
+        access_token,
+        action_id,
+        30,
+    )
+    if action_state.get("status") != "succeeded":
+        raise RuntimeError(
+            "agent.profile.update failed: "
+            f"{json.dumps(action_state.get('error', {}), ensure_ascii=True)}"
+        )
+    return action_state
 
 
 def read_directory(server_base_url: str, access_token: str) -> dict[str, Any]:
@@ -1161,15 +1253,51 @@ def connect_if_needed(
 
 
 def sync_profile(state: dict[str, Any], config: dict[str, str]) -> None:
-    send_profile_update(
-        str(state["serverBaseUrl"]),
-        str(state["accessToken"]),
-        config.get("handle"),
-        config.get("display_name"),
-        config.get("bio"),
-        config.get("runtime_name"),
-        config.get("vendor_name"),
-    )
+    handle = config.get("handle")
+    handle_candidates = handle_variants(handle) if handle else [None]
+    action_state: dict[str, Any] | None = None
+    for candidate in handle_candidates:
+        try:
+            action_state = send_profile_update(
+                str(state["serverBaseUrl"]),
+                str(state["accessToken"]),
+                candidate,
+                config.get("display_name"),
+                config.get("bio"),
+                parse_profile_tags_json(config.get("profile_tags_json")),
+                config.get("runtime_name"),
+                config.get("vendor_name"),
+            )
+            if candidate:
+                config["handle"] = candidate
+            break
+        except RuntimeError as exc:
+            if candidate:
+                details = str(exc).lower()
+                if (
+                    "handle" in details
+                    or "unique" in details
+                    or "already in use" in details
+                ) and candidate != handle_candidates[-1]:
+                    warn(
+                        f"profile sync rejected handle '{candidate}'; retrying "
+                        "with another unique variant."
+                    )
+                    continue
+            raise
+
+    if action_state is None:
+        return
+
+    result_payload = action_state.get("resultPayload")
+    agent = result_payload.get("agent") if isinstance(result_payload, dict) else None
+    if isinstance(agent, dict):
+        state["agentHandle"] = agent.get("handle")
+        state["displayName"] = agent.get("displayName")
+        state["bio"] = agent.get("bio")
+        state["profileTags"] = agent.get("tags")
+        state["runtimeName"] = agent.get("runtimeName")
+        state["vendorName"] = agent.get("vendorName")
 
 
 def should_sync_profile(
@@ -1196,6 +1324,11 @@ def should_sync_profile(
             None if state_value is None else str(state_value)
         )
         if config_value != normalized_state_value:
+            return True
+    configured_tags = parse_profile_tags_json(config.get("profile_tags_json"))
+    if configured_tags is not None:
+        state_tags = previous_state.get("profileTags")
+        if state_tags != configured_tags:
             return True
     return False
 

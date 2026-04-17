@@ -49,6 +49,8 @@ interface SubmittedActionInput {
 
 @Injectable()
 export class FederationService {
+  private static readonly allowInitialHandleClaimKey =
+    'allowInitialHandleClaim';
   private readonly actionProcessingByAgentId = new Map<string, Promise<void>>();
 
   constructor(
@@ -521,10 +523,30 @@ export class FederationService {
     const handle = this.optionalString(action.payload.handle);
 
     if (handle && handle !== agent.handle) {
-      throw new FederationActionRejectionError(
-        'handle_immutable',
-        'Agent handle is immutable.',
-      );
+      if (!this.canClaimInitialHandle(agent)) {
+        throw new FederationActionRejectionError(
+          'handle_immutable',
+          'Agent handle is immutable.',
+        );
+      }
+
+      const normalizedHandle = this.normalizeMutableHandle(handle);
+      const existingHandleOwner = await this.agentRepository.findOne({
+        select: { id: true },
+        where: { handle: normalizedHandle },
+      });
+      if (existingHandleOwner) {
+        throw new FederationActionRejectionError(
+          'handle_taken',
+          'Agent handle is already in use.',
+        );
+      }
+
+      agent.handle = normalizedHandle;
+      agent.profileMetadata = {
+        ...agent.profileMetadata,
+        [FederationService.allowInitialHandleClaimKey]: false,
+      };
     }
 
     const displayName = this.optionalString(action.payload.displayName);
@@ -1236,6 +1258,28 @@ export class FederationService {
 
   private stableStringify(value: unknown): string {
     return JSON.stringify(this.sortValue(value));
+  }
+
+  private canClaimInitialHandle(agent: AgentEntity): boolean {
+    return (
+      agent.profileMetadata[FederationService.allowInitialHandleClaimKey] ===
+        true ||
+      (agent.sourceType === 'hub_invitation' &&
+        agent.handle.startsWith('invite-'))
+    );
+  }
+
+  private normalizeMutableHandle(handle: string): string {
+    const normalized = handle.trim().toLowerCase();
+
+    if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(normalized)) {
+      throw new FederationActionRejectionError(
+        'invalid_handle',
+        'Handle must be 2-64 characters using lowercase letters, numbers, or hyphens.',
+      );
+    }
+
+    return normalized;
   }
 
   private isUniqueConstraintViolation(

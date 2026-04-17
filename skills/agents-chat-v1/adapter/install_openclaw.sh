@@ -9,6 +9,7 @@ SLOT=""
 HANDLE=""
 DISPLAY_NAME=""
 BIO=""
+PROFILE_TAGS_JSON=""
 OPENCLAW_AGENT=""
 OPENCLAW_BIN="openclaw"
 INSTRUCTION_FILE=""
@@ -56,6 +57,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --bio)
       BIO="$2"
+      shift 2
+      ;;
+    --profile-tags-json)
+      PROFILE_TAGS_JSON="$2"
       shift 2
       ;;
     --openclaw-agent)
@@ -220,6 +225,7 @@ fi
 
 LAUNCH_SCRIPT="$REPO_DIR/skills/agents-chat-v1/adapter/launch.sh"
 BRIDGE_SCRIPT="$REPO_DIR/skills/agents-chat-v1/adapter/openclaw_bridge.sh"
+PROFILE_BOOTSTRAP_SCRIPT="$REPO_DIR/skills/agents-chat-v1/adapter/bootstrap_openclaw_profile.py"
 if [ ! -f "$LAUNCH_SCRIPT" ]; then
   echo "Adapter launch script not found at $LAUNCH_SCRIPT" >&2
   exit 1
@@ -228,12 +234,65 @@ if [ ! -f "$BRIDGE_SCRIPT" ]; then
   echo "OpenClaw bridge script not found at $BRIDGE_SCRIPT" >&2
   exit 1
 fi
-
-if [ -n "$BIO" ]; then
-  sh "$LAUNCH_SCRIPT" --launcher-url "$LAUNCHER_URL" --skip-poll --bio "$BIO"
-else
-  sh "$LAUNCH_SCRIPT" --launcher-url "$LAUNCHER_URL" --skip-poll
+if [ ! -f "$PROFILE_BOOTSTRAP_SCRIPT" ]; then
+  echo "OpenClaw profile bootstrap script not found at $PROFILE_BOOTSTRAP_SCRIPT" >&2
+  exit 1
 fi
+
+if [ -z "$HANDLE" ] || [ -z "$DISPLAY_NAME" ] || [ -z "$BIO" ] || [ -z "$PROFILE_TAGS_JSON" ]; then
+  profile_json="$("$PYTHON_BIN" "$PROFILE_BOOTSTRAP_SCRIPT" --slot "$SLOT" --openclaw-agent "$OPENCLAW_AGENT" --openclaw-bin "$OPENCLAW_BIN")"
+  if [ -z "$HANDLE" ]; then
+    HANDLE="$("$PYTHON_BIN" - "$profile_json" <<'PY'
+import json
+import sys
+payload = json.loads(sys.argv[1])
+print(payload.get("handle", ""))
+PY
+)"
+  fi
+  if [ -z "$DISPLAY_NAME" ]; then
+    DISPLAY_NAME="$("$PYTHON_BIN" - "$profile_json" <<'PY'
+import json
+import sys
+payload = json.loads(sys.argv[1])
+print(payload.get("displayName", ""))
+PY
+)"
+  fi
+  if [ -z "$BIO" ]; then
+    BIO="$("$PYTHON_BIN" - "$profile_json" <<'PY'
+import json
+import sys
+payload = json.loads(sys.argv[1])
+print(payload.get("bio", ""))
+PY
+)"
+  fi
+  if [ -z "$PROFILE_TAGS_JSON" ]; then
+    PROFILE_TAGS_JSON="$("$PYTHON_BIN" - "$profile_json" <<'PY'
+import json
+import sys
+payload = json.loads(sys.argv[1])
+print(json.dumps(payload.get("tags", []), ensure_ascii=True))
+PY
+)"
+  fi
+fi
+
+set -- --launcher-url "$LAUNCHER_URL" --skip-poll
+if [ -n "$HANDLE" ]; then
+  set -- "$@" --handle "$HANDLE"
+fi
+if [ -n "$DISPLAY_NAME" ]; then
+  set -- "$@" --display-name "$DISPLAY_NAME"
+fi
+if [ -n "$BIO" ]; then
+  set -- "$@" --bio "$BIO"
+fi
+if [ -n "$PROFILE_TAGS_JSON" ]; then
+  set -- "$@" --profile-tags-json "$PROFILE_TAGS_JSON"
+fi
+sh "$LAUNCH_SCRIPT" "$@"
 
 runtime_dir="$REPO_DIR/skills/agents-chat-v1/adapter/.runtime"
 mkdir -p "$runtime_dir"
