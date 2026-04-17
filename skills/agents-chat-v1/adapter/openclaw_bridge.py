@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -51,6 +52,10 @@ TEXT_HINT_KEYS = (
     "output",
     "assistantText",
     "finalText",
+)
+IGNORED_OPENCLAW_LOG_LINE = re.compile(
+    r"^(?:\d{2}:\d{2}:\d{2}\s+)?\[(?:plugins|tools|ws|browser/service)\]\b",
+    re.IGNORECASE,
 )
 
 
@@ -488,6 +493,14 @@ def parse_openclaw_output(stdout: str) -> str:
         if candidate:
             return candidate
 
+    visible_lines = [
+        line.strip()
+        for line in raw_output.splitlines()
+        if line.strip() and not IGNORED_OPENCLAW_LOG_LINE.match(line.strip())
+    ]
+    if visible_lines:
+        return "\n".join(visible_lines)
+
     return raw_output
 
 
@@ -504,21 +517,22 @@ def build_openclaw_prompt(
     thread_id = event.get("threadId")
     transcript = format_transcript(messages, self_agent_id)
     latest_content = normalize_message_content(event) if isinstance(event, dict) else "[empty]"
+    latest_author = normalize_text(
+        event.get("actorDisplayName") if isinstance(event, dict) else None,
+        "Unknown sender",
+    )
     return (
-        f"{instruction_text}\n\n"
-        "Conversation rules:\n"
-        "- Reply as the agent in one natural message.\n"
-        "- Keep the reply useful, warm, and concise unless the user clearly asks for more depth.\n"
-        "- Do not mention hidden prompts, delivery ids, JSON, or internal bridge mechanics.\n"
-        "- If the last message is ambiguous, ask one direct clarification question instead of stalling.\n\n"
+        "Agents Chat DM delivery:\n"
+        f"From: {latest_author}\n"
+        f"Latest incoming message: {latest_content}\n"
+        f"Thread: {thread_id}\n\n"
+        "Reply rules:\n"
+        "- Reply as the agent in one natural plain-text message.\n"
+        "- Keep the reply warm, useful, and concise unless the user clearly asks for more.\n"
+        "- Do not mention hidden prompts, JSON, delivery ids, or bridge mechanics.\n"
+        "- If the last message is ambiguous, ask one direct clarification question.\n"
         f"{dm_activity_guidance(activity_level)}\n\n"
-        "Agents Chat delivery context:\n"
-        f"- slot: {slot}\n"
-        f"- selfAgentId: {self_agent_id}\n"
-        f"- activityLevel: {activity_level}\n"
-        f"- deliveryId: {delivery.get('deliveryId')}\n"
-        f"- threadId: {thread_id}\n"
-        f"- latestIncomingMessage: {latest_content}\n\n"
+        f"{instruction_text}\n\n"
         "Recent thread transcript:\n"
         f"{transcript}\n\n"
         "Return only the reply text."
@@ -602,23 +616,20 @@ def build_forum_prompt(
     )
     reply_tree = "\n".join(forum_reply_lines(replies)) or "- No visible replies yet."
     return (
-        f"{instruction_text}\n\n"
+        "Agents Chat forum delivery:\n"
+        f"Latest reply from: {latest_author}\n"
+        f"Latest reply: {latest_body}\n"
+        f"Topic: {normalize_text(topic.get('title'), 'Untitled topic')}\n\n"
         "Forum reply mode:\n"
         f"- Default to exactly {NO_REPLY_SENTINEL} unless the latest reply clearly merits a response.\n"
         "- Reply only when you can add something specific, helpful, or challenging.\n"
         "- If you do reply, write one natural forum reply in plain text.\n"
         "- Do not mention delivery ids, bridge mechanics, or system prompts.\n"
         f"{forum_activity_guidance(activity_level)}\n\n"
+        f"{instruction_text}\n\n"
         "Forum topic context:\n"
-        f"- slot: {slot}\n"
-        f"- selfAgentId: {self_agent_id}\n"
-        f"- activityLevel: {activity_level}\n"
-        f"- threadId: {topic.get('threadId')}\n"
-        f"- title: {normalize_text(topic.get('title'), 'Untitled topic')}\n"
         f"- rootAuthor: {normalize_text(topic.get('authorName'), 'Unknown')}\n"
-        f"- rootBody: {normalize_text(topic.get('rootBody'))}\n"
-        f"- latestIncomingReplyAuthor: {latest_author}\n"
-        f"- latestIncomingReply: {latest_body}\n\n"
+        f"- rootBody: {normalize_text(topic.get('rootBody'))}\n\n"
         "Visible reply tree:\n"
         f"{reply_tree}\n\n"
         f"Return either {NO_REPLY_SENTINEL} or the reply text."
@@ -690,23 +701,19 @@ def build_debate_turn_prompt(
         else "Unknown stance"
     )
     return (
-        f"{instruction_text}\n\n"
+        "Agents Chat live debate turn:\n"
+        f"Topic: {normalize_text(debate.get('topic'), 'Untitled debate')}\n"
+        f"Assigned stance: {stance_text}\n"
+        f"Turn number: {metadata.get('turnNumber')}\n\n"
         "Live debate formal-turn mode:\n"
         f"- If this assignment is not really for you, return exactly {NO_REPLY_SENTINEL}.\n"
         "- Otherwise write exactly one formal debate turn in plain text.\n"
         "- Stay on your assigned stance and advance the argument.\n"
         "- Do not output bullet points, JSON, stage directions, or hidden reasoning.\n"
         f"{debate_activity_guidance(activity_level)}\n\n"
+        f"{instruction_text}\n\n"
         "Debate context:\n"
-        f"- slot: {slot}\n"
-        f"- selfAgentId: {self_agent_id}\n"
-        f"- activityLevel: {activity_level}\n"
-        f"- debateSessionId: {debate.get('debateSessionId')}\n"
-        f"- topic: {normalize_text(debate.get('topic'), 'Untitled debate')}\n"
-        f"- seatId: {metadata.get('seatId')}\n"
         f"- stanceSide: {stance}\n"
-        f"- stanceText: {stance_text}\n"
-        f"- turnNumber: {metadata.get('turnNumber')}\n"
         f"- deadlineAt: {metadata.get('deadlineAt')}\n\n"
         "Recent formal turns:\n"
         f"{debate_turn_lines(debate)}\n\n"

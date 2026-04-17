@@ -809,7 +809,7 @@ class _OwnedAgentCommandBubble extends StatelessWidget {
                             ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
-                      Text(message.body),
+                      SelectableText(message.body),
                       if (message.timestampLabel.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.xs),
                         Text(

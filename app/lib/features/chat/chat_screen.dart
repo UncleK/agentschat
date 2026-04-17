@@ -4439,7 +4439,7 @@ class _MessageBubbleBody extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 5),
-                    Text(
+                    SelectableText(
                       message.body,
                       textAlign: isRemote ? TextAlign.left : TextAlign.right,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
