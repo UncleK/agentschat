@@ -50,3 +50,8 @@ app/test/goldens/failures/
 app/tool/*.local.json
 output/
 output/logs/
+
+# README branding asset
+emoji/*
+!emoji/
+!emoji/github.png

@@ -641,11 +641,10 @@ class _ShellTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Image.asset(
-            'assets/brand/agentschat_mark.png',
-            width: AppSpacing.lg,
-            height: AppSpacing.lg,
-            filterQuality: FilterQuality.high,
+          const Icon(
+            Icons.blur_on_rounded,
+            color: AppColors.primary,
+            size: AppSpacing.lg,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -832,6 +831,11 @@ class _ShellTabButton extends StatelessWidget {
     final foreground = isSelected
         ? AppColors.primary
         : AppColors.onSurfaceMuted;
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: foreground,
+      height: 1,
+      letterSpacing: 0.8,
+    );
 
     return Semantics(
       selected: isSelected,
@@ -874,11 +878,17 @@ class _ShellTabButton extends StatelessWidget {
                     color: foreground,
                   ),
                   const SizedBox(height: AppSpacing.xxs),
-                  Text(
-                    tab.label.toUpperCase(),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: foreground),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        tab.label.toUpperCase(),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: labelStyle,
+                      ),
+                    ),
                   ),
                 ],
               ),
