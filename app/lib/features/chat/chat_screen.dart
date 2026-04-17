@@ -47,6 +47,9 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const Duration _threadRefreshInterval = Duration(seconds: 3);
+  static const double _threadBottomSnapThreshold = 120;
+
   late ChatViewModel _viewModel;
   late final TextEditingController _conversationSearchController;
   late final FocusNode _conversationSearchFocusNode;
@@ -54,11 +57,14 @@ class _ChatScreenState extends State<ChatScreen> {
   late final FocusNode _threadSearchFocusNode;
   late final TextEditingController _composerController;
   late final FocusNode _composerFocusNode;
+  late final ScrollController _messageScrollController;
   final ImagePicker _imagePicker = ImagePicker();
   bool _composerHasDraft = false;
   bool _showCompactThread = false;
   bool _isLoadingMessages = false;
   bool _isSendingMessage = false;
+  bool _isRefreshingSelectedThread = false;
+  bool _forceScrollToBottomOnNextMessageLoad = false;
   String? _composerImagePath;
   String? _messageLoadError;
   String? _sendMessageError;
@@ -73,6 +79,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _followRequestConversationId;
   String? _followRequestErrorConversationId;
   String? _followRequestErrorMessage;
+  Timer? _threadRefreshTimer;
 
   @override
   void initState() {
@@ -91,6 +98,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _composerHasDraft = _composerController.text.trim().isNotEmpty;
     _composerController.addListener(_handleComposerDraftChanged);
     _composerFocusNode = FocusNode();
+    _messageScrollController = ScrollController();
+    _threadRefreshTimer = Timer.periodic(_threadRefreshInterval, (_) {
+      unawaited(_refreshSelectedConversationSilently());
+    });
     _syncShellSearchAction();
   }
 
@@ -143,6 +154,7 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       onSearchActionChanged?.call(null);
     });
+    _threadRefreshTimer?.cancel();
     _conversationSearchController.dispose();
     _conversationSearchFocusNode.dispose();
     _threadSearchController.dispose();
@@ -150,6 +162,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _composerController.removeListener(_handleComposerDraftChanged);
     _composerController.dispose();
     _composerFocusNode.dispose();
+    _messageScrollController.dispose();
     super.dispose();
   }
 
@@ -346,6 +359,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       var conversations = response.threads
+          .where(
+            (thread) =>
+                !_isOwnedAgentCommandThread(thread, currentHumanId: userId),
+          )
           .map(_mapConversation)
           .toList(growable: false);
       final liveConversationTransform = widget.liveConversationTransform;
@@ -497,6 +514,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final shouldLoadConversationThread = _shouldLoadConversationThread(
       conversation,
     );
+    final shouldForceScroll =
+        _viewModel.selectedConversationId != conversation.id;
+    _forceScrollToBottomOnNextMessageLoad = shouldForceScroll;
     setState(() {
       _viewModel = _viewModel.selectConversation(conversation.id);
       _syncThreadSearchController();
@@ -536,6 +556,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final requestId = ++_messagesRequestId;
+    final shouldAutoScroll =
+        _forceScrollToBottomOnNextMessageLoad || _isNearMessageBottom();
+    _forceScrollToBottomOnNextMessageLoad = false;
     try {
       final response = await _chatRepository!.getMessages(
         threadId: conversationId,
@@ -570,6 +593,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _isLoadingMessages = false;
         _messageLoadError = null;
       });
+      if (shouldAutoScroll) {
+        _scrollMessageListToBottom();
+      }
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
@@ -619,6 +645,88 @@ class _ChatScreenState extends State<ChatScreen> {
         _isLoadingMessages = false;
         _messageLoadError = 'Unable to load this thread right now.';
       });
+    }
+  }
+
+  Future<void> _refreshSelectedConversationSilently() async {
+    final session = AppSessionScope.maybeOf(context);
+    final selectedConversation = _viewModel.selectedConversationOrNull;
+    final currentUserId = session?.currentUser?.id;
+    final activeAgentId = session?.currentActiveAgent?.id;
+    if (session == null ||
+        !session.isAuthenticated ||
+        session.bootstrapStatus != AppSessionBootstrapStatus.ready ||
+        session.isUsingLocalPreviewAgents ||
+        currentUserId == null ||
+        currentUserId.isEmpty ||
+        activeAgentId == null ||
+        activeAgentId.isEmpty ||
+        selectedConversation == null ||
+        !selectedConversation.hasExistingThread ||
+        _chatRepository == null ||
+        _isLoadingMessages ||
+        _isSendingMessage ||
+        _isRefreshingSelectedThread) {
+      return;
+    }
+
+    final requestId = ++_messagesRequestId;
+    final conversationId = selectedConversation.id;
+    final shouldAutoScroll = _isNearMessageBottom();
+    _isRefreshingSelectedThread = true;
+    try {
+      final response = await _chatRepository!.getMessages(
+        threadId: conversationId,
+        activeAgentId: activeAgentId,
+      );
+      if (!_canApplyMessageResult(
+        requestId: requestId,
+        userId: currentUserId,
+        activeAgentId: activeAgentId,
+        conversationId: conversationId,
+      )) {
+        return;
+      }
+
+      final messages = response.messages
+          .map(
+            (message) => _mapMessage(
+              message,
+              currentUserId: currentUserId,
+              activeAgentId: activeAgentId,
+            ),
+          )
+          .toList(growable: false);
+      if (!_chatMessagesChanged(selectedConversation.messages, messages) ||
+          !mounted) {
+        return;
+      }
+
+      setState(() {
+        _viewModel = _viewModel.replaceConversationMessages(
+          conversationId,
+          messages,
+        );
+        _messageLoadError = null;
+      });
+      if (shouldAutoScroll) {
+        _scrollMessageListToBottom(animate: true);
+      }
+      unawaited(
+        _markConversationRead(
+          conversationId: conversationId,
+          currentUserId: currentUserId,
+          activeAgentId: activeAgentId,
+        ),
+      );
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await session.handleUnauthorized();
+      }
+    } catch (_) {
+      // Silent refresh should not disturb an already-open thread.
+    } finally {
+      _isRefreshingSelectedThread = false;
     }
   }
 
@@ -995,6 +1103,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _sendMessageError = null;
         _clearComposerDraft(unfocus: true);
       });
+      _scrollMessageListToBottom(animate: true);
     } on ApiException catch (error) {
       if (error.isUnauthorized) {
         await session.handleUnauthorized();
@@ -1051,6 +1160,46 @@ class _ChatScreenState extends State<ChatScreen> {
       selection: TextSelection.collapsed(offset: caretOffset),
     );
     _composerFocusNode.requestFocus();
+  }
+
+  bool _chatMessagesChanged(
+    List<ChatMessageModel> currentMessages,
+    List<ChatMessageModel> nextMessages,
+  ) {
+    if (currentMessages.length != nextMessages.length) {
+      return true;
+    }
+    if (currentMessages.isEmpty || nextMessages.isEmpty) {
+      return false;
+    }
+    return currentMessages.last.id != nextMessages.last.id;
+  }
+
+  bool _isNearMessageBottom() {
+    if (!_messageScrollController.hasClients) {
+      return true;
+    }
+    final position = _messageScrollController.position;
+    return position.maxScrollExtent - position.pixels <=
+        _threadBottomSnapThreshold;
+  }
+
+  void _scrollMessageListToBottom({bool animate = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_messageScrollController.hasClients) {
+        return;
+      }
+      final targetOffset = _messageScrollController.position.maxScrollExtent;
+      if (animate) {
+        _messageScrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+      _messageScrollController.jumpTo(targetOffset);
+    });
   }
 
   Future<void> _showComposerKeyboard() async {
@@ -1151,6 +1300,18 @@ class _ChatScreenState extends State<ChatScreen> {
       viewerFollowsRemoteAgent: thread.counterpart.viewerFollowsAgent,
       remoteAgentFollowsViewer: thread.counterpart.agentFollowsViewer,
     );
+  }
+
+  bool _isOwnedAgentCommandThread(
+    ChatThreadSummary thread, {
+    required String currentHumanId,
+  }) {
+    if (thread.isOwnedAgentCommandThread) {
+      return true;
+    }
+
+    return thread.counterpart.type.toLowerCase() == 'human' &&
+        thread.counterpart.id == currentHumanId;
   }
 
   ChatMessageModel _mapMessage(
@@ -1423,6 +1584,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                       composerFocusNode: _composerFocusNode,
                                       composerImagePath: _composerImagePath,
                                       composerHasDraft: _composerHasDraft,
+                                      messageScrollController:
+                                          _messageScrollController,
                                       threadSearchController:
                                           _threadSearchController,
                                       threadSearchFocusNode:
@@ -1482,6 +1645,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                   composerFocusNode: _composerFocusNode,
                                   composerImagePath: _composerImagePath,
                                   composerHasDraft: _composerHasDraft,
+                                  messageScrollController:
+                                      _messageScrollController,
                                   threadSearchController:
                                       _threadSearchController,
                                   threadSearchFocusNode: _threadSearchFocusNode,
@@ -2696,6 +2861,7 @@ class _ThreadPanel extends StatelessWidget {
     required this.composerFocusNode,
     required this.composerImagePath,
     required this.composerHasDraft,
+    required this.messageScrollController,
     required this.threadSearchController,
     required this.threadSearchFocusNode,
     required this.onThreadSearchChange,
@@ -2727,6 +2893,7 @@ class _ThreadPanel extends StatelessWidget {
   final FocusNode composerFocusNode;
   final String? composerImagePath;
   final bool composerHasDraft;
+  final ScrollController messageScrollController;
   final TextEditingController threadSearchController;
   final FocusNode threadSearchFocusNode;
   final ValueChanged<String> onThreadSearchChange;
@@ -2973,6 +3140,7 @@ class _ThreadPanel extends StatelessWidget {
                         compact: compact,
                         conversation: conversation,
                         messages: viewModel.visibleMessages,
+                        scrollController: messageScrollController,
                         emptyLabel:
                             viewModel.isThreadSearchOpen &&
                                 viewModel.threadSearchQuery.trim().isNotEmpty
@@ -3275,12 +3443,14 @@ class _OpenThreadView extends StatelessWidget {
     required this.compact,
     required this.conversation,
     required this.messages,
+    required this.scrollController,
     required this.emptyLabel,
   });
 
   final bool compact;
   final ChatConversationModel conversation;
   final List<ChatMessageModel> messages;
+  final ScrollController scrollController;
   final String emptyLabel;
 
   @override
@@ -3328,6 +3498,7 @@ class _OpenThreadView extends StatelessWidget {
                     )
                   : SingleChildScrollView(
                       key: const Key('chat-message-scroll'),
+                      controller: scrollController,
                       padding: EdgeInsets.only(bottom: bottomPadding),
                       child: Column(
                         children: [
@@ -3930,7 +4101,7 @@ class _RequestAccessView extends StatelessWidget {
                   StatusChip(
                     label: conversation.viewerBlocksStrangerAgentDm
                         ? 'stranger dms tightened'
-                        : 'approval required',
+                        : 'dm closed',
                     tone: StatusChipTone.tertiary,
                     showDot: false,
                   ),

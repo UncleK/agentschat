@@ -5,6 +5,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:agents_chat_app/app_shell.dart';
 import 'package:agents_chat_app/core/config/app_environment.dart';
 import 'package:agents_chat_app/core/network/api_client.dart';
+import 'package:agents_chat_app/core/network/agents_repository.dart';
 import 'package:agents_chat_app/core/network/notifications_repository.dart';
 import 'package:agents_chat_app/core/session/app_session_controller.dart';
 import 'package:agents_chat_app/core/theme/app_theme.dart';
@@ -143,33 +144,21 @@ void main() {
           ],
         );
       })
-      ..enqueueRequestClaim((agentId) async {
+      ..enqueueRequestClaim((agentId, expiresInMinutes) async {
         expect(agentId, 'agt-claimable-1');
-        return <String, dynamic>{
-          'claimRequest': <String, dynamic>{'id': 'claim-claimable-1'},
-          'challengeToken': 'claim:agt-claimable-1:usr-hub-integration',
-        };
-      })
-      ..enqueueConfirmClaim(({
-        required agentId,
-        required claimRequestId,
-        required challengeToken,
-      }) async {
-        expect(agentId, 'agt-claimable-1');
-        expect(claimRequestId, 'claim-claimable-1');
-        expect(challengeToken, 'claim:agt-claimable-1:usr-hub-integration');
-        return <String, dynamic>{
-          'agent': <String, dynamic>{'id': 'agt-claimable-1'},
-        };
+        expect(expiresInMinutes, 60);
+        return const AgentClaimRequest(
+          claimRequestId: 'claim-claimable-1',
+          agentId: 'agt-claimable-1',
+          status: 'pending',
+          requestedAt: '2026-04-17T10:00:00.000Z',
+          expiresAt: '2026-04-17T11:00:00.000Z',
+          challengeToken: 'claimreq.v1.integration',
+        );
       })
       ..enqueueReadMine(() async {
         return mineResponse(
           agents: [
-            agentSummary(
-              id: 'agt-claimable-1',
-              handle: 'claimable-one',
-              displayName: 'Claimable One',
-            ),
             agentSummary(
               id: 'agt-imported-1',
               handle: 'imported-agent',
@@ -190,6 +179,12 @@ void main() {
           ],
           claimableAgents: const [],
           pendingClaims: [
+            pendingClaimSummary(
+              claimRequestId: 'claim-claimable-1',
+              agentId: 'agt-claimable-1',
+              handle: 'claimable-one',
+              displayName: 'Claimable One',
+            ),
             pendingClaimSummary(
               claimRequestId: 'claim-pending-1',
               agentId: 'agt-pending-1',
@@ -300,21 +295,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(sessionController.currentActiveAgent?.id, 'agt-claimable-1');
-    expect(
-      find.byKey(const Key('owned-agent-card-agt-claimable-1')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('claimable-agent-card-agt-claimable-1')),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('generate-claim-link-button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('generate-claim-link-button')));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(sessionController.currentActiveAgent?.id, 'agt-imported-1');
     expect(
       find.byKey(const Key('pending-claim-card-claim-pending-1')),
       findsOneWidget,
     );
     expect(
-      find.byKey(const Key('agent-safety-section-agt-claimable-1')),
+      find.byKey(const Key('generated-claim-link-text')),
       findsOneWidget,
     );
   });

@@ -239,10 +239,8 @@ describe('Follow backend (e2e)', () => {
           expect(directoryAgent?.followerCount).toBe(1);
           expect(directoryAgent?.relationship.viewerFollowsAgent).toBe(true);
           expect(directoryAgent?.relationship.agentFollowsViewer).toBe(false);
-          expect(directoryAgent?.dmPolicy.acceptanceMode).toBe(
-            'approval_required',
-          );
-          expect(directoryAgent?.dmPolicy.directMessageAllowed).toBe(false);
+          expect(directoryAgent?.dmPolicy.acceptanceMode).toBe('followed_only');
+          expect(directoryAgent?.dmPolicy.directMessageAllowed).toBe(true);
         },
       );
   });

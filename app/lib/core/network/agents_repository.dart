@@ -3,8 +3,13 @@ import '../network/api_client.dart';
 enum AgentDmPolicyMode {
   open,
   followersOnly,
-  approvalRequired,
   closed,
+}
+
+enum AgentActivityLevel {
+  low,
+  normal,
+  high,
 }
 
 AgentDmPolicyMode _agentDmPolicyModeFromJson(String? value) {
@@ -13,11 +18,11 @@ AgentDmPolicyMode _agentDmPolicyModeFromJson(String? value) {
       return AgentDmPolicyMode.open;
     case 'followers_only':
       return AgentDmPolicyMode.followersOnly;
-    case 'closed':
-      return AgentDmPolicyMode.closed;
     case 'approval_required':
+      return AgentDmPolicyMode.followersOnly;
+    case 'closed':
     default:
-      return AgentDmPolicyMode.approvalRequired;
+      return AgentDmPolicyMode.closed;
   }
 }
 
@@ -25,8 +30,29 @@ String _agentDmPolicyModeToJson(AgentDmPolicyMode value) {
   return switch (value) {
     AgentDmPolicyMode.open => 'open',
     AgentDmPolicyMode.followersOnly => 'followers_only',
-    AgentDmPolicyMode.approvalRequired => 'approval_required',
     AgentDmPolicyMode.closed => 'closed',
+  };
+}
+
+AgentActivityLevel _agentActivityLevelFromJson(
+  String? value, {
+  required bool fallbackAllowsProactiveInteractions,
+}) {
+  return switch (value) {
+    'low' => AgentActivityLevel.low,
+    'high' => AgentActivityLevel.high,
+    'normal' => AgentActivityLevel.normal,
+    _ => fallbackAllowsProactiveInteractions
+        ? AgentActivityLevel.normal
+        : AgentActivityLevel.low,
+  };
+}
+
+String _agentActivityLevelToJson(AgentActivityLevel value) {
+  return switch (value) {
+    AgentActivityLevel.low => 'low',
+    AgentActivityLevel.normal => 'normal',
+    AgentActivityLevel.high => 'high',
   };
 }
 
@@ -35,41 +61,69 @@ class AgentSafetyPolicy {
     required this.dmPolicyMode,
     required this.requiresMutualFollowForDm,
     required this.allowProactiveInteractions,
+    required this.activityLevel,
   });
 
   static const defaults = AgentSafetyPolicy(
-    dmPolicyMode: AgentDmPolicyMode.approvalRequired,
+    dmPolicyMode: AgentDmPolicyMode.followersOnly,
     requiresMutualFollowForDm: false,
     allowProactiveInteractions: true,
+    activityLevel: AgentActivityLevel.normal,
   );
 
   final AgentDmPolicyMode dmPolicyMode;
   final bool requiresMutualFollowForDm;
   final bool allowProactiveInteractions;
+  final AgentActivityLevel activityLevel;
 
   AgentSafetyPolicy copyWith({
     AgentDmPolicyMode? dmPolicyMode,
     bool? requiresMutualFollowForDm,
     bool? allowProactiveInteractions,
+    AgentActivityLevel? activityLevel,
   }) {
+    final nextActivityLevel = activityLevel ?? this.activityLevel;
+    final nextAllowProactiveInteractions =
+        allowProactiveInteractions ??
+        (activityLevel != null
+            ? nextActivityLevel != AgentActivityLevel.low
+            : this.allowProactiveInteractions);
+    final normalizedActivityLevel = nextAllowProactiveInteractions
+        ? nextActivityLevel == AgentActivityLevel.low
+              ? AgentActivityLevel.normal
+              : nextActivityLevel
+        : AgentActivityLevel.low;
     return AgentSafetyPolicy(
       dmPolicyMode: dmPolicyMode ?? this.dmPolicyMode,
       requiresMutualFollowForDm:
           requiresMutualFollowForDm ?? this.requiresMutualFollowForDm,
-      allowProactiveInteractions:
-          allowProactiveInteractions ?? this.allowProactiveInteractions,
+      allowProactiveInteractions: nextAllowProactiveInteractions,
+      activityLevel: normalizedActivityLevel,
     );
   }
 
   factory AgentSafetyPolicy.fromJson(Map<String, dynamic> json) {
+    final rawAllowProactiveInteractions =
+        json['allowProactiveInteractions'] as bool?;
+    final activityLevel = _agentActivityLevelFromJson(
+      json['activityLevel'] as String?,
+      fallbackAllowsProactiveInteractions:
+          rawAllowProactiveInteractions ?? true,
+    );
+    final allowProactiveInteractions =
+        rawAllowProactiveInteractions ?? activityLevel != AgentActivityLevel.low;
     return AgentSafetyPolicy(
       dmPolicyMode: _agentDmPolicyModeFromJson(
         json['dmPolicyMode'] as String?,
       ),
       requiresMutualFollowForDm:
           json['requiresMutualFollowForDm'] as bool? ?? false,
-      allowProactiveInteractions:
-          json['allowProactiveInteractions'] as bool? ?? true,
+      allowProactiveInteractions: allowProactiveInteractions,
+      activityLevel: allowProactiveInteractions
+          ? activityLevel == AgentActivityLevel.low
+                ? AgentActivityLevel.normal
+                : activityLevel
+          : AgentActivityLevel.low,
     );
   }
 
@@ -78,6 +132,7 @@ class AgentSafetyPolicy {
       'dmPolicyMode': _agentDmPolicyModeToJson(dmPolicyMode),
       'requiresMutualFollowForDm': requiresMutualFollowForDm,
       'allowProactiveInteractions': allowProactiveInteractions,
+      'activityLevel': _agentActivityLevelToJson(activityLevel),
     };
   }
 }
@@ -281,6 +336,36 @@ class HumanOwnedAgentInvitation {
   }
 }
 
+class AgentClaimRequest {
+  const AgentClaimRequest({
+    required this.claimRequestId,
+    required this.agentId,
+    required this.status,
+    required this.requestedAt,
+    required this.expiresAt,
+    required this.challengeToken,
+  });
+
+  final String claimRequestId;
+  final String agentId;
+  final String status;
+  final String requestedAt;
+  final String expiresAt;
+  final String challengeToken;
+
+  factory AgentClaimRequest.fromJson(Map<String, dynamic> json) {
+    final claimRequest = json['claimRequest'] as Map<String, dynamic>? ?? json;
+    return AgentClaimRequest(
+      claimRequestId: claimRequest['id'] as String? ?? '',
+      agentId: claimRequest['agentId'] as String? ?? '',
+      status: claimRequest['status'] as String? ?? '',
+      requestedAt: claimRequest['requestedAt'] as String? ?? '',
+      expiresAt: claimRequest['expiresAt'] as String? ?? '',
+      challengeToken: json['challengeToken'] as String? ?? '',
+    );
+  }
+}
+
 /// Handles agent management operations against the backend.
 class AgentsRepository {
   const AgentsRepository({required this.apiClient});
@@ -322,8 +407,19 @@ class AgentsRepository {
   }
 
   /// Request to claim an existing self-owned agent.
-  Future<Map<String, dynamic>> requestClaim(String agentId) async {
-    return apiClient.post('/agents/$agentId/claim-requests');
+  Future<AgentClaimRequest> requestClaim(
+    String agentId, {
+    int? expiresInMinutes,
+  }) async {
+    final body = <String, dynamic>{};
+    if (expiresInMinutes != null) {
+      body['expiresInMinutes'] = expiresInMinutes;
+    }
+    final response = await apiClient.post(
+      '/agents/$agentId/claim-requests',
+      body: body,
+    );
+    return AgentClaimRequest.fromJson(response);
   }
 
   /// Confirm a claim request with a challenge token.

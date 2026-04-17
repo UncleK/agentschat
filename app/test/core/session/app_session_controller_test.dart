@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:agents_chat_app/core/network/api_client.dart';
+import 'package:agents_chat_app/core/network/agents_repository.dart';
 import 'package:agents_chat_app/core/network/api_exception.dart';
 import 'package:agents_chat_app/core/session/app_session_controller.dart';
 
@@ -302,7 +303,7 @@ void main() {
     );
 
     test(
-      'claimAgent confirms the claim, refreshes mine, and promotes the agent only after it reaches owned agents',
+      'createClaimRequest refreshes mine and keeps the agent pending until the runtime confirms it',
       () async {
         await storage.writeToken('token-1');
         authRepository.enqueueFetchMe((token) async {
@@ -319,48 +320,53 @@ void main() {
 
         await controller.bootstrap();
 
-        agentsRepository.enqueueRequestClaim((agentId) async {
+        agentsRepository.enqueueRequestClaim((agentId, expiresInMinutes) async {
           expect(agentId, 'agt-claimable-1');
-          return <String, dynamic>{
-            'claimRequest': <String, dynamic>{'id': 'claim-1'},
-            'challengeToken': 'claim:agt-claimable-1:usr-1',
-          };
-        });
-        agentsRepository.enqueueConfirmClaim(({
-          required agentId,
-          required claimRequestId,
-          required challengeToken,
-        }) async {
-          expect(agentId, 'agt-claimable-1');
-          expect(claimRequestId, 'claim-1');
-          expect(challengeToken, 'claim:agt-claimable-1:usr-1');
-          return <String, dynamic>{
-            'agent': <String, dynamic>{'id': 'agt-claimable-1'},
-          };
+          expect(expiresInMinutes, 60);
+          return const AgentClaimRequest(
+            claimRequestId: 'claim-1',
+            agentId: 'agt-claimable-1',
+            status: 'pending',
+            requestedAt: '2026-04-17T10:00:00.000Z',
+            expiresAt: '2026-04-17T11:00:00.000Z',
+            challengeToken: 'claimreq.v1.example',
+          );
         });
         agentsRepository.enqueueReadMine(() async {
           return mineResponse(
-            agents: [
-              agentSummary(
-                id: 'agt-claimable-1',
-                ownerType: 'human',
+            claimableAgents: const [],
+            pendingClaims: [
+              const PendingClaimSummary(
+                claimRequestId: 'claim-1',
+                agentId: 'agt-claimable-1',
+                handle: 'claimable-1',
                 displayName: 'Claimed Agent',
+                status: 'pending',
+                requestedAt: '2026-04-17T10:00:00.000Z',
+                expiresAt: '2026-04-17T11:00:00.000Z',
               ),
+            ],
+            agents: [
               agentSummary(id: 'agt-owned-1'),
             ],
           );
         });
 
-        await controller.claimAgent('agt-claimable-1');
+        final request = await controller.createClaimRequest(
+          agentId: 'agt-claimable-1',
+          expiresInMinutes: 60,
+        );
 
-        expect(controller.currentActiveAgent?.id, 'agt-claimable-1');
+        expect(request.claimRequestId, 'claim-1');
+        expect(request.challengeToken, 'claimreq.v1.example');
+        expect(controller.currentActiveAgent?.id, 'agt-owned-1');
         expect(
           controller.currentActiveAgentCandidates.first.id,
-          'agt-claimable-1',
+          'agt-owned-1',
         );
         expect(controller.claimableAgents, isEmpty);
-        expect(controller.pendingClaims, isEmpty);
-        expect(await storage.readCurrentActiveAgentId(), 'agt-claimable-1');
+        expect(controller.pendingClaims, hasLength(1));
+        expect(await storage.readCurrentActiveAgentId(), 'agt-owned-1');
       },
     );
 

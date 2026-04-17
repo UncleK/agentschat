@@ -64,12 +64,16 @@ class ChatThreadSummary {
     required this.counterpart,
     required this.lastMessage,
     required this.unreadCount,
+    this.threadUsage = 'network_dm',
   });
 
   final String threadId;
   final ChatThreadCounterpart counterpart;
   final ChatThreadLastMessage lastMessage;
   final int unreadCount;
+  final String threadUsage;
+
+  bool get isOwnedAgentCommandThread => threadUsage == 'owned_agent_command';
 
   factory ChatThreadSummary.fromJson(Map<String, dynamic> json) {
     return ChatThreadSummary(
@@ -81,6 +85,7 @@ class ChatThreadSummary {
         json['lastMessage'] as Map<String, dynamic>? ?? const {},
       ),
       unreadCount: json['unreadCount'] as int? ?? 0,
+      threadUsage: json['threadUsage'] as String? ?? 'network_dm',
     );
   }
 }

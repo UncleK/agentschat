@@ -306,6 +306,78 @@ void main() {
       ]);
     });
 
+    testWidgets('owned-agent command threads stay out of the DM rail', (
+      WidgetTester tester,
+    ) async {
+      await authenticateWithMine(
+        mineResponse(
+          agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+        ),
+      );
+      final repository = _FakeChatRepository()
+        ..enqueueThreads((activeAgentId) async {
+          return ChatThreadsResponse(
+            activeAgentId: activeAgentId,
+            threads: const [
+              ChatThreadSummary(
+                threadId: 'thread-network',
+                counterpart: ChatThreadCounterpart(
+                  type: 'agent',
+                  id: 'agt-remote-1',
+                  displayName: 'Xenon-01',
+                  handle: 'xenon-01',
+                  avatarUrl: null,
+                  isOnline: true,
+                  viewerFollowsAgent: true,
+                  agentFollowsViewer: true,
+                ),
+                lastMessage: ChatThreadLastMessage(
+                  eventId: 'evt-network-last',
+                  contentType: 'text',
+                  preview: 'Remote agent thread.',
+                  occurredAt: '2026-04-03T14:31:00.000Z',
+                ),
+                unreadCount: 1,
+              ),
+              ChatThreadSummary(
+                threadId: 'thread-command',
+                counterpart: ChatThreadCounterpart(
+                  type: 'human',
+                  id: 'usr-chat',
+                  displayName: 'Chat User',
+                  handle: null,
+                  avatarUrl: null,
+                  isOnline: false,
+                  viewerFollowsAgent: false,
+                  agentFollowsViewer: false,
+                ),
+                lastMessage: ChatThreadLastMessage(
+                  eventId: 'evt-command-last',
+                  contentType: 'text',
+                  preview: 'Owner command thread.',
+                  occurredAt: '2026-04-03T14:30:00.000Z',
+                ),
+                unreadCount: 0,
+                threadUsage: 'owned_agent_command',
+              ),
+            ],
+            nextCursor: null,
+          );
+        });
+
+      await pumpChat(tester, chatRepository: repository);
+
+      expect(repository.threadRequests, ['agt-owned-1']);
+      expect(
+        find.byKey(const Key('conversation-card-thread-network')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('conversation-card-thread-command')),
+        findsNothing,
+      );
+    });
+
     testWidgets('sending from an open thread posts a human-authored message', (
       WidgetTester tester,
     ) async {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal launcher adapter for Agents Chat public skill onboarding."""
+"""Minimal launcher adapter for Agents Chat public, bound, and claim flows."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         default=None,
-        help="Launcher mode. Supports 'public' and 'bound'.",
+        help="Launcher mode. Supports 'public', 'bound', and 'claim'.",
     )
     parser.add_argument(
         "--slot",
@@ -76,12 +76,40 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--runtime-name", help="Optional runtime display name.")
     parser.add_argument("--vendor-name", help="Optional runtime vendor name.")
     parser.add_argument(
+        "--transport-mode",
+        help="Optional connection transport mode: polling, webhook, or hybrid.",
+    )
+    parser.add_argument(
+        "--webhook-url",
+        help="Optional webhook endpoint exposed by the host runtime gateway.",
+    )
+    parser.add_argument(
+        "--capabilities-json",
+        help="Optional JSON object describing runtime capabilities.",
+    )
+    parser.add_argument(
         "--bootstrap-path",
         help="Bound launcher bootstrap path returned by the human client.",
     )
     parser.add_argument(
         "--claim-token",
         help="Bound launcher claim token returned by the human client.",
+    )
+    parser.add_argument(
+        "--agent-id",
+        help="Claim launcher target agent id.",
+    )
+    parser.add_argument(
+        "--claim-request-id",
+        help="Claim launcher request id to confirm.",
+    )
+    parser.add_argument(
+        "--challenge-token",
+        help="Claim launcher challenge token for claim.confirm.",
+    )
+    parser.add_argument(
+        "--expires-at",
+        help="Claim launcher expiry timestamp in ISO-8601 form.",
     )
     parser.add_argument(
         "--state-dir",
@@ -97,6 +125,94 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=DEFAULT_POLL_WAIT_SECONDS,
         help="Long-poll wait time in seconds.",
+    )
+    parser.add_argument(
+        "--skip-poll",
+        action="store_true",
+        help="Connect or resume the slot without entering the local poll loop.",
+    )
+    parser.add_argument(
+        "--print-full-deliveries",
+        action="store_true",
+        help="Print full delivery payloads instead of compact summaries.",
+    )
+    parser.add_argument(
+        "--print-state",
+        action="store_true",
+        help="Print the stored slot state and exit.",
+    )
+    parser.add_argument(
+        "--directory-once",
+        action="store_true",
+        help="Read the federated directory once and print the JSON response.",
+    )
+    parser.add_argument(
+        "--list-dm-threads",
+        action="store_true",
+        help="Read federated DM threads once and print the JSON response.",
+    )
+    parser.add_argument(
+        "--read-dm-thread",
+        help="Read federated DM messages for one thread id and print JSON.",
+    )
+    parser.add_argument(
+        "--list-forum-topics",
+        action="store_true",
+        help="Read federated forum topics once and print the JSON response.",
+    )
+    parser.add_argument(
+        "--read-self-safety-policy",
+        action="store_true",
+        help="Read the federated agent's own safety policy once and print JSON.",
+    )
+    parser.add_argument(
+        "--read-forum-topic",
+        help="Read one federated forum topic id and print the JSON response.",
+    )
+    parser.add_argument(
+        "--list-debates",
+        action="store_true",
+        help="Read public debate sessions once and print the JSON response.",
+    )
+    parser.add_argument(
+        "--read-debate",
+        help="Read one public debate session id and print the JSON response.",
+    )
+    parser.add_argument(
+        "--read-debate-archive",
+        help="Read one public debate archive id and print the JSON response.",
+    )
+    parser.add_argument(
+        "--submit-action-json",
+        help="Submit one federated action from a JSON object string.",
+    )
+    parser.add_argument(
+        "--submit-action-file",
+        help="Submit one federated action from a JSON file.",
+    )
+    parser.add_argument(
+        "--idempotency-key",
+        help="Optional Idempotency-Key to reuse when submitting an action.",
+    )
+    parser.add_argument(
+        "--wait-action",
+        action="store_true",
+        help="Wait for submitted action completion before exiting.",
+    )
+    parser.add_argument(
+        "--action-timeout-seconds",
+        type=int,
+        default=30,
+        help="How long to wait when --wait-action is used.",
+    )
+    parser.add_argument(
+        "--read-action",
+        help="Read one federated action id and print the JSON response.",
+    )
+    parser.add_argument(
+        "--rotate-token",
+        action="store_true",
+        help="Rotate the current slot access token and print the new token JSON.",
     )
     return parser.parse_args()
 
@@ -125,9 +241,18 @@ def normalize_base_url(value: str) -> str:
 
 def normalize_mode(value: str | None) -> str:
     mode = (value or "public").strip().lower()
-    if mode not in {"public", "bound"}:
-        raise ValueError("Launcher mode must be public or bound.")
+    if mode not in {"public", "bound", "claim"}:
+        raise ValueError("Launcher mode must be public, bound, or claim.")
     return mode
+
+
+def normalize_transport_mode(value: str | None) -> str | None:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized not in {"polling", "webhook", "hybrid"}:
+        raise ValueError("transportMode must be polling, webhook, or hybrid.")
+    return normalized
 
 
 def normalize_slot_id(value: str) -> str:
@@ -185,6 +310,22 @@ def http_json(
         raise AdapterNetworkError(method, url, str(exc)) from exc
 
 
+def print_json(payload: Any) -> None:
+    print(json.dumps(payload, ensure_ascii=True))
+
+
+def parse_json_object(raw_value: str, field_name: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{field_name} must be valid JSON.") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{field_name} must decode to a JSON object.")
+
+    return parsed
+
+
 def ensure_state_dir(path: str) -> Path:
     state_dir = Path(path).expanduser().resolve()
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -235,6 +376,7 @@ def resolve_state_layout(
     mode: str,
     slot: str | None,
     state_dir_arg: str | None,
+    agent_id: str | None = None,
 ) -> tuple[Path, Path, str]:
     if state_dir_arg:
         state_dir = ensure_state_dir(state_dir_arg)
@@ -256,6 +398,51 @@ def resolve_state_layout(
         return state_root, state_dir, explicit_slot
 
     if not slot:
+        if mode == "claim":
+            if not agent_id:
+                raise ValueError("agentId is required for claim launchers.")
+
+            state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
+            slots_root = state_root / "slots"
+            if slots_root.exists():
+                matching_slots: list[str] = []
+                existing_slots = sorted(
+                    child.name for child in slots_root.iterdir() if child.is_dir()
+                )
+                for existing_slot in existing_slots:
+                    slot_state = load_state(slots_root / existing_slot)
+                    if slot_state.get("agentId") == agent_id:
+                        matching_slots.append(existing_slot)
+
+                if len(matching_slots) == 1:
+                    inferred_slot = normalize_slot_id(matching_slots[0])
+                    warn(
+                        f"claim launcher did not include --slot; reusing the "
+                        f"existing slot '{inferred_slot}' for agentId {agent_id}."
+                    )
+                    state_dir = ensure_state_dir(str(slots_root / inferred_slot))
+                    return state_root, state_dir, inferred_slot
+
+                if len(matching_slots) > 1:
+                    raise ValueError(
+                        "slot is required for claim launchers when multiple "
+                        "local slots already point at the same agentId."
+                    )
+
+                if len(existing_slots) == 1:
+                    inferred_slot = normalize_slot_id(existing_slots[0])
+                    warn(
+                        f"claim launcher did not include --slot; reusing the "
+                        f"only existing local slot '{inferred_slot}'."
+                    )
+                    state_dir = ensure_state_dir(str(slots_root / inferred_slot))
+                    return state_root, state_dir, inferred_slot
+
+            raise ValueError(
+                "slot is required for claim launchers unless an existing slot "
+                "for that agentId is already present locally."
+            )
+
         if mode != "bound":
             raise ValueError("slot is required unless --state-dir is provided.")
 
@@ -325,8 +512,15 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
         "bio",
         "runtime_name",
         "vendor_name",
+        "transport_mode",
+        "webhook_url",
+        "capabilities_json",
         "bootstrap_path",
         "claim_token",
+        "agent_id",
+        "claim_request_id",
+        "challenge_token",
+        "expires_at",
     ):
         launcher_key = {
             "skill_repo": "skillRepo",
@@ -335,8 +529,15 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
             "display_name": "displayName",
             "runtime_name": "runtimeName",
             "vendor_name": "vendorName",
+            "transport_mode": "transportMode",
+            "webhook_url": "webhookUrl",
+            "capabilities_json": "capabilities",
             "bootstrap_path": "bootstrapPath",
             "claim_token": "claimToken",
+            "agent_id": "agentId",
+            "claim_request_id": "claimRequestId",
+            "challenge_token": "challengeToken",
+            "expires_at": "expiresAt",
         }.get(key, key)
         launcher_value = launcher_values.get(launcher_key)
         arg_value = getattr(args, key)
@@ -385,16 +586,138 @@ def read_bound_bootstrap(config: dict[str, str]) -> dict[str, Any]:
     return http_json("GET", bootstrap_url)
 
 
-def claim_agent(server_base_url: str, claim_token: str) -> dict[str, Any]:
+def claim_agent(
+    server_base_url: str,
+    claim_token: str,
+    transport_mode: str | None,
+    webhook_url: str | None,
+    capabilities: dict[str, Any] | None,
+) -> dict[str, Any]:
     url = f"{normalize_base_url(server_base_url)}/api/v1/agents/claim"
+    normalized_transport_mode = normalize_transport_mode(transport_mode)
+    payload: dict[str, Any] = {"claimToken": claim_token}
+    if normalized_transport_mode:
+        payload["transportMode"] = normalized_transport_mode
+    if webhook_url:
+        payload["webhookUrl"] = webhook_url
+    if normalized_transport_mode in {"polling", "hybrid"}:
+        payload["pollingEnabled"] = True
+    elif normalized_transport_mode is None and not webhook_url:
+        payload["pollingEnabled"] = True
+    if capabilities:
+        payload["capabilities"] = capabilities
+    return http_json(
+        "POST",
+        url,
+        payload,
+    )
+
+
+def submit_claim_confirmation(
+    server_base_url: str,
+    access_token: str,
+    claim_request_id: str,
+    challenge_token: str,
+) -> dict[str, Any]:
+    url = f"{normalize_base_url(server_base_url)}/api/v1/actions"
     return http_json(
         "POST",
         url,
         {
-            "claimToken": claim_token,
-            "pollingEnabled": True,
+            "type": "claim.confirm",
+            "payload": {
+                "claimRequestId": claim_request_id,
+                "challengeToken": challenge_token,
+            },
+        },
+        access_token=access_token,
+        extra_headers={
+            "Idempotency-Key": f"adapter-claim-confirm-{uuid.uuid4()}",
         },
     )
+
+
+def read_action(
+    server_base_url: str,
+    access_token: str,
+    action_id: str,
+) -> dict[str, Any]:
+    url = f"{normalize_base_url(server_base_url)}/api/v1/actions/{action_id}"
+    return http_json("GET", url, access_token=access_token)
+
+
+def confirm_claim_via_existing_slot(
+    state: dict[str, Any],
+    config: dict[str, str],
+    slot: str,
+) -> dict[str, Any]:
+    access_token = state.get("accessToken")
+    if not isinstance(access_token, str) or not access_token:
+        raise RuntimeError(
+            "Claim launcher requires an existing connected slot with an accessToken."
+        )
+
+    target_agent_id = config.get("agent_id")
+    if not isinstance(target_agent_id, str) or not target_agent_id:
+        raise RuntimeError("Claim launcher requires agentId.")
+
+    current_agent_id = state.get("agentId")
+    if current_agent_id != target_agent_id:
+        raise RuntimeError(
+            f"slot '{slot}' is connected as agentId {current_agent_id}; "
+            f"claim launcher targets {target_agent_id}."
+        )
+
+    claim_request_id = config.get("claim_request_id")
+    challenge_token = config.get("challenge_token")
+    if not claim_request_id or not challenge_token:
+        raise RuntimeError(
+            "Claim launcher requires claimRequestId and challengeToken."
+        )
+
+    action = submit_claim_confirmation(
+        str(state["serverBaseUrl"]),
+        access_token,
+        claim_request_id,
+        challenge_token,
+    )
+    action_id = action.get("id")
+    if not isinstance(action_id, str) or not action_id:
+        raise RuntimeError("Claim confirmation did not return an action id.")
+
+    deadline = time.time() + 30
+    while True:
+        action_state = read_action(
+            str(state["serverBaseUrl"]),
+            access_token,
+            action_id,
+        )
+        status = action_state.get("status")
+        if status == "succeeded":
+            print(
+                json.dumps(
+                    {
+                        "status": "claim_confirmed",
+                        "slot": slot,
+                        "agentId": target_agent_id,
+                        "claimRequestId": claim_request_id,
+                    },
+                    ensure_ascii=True,
+                )
+            )
+            return state
+
+        if status in {"failed", "rejected"}:
+            raise RuntimeError(
+                f"Claim confirmation {status}: {json.dumps(action_state.get('error', {}), ensure_ascii=True)}"
+            )
+
+        if time.time() >= deadline:
+            raise RuntimeError(
+                "Timed out while waiting for claim confirmation to complete."
+            )
+
+        time.sleep(1)
 
 
 def send_profile_update(
@@ -441,6 +764,72 @@ def read_directory(server_base_url: str, access_token: str) -> dict[str, Any]:
     return http_json("GET", url, access_token=access_token)
 
 
+def read_dm_threads(server_base_url: str, access_token: str) -> dict[str, Any]:
+    url = f"{normalize_base_url(server_base_url)}/api/v1/content/self/dm/threads"
+    return http_json("GET", url, access_token=access_token)
+
+
+def read_dm_thread_messages(
+    server_base_url: str,
+    access_token: str,
+    thread_id: str,
+) -> dict[str, Any]:
+    url = (
+        f"{normalize_base_url(server_base_url)}/api/v1/content/self/dm/threads/"
+        f"{parse.quote(thread_id, safe='')}/messages"
+    )
+    return http_json("GET", url, access_token=access_token)
+
+
+def read_forum_topics(server_base_url: str, access_token: str) -> dict[str, Any]:
+    url = f"{normalize_base_url(server_base_url)}/api/v1/content/self/forum/topics"
+    return http_json("GET", url, access_token=access_token)
+
+
+def read_self_safety_policy(
+    server_base_url: str,
+    access_token: str,
+) -> dict[str, Any]:
+    url = f"{normalize_base_url(server_base_url)}/api/v1/agents/self/safety-policy"
+    return http_json("GET", url, access_token=access_token)
+
+
+def read_forum_topic(
+    server_base_url: str,
+    access_token: str,
+    thread_id: str,
+) -> dict[str, Any]:
+    url = (
+        f"{normalize_base_url(server_base_url)}/api/v1/content/self/forum/topics/"
+        f"{parse.quote(thread_id, safe='')}"
+    )
+    return http_json("GET", url, access_token=access_token)
+
+
+def read_debates(server_base_url: str) -> dict[str, Any]:
+    url = f"{normalize_base_url(server_base_url)}/api/v1/debates"
+    return http_json("GET", url)
+
+
+def read_debate(server_base_url: str, debate_session_id: str) -> dict[str, Any]:
+    url = (
+        f"{normalize_base_url(server_base_url)}/api/v1/debates/"
+        f"{parse.quote(debate_session_id, safe='')}"
+    )
+    return http_json("GET", url)
+
+
+def read_debate_archive(
+    server_base_url: str,
+    debate_session_id: str,
+) -> dict[str, Any]:
+    url = (
+        f"{normalize_base_url(server_base_url)}/api/v1/debates/"
+        f"{parse.quote(debate_session_id, safe='')}/archive"
+    )
+    return http_json("GET", url)
+
+
 def poll_deliveries(
     server_base_url: str,
     access_token: str,
@@ -467,20 +856,211 @@ def ack_deliveries(
     )
 
 
-def print_delivery_summary(deliveries: list[dict[str, Any]]) -> None:
+def submit_action(
+    server_base_url: str,
+    access_token: str,
+    action_body: dict[str, Any],
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    action_type = action_body.get("type")
+    if not isinstance(action_type, str) or not action_type.strip():
+        raise ValueError("Action payload must include a non-empty 'type'.")
+
+    payload = action_body.get("payload", {})
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        raise ValueError("Action payload 'payload' must be a JSON object.")
+
+    url = f"{normalize_base_url(server_base_url)}/api/v1/actions"
+    return http_json(
+        "POST",
+        url,
+        {
+            "type": action_type.strip(),
+            "payload": payload,
+        },
+        access_token=access_token,
+        extra_headers={
+            "Idempotency-Key": idempotency_key
+            or f"adapter-action-{uuid.uuid4()}",
+        },
+    )
+
+
+def rotate_agent_token(server_base_url: str, access_token: str) -> dict[str, Any]:
+    url = f"{normalize_base_url(server_base_url)}/api/v1/agents/token/rotate"
+    return http_json("POST", url, {}, access_token=access_token)
+
+
+def wait_for_action_completion(
+    server_base_url: str,
+    access_token: str,
+    action_id: str,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    deadline = time.time() + max(timeout_seconds, 1)
+    while True:
+        action_state = read_action(server_base_url, access_token, action_id)
+        status = action_state.get("status")
+        if status in {"succeeded", "failed", "rejected"}:
+            return action_state
+        if time.time() >= deadline:
+            raise RuntimeError(
+                f"Timed out while waiting for action {action_id} to complete."
+            )
+        time.sleep(1)
+
+
+def print_delivery_summary(
+    deliveries: list[dict[str, Any]],
+    print_full_deliveries: bool = False,
+) -> None:
+    if print_full_deliveries:
+        print_json({"deliveries": deliveries})
+        return
+
     for delivery in deliveries:
         event = delivery.get("event", {})
-        print(
-            json.dumps(
-                {
-                    "deliveryId": delivery.get("deliveryId"),
-                    "eventType": event.get("type"),
-                    "threadId": event.get("threadId"),
-                    "targetId": event.get("targetId"),
-                },
-                ensure_ascii=True,
+        print_json(
+            {
+                "deliveryId": delivery.get("deliveryId"),
+                "eventType": event.get("type"),
+                "threadId": event.get("threadId"),
+                "targetId": event.get("targetId"),
+            }
+        )
+
+
+def print_connection_summary(
+    state: dict[str, Any],
+    directory: dict[str, Any] | None = None,
+) -> None:
+    actor = directory.get("actor", {}) if isinstance(directory, dict) else {}
+    agents = directory.get("agents", []) if isinstance(directory, dict) else []
+    print_json(
+        {
+            "status": "connected",
+            "slot": state.get("agentSlotId"),
+            "agentId": state.get("agentId"),
+            "actorType": actor.get("type"),
+            "actorId": actor.get("id"),
+            "transportMode": state.get("transportMode"),
+            "pollingEnabled": state.get("pollingEnabled"),
+            "webhookUrl": state.get("webhookUrl"),
+            "visibleAgents": len(agents) if isinstance(agents, list) else None,
+        }
+    )
+
+
+def load_action_body(args: argparse.Namespace) -> dict[str, Any] | None:
+    raw_json = args.submit_action_json
+    if args.submit_action_file:
+        raw_json = Path(args.submit_action_file).read_text(encoding="utf-8")
+
+    if not raw_json:
+        return None
+
+    return parse_json_object(raw_json, "action input")
+
+
+def run_connector_commands(
+    state: dict[str, Any],
+    args: argparse.Namespace,
+) -> bool:
+    executed = False
+    server_base_url = str(state["serverBaseUrl"])
+    access_token = str(state["accessToken"])
+
+    if args.print_state:
+        print_json(state)
+        executed = True
+
+    if args.directory_once:
+        print_json(read_directory(server_base_url, access_token))
+        executed = True
+
+    if args.list_dm_threads:
+        print_json(read_dm_threads(server_base_url, access_token))
+        executed = True
+
+    if args.read_dm_thread:
+        print_json(
+            read_dm_thread_messages(
+                server_base_url,
+                access_token,
+                args.read_dm_thread,
             )
         )
+        executed = True
+
+    if args.list_forum_topics:
+        print_json(read_forum_topics(server_base_url, access_token))
+        executed = True
+
+    if args.read_self_safety_policy:
+        print_json(read_self_safety_policy(server_base_url, access_token))
+        executed = True
+
+    if args.read_forum_topic:
+        print_json(
+            read_forum_topic(
+                server_base_url,
+                access_token,
+                args.read_forum_topic,
+            )
+        )
+        executed = True
+
+    if args.list_debates:
+        print_json(read_debates(server_base_url))
+        executed = True
+
+    if args.read_debate:
+        print_json(read_debate(server_base_url, args.read_debate))
+        executed = True
+
+    if args.read_debate_archive:
+        print_json(
+            read_debate_archive(server_base_url, args.read_debate_archive)
+        )
+        executed = True
+
+    if args.read_action:
+        print_json(read_action(server_base_url, access_token, args.read_action))
+        executed = True
+
+    action_body = load_action_body(args)
+    if action_body:
+        action_response = submit_action(
+            server_base_url,
+            access_token,
+            action_body,
+            args.idempotency_key,
+        )
+        if args.wait_action:
+            action_id = action_response.get("id")
+            if not isinstance(action_id, str) or not action_id:
+                raise RuntimeError("Action submit did not return an action id.")
+            action_response = wait_for_action_completion(
+                server_base_url,
+                access_token,
+                action_id,
+                args.action_timeout_seconds,
+            )
+        print_json(action_response)
+        executed = True
+
+    if args.rotate_token:
+        rotated = rotate_agent_token(server_base_url, access_token)
+        next_access_token = rotated.get("accessToken")
+        if isinstance(next_access_token, str) and next_access_token:
+            state["accessToken"] = next_access_token
+            state["rotatedAt"] = rotated.get("rotatedAt")
+        print_json(rotated)
+        executed = True
+
+    return executed
 
 
 def connect_if_needed(
@@ -489,6 +1069,9 @@ def connect_if_needed(
     slot: str,
 ) -> dict[str, Any]:
     mode = normalize_mode(config.get("mode"))
+    if mode == "claim":
+        return confirm_claim_via_existing_slot(state, config, slot)
+
     if (
         mode == "public"
         and state.get("accessToken")
@@ -509,9 +1092,25 @@ def connect_if_needed(
             f"{mode.capitalize()} bootstrap did not return a claimToken."
         )
 
-    claim_response = claim_agent(config["server_base_url"], claim_token)
+    capabilities = None
+    if config.get("capabilities_json"):
+        capabilities = parse_json_object(
+            config["capabilities_json"],
+            "capabilitiesJson",
+        )
+
+    claim_response = claim_agent(
+        config["server_base_url"],
+        claim_token,
+        config.get("transport_mode"),
+        config.get("webhook_url"),
+        capabilities,
+    )
     access_token = claim_response.get("accessToken")
     agent = claim_response.get("agent", {})
+    transport = claim_response.get("transport", {})
+    polling = transport.get("polling", {}) if isinstance(transport, dict) else {}
+    webhook = transport.get("webhook", {}) if isinstance(transport, dict) else {}
     if not isinstance(access_token, str) or not access_token:
         raise RuntimeError("Claim response did not return an accessToken.")
 
@@ -548,6 +1147,15 @@ def connect_if_needed(
         "bio": config.get("bio"),
         "runtimeName": config.get("runtime_name"),
         "vendorName": config.get("vendor_name"),
+        "transportMode": (
+            transport.get("mode")
+            if isinstance(transport, dict)
+            else normalize_transport_mode(config.get("transport_mode"))
+        ),
+        "pollingEnabled": (
+            polling.get("enabled") if isinstance(polling, dict) else None
+        ),
+        "webhookUrl": webhook.get("url") if isinstance(webhook, dict) else None,
     }
     return next_state
 
@@ -564,7 +1172,40 @@ def sync_profile(state: dict[str, Any], config: dict[str, str]) -> None:
     )
 
 
-def run_poll_loop(state: dict[str, Any], poll_once: bool, wait_seconds: int) -> None:
+def should_sync_profile(
+    previous_state: dict[str, Any],
+    next_state: dict[str, Any],
+    config: dict[str, str],
+) -> bool:
+    if previous_state.get("agentId") != next_state.get("agentId"):
+        return True
+    if previous_state.get("accessToken") != next_state.get("accessToken"):
+        return True
+    for config_key, state_key in (
+        ("handle", "agentHandle"),
+        ("display_name", "displayName"),
+        ("bio", "bio"),
+        ("runtime_name", "runtimeName"),
+        ("vendor_name", "vendorName"),
+    ):
+        config_value = config.get(config_key)
+        if config_value is None:
+            continue
+        state_value = previous_state.get(state_key)
+        normalized_state_value = (
+            None if state_value is None else str(state_value)
+        )
+        if config_value != normalized_state_value:
+            return True
+    return False
+
+
+def run_poll_loop(
+    state: dict[str, Any],
+    poll_once: bool,
+    wait_seconds: int,
+    print_full_deliveries: bool,
+) -> None:
     server_base_url = str(state["serverBaseUrl"])
     access_token = str(state["accessToken"])
     connected_summary_printed = False
@@ -574,19 +1215,7 @@ def run_poll_loop(state: dict[str, Any], poll_once: bool, wait_seconds: int) -> 
         try:
             if not connected_summary_printed:
                 directory = read_directory(server_base_url, access_token)
-                actor = directory.get("actor", {})
-                print(
-                    json.dumps(
-                        {
-                            "status": "connected",
-                            "slot": state.get("agentSlotId"),
-                            "actorType": actor.get("type"),
-                            "actorId": actor.get("id"),
-                            "visibleAgents": len(directory.get("agents", [])),
-                        },
-                        ensure_ascii=True,
-                    )
-                )
+                print_connection_summary(state, directory)
                 connected_summary_printed = True
 
             response = poll_deliveries(server_base_url, access_token, wait_seconds)
@@ -594,7 +1223,8 @@ def run_poll_loop(state: dict[str, Any], poll_once: bool, wait_seconds: int) -> 
             deliveries = response.get("deliveries", [])
             if isinstance(deliveries, list) and deliveries:
                 print_delivery_summary(
-                    [d for d in deliveries if isinstance(d, dict)]
+                    [d for d in deliveries if isinstance(d, dict)],
+                    print_full_deliveries,
                 )
                 delivery_ids = [
                     delivery.get("deliveryId")
@@ -639,35 +1269,65 @@ def main() -> int:
     config = merge_config(args)
     mode = normalize_mode(config.get("mode"))
     config["mode"] = mode
-    config["runtime_name"] = (
-        config.get("runtime_name")
-        or os.environ.get("AGENTS_CHAT_RUNTIME_NAME", "").strip()
-        or DEFAULT_RUNTIME_NAME
-    )
-    env_vendor_name = os.environ.get("AGENTS_CHAT_VENDOR_NAME", "").strip()
-    if env_vendor_name and not config.get("vendor_name"):
-        config["vendor_name"] = env_vendor_name
-
-    server_base_url = config.get("server_base_url")
-    if not server_base_url:
-        raise ValueError("serverBaseUrl is required for the launcher.")
 
     state_root, state_dir, slot = resolve_state_layout(
         mode,
         config.get("slot"),
         args.state_dir,
+        config.get("agent_id"),
     )
     migrate_legacy_state_if_needed(state_root, state_dir)
     installation = load_or_create_installation(state_root)
-    state = load_state(state_dir)
+    previous_state = load_state(state_dir)
+    if not config.get("server_base_url") and previous_state.get("serverBaseUrl"):
+        config["server_base_url"] = str(previous_state["serverBaseUrl"])
+    if not config.get("runtime_name"):
+        config["runtime_name"] = (
+            str(previous_state.get("runtimeName"))
+            if previous_state.get("runtimeName")
+            else os.environ.get("AGENTS_CHAT_RUNTIME_NAME", "").strip()
+            or DEFAULT_RUNTIME_NAME
+        )
+    env_vendor_name = os.environ.get("AGENTS_CHAT_VENDOR_NAME", "").strip()
+    if not config.get("vendor_name"):
+        if previous_state.get("vendorName"):
+            config["vendor_name"] = str(previous_state["vendorName"])
+        elif env_vendor_name:
+            config["vendor_name"] = env_vendor_name
+
+    server_base_url = config.get("server_base_url")
+    if not server_base_url:
+        raise ValueError(
+            "serverBaseUrl is required for a new launcher or an existing slot."
+        )
+
+    state = dict(previous_state)
     state["installationId"] = installation["installationId"]
     state["agentSlotId"] = slot
     state = connect_if_needed(state, config, slot)
     state["runtimeName"] = config.get("runtime_name")
     state["vendorName"] = config.get("vendor_name")
     save_state(state_dir, state)
-    sync_profile(state, config)
-    run_poll_loop(state, args.poll_once, args.poll_wait_seconds)
+    if should_sync_profile(previous_state, state, config):
+        sync_profile(state, config)
+
+    connector_commands_executed = run_connector_commands(state, args)
+    save_state(state_dir, state)
+    polling_enabled = state.get("pollingEnabled")
+
+    if args.skip_poll or connector_commands_executed:
+        return 0
+
+    if polling_enabled is False and not args.poll_once:
+        print_connection_summary(state)
+        return 0
+
+    run_poll_loop(
+        state,
+        args.poll_once,
+        args.poll_wait_seconds,
+        args.print_full_deliveries,
+    )
     return 0
 
 

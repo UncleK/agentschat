@@ -13,6 +13,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { DataSource, In, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
+  AgentActivityLevel,
   AgentDmAcceptanceMode,
   EventActorType,
   EventContentType,
@@ -54,12 +55,14 @@ interface UpdateAgentSafetyPolicyInput {
   dmPolicyMode?: string;
   requiresMutualFollowForDm?: boolean;
   allowProactiveInteractions?: boolean;
+  activityLevel?: string;
 }
 
 export interface AgentSafetyPolicySummary {
   dmPolicyMode: AgentDmPolicyMode;
   requiresMutualFollowForDm: boolean;
   allowProactiveInteractions: boolean;
+  activityLevel: AgentActivityLevel;
 }
 
 export interface AgentSummary {
@@ -113,6 +116,17 @@ export interface HumanOwnedAgentInvitationResponse {
     claimToken: string;
     expiresAt: string;
   };
+}
+
+export interface ClaimRequestResponse {
+  claimRequest: {
+    id: string;
+    agentId: string;
+    status: ClaimRequestStatus;
+    requestedAt: string;
+    expiresAt: string;
+  };
+  challengeToken: string;
 }
 
 export interface AgentBootstrapResponse {
@@ -181,6 +195,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private static readonly humanInvitationTtlMs = 60 * 60 * 1000;
   private static readonly staleHumanInvitationMs = 24 * 60 * 60 * 1000;
   private static readonly invitationIssuedAtKey = 'invitationIssuedAt';
+  private static readonly defaultClaimRequestTtlMinutes = 60;
+  private static readonly minClaimRequestTtlMinutes = 15;
+  private static readonly maxClaimRequestTtlMinutes = 24 * 60;
   private readonly invitationCleanupIntervalMs: number;
   private invitationCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -446,6 +463,8 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async readMine(owner: AuthenticatedHuman): Promise<AgentsMineResponse> {
+    await this.expireStaleClaimRequests(this.claimRequestRepository);
+
     const [agents, selfOwnedAgents, pendingClaims, otherPendingClaimAgentIds] =
       await Promise.all([
         this.findEligibleOwnedAgents(owner.id),
@@ -613,6 +632,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       input.requiresMutualFollowForDm,
       'requiresMutualFollowForDm',
     );
+    const activityLevel = this.parseAgentActivityLevel(input.activityLevel);
     const allowProactiveInteractions = this.parseOptionalBooleanField(
       input.allowProactiveInteractions,
       'allowProactiveInteractions',
@@ -636,8 +656,19 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         policy.dmAcceptanceMode =
           this.mapDmPolicyModeToAcceptanceMode(dmPolicyMode);
       }
-      if (allowProactiveInteractions !== undefined) {
+      if (activityLevel !== undefined) {
+        policy.activityLevel = activityLevel;
+        policy.allowProactiveInteractions =
+          activityLevel !== AgentActivityLevel.Low;
+      } else if (allowProactiveInteractions !== undefined) {
         policy.allowProactiveInteractions = allowProactiveInteractions;
+        if (allowProactiveInteractions) {
+          if (policy.activityLevel === AgentActivityLevel.Low) {
+            policy.activityLevel = AgentActivityLevel.Normal;
+          }
+        } else {
+          policy.activityLevel = AgentActivityLevel.Low;
+        }
       }
       await agentPolicyRepository.save(policy);
 
@@ -671,13 +702,19 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async requestClaim(owner: AuthenticatedHuman, agentId: string) {
+  async requestClaim(
+    owner: AuthenticatedHuman,
+    agentId: string,
+    expiresInMinutes?: number,
+  ): Promise<ClaimRequestResponse> {
     const result = await this.dataSource.transaction(async (manager) => {
       const agentRepository = manager.getRepository(AgentEntity);
       const claimRequestRepository = manager.getRepository(ClaimRequestEntity);
       const threadRepository = manager.getRepository(ThreadEntity);
       const eventRepository = manager.getRepository(EventEntity);
+      const ttlMs = this.resolveClaimRequestTtlMs(expiresInMinutes);
       const agent = await agentRepository.findOneBy({ id: agentId });
+      await this.expireStaleClaimRequests(claimRequestRepository);
 
       if (!agent) {
         throw new NotFoundException(`Agent ${agentId} was not found.`);
@@ -695,31 +732,47 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         );
       }
 
-      const existingPendingRequest = await claimRequestRepository.findOneBy({
-        agentId,
-        status: ClaimRequestStatus.Pending,
+      const existingPendingRequests = await claimRequestRepository.find({
+        where: {
+          agentId,
+          status: ClaimRequestStatus.Pending,
+        },
+        order: {
+          createdAt: 'DESC',
+        },
       });
-      const challengeToken = this.buildChallengeToken(agent.id, owner.id);
+      const conflictingPendingRequest = existingPendingRequests.find(
+        (claimRequest) => claimRequest.requestedByUserId !== owner.id,
+      );
 
-      if (
-        existingPendingRequest &&
-        existingPendingRequest.requestedByUserId !== owner.id
-      ) {
+      if (conflictingPendingRequest) {
         throw new ConflictException(
           'Another pending claim request already exists for this agent.',
         );
       }
 
-      const claimRequest =
-        existingPendingRequest ??
-        (await claimRequestRepository.save(
-          claimRequestRepository.create({
-            agentId: agent.id,
-            requestedByUserId: owner.id,
-            challengeTokenHash: this.hashToken(challengeToken),
-            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-          }),
-        ));
+      const reusablePendingRequests = existingPendingRequests.filter(
+        (claimRequest) => claimRequest.requestedByUserId === owner.id,
+      );
+      if (reusablePendingRequests.length > 0) {
+        const rotatedAt = new Date();
+        for (const claimRequest of reusablePendingRequests) {
+          claimRequest.status = ClaimRequestStatus.Expired;
+          claimRequest.rejectedAt = rotatedAt;
+          claimRequest.rejectionReason = 'claim_link_rotated';
+        }
+        await claimRequestRepository.save(reusablePendingRequests);
+      }
+
+      const challengeToken = this.buildChallengeToken();
+      const claimRequest = await claimRequestRepository.save(
+        claimRequestRepository.create({
+          agentId: agent.id,
+          requestedByUserId: owner.id,
+          challengeTokenHash: this.hashToken(challengeToken),
+          expiresAt: new Date(Date.now() + ttlMs),
+        }),
+      );
       const thread = await threadRepository.save(
         threadRepository.create({
           contextType: ThreadContextType.DirectMessage,
@@ -769,7 +822,13 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     );
 
     return {
-      claimRequest: result.claimRequest,
+      claimRequest: {
+        id: result.claimRequest.id,
+        agentId: result.claimRequest.agentId,
+        status: result.claimRequest.status,
+        requestedAt: result.claimRequest.createdAt.toISOString(),
+        expiresAt: result.claimRequest.expiresAt.toISOString(),
+      },
       challengeToken: result.challengeToken,
     };
   }
@@ -1028,7 +1087,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         this.readAgentFollowerCount(agent.id),
       ]);
     const dmAcceptanceMode =
-      agent.policy?.dmAcceptanceMode ?? AgentDmAcceptanceMode.ApprovalRequired;
+      agent.policy?.dmAcceptanceMode ?? AgentDmAcceptanceMode.FollowedOnly;
     const requiresMutualFollowForDm = this.readBooleanMetadata(
       agent.profileMetadata,
       'dmRequiresMutualFollow',
@@ -1158,7 +1217,8 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     agent: AgentEntity,
   ): AgentSafetyPolicySummary {
     const dmAcceptanceMode =
-      agent.policy?.dmAcceptanceMode ?? AgentDmAcceptanceMode.ApprovalRequired;
+      agent.policy?.dmAcceptanceMode ?? AgentDmAcceptanceMode.FollowedOnly;
+    const activityLevel = this.resolveAgentActivityLevel(agent.policy);
 
     return {
       dmPolicyMode: this.mapAcceptanceModeToDmPolicyMode(dmAcceptanceMode),
@@ -1166,8 +1226,8 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         agent.profileMetadata,
         'dmRequiresMutualFollow',
       ),
-      allowProactiveInteractions:
-        agent.policy?.allowProactiveInteractions ?? true,
+      allowProactiveInteractions: activityLevel !== AgentActivityLevel.Low,
+      activityLevel,
     };
   }
 
@@ -1274,6 +1334,45 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return value;
   }
 
+  private parseAgentActivityLevel(
+    value: unknown,
+  ): AgentActivityLevel | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestException(
+        'activityLevel must be low, normal, or high.',
+      );
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (
+      normalized !== 'low' &&
+      normalized !== 'normal' &&
+      normalized !== 'high'
+    ) {
+      throw new BadRequestException(
+        'activityLevel must be low, normal, or high.',
+      );
+    }
+
+    return normalized as AgentActivityLevel;
+  }
+
+  private resolveAgentActivityLevel(
+    policy?: AgentPolicyEntity | null,
+  ): AgentActivityLevel {
+    if (!policy) {
+      return AgentActivityLevel.Normal;
+    }
+    if (policy.allowProactiveInteractions === false) {
+      return AgentActivityLevel.Low;
+    }
+    return policy.activityLevel ?? AgentActivityLevel.Normal;
+  }
+
   private mapAcceptanceModeToDmPolicyMode(
     value: AgentDmAcceptanceMode,
   ): AgentDmPolicyMode {
@@ -1329,8 +1428,45 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private buildChallengeToken(agentId: string, userId: string): string {
-    return `claim:${agentId}:${userId}`;
+  private buildChallengeToken(): string {
+    return `claimreq.v1.${randomBytes(24).toString('hex')}`;
+  }
+
+  private async expireStaleClaimRequests(
+    repository: Repository<ClaimRequestEntity>,
+    now = new Date(),
+  ): Promise<void> {
+    await repository
+      .createQueryBuilder()
+      .update(ClaimRequestEntity)
+      .set({
+        status: ClaimRequestStatus.Expired,
+      })
+      .where('status = :status', {
+        status: ClaimRequestStatus.Pending,
+      })
+      .andWhere('expires_at <= :now', {
+        now: now.toISOString(),
+      })
+      .execute();
+  }
+
+  private resolveClaimRequestTtlMs(expiresInMinutes?: number): number {
+    if (expiresInMinutes == null) {
+      return AgentsService.defaultClaimRequestTtlMinutes * 60 * 1000;
+    }
+
+    if (
+      !Number.isInteger(expiresInMinutes) ||
+      expiresInMinutes < AgentsService.minClaimRequestTtlMinutes ||
+      expiresInMinutes > AgentsService.maxClaimRequestTtlMinutes
+    ) {
+      throw new BadRequestException(
+        `expiresInMinutes must be an integer between ${AgentsService.minClaimRequestTtlMinutes} and ${AgentsService.maxClaimRequestTtlMinutes}.`,
+      );
+    }
+
+    return expiresInMinutes * 60 * 1000;
   }
 
   private hashToken(token: string): string {

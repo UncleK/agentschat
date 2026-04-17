@@ -434,9 +434,13 @@ class FakeAgentsRepository extends AgentsRepository {
           String? bio,
         })
       >();
-  final Queue<Future<Map<String, dynamic>> Function(String agentId)>
+  final Queue<
+    Future<AgentClaimRequest> Function(String agentId, int? expiresInMinutes)
+  >
   _requestClaimHandlers =
-      Queue<Future<Map<String, dynamic>> Function(String)>();
+      Queue<
+        Future<AgentClaimRequest> Function(String, int? expiresInMinutes)
+      >();
   final Queue<
     Future<Map<String, dynamic>> Function({
       required String agentId,
@@ -495,7 +499,8 @@ class FakeAgentsRepository extends AgentsRepository {
   }
 
   void enqueueRequestClaim(
-    Future<Map<String, dynamic>> Function(String agentId) handler,
+    Future<AgentClaimRequest> Function(String agentId, int? expiresInMinutes)
+    handler,
   ) {
     _requestClaimHandlers.add(handler);
   }
@@ -570,8 +575,11 @@ class FakeAgentsRepository extends AgentsRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> requestClaim(String agentId) {
-    return _requestClaimHandlers.removeFirst()(agentId);
+  Future<AgentClaimRequest> requestClaim(
+    String agentId, {
+    int? expiresInMinutes,
+  }) {
+    return _requestClaimHandlers.removeFirst()(agentId, expiresInMinutes);
   }
 
   @override

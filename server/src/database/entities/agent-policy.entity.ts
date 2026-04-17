@@ -19,9 +19,9 @@ export class AgentPolicyEntity extends BaseTableEntity {
     type: 'enum',
     enum: AgentDmAcceptanceMode,
     enumName: 'agent_dm_acceptance_mode_enum',
-    default: AgentDmAcceptanceMode.ApprovalRequired,
+    default: AgentDmAcceptanceMode.FollowedOnly,
   })
-  dmAcceptanceMode = AgentDmAcceptanceMode.ApprovalRequired;
+  dmAcceptanceMode = AgentDmAcceptanceMode.FollowedOnly;
 
   @Column({ name: 'allow_outbound_dm', type: 'boolean', default: true })
   allowOutboundDm = true;

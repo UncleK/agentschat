@@ -16,6 +16,7 @@ import '../../core/widgets/primary_gradient_button.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/swipe_back_sheet.dart';
 import '../debate/debate_panel.dart';
+import '../shared/owned_agent_command_sheet.dart';
 import 'agents_hall_models.dart';
 import 'agents_hall_repository.dart';
 import 'agents_hall_view_model.dart';
@@ -128,6 +129,12 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
   }
 
   void _openDetails(HallAgentCardModel agent) {
+    final session = AppSessionScope.maybeOf(context);
+    if (session != null && agent.isOwnedByCurrentHuman) {
+      _openOwnedAgentPrivateChat(agent, session);
+      return;
+    }
+
     showSwipeBackSheet<_AgentDetailAction>(
       context: context,
       builder: (context) => _AgentDetailSheet(agent: agent),
@@ -139,9 +146,9 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         case _AgentDetailAction.toggleFollow:
           unawaited(_toggleFollow(agent.id));
         case _AgentDetailAction.message:
-          _openMessageSheet(_agentById(agent.id));
+          _openMessageSheet(_agentById(agent.id, session: session));
         case _AgentDetailAction.joinDebate:
-          _openJoinDebateSheet(_agentById(agent.id));
+          _openJoinDebateSheet(_agentById(agent.id, session: session));
       }
     });
   }
@@ -246,13 +253,69 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
     }
   }
 
-  HallAgentCardModel _agentById(String agentId) {
-    return _viewModel.agents.firstWhere((agent) => agent.id == agentId);
+  Set<String> _ownedAgentIds(AppSessionController? session) {
+    if (session == null || !session.isAuthenticated) {
+      return const <String>{};
+    }
+
+    return session.currentActiveAgentCandidates
+        .map((agent) => agent.id)
+        .where((id) => id.trim().isNotEmpty)
+        .toSet();
+  }
+
+  AgentsHallViewModel _viewModelForSession(AppSessionController? session) {
+    final ownedAgentIds = _ownedAgentIds(session);
+    if (ownedAgentIds.isEmpty) {
+      return _viewModel;
+    }
+
+    return _viewModel.copyWith(
+      agents: _viewModel.agents
+          .map((agent) {
+            final isOwned = ownedAgentIds.contains(agent.id);
+            if (agent.isOwnedByCurrentHuman == isOwned) {
+              return agent;
+            }
+            return agent.copyWith(isOwnedByCurrentHuman: isOwned);
+          })
+          .toList(growable: false),
+    );
+  }
+
+  HallAgentCardModel _agentById(
+    String agentId, {
+    AppSessionController? session,
+  }) {
+    return _viewModelForSession(
+      session,
+    ).agents.firstWhere((agent) => agent.id == agentId);
+  }
+
+  Future<void> _openOwnedAgentPrivateChat(
+    HallAgentCardModel agent,
+    AppSessionController session,
+  ) {
+    final handle = (agent.handle ?? '').trim();
+    final displayName = agent.name.trim();
+    return showOwnedAgentCommandSheet(
+      context: context,
+      session: session,
+      agent: OwnedAgentCommandTarget(
+        id: agent.id,
+        name: displayName.isEmpty ? handle : displayName,
+        handle: handle.isEmpty ? agent.id : handle,
+      ),
+    );
   }
 
   Future<void> _toggleFollow(String agentId) async {
-    final agent = _agentById(agentId);
     final session = AppSessionScope.maybeOf(context);
+    final agent = _agentById(agentId, session: session);
+    if (agent.isOwnedByCurrentHuman) {
+      _showSnackBar('Owned agents open a private command chat instead.');
+      return;
+    }
     final activeAgentId = session?.currentActiveAgent?.id;
     final shouldFollow = !agent.viewerFollowsAgent;
     final canUseBackend =
@@ -324,7 +387,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
     setState(() {
       _viewModel = _viewModel.toggleFollow(agentId);
     });
-    final nextAgent = _agentById(agentId);
+    final nextAgent = _agentById(agentId, session: session);
     _showSnackBar(
       nextAgent.viewerFollowsAgent
           ? 'Current agent follows ${agent.name}'
@@ -489,6 +552,12 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
   }
 
   void _openMessageSheet(HallAgentCardModel agent) {
+    final session = AppSessionScope.maybeOf(context);
+    if (session != null && agent.isOwnedByCurrentHuman) {
+      unawaited(_openOwnedAgentPrivateChat(agent, session));
+      return;
+    }
+
     showSwipeBackSheet<void>(
       context: context,
       builder: (context) => _AgentMessageSheet(
@@ -590,12 +659,13 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
   @override
   Widget build(BuildContext context) {
     final session = AppSessionScope.maybeOf(context);
+    final effectiveViewModel = _viewModelForSession(session);
     final isAuthenticated = session?.isAuthenticated ?? false;
     final isBootstrapping =
         session != null &&
         session.bootstrapStatus != AppSessionBootstrapStatus.ready;
-    final visibleAgents = _viewModel.visibleAgents;
-    final trimmedQuery = _viewModel.searchQuery.trim();
+    final visibleAgents = effectiveViewModel.visibleAgents;
+    final trimmedQuery = effectiveViewModel.searchQuery.trim();
     final showUtilityChips =
         _isLoadingDirectory ||
         _directoryLoadError != null ||
@@ -676,11 +746,11 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
               ],
             ),
           ),
-          if (_viewModel.agents.isEmpty &&
+          if (effectiveViewModel.agents.isEmpty &&
               (_isUsingLiveDirectory ||
                   _isLoadingDirectory ||
                   _directoryLoadError != null ||
-                  _viewModel.searchQuery.trim().isNotEmpty))
+                  effectiveViewModel.searchQuery.trim().isNotEmpty))
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
@@ -703,7 +773,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
                     tone: StatusChipTone.tertiary,
                     showDot: false,
                   ),
-                if (_viewModel.searchQuery.trim().isNotEmpty)
+                if (effectiveViewModel.searchQuery.trim().isNotEmpty)
                   StatusChip(
                     label: 'Search · ${_viewModel.searchQuery.trim()}',
                     tone: StatusChipTone.neutral,
@@ -723,7 +793,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
               ),
             ),
           ],
-          if (_viewModel.agents.isEmpty) ...[
+          if (effectiveViewModel.agents.isEmpty) ...[
             const SizedBox(height: AppSpacing.xl),
             GlassPanel(
               child: Column(
@@ -815,7 +885,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
               );
             },
           ),
-          if (_viewModel.agents.isNotEmpty) ...[
+          if (effectiveViewModel.agents.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.lg),
             Align(
               alignment: Alignment.center,
@@ -845,7 +915,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
                       ),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
-                        'Showing ${visibleAgents.length} of ${_viewModel.agents.length} agents',
+                        'Showing ${visibleAgents.length} of ${effectiveViewModel.agents.length} agents',
                         style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(
                               color: AppColors.onSurfaceMuted,
@@ -1550,18 +1620,20 @@ class _AgentDetailSheet extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: AppSpacing.xl),
-                          _FollowToggleButton(
-                            buttonKey: Key(
-                              'agent-detail-follow-toggle-${agent.id}',
+                          if (!agent.isOwnedByCurrentHuman) ...[
+                            _FollowToggleButton(
+                              buttonKey: Key(
+                                'agent-detail-follow-toggle-${agent.id}',
+                              ),
+                              isFollowing: agent.viewerFollowsAgent,
+                              followerCount: agent.followerCount,
+                              isBusy: false,
+                              onPressed: () => Navigator.of(
+                                context,
+                              ).pop(_AgentDetailAction.toggleFollow),
                             ),
-                            isFollowing: agent.viewerFollowsAgent,
-                            followerCount: agent.followerCount,
-                            isBusy: false,
-                            onPressed: () => Navigator.of(
-                              context,
-                            ).pop(_AgentDetailAction.toggleFollow),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
+                            const SizedBox(height: AppSpacing.lg),
+                          ],
                           DecoratedBox(
                             decoration: BoxDecoration(
                               color: AppColors.surfaceLow.withValues(
@@ -1633,7 +1705,9 @@ class _AgentDetailSheet extends StatelessWidget {
                         width: double.infinity,
                         child: PrimaryGradientButton(
                           label: agent.primaryActionLabel,
-                          icon: agent.directMessageAllowed
+                          icon:
+                              agent.isOwnedByCurrentHuman ||
+                                  agent.directMessageAllowed
                               ? Icons.chat_bubble_rounded
                               : Icons.key_rounded,
                           onPressed: () => Navigator.of(
@@ -2327,6 +2401,50 @@ class _PermissionChecklist extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lines = agent.isOwnedByCurrentHuman
+        ? const <({bool satisfied, String label})>[
+            (
+              satisfied: true,
+              label:
+                  'You own this agent, so Hall opens the private command chat',
+            ),
+            (
+              satisfied: true,
+              label: 'Messages in this thread are written by the human owner',
+            ),
+            (
+              satisfied: true,
+              label: 'No public DM approval or follow gate applies here',
+            ),
+          ]
+        : <({bool satisfied, String label})>[
+            (
+              satisfied: agent.directMessageAllowed,
+              label: agent.directMessageAllowed
+                  ? 'Agent accepts direct-message entry'
+                  : 'Agent requires a request before direct messages',
+            ),
+            (
+              satisfied: !agent.requiresFollowForDm || agent.viewerFollowsAgent,
+              label: agent.requiresFollowForDm
+                  ? 'Active agent follows this agent'
+                  : 'Following is not required',
+            ),
+            (
+              satisfied:
+                  !agent.requiresMutualFollowForDm || agent.agentFollowsViewer,
+              label: agent.requiresMutualFollowForDm
+                  ? 'Mutual follow is satisfied'
+                  : 'Mutual follow is not required',
+            ),
+            (
+              satisfied: !agent.isOffline,
+              label: agent.isOffline
+                  ? 'Agent is offline'
+                  : 'Agent is available for live routing',
+            ),
+          ];
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh.withValues(alpha: 0.68),
@@ -2339,41 +2457,24 @@ class _PermissionChecklist extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Permission checks'.toUpperCase(),
+              (agent.isOwnedByCurrentHuman
+                      ? 'Owner channel'
+                      : 'Permission checks')
+                  .toUpperCase(),
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: AppColors.primary,
                 letterSpacing: 1.8,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            _PermissionLine(
-              satisfied: agent.directMessageAllowed,
-              label: agent.directMessageAllowed
-                  ? 'Agent accepts direct-message entry'
-                  : 'Agent requires a request before direct messages',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _PermissionLine(
-              satisfied: !agent.requiresFollowForDm || agent.viewerFollowsAgent,
-              label: agent.requiresFollowForDm
-                  ? 'Active agent follows this agent'
-                  : 'Following is not required',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _PermissionLine(
-              satisfied:
-                  !agent.requiresMutualFollowForDm || agent.agentFollowsViewer,
-              label: agent.requiresMutualFollowForDm
-                  ? 'Mutual follow is satisfied'
-                  : 'Mutual follow is not required',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _PermissionLine(
-              satisfied: !agent.isOffline,
-              label: agent.isOffline
-                  ? 'Agent is offline'
-                  : 'Agent is available for live routing',
-            ),
+            for (var index = 0; index < lines.length; index++) ...[
+              _PermissionLine(
+                satisfied: lines[index].satisfied,
+                label: lines[index].label,
+              ),
+              if (index != lines.length - 1)
+                const SizedBox(height: AppSpacing.sm),
+            ],
           ],
         ),
       ),

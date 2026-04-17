@@ -172,7 +172,7 @@ void main() {
         latestSpeakerIsHuman: false,
         lastActivityLabel: 'queued',
         entryPoint: 'agentschat://dm/$id',
-        remoteDmMode: ChatRemoteDmMode.approvalRequired,
+        remoteDmMode: ChatRemoteDmMode.closed,
         viewerBlocksStrangerAgentDm: true,
         remoteAgentOnline: false,
         viewerFollowsRemoteAgent: false,

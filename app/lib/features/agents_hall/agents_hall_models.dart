@@ -59,6 +59,7 @@ class HallAgentCardModel {
     this.viewerFollowsAgent = false,
     this.agentFollowsViewer = false,
     this.directoryActorIsAgent = false,
+    this.isOwnedByCurrentHuman = false,
     this.requiresFollowForDm = true,
     this.requiresMutualFollowForDm = false,
     this.skills = const <String>[],
@@ -82,6 +83,7 @@ class HallAgentCardModel {
   final bool viewerFollowsAgent;
   final bool agentFollowsViewer;
   final bool directoryActorIsAgent;
+  final bool isOwnedByCurrentHuman;
   final bool requiresFollowForDm;
   final bool requiresMutualFollowForDm;
   final List<String> skills;
@@ -94,8 +96,11 @@ class HallAgentCardModel {
 
   bool get isOffline => presence == AgentPresence.offline;
 
-  String get primaryActionLabel =>
-      directMessageAllowed ? 'Message' : 'Request access';
+  String get primaryActionLabel => isOwnedByCurrentHuman
+      ? 'Open chat'
+      : directMessageAllowed
+      ? 'Message'
+      : 'Request access';
 
   String? get displayHandle {
     final rawHandle = handle?.trim();
@@ -106,13 +111,17 @@ class HallAgentCardModel {
   }
 
   String get hallCardPrimaryLabel {
+    if (isOwnedByCurrentHuman) {
+      return 'Open chat';
+    }
     if (isOffline) {
       return 'View Profile';
     }
     return directMessageAllowed ? 'Message' : 'Request access';
   }
 
-  bool get hallCardPrimaryOpensDetails => isOffline || !directMessageAllowed;
+  bool get hallCardPrimaryOpensDetails =>
+      !isOwnedByCurrentHuman && (isOffline || !directMessageAllowed);
 
   bool get canJoinDebate => isDebating && debateJoinAllowed;
 
@@ -163,6 +172,9 @@ class HallAgentCardModel {
   }
 
   String get directChannelLabel {
+    if (isOwnedByCurrentHuman) {
+      return 'Owner command chat';
+    }
     if (directMessageAllowed) {
       if (requiresMutualFollowForDm) {
         return 'Mutual-follow DM open';
@@ -181,10 +193,13 @@ class HallAgentCardModel {
     if (isOffline) {
       return 'Offline; requests only';
     }
-    return 'Approval required';
+    return 'Direct channel closed';
   }
 
   String get relationshipLabel {
+    if (isOwnedByCurrentHuman) {
+      return 'Owned by you';
+    }
     if (viewerFollowsAgent && agentFollowsViewer) {
       return 'Mutual follow';
     }
@@ -198,9 +213,12 @@ class HallAgentCardModel {
   }
 
   List<String> get messageBlockedReasons {
+    if (isOwnedByCurrentHuman) {
+      return const <String>[];
+    }
     final reasons = <String>[];
     if (!directMessageAllowed) {
-      reasons.add('This agent requires an access request before new DMs.');
+      reasons.add('This agent is not accepting new direct messages.');
     }
     if (requiresFollowForDm && !viewerFollowsAgent) {
       reasons.add('Your active agent must follow this agent before messaging.');
@@ -222,6 +240,7 @@ class HallAgentCardModel {
     bool? viewerFollowsAgent,
     bool? agentFollowsViewer,
     int? followerCount,
+    bool? isOwnedByCurrentHuman,
   }) {
     return HallAgentCardModel(
       id: id,
@@ -240,6 +259,8 @@ class HallAgentCardModel {
       viewerFollowsAgent: viewerFollowsAgent ?? this.viewerFollowsAgent,
       agentFollowsViewer: agentFollowsViewer ?? this.agentFollowsViewer,
       directoryActorIsAgent: directoryActorIsAgent,
+      isOwnedByCurrentHuman:
+          isOwnedByCurrentHuman ?? this.isOwnedByCurrentHuman,
       requiresFollowForDm: requiresFollowForDm,
       requiresMutualFollowForDm: requiresMutualFollowForDm,
       skills: skills,

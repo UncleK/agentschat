@@ -81,6 +81,8 @@ interface DirectMessageCounterpartDto {
   agentFollowsViewer: boolean;
 }
 
+type DirectMessageThreadUsage = 'network_dm' | 'owned_agent_command';
+
 interface DirectMessageAssetDto {
   id: string;
   kind: string;
@@ -334,12 +336,23 @@ export class ContentService {
     }
 
     const counterpartByThreadId = new Map<string, ThreadParticipantEntity>();
+    const threadUsageByThreadId = new Map<string, DirectMessageThreadUsage>();
     for (const finalEvent of pageEvents) {
+      const threadParticipants =
+        participantsByThreadId.get(finalEvent.threadId) ?? [];
       counterpartByThreadId.set(
         finalEvent.threadId,
         this.resolveDirectMessageCounterpartParticipant(
-          participantsByThreadId.get(finalEvent.threadId) ?? [],
+          threadParticipants,
           activeAgentId,
+        ),
+      );
+      threadUsageByThreadId.set(
+        finalEvent.threadId,
+        this.resolveDirectMessageThreadUsage(
+          threadParticipants,
+          activeAgentId,
+          humanViewerId,
         ),
       );
     }
@@ -363,6 +376,7 @@ export class ContentService {
       activeAgentId,
       threads: pageEvents.map((event) => ({
         threadId: event.threadId,
+        threadUsage: threadUsageByThreadId.get(event.threadId) ?? 'network_dm',
         counterpart: this.serializeDirectMessageCounterpart(
           counterpartByThreadId.get(event.threadId)!,
           viewerFollowedAgentIds,
@@ -1933,6 +1947,37 @@ ${selfAuthoredFilter}
     }
 
     return counterpart;
+  }
+
+  private resolveDirectMessageThreadUsage(
+    participants: ThreadParticipantEntity[],
+    activeAgentId: string,
+    humanViewerId: string | null,
+  ): DirectMessageThreadUsage {
+    if (!humanViewerId) {
+      return 'network_dm';
+    }
+
+    const memberParticipants = participants.filter(
+      (participant) => participant.role === ThreadParticipantRole.Member,
+    );
+    if (memberParticipants.length !== 2) {
+      return 'network_dm';
+    }
+
+    const humanMembers = memberParticipants.filter(
+      (participant) => participant.participantType === SubjectType.Human,
+    );
+    const agentMembers = memberParticipants.filter(
+      (participant) => participant.participantType === SubjectType.Agent,
+    );
+    const isOwnedAgentCommandThread =
+      humanMembers.length === 1 &&
+      humanMembers[0]?.participantSubjectId === humanViewerId &&
+      agentMembers.length === 1 &&
+      agentMembers[0]?.participantSubjectId === activeAgentId;
+
+    return isOwnedAgentCommandThread ? 'owned_agent_command' : 'network_dm';
   }
 
   private serializeDirectMessageCounterpart(

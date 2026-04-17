@@ -78,6 +78,21 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    Future<void> setAutonomyLevel(
+      WidgetTester tester, {
+      required String agentId,
+      required double value,
+    }) async {
+      final sliderFinder = find.byKey(
+        Key('agent-safety-autonomy-slider-$agentId'),
+      );
+      final slider = tester.widget<Slider>(sliderFinder);
+      slider.onChanged?.call(value);
+      await tester.pump();
+      slider.onChangeEnd?.call(value);
+      await tester.pumpAndSettle();
+    }
+
     testWidgets('signed-out hub surfaces human access actions', (
       WidgetTester tester,
     ) async {
@@ -121,26 +136,25 @@ void main() {
           find.textContaining('Import or claim an owned agent first'),
           findsOneWidget,
         );
-        expect(find.byKey(const Key('agent-safety-dm-policy-none')), findsOneWidget);
+        expect(
+          find.byKey(const Key('agent-safety-autonomy-slider-none')),
+          findsOneWidget,
+        );
 
         final applyAllSwitch = tester.widget<Switch>(
           find.byKey(const Key('agent-security-apply-all-switch')),
         );
-        final mutualSwitch = tester.widget<Switch>(
-          find.byKey(const Key('agent-safety-mutual-follow-none')),
-        );
-        final proactiveSwitch = tester.widget<Switch>(
-          find.byKey(const Key('agent-safety-proactive-none')),
+        final autonomySlider = tester.widget<Slider>(
+          find.byKey(const Key('agent-safety-autonomy-slider-none')),
         );
 
         expect(applyAllSwitch.onChanged, isNull);
-        expect(mutualSwitch.onChanged, isNull);
-        expect(proactiveSwitch.onChanged, isNull);
+        expect(autonomySlider.onChanged, isNull);
       },
     );
 
     testWidgets(
-      'signed-in owned agents render the real dm policy and proactive controls',
+      'signed-in owned agents render the unified three-tier autonomy control',
       (WidgetTester tester) async {
         await authenticateWithMine(
           mineResponse(
@@ -150,8 +164,9 @@ void main() {
                 displayName: 'Owned One',
                 safetyPolicy: const AgentSafetyPolicy(
                   dmPolicyMode: AgentDmPolicyMode.followersOnly,
-                  requiresMutualFollowForDm: true,
+                  requiresMutualFollowForDm: false,
                   allowProactiveInteractions: true,
+                  activityLevel: AgentActivityLevel.normal,
                 ),
               ),
             ],
@@ -162,117 +177,47 @@ void main() {
         await scrollToAgentSecurity(tester);
 
         expect(
-          find.byKey(const Key('agent-safety-dm-policy-agt-owned-1')),
+          find.byKey(const Key('agent-safety-autonomy-slider-agt-owned-1')),
           findsOneWidget,
         );
-        expect(find.text('Followers only'), findsOneWidget);
-
-        final mutualSwitch = tester.widget<Switch>(
-          find.byKey(const Key('agent-safety-mutual-follow-agt-owned-1')),
-        );
-        final proactiveSwitch = tester.widget<Switch>(
-          find.byKey(const Key('agent-safety-proactive-agt-owned-1')),
+        final autonomySlider = tester.widget<Slider>(
+          find.byKey(const Key('agent-safety-autonomy-slider-agt-owned-1')),
         );
 
-        expect(mutualSwitch.value, isTrue);
-        expect(mutualSwitch.onChanged, isNotNull);
-        expect(proactiveSwitch.value, isTrue);
-        expect(proactiveSwitch.onChanged, isNotNull);
-      },
-    );
-
-    testWidgets(
-      'changing dm policy persists through the live safety policy endpoint and disables mutual follow when closed',
-      (WidgetTester tester) async {
-        const initialPolicy = AgentSafetyPolicy(
-          dmPolicyMode: AgentDmPolicyMode.open,
-          requiresMutualFollowForDm: true,
-          allowProactiveInteractions: true,
+        expect(autonomySlider.value, 1);
+        expect(autonomySlider.onChanged, isNotNull);
+        final summaryFinder = find.byKey(
+          const Key('agent-safety-autonomy-summary-agt-owned-1'),
         );
-        const updatedPolicy = AgentSafetyPolicy(
-          dmPolicyMode: AgentDmPolicyMode.closed,
-          requiresMutualFollowForDm: true,
-          allowProactiveInteractions: true,
+        expect(summaryFinder, findsOneWidget);
+        expect(
+          find.descendant(of: summaryFinder, matching: find.text('Active')),
+          findsOneWidget,
         );
-
-        await authenticateWithMine(
-          mineResponse(
-            agents: [
-              agentSummary(
-                id: 'agt-owned-1',
-                displayName: 'Owned One',
-                safetyPolicy: initialPolicy,
-              ),
-            ],
+        expect(
+          find.descendant(
+            of: summaryFinder,
+            matching: find.text('Followers can DM'),
           ),
-        );
-
-        agentsRepository.enqueueUpdateAgentSafetyPolicy(({
-          required agentId,
-          required policy,
-        }) async {
-          expect(agentId, 'agt-owned-1');
-          expect(policy.dmPolicyMode, AgentDmPolicyMode.closed);
-          expect(policy.requiresMutualFollowForDm, isTrue);
-          expect(policy.allowProactiveInteractions, isTrue);
-          return updatedPolicy;
-        });
-        agentsRepository.enqueueReadMine(() async {
-          return mineResponse(
-            agents: [
-              agentSummary(
-                id: 'agt-owned-1',
-                displayName: 'Owned One',
-                safetyPolicy: updatedPolicy,
-              ),
-            ],
-          );
-        });
-
-        await pumpHub(tester);
-        await scrollToAgentSecurity(tester);
-
-        await tester.tap(find.byKey(const Key('agent-safety-dm-policy-agt-owned-1')));
-        await tester.pumpAndSettle();
-
-        expect(find.byKey(const Key('agent-dm-policy-option-open')), findsOneWidget);
-        expect(
-          find.byKey(const Key('agent-dm-policy-option-followers-only')),
           findsOneWidget,
         );
-        expect(
-          find.byKey(const Key('agent-dm-policy-option-approval-required')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const Key('agent-dm-policy-option-closed')),
-          findsOneWidget,
-        );
-
-        await tester.tap(find.byKey(const Key('agent-dm-policy-option-closed')));
-        await tester.pump();
-        await tester.pumpAndSettle();
-
-        expect(find.text('Closed'), findsOneWidget);
-        final mutualSwitch = tester.widget<Switch>(
-          find.byKey(const Key('agent-safety-mutual-follow-agt-owned-1')),
-        );
-        expect(mutualSwitch.onChanged, isNull);
       },
     );
 
     testWidgets(
-      'proactive interactions toggle persists through the live safety policy endpoint',
+      'changing autonomy level to guarded persists through the live safety policy endpoint',
       (WidgetTester tester) async {
         const initialPolicy = AgentSafetyPolicy(
           dmPolicyMode: AgentDmPolicyMode.followersOnly,
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
+          activityLevel: AgentActivityLevel.normal,
         );
         const updatedPolicy = AgentSafetyPolicy(
           dmPolicyMode: AgentDmPolicyMode.followersOnly,
-          requiresMutualFollowForDm: false,
+          requiresMutualFollowForDm: true,
           allowProactiveInteractions: false,
+          activityLevel: AgentActivityLevel.low,
         );
 
         await authenticateWithMine(
@@ -293,8 +238,9 @@ void main() {
         }) async {
           expect(agentId, 'agt-owned-1');
           expect(policy.dmPolicyMode, AgentDmPolicyMode.followersOnly);
-          expect(policy.requiresMutualFollowForDm, isFalse);
+          expect(policy.requiresMutualFollowForDm, isTrue);
           expect(policy.allowProactiveInteractions, isFalse);
+          expect(policy.activityLevel, AgentActivityLevel.low);
           return updatedPolicy;
         });
         agentsRepository.enqueueReadMine(() async {
@@ -312,39 +258,171 @@ void main() {
         await pumpHub(tester);
         await scrollToAgentSecurity(tester);
 
-        final initialSwitch = tester.widget<Switch>(
-          find.byKey(const Key('agent-safety-proactive-agt-owned-1')),
+        await setAutonomyLevel(
+          tester,
+          agentId: 'agt-owned-1',
+          value: 0,
         );
-        expect(initialSwitch.value, isTrue);
 
-        await tester.tap(find.byKey(const Key('agent-safety-proactive-agt-owned-1')));
-        await tester.pump();
-        await tester.pumpAndSettle();
-
-        final updatedSwitch = tester.widget<Switch>(
-          find.byKey(const Key('agent-safety-proactive-agt-owned-1')),
+        final summaryFinder = find.byKey(
+          const Key('agent-safety-autonomy-summary-agt-owned-1'),
         );
-        expect(updatedSwitch.value, isFalse);
+        expect(
+          find.descendant(of: summaryFinder, matching: find.text('Guarded')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: summaryFinder,
+            matching: find.text('Mutual follow only'),
+          ),
+          findsOneWidget,
+        );
       },
     );
 
     testWidgets(
-      'the all toggle applies proactive interaction updates to every owned agent before refreshing mine',
+      'legacy open dm policies still map to the highest autonomy tier',
       (WidgetTester tester) async {
-        const initialPrimaryPolicy = AgentSafetyPolicy(
-          dmPolicyMode: AgentDmPolicyMode.open,
+        await authenticateWithMine(
+          mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-legacy-open',
+                displayName: 'Legacy Open',
+                safetyPolicy: const AgentSafetyPolicy(
+                  dmPolicyMode: AgentDmPolicyMode.open,
+                  requiresMutualFollowForDm: false,
+                  allowProactiveInteractions: true,
+                  activityLevel: AgentActivityLevel.normal,
+                ),
+              ),
+            ],
+          ),
+        );
+
+        await pumpHub(tester);
+        await scrollToAgentSecurity(tester);
+
+        final sliderFinder = find.byKey(
+          const Key('agent-safety-autonomy-slider-agt-owned-legacy-open'),
+        );
+        expect(sliderFinder, findsOneWidget);
+        expect(tester.widget<Slider>(sliderFinder).value, 2);
+        expect(
+          find.descendant(
+            of: find.byKey(
+              const Key('agent-safety-autonomy-summary-agt-owned-legacy-open'),
+            ),
+            matching: find.text('Full proactive'),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'changing autonomy level to full proactive persists through the live safety policy endpoint',
+      (WidgetTester tester) async {
+        const initialPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.followersOnly,
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
-        );
-        const initialSecondaryPolicy = AgentSafetyPolicy(
-          dmPolicyMode: AgentDmPolicyMode.closed,
-          requiresMutualFollowForDm: false,
-          allowProactiveInteractions: false,
+          activityLevel: AgentActivityLevel.normal,
         );
         const updatedPolicy = AgentSafetyPolicy(
           dmPolicyMode: AgentDmPolicyMode.open,
           requiresMutualFollowForDm: false,
+          allowProactiveInteractions: true,
+          activityLevel: AgentActivityLevel.high,
+        );
+
+        await authenticateWithMine(
+          mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: initialPolicy,
+              ),
+            ],
+          ),
+        );
+
+        agentsRepository.enqueueUpdateAgentSafetyPolicy(({
+          required agentId,
+          required policy,
+        }) async {
+          expect(agentId, 'agt-owned-1');
+          expect(policy.dmPolicyMode, AgentDmPolicyMode.open);
+          expect(policy.requiresMutualFollowForDm, isFalse);
+          expect(policy.allowProactiveInteractions, isTrue);
+          expect(policy.activityLevel, AgentActivityLevel.high);
+          return updatedPolicy;
+        });
+        agentsRepository.enqueueReadMine(() async {
+          return mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: updatedPolicy,
+              ),
+            ],
+          );
+        });
+
+        await pumpHub(tester);
+        await scrollToAgentSecurity(tester);
+
+        final summaryFinder = find.byKey(
+          const Key('agent-safety-autonomy-summary-agt-owned-1'),
+        );
+        expect(
+          find.descendant(of: summaryFinder, matching: find.text('Active')),
+          findsOneWidget,
+        );
+
+        await setAutonomyLevel(
+          tester,
+          agentId: 'agt-owned-1',
+          value: 2,
+        );
+
+        expect(
+          find.descendant(
+            of: summaryFinder,
+            matching: find.text('Full proactive'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: summaryFinder, matching: find.text('Open')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'the all toggle applies the autonomy preset updates to every owned agent before refreshing mine',
+      (WidgetTester tester) async {
+        const initialPrimaryPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.followersOnly,
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: true,
+          activityLevel: AgentActivityLevel.normal,
+        );
+        const initialSecondaryPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.followersOnly,
+          requiresMutualFollowForDm: true,
           allowProactiveInteractions: false,
+          activityLevel: AgentActivityLevel.low,
+        );
+        const updatedPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.open,
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: true,
+          activityLevel: AgentActivityLevel.high,
         );
         final updatedCalls = <String>[];
 
@@ -371,7 +449,9 @@ void main() {
         }) async {
           updatedCalls.add(agentId);
           expect(policy.dmPolicyMode, AgentDmPolicyMode.open);
-          expect(policy.allowProactiveInteractions, isFalse);
+          expect(policy.requiresMutualFollowForDm, isFalse);
+          expect(policy.allowProactiveInteractions, isTrue);
+          expect(policy.activityLevel, AgentActivityLevel.high);
           return updatedPolicy;
         });
         agentsRepository.enqueueUpdateAgentSafetyPolicy(({
@@ -380,7 +460,9 @@ void main() {
         }) async {
           updatedCalls.add(agentId);
           expect(policy.dmPolicyMode, AgentDmPolicyMode.open);
-          expect(policy.allowProactiveInteractions, isFalse);
+          expect(policy.requiresMutualFollowForDm, isFalse);
+          expect(policy.allowProactiveInteractions, isTrue);
+          expect(policy.activityLevel, AgentActivityLevel.high);
           return updatedPolicy;
         });
         agentsRepository.enqueueReadMine(() async {
@@ -414,15 +496,22 @@ void main() {
         );
         expect(applyAllSwitch.value, isTrue);
 
-        await tester.tap(find.byKey(const Key('agent-safety-proactive-agt-owned-1')));
-        await tester.pump();
-        await tester.pumpAndSettle();
+        await setAutonomyLevel(
+          tester,
+          agentId: 'agt-owned-1',
+          value: 2,
+        );
 
         expect(updatedCalls, ['agt-owned-1', 'agt-owned-2']);
-        final updatedSwitch = tester.widget<Switch>(
-          find.byKey(const Key('agent-safety-proactive-agt-owned-1')),
+        expect(
+          find.descendant(
+            of: find.byKey(
+              const Key('agent-safety-autonomy-summary-agt-owned-1'),
+            ),
+            matching: find.text('Full proactive'),
+          ),
+          findsOneWidget,
         );
-        expect(updatedSwitch.value, isFalse);
       },
     );
 
@@ -1128,7 +1217,7 @@ void main() {
     );
 
     testWidgets(
-      'claim refreshes partitions and only promotes the agent after it reaches owned agents',
+      'claim opens a launcher flow, generates a pending request, and does not promote the agent early',
       (WidgetTester tester) async {
         await authenticateWithMine(
           mineResponse(
@@ -1143,30 +1232,29 @@ void main() {
           ),
         );
 
-        agentsRepository.enqueueRequestClaim((agentId) async {
+        agentsRepository.enqueueRequestClaim((agentId, expiresInMinutes) async {
           expect(agentId, 'agt-claimable-1');
-          return <String, dynamic>{
-            'claimRequest': <String, dynamic>{'id': 'claim-1'},
-            'challengeToken': 'claim:agt-claimable-1:usr-hub',
-          };
-        });
-        agentsRepository.enqueueConfirmClaim(({
-          required agentId,
-          required claimRequestId,
-          required challengeToken,
-        }) async {
-          expect(agentId, 'agt-claimable-1');
-          expect(claimRequestId, 'claim-1');
-          expect(challengeToken, 'claim:agt-claimable-1:usr-hub');
-          return <String, dynamic>{
-            'agent': <String, dynamic>{'id': 'agt-claimable-1'},
-          };
+          expect(expiresInMinutes, 60);
+          return const AgentClaimRequest(
+            claimRequestId: 'claim-1',
+            agentId: 'agt-claimable-1',
+            status: 'pending',
+            requestedAt: '2026-04-17T10:00:00.000Z',
+            expiresAt: '2026-04-17T11:00:00.000Z',
+            challengeToken: 'claimreq.v1.example',
+          );
         });
         agentsRepository.enqueueReadMine(() async {
           return mineResponse(
-            agents: [
-              agentSummary(id: 'agt-claimable-1', displayName: 'Claimable One'),
-              agentSummary(id: 'agt-owned-1', displayName: 'Owned One'),
+            agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+            claimableAgents: const [],
+            pendingClaims: [
+              pendingClaimSummary(
+                claimRequestId: 'claim-1',
+                agentId: 'agt-claimable-1',
+                handle: 'claimable-one',
+                displayName: 'Claimable One',
+              ),
             ],
           );
         });
@@ -1194,15 +1282,25 @@ void main() {
         await tester.pump();
         await tester.pumpAndSettle();
 
-        expect(controller.currentActiveAgent?.id, 'agt-claimable-1');
         expect(
-          find.byKey(const Key('owned-agent-card-agt-claimable-1')),
+          find.byKey(const Key('generate-claim-link-button')),
           findsOneWidget,
         );
         expect(
-          find.byKey(const Key('claimable-agent-card-agt-claimable-1')),
-          findsNothing,
+          find.byKey(const Key('generated-claim-link-text')),
+          findsOneWidget,
         );
+
+        await tester.tap(find.byKey(const Key('generate-claim-link-button')));
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        expect(controller.currentActiveAgent?.id, 'agt-owned-1');
+        expect(
+          find.textContaining('agents-chat://launch?'),
+          findsOneWidget,
+        );
+        expect(controller.pendingClaims, hasLength(1));
       },
     );
 

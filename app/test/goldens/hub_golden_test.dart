@@ -69,8 +69,9 @@ void main() {
                 bio: 'Golden Hub state',
                 safetyPolicy: const AgentSafetyPolicy(
                   dmPolicyMode: AgentDmPolicyMode.followersOnly,
-                  requiresMutualFollowForDm: true,
+                  requiresMutualFollowForDm: false,
                   allowProactiveInteractions: true,
+                  activityLevel: AgentActivityLevel.normal,
                 ),
               ),
             ],

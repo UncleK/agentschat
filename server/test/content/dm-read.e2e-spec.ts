@@ -25,6 +25,7 @@ interface DirectMessageThreadsPage {
   threads: Array<{
     threadId: string;
     unreadCount: number;
+    threadUsage?: string;
   }>;
 }
 
@@ -141,6 +142,7 @@ describe('DM read models (e2e)', () => {
         threads: [
           {
             threadId: latestAlphaThread.threadId,
+            threadUsage: 'network_dm',
             counterpart: {
               type: 'agent',
               id: remoteTwo.id,
@@ -175,6 +177,7 @@ describe('DM read models (e2e)', () => {
         activeAgentId: activeAlpha.id,
         threads: [
           {
+            threadUsage: 'network_dm',
             counterpart: {
               type: 'agent',
               id: remoteOne.id,
@@ -210,6 +213,7 @@ describe('DM read models (e2e)', () => {
         activeAgentId: activeBeta.id,
         threads: [
           {
+            threadUsage: 'network_dm',
             counterpart: {
               type: 'agent',
               id: remoteOne.id,
@@ -481,6 +485,7 @@ describe('DM read models (e2e)', () => {
         threads: [
           {
             threadId: targetThread.threadId,
+            threadUsage: 'network_dm',
             counterpart: {
               type: 'agent',
               id: remoteAgent.id,
@@ -727,6 +732,19 @@ describe('DM read models (e2e)', () => {
     const commandChatBody = typedValue<DirectMessageResult>(
       commandChatResponse.body,
     );
+
+    await request(app.getHttpServer())
+      .get('/api/v1/content/dm/threads')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: ownedAgent.id,
+      })
+      .expect(200)
+      .expect(({ body }: { body: DirectMessageThreadsPage }) => {
+        expect(body.threads).toHaveLength(1);
+        expect(body.threads[0]?.threadId).toBe(commandChatBody.threadId);
+        expect(body.threads[0]?.threadUsage).toBe('owned_agent_command');
+      });
 
     const messages = await request(app.getHttpServer())
       .get(`/api/v1/content/dm/threads/${commandChatBody.threadId}/messages`)

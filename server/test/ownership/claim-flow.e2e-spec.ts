@@ -3,6 +3,7 @@ import request from 'supertest';
 import { Repository } from 'typeorm';
 import { AgentStatus } from '../../src/database/domain.enums';
 import { AgentEntity } from '../../src/database/entities/agent.entity';
+import { ClaimRequestEntity } from '../../src/database/entities/claim-request.entity';
 import { AgentsService } from '../../src/modules/agents/agents.service';
 import {
   TestApplicationContext,
@@ -31,7 +32,10 @@ interface AgentSummaryResponse {
 interface ClaimRequestResponse {
   claimRequest: {
     id: string;
+    agentId: string;
     status: string;
+    requestedAt: string;
+    expiresAt: string;
   };
   challengeToken: string;
 }
@@ -92,11 +96,14 @@ describe('Agent claim flow (e2e)', () => {
   let app: INestApplication;
   let context: TestApplicationContext;
   let agentRepository: Repository<AgentEntity>;
+  let claimRequestRepository: Repository<ClaimRequestEntity>;
 
   beforeAll(async () => {
     context = await createTestApplication();
     app = context.app;
     agentRepository = context.dataSource.getRepository(AgentEntity);
+    claimRequestRepository =
+      context.dataSource.getRepository(ClaimRequestEntity);
   });
 
   afterAll(async () => {
@@ -206,6 +213,12 @@ describe('Agent claim flow (e2e)', () => {
         avatarUrl: null,
         bio: null,
         ownerType: 'human',
+        safetyPolicy: {
+          dmPolicyMode: 'followers_only',
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: true,
+          activityLevel: 'normal',
+        },
         status: 'offline',
       },
       {
@@ -215,6 +228,12 @@ describe('Agent claim flow (e2e)', () => {
         avatarUrl: null,
         bio: 'Owned older bio',
         ownerType: 'human',
+        safetyPolicy: {
+          dmPolicyMode: 'followers_only',
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: true,
+          activityLevel: 'normal',
+        },
         status: 'offline',
       },
     ]);
@@ -278,6 +297,7 @@ describe('Agent claim flow (e2e)', () => {
       'handle',
       'id',
       'ownerType',
+      'safetyPolicy',
       'status',
     ]);
     expect(
@@ -331,18 +351,25 @@ describe('Agent claim flow (e2e)', () => {
     const secondClaimRequest = await createClaimRequest(
       humanToken,
       selfOwnedAgent.id,
+      15,
     );
 
     expect(firstClaimRequest.claimRequest.status).toBe('pending');
-    expect(secondClaimRequest.claimRequest.id).toBe(
+    expect(firstClaimRequest.claimRequest.agentId).toBe(selfOwnedAgent.id);
+    expect(firstClaimRequest.claimRequest.requestedAt).toEqual(
+      expect.any(String),
+    );
+    expect(firstClaimRequest.claimRequest.expiresAt).toEqual(
+      expect.any(String),
+    );
+    expect(secondClaimRequest.claimRequest.id).not.toBe(
       firstClaimRequest.claimRequest.id,
     );
-    expect(secondClaimRequest.challengeToken).toBe(
+    expect(secondClaimRequest.challengeToken).not.toBe(
       firstClaimRequest.challengeToken,
     );
-    expect(firstClaimRequest.challengeToken).toBe(
-      `claim:${selfOwnedAgent.id}:${registerResponse.user.id}`,
-    );
+    expect(firstClaimRequest.challengeToken).toMatch(/^claimreq\.v1\./);
+    expect(secondClaimRequest.challengeToken).toMatch(/^claimreq\.v1\./);
 
     const pendingResponse = await readAgentsMine(humanToken);
 
@@ -352,7 +379,7 @@ describe('Agent claim flow (e2e)', () => {
     );
     expect(pendingResponse.pendingClaims).toContainEqual(
       typedValue<Record<string, unknown>>({
-        claimRequestId: firstClaimRequest.claimRequest.id,
+        claimRequestId: secondClaimRequest.claimRequest.id,
         agentId: selfOwnedAgent.id,
         handle: 'self-owned-agent',
         displayName: 'Self Owned Agent',
@@ -365,8 +392,8 @@ describe('Agent claim flow (e2e)', () => {
     const confirmationResponse = await confirmClaimRequest(
       humanToken,
       selfOwnedAgent.id,
-      firstClaimRequest.claimRequest.id,
-      firstClaimRequest.challengeToken,
+      secondClaimRequest.claimRequest.id,
+      secondClaimRequest.challengeToken,
     );
 
     expect(confirmationResponse.claimRequest.status).toBe('confirmed');
@@ -384,6 +411,12 @@ describe('Agent claim flow (e2e)', () => {
       avatarUrl: null,
       bio: null,
       ownerType: 'human',
+      safetyPolicy: {
+        dmPolicyMode: 'followers_only',
+        requiresMutualFollowForDm: false,
+        allowProactiveInteractions: true,
+        activityLevel: 'normal',
+      },
       status: 'offline',
     });
     expect(ownedResponse.claimableAgents).not.toContainEqual(
@@ -391,6 +424,55 @@ describe('Agent claim flow (e2e)', () => {
     );
     expect(ownedResponse.pendingClaims).not.toContainEqual(
       expect.objectContaining({ agentId: selfOwnedAgent.id }),
+    );
+  });
+
+  it('expires stale pending claims during readMine and allows a fresh claim link to be generated', async () => {
+    const registerResponse = await registerEmailHuman(
+      'claim-expire-owner@example.com',
+      'Claim Expire Owner',
+    );
+    const humanToken = registerResponse.accessToken;
+    const selfOwnedAgent = await importSelfOwnedAgent({
+      handle: 'claim-expire-agent',
+      displayName: 'Claim Expire Agent',
+    });
+
+    const firstClaimRequest = await createClaimRequest(
+      humanToken,
+      selfOwnedAgent.id,
+      15,
+    );
+
+    await claimRequestRepository.update(
+      { id: firstClaimRequest.claimRequest.id },
+      {
+        expiresAt: new Date(Date.now() - 60 * 1000),
+      },
+    );
+
+    const expiredResponse = await readAgentsMine(humanToken);
+    expect(expiredResponse.pendingClaims).toEqual([]);
+    expect(expiredResponse.claimableAgents).toContainEqual({
+      id: selfOwnedAgent.id,
+      handle: 'claim-expire-agent',
+      displayName: 'Claim Expire Agent',
+      avatarUrl: null,
+      bio: null,
+      ownerType: 'self',
+      status: 'offline',
+    });
+
+    const secondClaimRequest = await createClaimRequest(
+      humanToken,
+      selfOwnedAgent.id,
+      60,
+    );
+    expect(secondClaimRequest.claimRequest.id).not.toBe(
+      firstClaimRequest.claimRequest.id,
+    );
+    expect(secondClaimRequest.challengeToken).not.toBe(
+      firstClaimRequest.challengeToken,
     );
   });
 
@@ -465,7 +547,9 @@ describe('Agent claim flow (e2e)', () => {
       })
       .expect(201);
 
-    const preDisconnectMine = await readAgentsMine(registerResponse.accessToken);
+    const preDisconnectMine = await readAgentsMine(
+      registerResponse.accessToken,
+    );
     expect(preDisconnectMine.agents).toContainEqual(
       expect.objectContaining({
         id: invitation.invitation.agentId,
@@ -481,7 +565,9 @@ describe('Agent claim flow (e2e)', () => {
         expect(body.disconnectedCount).toBe(1);
       });
 
-    const postDisconnectMine = await readAgentsMine(registerResponse.accessToken);
+    const postDisconnectMine = await readAgentsMine(
+      registerResponse.accessToken,
+    );
     expect(postDisconnectMine.agents).toContainEqual(
       expect.objectContaining({
         id: invitation.invitation.agentId,
@@ -640,10 +726,18 @@ describe('Agent claim flow (e2e)', () => {
   async function createClaimRequest(
     accessToken: string,
     agentId: string,
+    expiresInMinutes?: number,
   ): Promise<ClaimRequestResponse> {
     const response = await request(app.getHttpServer())
       .post(`/api/v1/agents/${agentId}/claim-requests`)
       .set('Authorization', `Bearer ${accessToken}`)
+      .send(
+        expiresInMinutes == null
+          ? {}
+          : {
+              expiresInMinutes,
+            },
+      )
       .expect(201);
 
     return typedValue<ClaimRequestResponse>(response.body);

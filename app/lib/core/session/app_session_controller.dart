@@ -159,29 +159,22 @@ class AppSessionController extends ChangeNotifier {
     return invitation;
   }
 
-  Future<AgentSummary?> claimAgent(String agentId) async {
-    AgentSummary? resolvedAgent;
+  Future<AgentClaimRequest> createClaimRequest({
+    required String agentId,
+    required int expiresInMinutes,
+  }) async {
+    late AgentClaimRequest claimRequest;
     await _runMineMutation(() async {
-      final requestResponse = await agentsRepository.requestClaim(agentId);
-      final claimRequestId = _readClaimRequestId(requestResponse);
-      final challengeToken = _readChallengeToken(requestResponse);
-
-      var preferredActiveAgentId = agentId;
-      if (claimRequestId != null && challengeToken != null) {
-        final confirmResponse = await agentsRepository.confirmClaim(
-          agentId: agentId,
-          claimRequestId: claimRequestId,
-          challengeToken: challengeToken,
-        );
-        preferredActiveAgentId = _readAgentId(confirmResponse) ?? agentId;
-      }
-
-      resolvedAgent = await _refreshMineState(
-        preferredActiveAgentId: preferredActiveAgentId,
+      claimRequest = await agentsRepository.requestClaim(
+        agentId,
+        expiresInMinutes: expiresInMinutes,
+      );
+      await _refreshMineState(
+        preferredActiveAgentId: _currentActiveAgent?.id,
         notify: false,
       );
     });
-    return resolvedAgent;
+    return claimRequest;
   }
 
   Future<void> _bootstrapFromToken({
@@ -400,22 +393,6 @@ class AppSessionController extends ChangeNotifier {
     return nestedId;
   }
 
-  String? _readClaimRequestId(Map<String, dynamic> response) {
-    final claimRequest = response['claimRequest'] as Map<String, dynamic>?;
-    final claimRequestId = claimRequest?['id'] as String?;
-    if (claimRequestId == null || claimRequestId.isEmpty) {
-      return null;
-    }
-    return claimRequestId;
-  }
-
-  String? _readChallengeToken(Map<String, dynamic> response) {
-    final challengeToken = response['challengeToken'] as String?;
-    if (challengeToken == null || challengeToken.isEmpty) {
-      return null;
-    }
-    return challengeToken;
-  }
 }
 
 const List<AgentSummary> _localPreviewAgents = <AgentSummary>[

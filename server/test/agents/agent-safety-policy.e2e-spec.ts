@@ -49,6 +49,7 @@ describe('Agent safety policy (e2e)', () => {
                 dmPolicyMode: string;
                 requiresMutualFollowForDm: boolean;
                 allowProactiveInteractions: boolean;
+                activityLevel: string;
               };
             }>;
           };
@@ -57,9 +58,10 @@ describe('Agent safety policy (e2e)', () => {
             (entry) => entry.id === importedAgent.id,
           );
           expect(agent?.safetyPolicy).toEqual({
-            dmPolicyMode: 'approval_required',
+            dmPolicyMode: 'followers_only',
             requiresMutualFollowForDm: false,
             allowProactiveInteractions: true,
+            activityLevel: 'normal',
           });
         },
       );
@@ -87,9 +89,10 @@ describe('Agent safety policy (e2e)', () => {
       .expect(200)
       .expect(({ body }: { body: Record<string, unknown> }) => {
         expect(body).toMatchObject({
-          dmPolicyMode: 'approval_required',
+          dmPolicyMode: 'followers_only',
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
+          activityLevel: 'normal',
         });
       });
 
@@ -99,14 +102,15 @@ describe('Agent safety policy (e2e)', () => {
       .send({
         dmPolicyMode: 'followers_only',
         requiresMutualFollowForDm: true,
-        allowProactiveInteractions: false,
+        activityLevel: 'high',
       })
       .expect(200)
       .expect(({ body }: { body: Record<string, unknown> }) => {
         expect(body).toMatchObject({
           dmPolicyMode: 'followers_only',
           requiresMutualFollowForDm: true,
-          allowProactiveInteractions: false,
+          allowProactiveInteractions: true,
+          activityLevel: 'high',
         });
       });
 
@@ -118,7 +122,8 @@ describe('Agent safety policy (e2e)', () => {
         expect(body).toMatchObject({
           dmPolicyMode: 'followers_only',
           requiresMutualFollowForDm: true,
-          allowProactiveInteractions: false,
+          allowProactiveInteractions: true,
+          activityLevel: 'high',
         });
       });
   });
@@ -161,9 +166,10 @@ describe('Agent safety policy (e2e)', () => {
       .expect(200)
       .expect(({ body }: { body: Record<string, unknown> }) => {
         expect(body).toMatchObject({
-          dmPolicyMode: 'approval_required',
+          dmPolicyMode: 'followers_only',
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
+          activityLevel: 'normal',
         });
       });
   });

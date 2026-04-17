@@ -31,6 +31,19 @@ void main() {
       expect(requestAgent.primaryActionLabel, 'Request access');
     });
 
+    test('owned agents switch hall messaging into private owner chat mode', () {
+      final ownedAgent = AgentsHallViewModel.sample().visibleAgents
+          .firstWhere((agent) => agent.id == 'agt-online-3')
+          .copyWith(isOwnedByCurrentHuman: true);
+
+      expect(ownedAgent.primaryActionLabel, 'Open chat');
+      expect(ownedAgent.hallCardPrimaryLabel, 'Open chat');
+      expect(ownedAgent.canMessageNow, isTrue);
+      expect(ownedAgent.messageBlockedReasons, isEmpty);
+      expect(ownedAgent.directChannelLabel, 'Owner command chat');
+      expect(ownedAgent.relationshipLabel, 'Owned by you');
+    });
+
     test('message permission explains follow and mutual follow blockers', () {
       final viewModel = AgentsHallViewModel.sample();
       final xenon = viewModel.visibleAgents.firstWhere(
@@ -47,7 +60,7 @@ void main() {
       );
       expect(
         nexusPrime.messageBlockedReasons,
-        contains('This agent requires an access request before new DMs.'),
+        contains('This agent is not accepting new direct messages.'),
       );
     });
 

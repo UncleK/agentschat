@@ -77,22 +77,21 @@ class _HubScreenState extends State<HubScreen> {
     await session.setCurrentActiveAgent(agentId);
   }
 
-  Future<void> _claimAgent(HubClaimableAgentModel agent) async {
+  Future<void> _openClaimLauncherSheet(HubClaimableAgentModel agent) async {
     final session = AppSessionScope.read(context);
-    try {
-      final resolvedAgent = await session.claimAgent(agent.id);
-      if (!mounted) {
-        return;
-      }
-
-      final displayName = resolvedAgent?.displayName ?? agent.name;
-      _showSnackBar('Claimed $displayName');
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      _showSnackBar('Unable to claim ${agent.name}');
-    }
+    await showSwipeBackSheet<void>(
+      context: context,
+      builder: (context) => _ClaimAgentLauncherSheet(
+        agent: agent,
+        apiBaseUrl: session.apiClient.baseUrl,
+        onGenerate:
+            ({required String agentId, required int expiresInMinutes}) =>
+                session.createClaimRequest(
+                  agentId: agentId,
+                  expiresInMinutes: expiresInMinutes,
+                ),
+      ),
+    );
   }
 
   Future<void> _openAddAgentSheet(bool isSignedIn) async {
@@ -148,14 +147,19 @@ class _HubScreenState extends State<HubScreen> {
       return;
     }
 
-    await showSwipeBackSheet<void>(
+    final selectedAgent = await showSwipeBackSheet<HubClaimableAgentModel>(
       context: context,
       builder: (context) => _ClaimableAgentsSheet(
         claimableAgents: viewModel.claimableAgents,
         isRefreshingMine: isRefreshingMine,
-        onClaim: _claimAgent,
       ),
     );
+
+    if (!mounted || selectedAgent == null) {
+      return;
+    }
+
+    await _openClaimLauncherSheet(selectedAgent);
   }
 
   Future<String> _submitHumanAuth({
@@ -348,70 +352,52 @@ class _HubScreenState extends State<HubScreen> {
     });
   }
 
-  Future<void> _openDmPolicySheet(HubViewModel viewModel) async {
-    final agent = viewModel.selectedAgentOrNull;
-    if (agent == null || _isSavingAgentSecurity) {
-      return;
-    }
-
-    final current = _effectiveAgentSafety(agent);
-    final nextMode = await showSwipeBackSheet<AgentDmPolicyMode>(
-      context: context,
-      builder: (context) =>
-          _AgentDmPolicySelectionSheet(currentMode: current.dmPolicyMode),
-    );
-
-    if (!mounted || nextMode == null || nextMode == current.dmPolicyMode) {
-      return;
-    }
-
-    await _saveAgentSecurity(
-      viewModel: viewModel,
-      buildNext: (policy) => policy.copyWith(dmPolicyMode: nextMode),
-      successMessage: _applyAgentSecurityToAll
-          ? 'Applied DM policy to all owned agents'
-          : 'Updated DM policy for ${agent.name}',
-    );
+  HubAgentAutonomyPreset _effectiveAutonomyPreset(HubOwnedAgentModel? agent) {
+    return _effectiveAgentSafety(agent).autonomyPreset;
   }
 
-  Future<void> _toggleSelectedAgentMutualOnly(HubViewModel viewModel) async {
-    final agent = viewModel.selectedAgentOrNull;
-    if (agent == null || _isSavingAgentSecurity) {
-      return;
-    }
-
-    final current = _effectiveAgentSafety(agent);
-    if (!current.dmPolicyMode.supportsMutualFollow) {
-      return;
-    }
-
-    await _saveAgentSecurity(
-      viewModel: viewModel,
-      buildNext: (policy) => policy.copyWith(
-        requiresMutualFollowForDm: !policy.requiresMutualFollowForDm,
-      ),
-      successMessage: _applyAgentSecurityToAll
-          ? 'Applied mutual-follow DM rule to all owned agents'
-          : 'Updated mutual-follow DM rule for ${agent.name}',
-    );
-  }
-
-  Future<void> _toggleSelectedAgentProactiveInteractions(
+  void _previewSelectedAutonomyPreset(
     HubViewModel viewModel,
+    HubAgentAutonomyPreset preset,
+  ) {
+    final agent = viewModel.selectedAgentOrNull;
+    if (agent == null) {
+      return;
+    }
+
+    setState(() {
+      if (_applyAgentSecurityToAll) {
+        _globalAgentSafetyDraft = preset.policy;
+      } else {
+        _agentSafetyOverrides[agent.id] = preset.policy;
+      }
+    });
+  }
+
+  Future<void> _commitSelectedAutonomyPreset(
+    HubViewModel viewModel,
+    HubAgentAutonomyPreset preset,
   ) async {
     final agent = viewModel.selectedAgentOrNull;
     if (agent == null || _isSavingAgentSecurity) {
       return;
     }
 
+    final currentPolicy = agent.safetyPolicy;
+    final shouldSkip =
+        !_applyAgentSecurityToAll &&
+        currentPolicy.autonomyPreset == preset &&
+        currentPolicy.matchesAutonomyPreset(preset);
+    if (shouldSkip) {
+      return;
+    }
+
     await _saveAgentSecurity(
       viewModel: viewModel,
-      buildNext: (policy) => policy.copyWith(
-        allowProactiveInteractions: !policy.allowProactiveInteractions,
-      ),
+      buildNext: (_) => preset.policy,
       successMessage: _applyAgentSecurityToAll
-          ? 'Applied proactive interaction rule to all owned agents'
-          : 'Updated proactive interaction rule for ${agent.name}',
+          ? 'Applied autonomy level to all owned agents'
+          : 'Updated autonomy level for ${agent.name}',
     );
   }
 
@@ -439,7 +425,8 @@ class _HubScreenState extends State<HubScreen> {
       if (_applyAgentSecurityToAll) {
         _globalAgentSafetyDraft = nextPolicies[selectedAgent.id];
       } else {
-        _agentSafetyOverrides[selectedAgent.id] = nextPolicies[selectedAgent.id]!;
+        _agentSafetyOverrides[selectedAgent.id] =
+            nextPolicies[selectedAgent.id]!;
       }
     });
 
@@ -457,7 +444,9 @@ class _HubScreenState extends State<HubScreen> {
       setState(() {
         _isSavingAgentSecurity = false;
         _globalAgentSafetyDraft = null;
-        _agentSafetyOverrides.removeWhere((key, _) => nextPolicies.containsKey(key));
+        _agentSafetyOverrides.removeWhere(
+          (key, _) => nextPolicies.containsKey(key),
+        );
       });
       _showSnackBar(successMessage);
     } on ApiException catch (error) {
@@ -876,14 +865,12 @@ class _HubScreenState extends State<HubScreen> {
 
   Widget _buildSecuritySection(HubViewModel viewModel) {
     final agent = viewModel.selectedAgentOrNull;
-    final security = _effectiveAgentSafety(agent);
     final hasOwnedAgents = viewModel.hasOwnedAgents;
     final canEditAgentSecurity = hasOwnedAgents && !_isSavingAgentSecurity;
     final targetName = _applyAgentSecurityToAll
         ? 'all agents'
         : '"${agent?.name ?? 'the active agent'}"';
-    final canEditMutualFollow =
-        canEditAgentSecurity && security.dmPolicyMode.supportsMutualFollow;
+    final autonomyPreset = _effectiveAutonomyPreset(agent);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -911,77 +898,49 @@ class _HubScreenState extends State<HubScreen> {
                 !hasOwnedAgents
                     ? 'Import or claim an owned agent first. Agent Security is only configurable once a real owned agent is active in this account.'
                     : _applyAgentSecurityToAll
-                    ? 'The rules below apply to every owned agent in this account.'
-                    : 'The rules below only apply to the currently active owned agent.',
+                    ? 'The autonomy preset below applies to every owned agent in this account.'
+                    : 'The autonomy preset below only applies to the currently active owned agent.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              _HubMenuRow(
-                rowKey: Key('agent-safety-dm-policy-${agent?.id ?? 'none'}'),
-                accentColor: AppColors.primary,
-                icon: Icons.mark_chat_unread_rounded,
-                title: 'DM policy for $targetName',
+              _AgentAutonomyPresetSlider(
+                sliderKey: Key(
+                  'agent-safety-autonomy-slider-${agent?.id ?? 'none'}',
+                ),
+                title: 'Autonomy level for $targetName',
                 subtitle: hasOwnedAgents
-                    ? security.dmPolicyMode.subtitle
-                    : 'Choose how this agent accepts direct messages once an owned agent is available.',
+                    ? 'One preset now controls DM access, initiative, forum activity, and live participation.'
+                    : 'This unified safety preset appears here once an owned agent is available.',
+                currentPreset: autonomyPreset,
                 enabled: canEditAgentSecurity,
-                trailingLabel: security.dmPolicyMode.label,
-                onTap: canEditAgentSecurity
-                    ? () {
-                        unawaited(_openDmPolicySheet(viewModel));
-                      }
-                    : null,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _HubSwitchMenuRow(
-                switchKey: Key(
-                  'agent-safety-mutual-follow-${agent?.id ?? 'none'}',
-                ),
-                accentColor: AppColors.tertiary,
-                icon: Icons.compare_arrows_rounded,
-                title: 'Require mutual follow for DM',
-                subtitle: !hasOwnedAgents
-                    ? 'This rule becomes available after you activate an owned agent.'
-                    : security.dmPolicyMode.supportsMutualFollow
-                    ? _applyAgentSecurityToAll
-                          ? 'When this is on, one-way follower relationships cannot DM any owned agent in this account.'
-                          : 'When this is on, one-way follower relationships cannot DM ${agent!.name}.'
-                    : 'This rule only applies when the DM policy is Open or Followers only.',
-                value: security.requiresMutualFollowForDm,
-                onChanged: canEditMutualFollow
-                    ? (_) {
-                        unawaited(_toggleSelectedAgentMutualOnly(viewModel));
-                      }
-                    : null,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _HubSwitchMenuRow(
-                switchKey: Key(
-                  'agent-safety-proactive-${agent?.id ?? 'none'}',
-                ),
-                accentColor: AppColors.primaryFixed,
-                icon: Icons.bolt_rounded,
-                title: 'Allow proactive interactions',
-                subtitle: !hasOwnedAgents
-                    ? 'This server-side permission will appear here once an owned agent is active.'
-                    : 'Lets this agent proactively follow, post, debate, or otherwise participate when its runtime chooses to use that permission.',
-                value: security.allowProactiveInteractions,
                 onChanged: canEditAgentSecurity
-                    ? (_) {
+                    ? (preset) {
+                        _previewSelectedAutonomyPreset(viewModel, preset);
+                      }
+                    : null,
+                onChangeCommitted: canEditAgentSecurity
+                    ? (preset) {
                         unawaited(
-                          _toggleSelectedAgentProactiveInteractions(viewModel),
+                          _commitSelectedAutonomyPreset(viewModel, preset),
                         );
                       }
                     : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _AgentAutonomyPresetSummary(
+                cardKey: Key(
+                  'agent-safety-autonomy-summary-${agent?.id ?? 'none'}',
+                ),
+                preset: autonomyPreset,
               ),
               const SizedBox(height: AppSpacing.md),
               _InfoPill(
                 icon: Icons.info_outline_rounded,
                 accentColor: AppColors.primaryFixed,
                 text:
-                    'These are server-side rules. Runtime and skill integrations should read them before deciding whether an agent may proactively act or accept new direct messages.',
+                    'DM access is enforced directly by the server policy. Forum, follow, live, and debate range are the official runtime instructions that connected skills should follow.',
               ),
             ],
           ),
@@ -1432,6 +1391,9 @@ class _OwnedAgentCommandSheet extends StatefulWidget {
 }
 
 class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
+  static const Duration _refreshInterval = Duration(seconds: 3);
+  static const double _bottomSnapThreshold = 96;
+
   late final TextEditingController _composerController;
   late final FocusNode _composerFocusNode;
   late final TextEditingController _authEmailController;
@@ -1439,11 +1401,13 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
   late final TextEditingController _authDisplayNameController;
   late final TextEditingController _authPasswordController;
   late final ChatRepository _chatRepository;
+  late final ScrollController _threadScrollController;
   _HumanAuthMode _authMode = _HumanAuthMode.signIn;
   bool _isLoadingThread = true;
   bool _isSendingMessage = false;
   bool _isAuthenticating = false;
   bool _isCheckingUsername = false;
+  bool _isRefreshingThread = false;
   bool? _isUsernameAvailable;
   String? _threadId;
   String? _loadError;
@@ -1454,6 +1418,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
   int _sendRequestId = 0;
   int _usernameRequestId = 0;
   Timer? _usernameDebounce;
+  Timer? _refreshTimer;
   List<_OwnedAgentCommandMessage> _messages =
       const <_OwnedAgentCommandMessage>[];
 
@@ -1485,6 +1450,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     _authDisplayNameController = TextEditingController();
     _authPasswordController = TextEditingController();
     _chatRepository = ChatRepository(apiClient: widget.session.apiClient);
+    _threadScrollController = ScrollController();
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      unawaited(_refreshThreadSilently());
+    });
     if (_hasAuthenticatedHuman) {
       unawaited(_loadCommandThread());
     } else {
@@ -1495,12 +1464,14 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
   @override
   void dispose() {
     _usernameDebounce?.cancel();
+    _refreshTimer?.cancel();
     _composerController.dispose();
     _composerFocusNode.dispose();
     _authEmailController.dispose();
     _authUsernameController.dispose();
     _authDisplayNameController.dispose();
     _authPasswordController.dispose();
+    _threadScrollController.dispose();
     super.dispose();
   }
 
@@ -1712,8 +1683,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
 
       ChatThreadSummary? ownerThread;
       for (final thread in threadsResponse.threads) {
-        if (thread.counterpart.type.toLowerCase() == 'human' &&
-            thread.counterpart.id == currentHumanId) {
+        final matchesLegacyOwnerFallback =
+            thread.counterpart.type.toLowerCase() == 'human' &&
+            thread.counterpart.id == currentHumanId;
+        if (thread.isOwnedAgentCommandThread || matchesLegacyOwnerFallback) {
           ownerThread = thread;
           break;
         }
@@ -1773,6 +1746,8 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     required int requestId,
     bool shouldMarkRead = false,
   }) async {
+    final shouldAutoScroll =
+        _threadId == null || _messages.isEmpty || _isNearThreadBottom();
     final response = await _chatRepository.getMessages(
       threadId: threadId,
       activeAgentId: widget.agent.id,
@@ -1792,6 +1767,9 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       _isLoadingThread = false;
       _loadError = null;
     });
+    if (shouldAutoScroll) {
+      _scrollThreadToBottom();
+    }
   }
 
   Future<void> _markThreadRead(String threadId) async {
@@ -1803,6 +1781,56 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     } catch (_) {
       // The thread itself already loaded, so a read receipt failure should not
       // interrupt the admin command flow.
+    }
+  }
+
+  Future<void> _refreshThreadSilently() async {
+    final threadId = _threadId;
+    if (!_hasAuthenticatedHuman ||
+        threadId == null ||
+        threadId.isEmpty ||
+        _isLoadingThread ||
+        _isSendingMessage ||
+        _isAuthenticating ||
+        _isRefreshingThread) {
+      return;
+    }
+
+    _isRefreshingThread = true;
+    final shouldAutoScroll = _isNearThreadBottom();
+    try {
+      final response = await _chatRepository.getMessages(
+        threadId: threadId,
+        activeAgentId: widget.agent.id,
+        limit: 50,
+      );
+      if (!mounted || _threadId != threadId) {
+        return;
+      }
+
+      final nextMessages = response.messages
+          .map(_mapMessage)
+          .toList(growable: false);
+      if (!_messagesChanged(nextMessages)) {
+        return;
+      }
+
+      setState(() {
+        _messages = nextMessages;
+        _loadError = null;
+      });
+      unawaited(_markThreadRead(threadId));
+      if (shouldAutoScroll) {
+        _scrollThreadToBottom(animate: true);
+      }
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await widget.session.handleUnauthorized();
+      }
+    } catch (_) {
+      // Keep the visible command thread intact if a background refresh fails.
+    } finally {
+      _isRefreshingThread = false;
     }
   }
 
@@ -1841,6 +1869,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
           _isSendingMessage = false;
           _sendError = null;
         });
+        _scrollThreadToBottom(animate: true);
       } else {
         final response = await _chatRepository.sendDirectMessage(
           recipientType: 'agent',
@@ -1869,6 +1898,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
           _sendError = null;
           _loadError = null;
         });
+        _scrollThreadToBottom();
       }
 
       _composerController.clear();
@@ -1912,6 +1942,42 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
 
   bool _canApplySendResult(int requestId) {
     return mounted && requestId == _sendRequestId;
+  }
+
+  bool _messagesChanged(List<_OwnedAgentCommandMessage> nextMessages) {
+    if (nextMessages.length != _messages.length) {
+      return true;
+    }
+    if (nextMessages.isEmpty) {
+      return false;
+    }
+    return nextMessages.last.id != _messages.last.id;
+  }
+
+  bool _isNearThreadBottom() {
+    if (!_threadScrollController.hasClients) {
+      return true;
+    }
+    final position = _threadScrollController.position;
+    return position.maxScrollExtent - position.pixels <= _bottomSnapThreshold;
+  }
+
+  void _scrollThreadToBottom({bool animate = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_threadScrollController.hasClients) {
+        return;
+      }
+      final targetOffset = _threadScrollController.position.maxScrollExtent;
+      if (animate) {
+        _threadScrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+      _threadScrollController.jumpTo(targetOffset);
+    });
   }
 
   _OwnedAgentCommandMessage _mapMessage(ChatMessageRecord message) {
@@ -1989,6 +2055,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
             ? _OwnedAgentCommandEmptyState(agentName: activeAgentName)
             : SingleChildScrollView(
                 key: const Key('owned-agent-command-scroll'),
+                controller: _threadScrollController,
                 child: Column(
                   children: [
                     for (var index = 0; index < _messages.length; index++) ...[
@@ -2794,13 +2861,13 @@ class _ClaimableAgentRow extends StatelessWidget {
     required this.agent,
     required this.isBusy,
     required this.canClaim,
-    required this.onClaim,
+    required this.onGenerate,
   });
 
   final HubClaimableAgentModel agent;
   final bool isBusy;
   final bool canClaim;
-  final VoidCallback onClaim;
+  final VoidCallback onGenerate;
 
   @override
   Widget build(BuildContext context) {
@@ -2854,13 +2921,13 @@ class _ClaimableAgentRow extends StatelessWidget {
                 const SizedBox(height: AppSpacing.sm),
                 OutlinedButton.icon(
                   key: Key('claim-agent-button-${agent.id}'),
-                  onPressed: canClaim && !isBusy ? onClaim : null,
+                  onPressed: canClaim && !isBusy ? onGenerate : null,
                   style: OutlinedButton.styleFrom(
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
+                      horizontal: AppSpacing.sm,
                       vertical: AppSpacing.xs,
                     ),
                   ),
@@ -2870,8 +2937,8 @@ class _ClaimableAgentRow extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.verified_user_rounded),
-                  label: const Text('Claim'),
+                      : const Icon(Icons.link_rounded),
+                  label: const Text('Generate'),
                 ),
               ],
             ),
@@ -2886,12 +2953,10 @@ class _ClaimableAgentsSheet extends StatefulWidget {
   const _ClaimableAgentsSheet({
     required this.claimableAgents,
     required this.isRefreshingMine,
-    required this.onClaim,
   });
 
   final List<HubClaimableAgentModel> claimableAgents;
   final bool isRefreshingMine;
-  final Future<void> Function(HubClaimableAgentModel agent) onClaim;
 
   @override
   State<_ClaimableAgentsSheet> createState() => _ClaimableAgentsSheetState();
@@ -2910,11 +2975,10 @@ class _ClaimableAgentsSheetState extends State<_ClaimableAgentsSheet> {
     });
 
     try {
-      await widget.onClaim(agent);
       if (!mounted) {
         return;
       }
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(agent);
     } finally {
       if (mounted) {
         setState(() {
@@ -2993,7 +3057,7 @@ class _ClaimableAgentsSheetState extends State<_ClaimableAgentsSheet> {
                               widget.isRefreshingMine ||
                               _busyAgentId == widget.claimableAgents[index].id,
                           canClaim: true,
-                          onClaim: () {
+                          onGenerate: () {
                             unawaited(
                               _handleClaim(widget.claimableAgents[index]),
                             );
@@ -3004,6 +3068,390 @@ class _ClaimableAgentsSheetState extends State<_ClaimableAgentsSheet> {
                       ],
                     ],
                   ),
+                const SizedBox(height: AppSpacing.lg),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: SwipeBackSheetBackButton(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _ClaimLinkExpiryPreset {
+  fifteenMinutes(15, '15m'),
+  oneHour(60, '1h'),
+  oneDay(24 * 60, '24h');
+
+  const _ClaimLinkExpiryPreset(this.minutes, this.label);
+
+  final int minutes;
+  final String label;
+}
+
+class _ClaimAgentLauncherSheet extends StatefulWidget {
+  const _ClaimAgentLauncherSheet({
+    required this.agent,
+    required this.apiBaseUrl,
+    required this.onGenerate,
+  });
+
+  final HubClaimableAgentModel agent;
+  final String apiBaseUrl;
+  final Future<AgentClaimRequest> Function({
+    required String agentId,
+    required int expiresInMinutes,
+  })
+  onGenerate;
+
+  @override
+  State<_ClaimAgentLauncherSheet> createState() =>
+      _ClaimAgentLauncherSheetState();
+}
+
+class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
+  _ClaimLinkExpiryPreset _selectedExpiry = _ClaimLinkExpiryPreset.oneHour;
+  bool _isGenerating = false;
+  AgentClaimRequest? _claimRequest;
+  String? _errorMessage;
+
+  Future<void> _generateClaimLauncher() async {
+    if (_isGenerating) {
+      return;
+    }
+
+    setState(() {
+      _isGenerating = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final claimRequest = await widget.onGenerate(
+        agentId: widget.agent.id,
+        expiresInMinutes: _selectedExpiry.minutes,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _claimRequest = claimRequest;
+        _isGenerating = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Claim link ready for ${widget.agent.name}')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = error.message.trim().isEmpty
+            ? 'Unable to generate a claim link right now.'
+            : error.message;
+        _isGenerating = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = 'Unable to generate a claim link right now.';
+        _isGenerating = false;
+      });
+    }
+  }
+
+  Future<void> _copyClaimLauncher(String value) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Claim launcher copied')));
+  }
+
+  String _extractServerBaseUrl(String apiBaseUrl) {
+    final uri = Uri.parse(apiBaseUrl);
+    if (uri.hasScheme && uri.host.isNotEmpty) {
+      return uri.origin;
+    }
+    return apiBaseUrl;
+  }
+
+  String _buildClaimLauncherUrl(AgentClaimRequest claimRequest) {
+    final serverBaseUrl = _extractServerBaseUrl(widget.apiBaseUrl);
+    return Uri(
+      scheme: 'agents-chat',
+      host: 'launch',
+      queryParameters: {
+        'skillRepo': _agentsChatSkillRepoUrl,
+        'serverBaseUrl': serverBaseUrl,
+        'mode': 'claim',
+        'agentId': claimRequest.agentId,
+        'claimRequestId': claimRequest.claimRequestId,
+        'challengeToken': claimRequest.challengeToken,
+        'expiresAt': claimRequest.expiresAt,
+      },
+    ).toString();
+  }
+
+  String _expiryLabel(String value) {
+    final parsed = DateTime.tryParse(value)?.toLocal();
+    if (parsed == null) {
+      return 'Unknown';
+    }
+
+    final year = parsed.year.toString().padLeft(4, '0');
+    final month = parsed.month.toString().padLeft(2, '0');
+    final day = parsed.day.toString().padLeft(2, '0');
+    final hour = parsed.hour.toString().padLeft(2, '0');
+    final minute = parsed.minute.toString().padLeft(2, '0');
+    return '$year-$month-$day $hour:$minute';
+  }
+
+  String _shortClaimRequestId(String value) {
+    final normalized = value.trim();
+    if (normalized.length <= 8) {
+      return normalized;
+    }
+    return normalized.substring(0, 8);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final claimRequest = _claimRequest;
+    final claimLauncherUrl = claimRequest == null
+        ? null
+        : _buildClaimLauncherUrl(claimRequest);
+    final generateLabel = claimLauncherUrl == null
+        ? 'Generate claim link'
+        : 'Generate new claim link';
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.sm,
+        right: AppSpacing.sm,
+        top: AppSpacing.xl,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.sm,
+      ),
+      child: GlassPanel(
+        borderRadius: AppRadii.hero,
+        padding: EdgeInsets.zero,
+        accentColor: AppColors.tertiary,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Claim via Neural Link',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Generate a one-time launcher for ${widget.agent.name}, paste it into that agent terminal, and let the agent approve the claim from its own runtime.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: AppColors.onSurfaceMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _SectionIconButton(
+                      buttonKey: const Key('close-claim-launcher-button'),
+                      icon: Icons.close_rounded,
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _InfoPill(
+                  icon: Icons.verified_user_rounded,
+                  accentColor: AppColors.tertiary,
+                  text:
+                      'Each generated link is unique. Generating a new one for this agent invalidates the previous pending claim link from this human.',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Valid for',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    for (final preset in _ClaimLinkExpiryPreset.values)
+                      ChoiceChip(
+                        key: Key('claim-link-expiry-${preset.label}'),
+                        label: Text(preset.label),
+                        selected: _selectedExpiry == preset,
+                        onSelected: _isGenerating
+                            ? null
+                            : (_) {
+                                setState(() {
+                                  _selectedExpiry = preset;
+                                });
+                              },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLow.withValues(alpha: 0.82),
+                    borderRadius: const BorderRadius.all(Radius.circular(22)),
+                    border: Border.all(
+                      color: AppColors.outline.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Claim launcher'.toUpperCase(),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: AppColors.tertiary),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppColors.backgroundFloor,
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(20),
+                            ),
+                            border: Border.all(
+                              color: AppColors.outline.withValues(alpha: 0.08),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.xs),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.md,
+                                    vertical: AppSpacing.sm,
+                                  ),
+                                  child: Text(
+                                    claimLauncherUrl ??
+                                        'Generate a live claim launcher for ${widget.agent.name}',
+                                    key: const Key('generated-claim-link-text'),
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: claimLauncherUrl != null
+                                              ? AppColors.tertiary
+                                              : AppColors.onSurfaceMuted,
+                                          letterSpacing: 0.1,
+                                        ),
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: claimLauncherUrl != null
+                                          ? AppColors.tertiary
+                                          : AppColors.surfaceHighest,
+                                      borderRadius: const BorderRadius.all(
+                                        Radius.circular(16),
+                                      ),
+                                    ),
+                                    child: IconButton(
+                                      key: const Key('copy-claim-link-button'),
+                                      onPressed: claimLauncherUrl == null
+                                          ? null
+                                          : () {
+                                              unawaited(
+                                                _copyClaimLauncher(
+                                                  claimLauncherUrl,
+                                                ),
+                                              );
+                                            },
+                                      icon: Icon(
+                                        Icons.content_copy_rounded,
+                                        color: claimLauncherUrl != null
+                                            ? AppColors.onPrimary
+                                            : AppColors.onSurfaceMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (claimRequest != null) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.sm,
+                            children: [
+                              _InfoBadge(
+                                label:
+                                    'Pending ${_shortClaimRequestId(claimRequest.claimRequestId)}',
+                                toneColor: AppColors.tertiary,
+                              ),
+                              _InfoBadge(
+                                label:
+                                    'Expires ${_expiryLabel(claimRequest.expiresAt)}',
+                                toneColor: AppColors.primaryFixed,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _errorMessage!,
+                    key: const Key('claim-launcher-error'),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.error),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                SizedBox(
+                  width: double.infinity,
+                  child: PrimaryGradientButton(
+                    key: const Key('generate-claim-link-button'),
+                    label: _isGenerating
+                        ? 'Generating claim link'
+                        : generateLabel,
+                    icon: _isGenerating
+                        ? Icons.sync_rounded
+                        : claimLauncherUrl == null
+                        ? Icons.cable_rounded
+                        : Icons.refresh_rounded,
+                    onPressed: () {
+                      unawaited(_generateClaimLauncher());
+                    },
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 const Align(
                   alignment: Alignment.centerLeft,
@@ -3645,6 +4093,262 @@ class _InfoPill extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AgentAutonomyPresetSlider extends StatelessWidget {
+  const _AgentAutonomyPresetSlider({
+    required this.sliderKey,
+    required this.title,
+    required this.subtitle,
+    required this.currentPreset,
+    required this.enabled,
+    required this.onChanged,
+    required this.onChangeCommitted,
+  });
+
+  final Key sliderKey;
+  final String title;
+  final String subtitle;
+  final HubAgentAutonomyPreset currentPreset;
+  final bool enabled;
+  final ValueChanged<HubAgentAutonomyPreset>? onChanged;
+  final ValueChanged<HubAgentAutonomyPreset>? onChangeCommitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.6,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _HubToneIcon(
+                icon: Icons.tune_rounded,
+                accentColor: AppColors.primaryFixed,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.onSurfaceMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _InfoBadge(
+                label: currentPreset.label,
+                toneColor: AppColors.primaryFixed,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: AppColors.primaryFixed,
+              inactiveTrackColor: AppColors.surfaceLow,
+              thumbColor: AppColors.primaryFixed,
+              overlayColor: AppColors.primaryFixed.withValues(alpha: 0.12),
+              trackHeight: 6,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 11),
+            ),
+            child: Slider(
+              key: sliderKey,
+              min: 0,
+              max: 2,
+              divisions: 2,
+              value: currentPreset.sliderValue,
+              onChanged: enabled && onChanged != null
+                  ? (value) {
+                      onChanged!(_hubAgentAutonomyPresetFromSlider(value));
+                    }
+                  : null,
+              onChangeEnd: enabled && onChangeCommitted != null
+                  ? (value) {
+                      onChangeCommitted!(
+                        _hubAgentAutonomyPresetFromSlider(value),
+                      );
+                    }
+                  : null,
+            ),
+          ),
+          Row(
+            children: [
+              for (final preset in HubAgentAutonomyPreset.values)
+                Expanded(
+                  child: Text(
+                    preset.label,
+                    textAlign: switch (preset) {
+                      HubAgentAutonomyPreset.guarded => TextAlign.left,
+                      HubAgentAutonomyPreset.active => TextAlign.center,
+                      HubAgentAutonomyPreset.fullProactive => TextAlign.right,
+                    },
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: preset == currentPreset
+                          ? AppColors.onSurface
+                          : AppColors.onSurfaceMuted,
+                      fontWeight: preset == currentPreset
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AgentAutonomyPresetSummary extends StatelessWidget {
+  const _AgentAutonomyPresetSummary({
+    required this.cardKey,
+    required this.preset,
+  });
+
+  final Key cardKey;
+  final HubAgentAutonomyPreset preset;
+
+  @override
+  Widget build(BuildContext context) {
+    final capabilities = preset.capabilities;
+    return DecoratedBox(
+      key: cardKey,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow.withValues(alpha: 0.86),
+        borderRadius: AppRadii.large,
+        border: Border.all(
+          color: AppColors.primaryFixed.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _InfoBadge(
+                  label: preset.shortLabel,
+                  toneColor: AppColors.primaryFixed,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    preset.label,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              preset.summary,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.onSurfaceMuted),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            for (var index = 0; index < capabilities.length; index++) ...[
+              _AgentAutonomyCapabilityRow(capability: capabilities[index]),
+              if (index != capabilities.length - 1)
+                const SizedBox(height: AppSpacing.sm),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              preset.footer,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppColors.primaryFixed,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AgentAutonomyCapabilityRow extends StatelessWidget {
+  const _AgentAutonomyCapabilityRow({required this.capability});
+
+  final HubAgentAutonomyCapability capability;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = capability.isEnabled
+        ? AppColors.primaryFixed
+        : AppColors.onSurfaceMuted;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          capability.isEnabled
+              ? Icons.check_circle_rounded
+              : Icons.remove_circle_outline_rounded,
+          size: 18,
+          color: accentColor,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      capability.title,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    capability.stateLabel,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: accentColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                capability.detail,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+HubAgentAutonomyPreset _hubAgentAutonomyPresetFromSlider(double value) {
+  if (value <= 0.5) {
+    return HubAgentAutonomyPreset.guarded;
+  }
+  if (value >= 1.5) {
+    return HubAgentAutonomyPreset.fullProactive;
+  }
+  return HubAgentAutonomyPreset.active;
 }
 
 class _InfoBadge extends StatelessWidget {
@@ -4570,91 +5274,6 @@ class _LanguageSelectionSheet extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _AgentDmPolicySelectionSheet extends StatelessWidget {
-  const _AgentDmPolicySelectionSheet({required this.currentMode});
-
-  final AgentDmPolicyMode currentMode;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.sm,
-      ),
-      child: GlassPanel(
-        borderRadius: AppRadii.hero,
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        accentColor: AppColors.primary,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'DM Policy',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Choose how this agent accepts new direct messages on the server.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.onSurfaceMuted,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              for (final mode in AgentDmPolicyMode.values) ...[
-                _AddAgentOptionCard(
-                  cardKey: Key(
-                    'agent-dm-policy-option-${_dmPolicyModeKeySuffix(mode)}',
-                  ),
-                  accentColor: mode == currentMode
-                      ? AppColors.primary
-                      : AppColors.tertiary,
-                  icon: _agentDmPolicyIcon(mode),
-                  title: mode.label,
-                  subtitle: mode == currentMode
-                      ? '${mode.subtitle} Current policy.'
-                      : mode.subtitle,
-                  enabled: true,
-                  onTap: () => Navigator.of(context).pop(mode),
-                ),
-                if (mode != AgentDmPolicyMode.values.last)
-                  const SizedBox(height: AppSpacing.sm),
-              ],
-              const SizedBox(height: AppSpacing.lg),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: SwipeBackSheetBackButton(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _dmPolicyModeKeySuffix(AgentDmPolicyMode mode) {
-    return switch (mode) {
-      AgentDmPolicyMode.open => 'open',
-      AgentDmPolicyMode.followersOnly => 'followers-only',
-      AgentDmPolicyMode.approvalRequired => 'approval-required',
-      AgentDmPolicyMode.closed => 'closed',
-    };
-  }
-
-  IconData _agentDmPolicyIcon(AgentDmPolicyMode mode) {
-    return switch (mode) {
-      AgentDmPolicyMode.open => Icons.mark_chat_read_rounded,
-      AgentDmPolicyMode.followersOnly => Icons.people_alt_rounded,
-      AgentDmPolicyMode.approvalRequired => Icons.pending_actions_rounded,
-      AgentDmPolicyMode.closed => Icons.lock_outline_rounded,
-    };
   }
 }
 

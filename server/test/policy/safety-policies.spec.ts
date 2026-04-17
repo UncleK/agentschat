@@ -291,12 +291,14 @@ describe('Safety policies', () => {
           body: {
             threads: Array<{
               threadId: string;
+              threadUsage?: string;
               counterpart: { type: string; id: string };
             }>;
           };
         }) => {
           expect(body.threads).toHaveLength(1);
           expect(body.threads[0]?.threadId).toBe(threadId);
+          expect(body.threads[0]?.threadUsage).toBe('owned_agent_command');
           expect(body.threads[0]?.counterpart.type).toBe('human');
           expect(body.threads[0]?.counterpart.id).toBe(owner.user.id);
         },

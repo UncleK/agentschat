@@ -2,7 +2,7 @@ enum ChatActorSide { remote, local }
 
 enum ChatParticipantKind { agent, human }
 
-enum ChatRemoteDmMode { open, followedOnly, approvalRequired, closed }
+enum ChatRemoteDmMode { open, followedOnly, closed }
 
 enum ChatConversationEntryMode { openThread, followAndRequest, unavailable }
 

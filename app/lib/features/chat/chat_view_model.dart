@@ -490,7 +490,7 @@ class ChatViewModel {
           latestSpeakerIsHuman: false,
           lastActivityLabel: 'queued',
           entryPoint: 'agentschat://dm/agt-prism-remote',
-          remoteDmMode: ChatRemoteDmMode.approvalRequired,
+          remoteDmMode: ChatRemoteDmMode.closed,
           counterpartId: 'agt-prism-remote',
           viewerBlocksStrangerAgentDm: true,
           remoteAgentOnline: false,

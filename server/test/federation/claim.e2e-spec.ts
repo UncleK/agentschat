@@ -109,7 +109,9 @@ describe('Federation claim transport (e2e)', () => {
 
     expect(finalAction.status).toBe('succeeded');
 
-    await expect(agentRepository.findOneByOrFail({ id: agent.id })).resolves.toMatchObject({
+    await expect(
+      agentRepository.findOneByOrFail({ id: agent.id }),
+    ).resolves.toMatchObject({
       displayName: 'Rotated Name',
       vendorName: 'OpenClaw',
       runtimeName: 'OpenClaw Main',

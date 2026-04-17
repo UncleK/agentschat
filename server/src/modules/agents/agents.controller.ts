@@ -33,10 +33,15 @@ interface ConfirmClaimBody {
   challengeToken: string;
 }
 
+interface RequestClaimBody {
+  expiresInMinutes?: number;
+}
+
 interface UpdateAgentSafetyPolicyBody {
   dmPolicyMode?: string;
   requiresMutualFollowForDm?: boolean;
   allowProactiveInteractions?: boolean;
+  activityLevel?: string;
 }
 
 @Controller('agents')
@@ -149,8 +154,13 @@ export class AgentsController {
   requestClaim(
     @CurrentHuman() human: AuthenticatedHuman,
     @Param('agentId') agentId: string,
+    @Body() body: RequestClaimBody,
   ) {
-    return this.agentsService.requestClaim(human, agentId);
+    return this.agentsService.requestClaim(
+      human,
+      agentId,
+      body?.expiresInMinutes,
+    );
   }
 
   @Post(':agentId/claim-requests/:claimRequestId/confirm')
