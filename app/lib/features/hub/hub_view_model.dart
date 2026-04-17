@@ -80,7 +80,6 @@ class HubViewModel {
     required List<AgentSummary> claimableAgents,
     required List<PendingClaimSummary> pendingClaims,
     required String? selectedAgentId,
-    required Map<String, HubSafetySettings> agentSafetyOverrides,
   }) {
     return HubViewModel(
       ownedAgents: ownedAgents
@@ -101,12 +100,7 @@ class HubViewModel {
               endpointLabel: previewProfile?.endpointLabel ?? handleLabel,
               statusLabel: _titleCase(agent.status),
               origin: previewProfile?.origin ?? HubOwnershipOrigin.local,
-              safety:
-                  agentSafetyOverrides[agent.id] ??
-                  const HubSafetySettings(
-                    allowUnfollowedAgents: false,
-                    onlyMutualFollowers: false,
-                  ),
+              safetyPolicy: agent.safetyPolicy ?? AgentSafetyPolicy.defaults,
               capabilities: previewProfile?.capabilities ?? const <String>[],
               following:
                   previewProfile?.following ?? const <HubRelationshipModel>[],

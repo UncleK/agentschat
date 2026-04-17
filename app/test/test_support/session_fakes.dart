@@ -39,6 +39,7 @@ AgentSummary agentSummary({
   String? bio,
   String ownerType = 'human',
   String status = 'offline',
+  AgentSafetyPolicy? safetyPolicy,
 }) {
   return AgentSummary(
     id: id,
@@ -48,6 +49,7 @@ AgentSummary agentSummary({
     bio: bio,
     ownerType: ownerType,
     status: status,
+    safetyPolicy: safetyPolicy,
   );
 }
 
@@ -137,6 +139,13 @@ class FakeApiClient extends ApiClient {
   final Queue<
     Future<Map<String, dynamic>> Function(String, Map<String, dynamic>?)
   >
+  _patchHandlers =
+      Queue<
+        Future<Map<String, dynamic>> Function(String, Map<String, dynamic>?)
+      >();
+  final Queue<
+    Future<Map<String, dynamic>> Function(String, Map<String, dynamic>?)
+  >
   _deleteHandlers =
       Queue<
         Future<Map<String, dynamic>> Function(String, Map<String, dynamic>?)
@@ -172,6 +181,16 @@ class FakeApiClient extends ApiClient {
     _deleteHandlers.add(handler);
   }
 
+  void enqueuePatch(
+    Future<Map<String, dynamic>> Function(
+      String path,
+      Map<String, dynamic>? body,
+    )
+    handler,
+  ) {
+    _patchHandlers.add(handler);
+  }
+
   @override
   Future<Map<String, dynamic>> get(
     String path, {
@@ -183,6 +202,14 @@ class FakeApiClient extends ApiClient {
   @override
   Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? body}) {
     return _postHandlers.removeFirst()(path, body);
+  }
+
+  @override
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+  }) {
+    return _patchHandlers.removeFirst()(path, body);
   }
 
   @override
@@ -428,6 +455,22 @@ class FakeAgentsRepository extends AgentsRepository {
   final Queue<Future<Map<String, dynamic>> Function()>
   _disconnectConnectedAgentsHandlers =
       Queue<Future<Map<String, dynamic>> Function()>();
+  final Queue<Future<AgentSafetyPolicy> Function(String agentId)>
+  _readAgentSafetyPolicyHandlers =
+      Queue<Future<AgentSafetyPolicy> Function(String)>();
+  final Queue<
+    Future<AgentSafetyPolicy> Function({
+      required String agentId,
+      required AgentSafetyPolicy policy,
+    })
+  >
+  _updateAgentSafetyPolicyHandlers =
+      Queue<
+        Future<AgentSafetyPolicy> Function({
+          required String agentId,
+          required AgentSafetyPolicy policy,
+        })
+      >();
 
   void enqueueReadMine(Future<AgentsMineResponse> Function() handler) {
     _readMineHandlers.add(handler);
@@ -478,6 +521,22 @@ class FakeAgentsRepository extends AgentsRepository {
     Future<Map<String, dynamic>> Function() handler,
   ) {
     _disconnectConnectedAgentsHandlers.add(handler);
+  }
+
+  void enqueueReadAgentSafetyPolicy(
+    Future<AgentSafetyPolicy> Function(String agentId) handler,
+  ) {
+    _readAgentSafetyPolicyHandlers.add(handler);
+  }
+
+  void enqueueUpdateAgentSafetyPolicy(
+    Future<AgentSafetyPolicy> Function({
+      required String agentId,
+      required AgentSafetyPolicy policy,
+    })
+    handler,
+  ) {
+    _updateAgentSafetyPolicyHandlers.add(handler);
   }
 
   @override
@@ -531,6 +590,22 @@ class FakeAgentsRepository extends AgentsRepository {
   @override
   Future<Map<String, dynamic>> disconnectAllConnectedAgents() {
     return _disconnectConnectedAgentsHandlers.removeFirst()();
+  }
+
+  @override
+  Future<AgentSafetyPolicy> readAgentSafetyPolicy(String agentId) {
+    return _readAgentSafetyPolicyHandlers.removeFirst()(agentId);
+  }
+
+  @override
+  Future<AgentSafetyPolicy> updateAgentSafetyPolicy({
+    required String agentId,
+    required AgentSafetyPolicy policy,
+  }) {
+    return _updateAgentSafetyPolicyHandlers.removeFirst()(
+      agentId: agentId,
+      policy: policy,
+    );
   }
 }
 

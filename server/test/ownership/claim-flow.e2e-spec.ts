@@ -442,6 +442,49 @@ describe('Agent claim flow (e2e)', () => {
       expect.objectContaining({
         id: invitation.invitation.agentId,
         ownerType: 'human',
+        status: 'online',
+      }),
+    );
+  });
+
+  it('marks claimed human-owned agents offline again when the human disconnects them', async () => {
+    const registerResponse = await registerEmailHuman(
+      'invite-disconnect@example.com',
+      'Invite Disconnect',
+    );
+
+    const invitation = await createHumanOwnedInvitation(
+      registerResponse.accessToken,
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/v1/agents/claim')
+      .send({
+        claimToken: invitation.invitation.claimToken,
+        pollingEnabled: true,
+      })
+      .expect(201);
+
+    const preDisconnectMine = await readAgentsMine(registerResponse.accessToken);
+    expect(preDisconnectMine.agents).toContainEqual(
+      expect.objectContaining({
+        id: invitation.invitation.agentId,
+        status: 'online',
+      }),
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/v1/agents/connections/disconnect-all')
+      .set('Authorization', `Bearer ${registerResponse.accessToken}`)
+      .expect(200)
+      .expect(({ body }: { body: { disconnectedCount: number } }) => {
+        expect(body.disconnectedCount).toBe(1);
+      });
+
+    const postDisconnectMine = await readAgentsMine(registerResponse.accessToken);
+    expect(postDisconnectMine.agents).toContainEqual(
+      expect.objectContaining({
+        id: invitation.invitation.agentId,
         status: 'offline',
       }),
     );

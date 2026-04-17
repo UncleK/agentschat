@@ -172,10 +172,11 @@ export class FederationService {
       persistedAgent.lastSeenAt = new Date();
       persistedAgent.profileMetadata = nextProfileMetadata;
       if (
-        persistedAgent.sourceType === 'hub_invitation' &&
-        persistedAgent.status === AgentStatus.Suspended
+        persistedAgent.status === AgentStatus.Offline ||
+        (persistedAgent.sourceType === 'hub_invitation' &&
+          persistedAgent.status === AgentStatus.Suspended)
       ) {
-        persistedAgent.status = AgentStatus.Offline;
+        persistedAgent.status = AgentStatus.Online;
       }
       await agentRepository.save(persistedAgent);
 
@@ -242,8 +243,9 @@ export class FederationService {
       this.federationCredentialsService.generateAgentAccessToken(connection.id);
     connection.tokenHash =
       this.federationCredentialsService.hashValue(accessToken);
-    connection.lastSeenAt = new Date();
-    await this.agentConnectionRepository.save(connection);
+    await this.markAgentConnectionActive(agent, false, {
+      connectionTokenHash: connection.tokenHash,
+    });
 
     return {
       accessToken,
@@ -256,6 +258,8 @@ export class FederationService {
     idempotencyKeyHeader: string | undefined,
     input: SubmittedActionInput,
   ) {
+    await this.markAgentConnectionActive(agent, false);
+
     const idempotencyKey = idempotencyKeyHeader?.trim();
 
     if (!idempotencyKey) {
@@ -526,6 +530,8 @@ export class FederationService {
     const displayName = this.optionalString(action.payload.displayName);
     const avatarUrl = this.optionalNullableString(action.payload.avatarUrl);
     const bio = this.optionalNullableString(action.payload.bio);
+    const vendorName = this.optionalNullableString(action.payload.vendorName);
+    const runtimeName = this.optionalNullableString(action.payload.runtimeName);
     const isPublic = this.optionalBoolean(action.payload.isPublic);
     const profileTags = this.optionalStringArray(action.payload.tags);
     const profileMetadata = this.optionalRecord(action.payload.profileMetadata);
@@ -540,6 +546,14 @@ export class FederationService {
 
     if (bio !== undefined) {
       agent.bio = bio;
+    }
+
+    if (vendorName !== undefined) {
+      agent.vendorName = vendorName;
+    }
+
+    if (runtimeName !== undefined) {
+      agent.runtimeName = runtimeName;
     }
 
     if (typeof isPublic === 'boolean') {
@@ -565,6 +579,8 @@ export class FederationService {
           displayName: agent.displayName,
           avatarUrl: agent.avatarUrl,
           bio: agent.bio,
+          vendorName: agent.vendorName,
+          runtimeName: agent.runtimeName,
           isPublic: agent.isPublic,
           tags: agent.profileTags,
           profileMetadata: agent.profileMetadata,
@@ -609,6 +625,46 @@ export class FederationService {
         targetId: result.targetId,
       },
     };
+  }
+
+  private async markAgentConnectionActive(
+    agent: AuthenticatedFederatedAgent,
+    heartbeat: boolean,
+    options?: {
+      connectionTokenHash?: string;
+    },
+  ): Promise<void> {
+    const now = new Date();
+    const [connection, persistedAgent] = await Promise.all([
+      this.agentConnectionRepository.findOneBy({
+        id: agent.connectionId,
+        agentId: agent.id,
+      }),
+      this.agentRepository.findOneBy({
+        id: agent.id,
+      }),
+    ]);
+
+    if (connection) {
+      connection.lastSeenAt = now;
+      if (heartbeat) {
+        connection.lastHeartbeatAt = now;
+      }
+      if (options?.connectionTokenHash) {
+        connection.tokenHash = options.connectionTokenHash;
+      }
+      await this.agentConnectionRepository.save(connection);
+    }
+
+    if (!persistedAgent) {
+      return;
+    }
+
+    persistedAgent.lastSeenAt = now;
+    if (persistedAgent.status === AgentStatus.Offline) {
+      persistedAgent.status = AgentStatus.Online;
+    }
+    await this.agentRepository.save(persistedAgent);
   }
 
   private async handleDirectMessage(action: FederationActionEntity) {

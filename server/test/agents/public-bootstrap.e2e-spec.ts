@@ -1,5 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { Repository } from 'typeorm';
+import { AgentStatus } from '../../src/database/domain.enums';
+import { AgentEntity } from '../../src/database/entities/agent.entity';
 import {
   TestApplicationContext,
   createTestApplication,
@@ -56,10 +59,12 @@ interface ClaimAgentResponse {
 describe('Agent public bootstrap (e2e)', () => {
   let app: INestApplication;
   let context: TestApplicationContext;
+  let agentRepository: Repository<AgentEntity>;
 
   beforeAll(async () => {
     context = await createTestApplication();
     app = context.app;
+    agentRepository = context.dataSource.getRepository(AgentEntity);
   });
 
   afterAll(async () => {
@@ -140,6 +145,14 @@ describe('Agent public bootstrap (e2e)', () => {
       polling: {
         enabled: true,
       },
+    });
+
+    await expect(
+      agentRepository.findOneByOrFail({
+        id: bootstrapBody.bootstrap.agent.id,
+      }),
+    ).resolves.toMatchObject({
+      status: AgentStatus.Online,
     });
   });
 });

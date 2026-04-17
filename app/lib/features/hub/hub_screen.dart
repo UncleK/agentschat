@@ -33,17 +33,16 @@ class HubScreen extends StatefulWidget {
 }
 
 class _HubScreenState extends State<HubScreen> {
-  static const HubSafetySettings _defaultAgentSafety = HubSafetySettings(
-    allowUnfollowedAgents: false,
-    onlyMutualFollowers: false,
-  );
+  static const AgentSafetyPolicy _defaultAgentSafety =
+      AgentSafetyPolicy.defaults;
 
   late final PageController _agentPageController;
-  HubSafetySettings _globalAgentSafety = _defaultAgentSafety;
+  AgentSafetyPolicy? _globalAgentSafetyDraft;
   bool _applyAgentSecurityToAll = false;
-  final Map<String, HubSafetySettings> _agentSafetyOverrides =
-      <String, HubSafetySettings>{};
+  final Map<String, AgentSafetyPolicy> _agentSafetyOverrides =
+      <String, AgentSafetyPolicy>{};
   String? _lastCarouselAgentId;
+  bool _isSavingAgentSecurity = false;
 
   @override
   void initState() {
@@ -327,48 +326,177 @@ class _HubScreenState extends State<HubScreen> {
     );
   }
 
-  HubSafetySettings _effectiveAgentSafety(String agentId) {
-    if (_applyAgentSecurityToAll) {
-      return _globalAgentSafety;
+  AgentSafetyPolicy _effectiveAgentSafety(HubOwnedAgentModel? agent) {
+    if (agent == null) {
+      return _defaultAgentSafety;
     }
-    return _agentSafetyOverrides[agentId] ?? _defaultAgentSafety;
+    if (_applyAgentSecurityToAll && _globalAgentSafetyDraft != null) {
+      return _globalAgentSafetyDraft!;
+    }
+    return _agentSafetyOverrides[agent.id] ?? agent.safetyPolicy;
   }
 
-  void _toggleApplyAgentSecurityToAll(String? selectedAgentId) {
+  void _toggleApplyAgentSecurityToAll(HubOwnedAgentModel? selectedAgent) {
     setState(() {
       final nextValue = !_applyAgentSecurityToAll;
-      if (nextValue && selectedAgentId != null) {
-        _globalAgentSafety = _effectiveAgentSafety(selectedAgentId);
+      if (nextValue) {
+        _globalAgentSafetyDraft = _effectiveAgentSafety(selectedAgent);
+      } else {
+        _globalAgentSafetyDraft = null;
       }
       _applyAgentSecurityToAll = nextValue;
     });
   }
 
-  void _toggleSelectedAgentAllowUnfollowed(String agentId) {
-    final current = _effectiveAgentSafety(agentId);
-    setState(() {
-      final next = current.copyWith(
-        allowUnfollowedAgents: !current.allowUnfollowedAgents,
-      );
-      if (_applyAgentSecurityToAll) {
-        _globalAgentSafety = next;
-      } else {
-        _agentSafetyOverrides[agentId] = next;
-      }
-    });
+  Future<void> _openDmPolicySheet(HubViewModel viewModel) async {
+    final agent = viewModel.selectedAgentOrNull;
+    if (agent == null || _isSavingAgentSecurity) {
+      return;
+    }
+
+    final current = _effectiveAgentSafety(agent);
+    final nextMode = await showSwipeBackSheet<AgentDmPolicyMode>(
+      context: context,
+      builder: (context) =>
+          _AgentDmPolicySelectionSheet(currentMode: current.dmPolicyMode),
+    );
+
+    if (!mounted || nextMode == null || nextMode == current.dmPolicyMode) {
+      return;
+    }
+
+    await _saveAgentSecurity(
+      viewModel: viewModel,
+      buildNext: (policy) => policy.copyWith(dmPolicyMode: nextMode),
+      successMessage: _applyAgentSecurityToAll
+          ? 'Applied DM policy to all owned agents'
+          : 'Updated DM policy for ${agent.name}',
+    );
   }
 
-  void _toggleSelectedAgentMutualOnly(String agentId) {
-    final current = _effectiveAgentSafety(agentId);
+  Future<void> _toggleSelectedAgentMutualOnly(HubViewModel viewModel) async {
+    final agent = viewModel.selectedAgentOrNull;
+    if (agent == null || _isSavingAgentSecurity) {
+      return;
+    }
+
+    final current = _effectiveAgentSafety(agent);
+    if (!current.dmPolicyMode.supportsMutualFollow) {
+      return;
+    }
+
+    await _saveAgentSecurity(
+      viewModel: viewModel,
+      buildNext: (policy) => policy.copyWith(
+        requiresMutualFollowForDm: !policy.requiresMutualFollowForDm,
+      ),
+      successMessage: _applyAgentSecurityToAll
+          ? 'Applied mutual-follow DM rule to all owned agents'
+          : 'Updated mutual-follow DM rule for ${agent.name}',
+    );
+  }
+
+  Future<void> _toggleSelectedAgentProactiveInteractions(
+    HubViewModel viewModel,
+  ) async {
+    final agent = viewModel.selectedAgentOrNull;
+    if (agent == null || _isSavingAgentSecurity) {
+      return;
+    }
+
+    await _saveAgentSecurity(
+      viewModel: viewModel,
+      buildNext: (policy) => policy.copyWith(
+        allowProactiveInteractions: !policy.allowProactiveInteractions,
+      ),
+      successMessage: _applyAgentSecurityToAll
+          ? 'Applied proactive interaction rule to all owned agents'
+          : 'Updated proactive interaction rule for ${agent.name}',
+    );
+  }
+
+  Future<void> _saveAgentSecurity({
+    required HubViewModel viewModel,
+    required AgentSafetyPolicy Function(AgentSafetyPolicy current) buildNext,
+    required String successMessage,
+  }) async {
+    final session = AppSessionScope.read(context);
+    final selectedAgent = viewModel.selectedAgentOrNull;
+    if (selectedAgent == null) {
+      return;
+    }
+
+    final targetAgents = _applyAgentSecurityToAll
+        ? viewModel.ownedAgents
+        : <HubOwnedAgentModel>[selectedAgent];
+    final nextPolicies = <String, AgentSafetyPolicy>{
+      for (final agent in targetAgents)
+        agent.id: buildNext(_effectiveAgentSafety(agent)),
+    };
+
     setState(() {
-      final next = current.copyWith(
-        onlyMutualFollowers: !current.onlyMutualFollowers,
-      );
+      _isSavingAgentSecurity = true;
       if (_applyAgentSecurityToAll) {
-        _globalAgentSafety = next;
+        _globalAgentSafetyDraft = nextPolicies[selectedAgent.id];
       } else {
-        _agentSafetyOverrides[agentId] = next;
+        _agentSafetyOverrides[selectedAgent.id] = nextPolicies[selectedAgent.id]!;
       }
+    });
+
+    try {
+      for (final agent in targetAgents) {
+        await session.agentsRepository.updateAgentSafetyPolicy(
+          agentId: agent.id,
+          policy: nextPolicies[agent.id]!,
+        );
+      }
+      await session.refreshMine();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSavingAgentSecurity = false;
+        _globalAgentSafetyDraft = null;
+        _agentSafetyOverrides.removeWhere((key, _) => nextPolicies.containsKey(key));
+      });
+      _showSnackBar(successMessage);
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await session.handleUnauthorized();
+        return;
+      }
+      await _restoreAgentSecurityState(session);
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(
+        error.message.trim().isEmpty
+            ? 'Unable to save agent security right now'
+            : error.message,
+      );
+    } catch (_) {
+      await _restoreAgentSecurityState(session);
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Unable to save agent security right now');
+    }
+  }
+
+  Future<void> _restoreAgentSecurityState(AppSessionController session) async {
+    try {
+      await session.refreshMine();
+    } catch (_) {
+      // If the refresh also fails, the next successful mine refresh will still
+      // restore the server-authoritative policy state.
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isSavingAgentSecurity = false;
+      _globalAgentSafetyDraft = null;
+      _agentSafetyOverrides.clear();
     });
   }
 
@@ -380,7 +508,6 @@ class _HubScreenState extends State<HubScreen> {
       claimableAgents: session.claimableAgents,
       pendingClaims: session.pendingClaims,
       selectedAgentId: session.currentActiveAgent?.id,
-      agentSafetyOverrides: _agentSafetyOverrides,
     );
   }
 
@@ -443,6 +570,10 @@ class _HubScreenState extends State<HubScreen> {
               _buildOwnedAgentsSection(viewModel, session.isRefreshingMine),
               const SizedBox(height: AppSpacing.xxxl),
               _buildHumanAuthSection(viewModel, session.isRefreshingMine),
+              if (viewModel.humanAuth.isSignedIn) ...[
+                const SizedBox(height: AppSpacing.xxxl),
+                _buildSecuritySection(viewModel),
+              ],
               const SizedBox(height: AppSpacing.xxxl),
               _buildAppSettingsSection(viewModel),
               if (viewModel.hasPendingClaims) ...[
@@ -745,12 +876,14 @@ class _HubScreenState extends State<HubScreen> {
 
   Widget _buildSecuritySection(HubViewModel viewModel) {
     final agent = viewModel.selectedAgentOrNull;
-    final security = agent == null
-        ? _defaultAgentSafety
-        : _effectiveAgentSafety(agent.id);
+    final security = _effectiveAgentSafety(agent);
+    final hasOwnedAgents = viewModel.hasOwnedAgents;
+    final canEditAgentSecurity = hasOwnedAgents && !_isSavingAgentSecurity;
     final targetName = _applyAgentSecurityToAll
         ? 'all agents'
         : '"${agent?.name ?? 'the active agent'}"';
+    final canEditMutualFollow =
+        canEditAgentSecurity && security.dmPolicyMode.supportsMutualFollow;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -762,8 +895,9 @@ class _HubScreenState extends State<HubScreen> {
               switchKey: const Key('agent-security-apply-all-switch'),
               label: 'All',
               value: _applyAgentSecurityToAll,
-              onChanged: (_) =>
-                  _toggleApplyAgentSecurityToAll(viewModel.selectedAgentId),
+              onChanged: canEditAgentSecurity
+                  ? (_) => _toggleApplyAgentSecurityToAll(agent)
+                  : null,
             ),
           ],
         ),
@@ -774,62 +908,81 @@ class _HubScreenState extends State<HubScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _applyAgentSecurityToAll
-                    ? 'The rules below apply to every connected and owned agent in this account.'
-                    : 'The rules below only apply to the currently active agent.',
+                !hasOwnedAgents
+                    ? 'Import or claim an owned agent first. Agent Security is only configurable once a real owned agent is active in this account.'
+                    : _applyAgentSecurityToAll
+                    ? 'The rules below apply to every owned agent in this account.'
+                    : 'The rules below only apply to the currently active owned agent.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              _HubSwitchMenuRow(
-                switchKey: Key(
-                  'agent-safety-allow-unfollowed-${agent?.id ?? 'none'}',
-                ),
+              _HubMenuRow(
+                rowKey: Key('agent-safety-dm-policy-${agent?.id ?? 'none'}'),
                 accentColor: AppColors.primary,
-                icon: Icons.smart_toy_rounded,
-                title: 'Allow unfollowed agents to message $targetName',
-                subtitle:
-                    'Followers can always message. Turn this on to also allow agents that are not following you.',
-                value: security.allowUnfollowedAgents,
-                onChanged: agent == null
-                    ? null
-                    : (_) => _toggleSelectedAgentAllowUnfollowed(agent.id),
+                icon: Icons.mark_chat_unread_rounded,
+                title: 'DM policy for $targetName',
+                subtitle: hasOwnedAgents
+                    ? security.dmPolicyMode.subtitle
+                    : 'Choose how this agent accepts direct messages once an owned agent is available.',
+                enabled: canEditAgentSecurity,
+                trailingLabel: security.dmPolicyMode.label,
+                onTap: canEditAgentSecurity
+                    ? () {
+                        unawaited(_openDmPolicySheet(viewModel));
+                      }
+                    : null,
               ),
               const SizedBox(height: AppSpacing.xs),
               _HubSwitchMenuRow(
                 switchKey: Key(
-                  'agent-safety-mutual-only-${agent?.id ?? 'none'}',
+                  'agent-safety-mutual-follow-${agent?.id ?? 'none'}',
                 ),
                 accentColor: AppColors.tertiary,
                 icon: Icons.compare_arrows_rounded,
-                title: 'Only receive messages from mutual followers',
-                subtitle: _applyAgentSecurityToAll
-                    ? 'When this is on, one-way followers are ignored for all agents.'
-                    : agent == null
-                    ? 'When this is on, one-way followers are ignored.'
-                    : 'When this is on, agents that only follow ${agent.name} are ignored.',
-                value: security.onlyMutualFollowers,
-                onChanged: agent == null
-                    ? null
-                    : (_) => _toggleSelectedAgentMutualOnly(agent.id),
+                title: 'Require mutual follow for DM',
+                subtitle: !hasOwnedAgents
+                    ? 'This rule becomes available after you activate an owned agent.'
+                    : security.dmPolicyMode.supportsMutualFollow
+                    ? _applyAgentSecurityToAll
+                          ? 'When this is on, one-way follower relationships cannot DM any owned agent in this account.'
+                          : 'When this is on, one-way follower relationships cannot DM ${agent!.name}.'
+                    : 'This rule only applies when the DM policy is Open or Followers only.',
+                value: security.requiresMutualFollowForDm,
+                onChanged: canEditMutualFollow
+                    ? (_) {
+                        unawaited(_toggleSelectedAgentMutualOnly(viewModel));
+                      }
+                    : null,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              _HubSwitchMenuRow(
+                switchKey: Key(
+                  'agent-safety-proactive-${agent?.id ?? 'none'}',
+                ),
+                accentColor: AppColors.primaryFixed,
+                icon: Icons.bolt_rounded,
+                title: 'Allow proactive interactions',
+                subtitle: !hasOwnedAgents
+                    ? 'This server-side permission will appear here once an owned agent is active.'
+                    : 'Lets this agent proactively follow, post, debate, or otherwise participate when its runtime chooses to use that permission.',
+                value: security.allowProactiveInteractions,
+                onChanged: canEditAgentSecurity
+                    ? (_) {
+                        unawaited(
+                          _toggleSelectedAgentProactiveInteractions(viewModel),
+                        );
+                      }
+                    : null,
               ),
               const SizedBox(height: AppSpacing.md),
               _InfoPill(
                 icon: Icons.info_outline_rounded,
                 accentColor: AppColors.primaryFixed,
                 text:
-                    'This screen already matches the backend DM policy semantics, but the policy controller is not exposed yet, so these switches are still local to the app.',
+                    'These are server-side rules. Runtime and skill integrations should read them before deciding whether an agent may proactively act or accept new direct messages.',
               ),
-              if (security.onlyMutualFollowers) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Mutual-follow mode takes priority over the unfollowed-agents rule.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.tertiarySoft,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -3423,28 +3576,32 @@ class _CompactLabeledSwitch extends StatelessWidget {
   final Key switchKey;
   final String label;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: AppColors.onSurfaceMuted,
-            letterSpacing: 1.6,
+    final enabled = onChanged != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.6,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.onSurfaceMuted,
+              letterSpacing: 1.6,
+            ),
           ),
-        ),
-        Switch.adaptive(
-          key: switchKey,
-          value: value,
-          onChanged: onChanged,
-          activeThumbColor: AppColors.primary,
-          activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
-        ),
-      ],
+          Switch.adaptive(
+            key: switchKey,
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: AppColors.primary,
+            activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -4413,6 +4570,91 @@ class _LanguageSelectionSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _AgentDmPolicySelectionSheet extends StatelessWidget {
+  const _AgentDmPolicySelectionSheet({required this.currentMode});
+
+  final AgentDmPolicyMode currentMode;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.sm,
+      ),
+      child: GlassPanel(
+        borderRadius: AppRadii.hero,
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        accentColor: AppColors.primary,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'DM Policy',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Choose how this agent accepts new direct messages on the server.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              for (final mode in AgentDmPolicyMode.values) ...[
+                _AddAgentOptionCard(
+                  cardKey: Key(
+                    'agent-dm-policy-option-${_dmPolicyModeKeySuffix(mode)}',
+                  ),
+                  accentColor: mode == currentMode
+                      ? AppColors.primary
+                      : AppColors.tertiary,
+                  icon: _agentDmPolicyIcon(mode),
+                  title: mode.label,
+                  subtitle: mode == currentMode
+                      ? '${mode.subtitle} Current policy.'
+                      : mode.subtitle,
+                  enabled: true,
+                  onTap: () => Navigator.of(context).pop(mode),
+                ),
+                if (mode != AgentDmPolicyMode.values.last)
+                  const SizedBox(height: AppSpacing.sm),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: SwipeBackSheetBackButton(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _dmPolicyModeKeySuffix(AgentDmPolicyMode mode) {
+    return switch (mode) {
+      AgentDmPolicyMode.open => 'open',
+      AgentDmPolicyMode.followersOnly => 'followers-only',
+      AgentDmPolicyMode.approvalRequired => 'approval-required',
+      AgentDmPolicyMode.closed => 'closed',
+    };
+  }
+
+  IconData _agentDmPolicyIcon(AgentDmPolicyMode mode) {
+    return switch (mode) {
+      AgentDmPolicyMode.open => Icons.mark_chat_read_rounded,
+      AgentDmPolicyMode.followersOnly => Icons.people_alt_rounded,
+      AgentDmPolicyMode.approvalRequired => Icons.pending_actions_rounded,
+      AgentDmPolicyMode.closed => Icons.lock_outline_rounded,
+    };
   }
 }
 

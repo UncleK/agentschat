@@ -1,5 +1,87 @@
 import '../network/api_client.dart';
 
+enum AgentDmPolicyMode {
+  open,
+  followersOnly,
+  approvalRequired,
+  closed,
+}
+
+AgentDmPolicyMode _agentDmPolicyModeFromJson(String? value) {
+  switch (value) {
+    case 'open':
+      return AgentDmPolicyMode.open;
+    case 'followers_only':
+      return AgentDmPolicyMode.followersOnly;
+    case 'closed':
+      return AgentDmPolicyMode.closed;
+    case 'approval_required':
+    default:
+      return AgentDmPolicyMode.approvalRequired;
+  }
+}
+
+String _agentDmPolicyModeToJson(AgentDmPolicyMode value) {
+  return switch (value) {
+    AgentDmPolicyMode.open => 'open',
+    AgentDmPolicyMode.followersOnly => 'followers_only',
+    AgentDmPolicyMode.approvalRequired => 'approval_required',
+    AgentDmPolicyMode.closed => 'closed',
+  };
+}
+
+class AgentSafetyPolicy {
+  const AgentSafetyPolicy({
+    required this.dmPolicyMode,
+    required this.requiresMutualFollowForDm,
+    required this.allowProactiveInteractions,
+  });
+
+  static const defaults = AgentSafetyPolicy(
+    dmPolicyMode: AgentDmPolicyMode.approvalRequired,
+    requiresMutualFollowForDm: false,
+    allowProactiveInteractions: true,
+  );
+
+  final AgentDmPolicyMode dmPolicyMode;
+  final bool requiresMutualFollowForDm;
+  final bool allowProactiveInteractions;
+
+  AgentSafetyPolicy copyWith({
+    AgentDmPolicyMode? dmPolicyMode,
+    bool? requiresMutualFollowForDm,
+    bool? allowProactiveInteractions,
+  }) {
+    return AgentSafetyPolicy(
+      dmPolicyMode: dmPolicyMode ?? this.dmPolicyMode,
+      requiresMutualFollowForDm:
+          requiresMutualFollowForDm ?? this.requiresMutualFollowForDm,
+      allowProactiveInteractions:
+          allowProactiveInteractions ?? this.allowProactiveInteractions,
+    );
+  }
+
+  factory AgentSafetyPolicy.fromJson(Map<String, dynamic> json) {
+    return AgentSafetyPolicy(
+      dmPolicyMode: _agentDmPolicyModeFromJson(
+        json['dmPolicyMode'] as String?,
+      ),
+      requiresMutualFollowForDm:
+          json['requiresMutualFollowForDm'] as bool? ?? false,
+      allowProactiveInteractions:
+          json['allowProactiveInteractions'] as bool? ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'dmPolicyMode': _agentDmPolicyModeToJson(dmPolicyMode),
+      'requiresMutualFollowForDm': requiresMutualFollowForDm,
+      'allowProactiveInteractions': allowProactiveInteractions,
+    };
+  }
+}
+
 class AgentSummary {
   const AgentSummary({
     required this.id,
@@ -9,6 +91,7 @@ class AgentSummary {
     required this.bio,
     required this.ownerType,
     required this.status,
+    this.safetyPolicy,
   });
 
   final String id;
@@ -18,8 +101,10 @@ class AgentSummary {
   final String? bio;
   final String ownerType;
   final String status;
+  final AgentSafetyPolicy? safetyPolicy;
 
   factory AgentSummary.fromJson(Map<String, dynamic> json) {
+    final safetyPolicyJson = json['safetyPolicy'];
     return AgentSummary(
       id: json['id'] as String? ?? '',
       handle: json['handle'] as String? ?? '',
@@ -28,6 +113,9 @@ class AgentSummary {
       bio: json['bio'] as String?,
       ownerType: json['ownerType'] as String? ?? '',
       status: json['status'] as String? ?? '',
+      safetyPolicy: safetyPolicyJson is Map<String, dynamic>
+          ? AgentSafetyPolicy.fromJson(safetyPolicyJson)
+          : null,
     );
   }
 }
@@ -253,5 +341,23 @@ class AgentsRepository {
   /// Disconnect all currently connected agents owned by the authenticated human.
   Future<Map<String, dynamic>> disconnectAllConnectedAgents() async {
     return apiClient.post('/agents/connections/disconnect-all');
+  }
+
+  /// Read the current safety policy for an owned agent.
+  Future<AgentSafetyPolicy> readAgentSafetyPolicy(String agentId) async {
+    final response = await apiClient.get('/agents/$agentId/safety-policy');
+    return AgentSafetyPolicy.fromJson(response);
+  }
+
+  /// Update the current safety policy for an owned agent.
+  Future<AgentSafetyPolicy> updateAgentSafetyPolicy({
+    required String agentId,
+    required AgentSafetyPolicy policy,
+  }) async {
+    final response = await apiClient.patch(
+      '/agents/$agentId/safety-policy',
+      body: policy.toJson(),
+    );
+    return AgentSafetyPolicy.fromJson(response);
   }
 }

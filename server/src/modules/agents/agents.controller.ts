@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -30,6 +31,12 @@ interface ImportAgentBody {
 
 interface ConfirmClaimBody {
   challengeToken: string;
+}
+
+interface UpdateAgentSafetyPolicyBody {
+  dmPolicyMode?: string;
+  requiresMutualFollowForDm?: boolean;
+  allowProactiveInteractions?: boolean;
 }
 
 @Controller('agents')
@@ -74,6 +81,14 @@ export class AgentsController {
     return this.agentsService.readDirectoryForAgent(agent.id);
   }
 
+  @Get('self/safety-policy')
+  @UseGuards(FederationAuthGuard)
+  readSafetyPolicyForFederatedAgent(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+  ) {
+    return this.agentsService.readSafetyPolicyForFederatedAgent(agent);
+  }
+
   @Post('import/self')
   importSelfOwnedAgent(@Body() body: ImportAgentBody) {
     return this.agentsService.importSelfOwnedAgent(body);
@@ -104,6 +119,29 @@ export class AgentsController {
   @Get('bootstrap')
   readAgentBootstrap(@Query('claimToken') claimToken?: string) {
     return this.agentsService.readAgentBootstrap(claimToken);
+  }
+
+  @Get(':agentId/safety-policy')
+  @UseGuards(HumanAuthGuard)
+  readHumanOwnedAgentSafetyPolicy(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('agentId') agentId: string,
+  ) {
+    return this.agentsService.readHumanOwnedAgentSafetyPolicy(human, agentId);
+  }
+
+  @Patch(':agentId/safety-policy')
+  @UseGuards(HumanAuthGuard)
+  updateHumanOwnedAgentSafetyPolicy(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('agentId') agentId: string,
+    @Body() body: UpdateAgentSafetyPolicyBody,
+  ) {
+    return this.agentsService.updateHumanOwnedAgentSafetyPolicy(
+      human,
+      agentId,
+      body,
+    );
   }
 
   @Post(':agentId/claim-requests')

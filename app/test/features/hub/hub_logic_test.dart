@@ -69,6 +69,15 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    Future<void> scrollToAgentSecurity(WidgetTester tester) async {
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('agent-security-section')),
+        280,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+    }
+
     testWidgets('signed-out hub surfaces human access actions', (
       WidgetTester tester,
     ) async {
@@ -98,6 +107,324 @@ void main() {
       );
       expect(find.byKey(const Key('agent-security-section')), findsNothing);
     });
+
+    testWidgets(
+      'signed-in without owned agents shows a disabled agent security placeholder',
+      (WidgetTester tester) async {
+        await authenticateWithMine(mineResponse());
+
+        await pumpHub(tester);
+        await scrollToAgentSecurity(tester);
+
+        expect(find.byKey(const Key('agent-security-section')), findsOneWidget);
+        expect(
+          find.textContaining('Import or claim an owned agent first'),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('agent-safety-dm-policy-none')), findsOneWidget);
+
+        final applyAllSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-security-apply-all-switch')),
+        );
+        final mutualSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-safety-mutual-follow-none')),
+        );
+        final proactiveSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-safety-proactive-none')),
+        );
+
+        expect(applyAllSwitch.onChanged, isNull);
+        expect(mutualSwitch.onChanged, isNull);
+        expect(proactiveSwitch.onChanged, isNull);
+      },
+    );
+
+    testWidgets(
+      'signed-in owned agents render the real dm policy and proactive controls',
+      (WidgetTester tester) async {
+        await authenticateWithMine(
+          mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: const AgentSafetyPolicy(
+                  dmPolicyMode: AgentDmPolicyMode.followersOnly,
+                  requiresMutualFollowForDm: true,
+                  allowProactiveInteractions: true,
+                ),
+              ),
+            ],
+          ),
+        );
+
+        await pumpHub(tester);
+        await scrollToAgentSecurity(tester);
+
+        expect(
+          find.byKey(const Key('agent-safety-dm-policy-agt-owned-1')),
+          findsOneWidget,
+        );
+        expect(find.text('Followers only'), findsOneWidget);
+
+        final mutualSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-safety-mutual-follow-agt-owned-1')),
+        );
+        final proactiveSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-safety-proactive-agt-owned-1')),
+        );
+
+        expect(mutualSwitch.value, isTrue);
+        expect(mutualSwitch.onChanged, isNotNull);
+        expect(proactiveSwitch.value, isTrue);
+        expect(proactiveSwitch.onChanged, isNotNull);
+      },
+    );
+
+    testWidgets(
+      'changing dm policy persists through the live safety policy endpoint and disables mutual follow when closed',
+      (WidgetTester tester) async {
+        const initialPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.open,
+          requiresMutualFollowForDm: true,
+          allowProactiveInteractions: true,
+        );
+        const updatedPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.closed,
+          requiresMutualFollowForDm: true,
+          allowProactiveInteractions: true,
+        );
+
+        await authenticateWithMine(
+          mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: initialPolicy,
+              ),
+            ],
+          ),
+        );
+
+        agentsRepository.enqueueUpdateAgentSafetyPolicy(({
+          required agentId,
+          required policy,
+        }) async {
+          expect(agentId, 'agt-owned-1');
+          expect(policy.dmPolicyMode, AgentDmPolicyMode.closed);
+          expect(policy.requiresMutualFollowForDm, isTrue);
+          expect(policy.allowProactiveInteractions, isTrue);
+          return updatedPolicy;
+        });
+        agentsRepository.enqueueReadMine(() async {
+          return mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: updatedPolicy,
+              ),
+            ],
+          );
+        });
+
+        await pumpHub(tester);
+        await scrollToAgentSecurity(tester);
+
+        await tester.tap(find.byKey(const Key('agent-safety-dm-policy-agt-owned-1')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('agent-dm-policy-option-open')), findsOneWidget);
+        expect(
+          find.byKey(const Key('agent-dm-policy-option-followers-only')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('agent-dm-policy-option-approval-required')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('agent-dm-policy-option-closed')),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byKey(const Key('agent-dm-policy-option-closed')));
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        expect(find.text('Closed'), findsOneWidget);
+        final mutualSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-safety-mutual-follow-agt-owned-1')),
+        );
+        expect(mutualSwitch.onChanged, isNull);
+      },
+    );
+
+    testWidgets(
+      'proactive interactions toggle persists through the live safety policy endpoint',
+      (WidgetTester tester) async {
+        const initialPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.followersOnly,
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: true,
+        );
+        const updatedPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.followersOnly,
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: false,
+        );
+
+        await authenticateWithMine(
+          mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: initialPolicy,
+              ),
+            ],
+          ),
+        );
+
+        agentsRepository.enqueueUpdateAgentSafetyPolicy(({
+          required agentId,
+          required policy,
+        }) async {
+          expect(agentId, 'agt-owned-1');
+          expect(policy.dmPolicyMode, AgentDmPolicyMode.followersOnly);
+          expect(policy.requiresMutualFollowForDm, isFalse);
+          expect(policy.allowProactiveInteractions, isFalse);
+          return updatedPolicy;
+        });
+        agentsRepository.enqueueReadMine(() async {
+          return mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: updatedPolicy,
+              ),
+            ],
+          );
+        });
+
+        await pumpHub(tester);
+        await scrollToAgentSecurity(tester);
+
+        final initialSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-safety-proactive-agt-owned-1')),
+        );
+        expect(initialSwitch.value, isTrue);
+
+        await tester.tap(find.byKey(const Key('agent-safety-proactive-agt-owned-1')));
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        final updatedSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-safety-proactive-agt-owned-1')),
+        );
+        expect(updatedSwitch.value, isFalse);
+      },
+    );
+
+    testWidgets(
+      'the all toggle applies proactive interaction updates to every owned agent before refreshing mine',
+      (WidgetTester tester) async {
+        const initialPrimaryPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.open,
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: true,
+        );
+        const initialSecondaryPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.closed,
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: false,
+        );
+        const updatedPolicy = AgentSafetyPolicy(
+          dmPolicyMode: AgentDmPolicyMode.open,
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: false,
+        );
+        final updatedCalls = <String>[];
+
+        await authenticateWithMine(
+          mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: initialPrimaryPolicy,
+              ),
+              agentSummary(
+                id: 'agt-owned-2',
+                displayName: 'Owned Two',
+                safetyPolicy: initialSecondaryPolicy,
+              ),
+            ],
+          ),
+        );
+
+        agentsRepository.enqueueUpdateAgentSafetyPolicy(({
+          required agentId,
+          required policy,
+        }) async {
+          updatedCalls.add(agentId);
+          expect(policy.dmPolicyMode, AgentDmPolicyMode.open);
+          expect(policy.allowProactiveInteractions, isFalse);
+          return updatedPolicy;
+        });
+        agentsRepository.enqueueUpdateAgentSafetyPolicy(({
+          required agentId,
+          required policy,
+        }) async {
+          updatedCalls.add(agentId);
+          expect(policy.dmPolicyMode, AgentDmPolicyMode.open);
+          expect(policy.allowProactiveInteractions, isFalse);
+          return updatedPolicy;
+        });
+        agentsRepository.enqueueReadMine(() async {
+          return mineResponse(
+            agents: [
+              agentSummary(
+                id: 'agt-owned-1',
+                displayName: 'Owned One',
+                safetyPolicy: updatedPolicy,
+              ),
+              agentSummary(
+                id: 'agt-owned-2',
+                displayName: 'Owned Two',
+                safetyPolicy: updatedPolicy,
+              ),
+            ],
+          );
+        });
+
+        await pumpHub(tester);
+        await scrollToAgentSecurity(tester);
+
+        await tester.ensureVisible(
+          find.byKey(const Key('agent-security-apply-all-switch')),
+        );
+        await tester.tap(find.byKey(const Key('agent-security-apply-all-switch')));
+        await tester.pumpAndSettle();
+
+        final applyAllSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-security-apply-all-switch')),
+        );
+        expect(applyAllSwitch.value, isTrue);
+
+        await tester.tap(find.byKey(const Key('agent-safety-proactive-agt-owned-1')));
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        expect(updatedCalls, ['agt-owned-1', 'agt-owned-2']);
+        final updatedSwitch = tester.widget<Switch>(
+          find.byKey(const Key('agent-safety-proactive-agt-owned-1')),
+        );
+        expect(updatedSwitch.value, isFalse);
+      },
+    );
 
     testWidgets(
       'sign in sheet keeps the external provider entry inside the three-way auth switch',

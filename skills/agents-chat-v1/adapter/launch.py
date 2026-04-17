@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -16,7 +17,37 @@ from urllib import error, parse, request
 
 DEFAULT_STATE_ROOT = Path.home() / ".agents-chat-skill"
 DEFAULT_POLL_WAIT_SECONDS = 5
+DEFAULT_POLL_RETRY_BACKOFF_SECONDS = (1, 2, 5, 10, 20, 30)
+DEFAULT_RUNTIME_NAME = "Agents Chat Skill Adapter"
+DEFAULT_HTTP_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/135.0.0.0 Safari/537.36"
+)
 SLOT_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+class AdapterHttpError(RuntimeError):
+    def __init__(
+        self,
+        method: str,
+        url: str,
+        status_code: int,
+        details: str,
+    ) -> None:
+        self.method = method
+        self.url = url
+        self.status_code = status_code
+        self.details = details
+        super().__init__(f"HTTP {status_code} for {method} {url}: {details}")
+
+
+class AdapterNetworkError(RuntimeError):
+    def __init__(self, method: str, url: str, details: str) -> None:
+        self.method = method
+        self.url = url
+        self.details = details
+        super().__init__(f"Network error for {method} {url}: {details}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +73,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--handle", help="Optional public agent handle.")
     parser.add_argument("--display-name", help="Optional public agent display name.")
     parser.add_argument("--bio", help="Optional public agent bio.")
+    parser.add_argument("--runtime-name", help="Optional runtime display name.")
+    parser.add_argument("--vendor-name", help="Optional runtime vendor name.")
     parser.add_argument(
         "--bootstrap-path",
         help="Bound launcher bootstrap path returned by the human client.",
@@ -104,13 +137,23 @@ def normalize_slot_id(value: str) -> str:
     return normalized
 
 
-def build_headers(access_token: str | None = None) -> dict[str, str]:
+def build_headers(
+    access_token: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+) -> dict[str, str]:
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "Accept-Language": "en-US,en;q=0.9",
+        "User-Agent": (
+            os.environ.get("AGENTS_CHAT_HTTP_USER_AGENT", "").strip()
+            or DEFAULT_HTTP_USER_AGENT
+        ),
     }
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
+    if extra_headers:
+        headers.update(extra_headers)
     return headers
 
 
@@ -119,6 +162,7 @@ def http_json(
     url: str,
     payload: dict[str, Any] | None = None,
     access_token: str | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     data = None
     if payload is not None:
@@ -127,7 +171,7 @@ def http_json(
     req = request.Request(
         url,
         data=data,
-        headers=build_headers(access_token),
+        headers=build_headers(access_token, extra_headers),
         method=method,
     )
     try:
@@ -136,11 +180,9 @@ def http_json(
             return json.loads(body) if body else {}
     except error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(
-            f"HTTP {exc.code} for {method} {url}: {details}"
-        ) from exc
+        raise AdapterHttpError(method, url, exc.code, details) from exc
     except error.URLError as exc:
-        raise RuntimeError(f"Network error for {method} {url}: {exc}") from exc
+        raise AdapterNetworkError(method, url, str(exc)) from exc
 
 
 def ensure_state_dir(path: str) -> Path:
@@ -281,6 +323,8 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
         "handle",
         "display_name",
         "bio",
+        "runtime_name",
+        "vendor_name",
         "bootstrap_path",
         "claim_token",
     ):
@@ -289,6 +333,8 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
             "server_base_url": "serverBaseUrl",
             "slot": "slot",
             "display_name": "displayName",
+            "runtime_name": "runtimeName",
+            "vendor_name": "vendorName",
             "bootstrap_path": "bootstrapPath",
             "claim_token": "claimToken",
         }.get(key, key)
@@ -357,6 +403,8 @@ def send_profile_update(
     handle: str | None,
     display_name: str | None,
     bio: str | None,
+    runtime_name: str | None,
+    vendor_name: str | None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {}
     if handle:
@@ -365,28 +413,27 @@ def send_profile_update(
         payload["displayName"] = display_name
     if bio:
         payload["bio"] = bio
+    if runtime_name:
+        payload["runtimeName"] = runtime_name
+    if vendor_name:
+        payload["vendorName"] = vendor_name
 
     if not payload:
         return {}
 
     url = f"{normalize_base_url(server_base_url)}/api/v1/actions"
-    action_request = request.Request(
+    return http_json(
+        "POST",
         url,
-        data=json.dumps(
-            {
-                "type": "agent.profile.update",
-                "payload": payload,
-            }
-        ).encode("utf-8"),
-        headers={
-            **build_headers(access_token),
+        {
+            "type": "agent.profile.update",
+            "payload": payload,
+        },
+        access_token=access_token,
+        extra_headers={
             "Idempotency-Key": f"adapter-profile-{uuid.uuid4()}",
         },
-        method="POST",
     )
-    with request.urlopen(action_request, timeout=30) as response:
-        body = response.read().decode("utf-8")
-        return json.loads(body) if body else {}
 
 
 def read_directory(server_base_url: str, access_token: str) -> dict[str, Any]:
@@ -499,50 +546,87 @@ def connect_if_needed(
         "accessToken": access_token,
         "displayName": config.get("display_name"),
         "bio": config.get("bio"),
+        "runtimeName": config.get("runtime_name"),
+        "vendorName": config.get("vendor_name"),
     }
+    return next_state
 
+
+def sync_profile(state: dict[str, Any], config: dict[str, str]) -> None:
     send_profile_update(
-        next_state["serverBaseUrl"],
-        next_state["accessToken"],
+        str(state["serverBaseUrl"]),
+        str(state["accessToken"]),
         config.get("handle"),
         config.get("display_name"),
         config.get("bio"),
+        config.get("runtime_name"),
+        config.get("vendor_name"),
     )
-    return next_state
 
 
 def run_poll_loop(state: dict[str, Any], poll_once: bool, wait_seconds: int) -> None:
     server_base_url = str(state["serverBaseUrl"])
     access_token = str(state["accessToken"])
-
-    directory = read_directory(server_base_url, access_token)
-    actor = directory.get("actor", {})
-    print(
-        json.dumps(
-            {
-                "status": "connected",
-                "slot": state.get("agentSlotId"),
-                "actorType": actor.get("type"),
-                "actorId": actor.get("id"),
-                "visibleAgents": len(directory.get("agents", [])),
-            },
-            ensure_ascii=True,
-        )
-    )
+    connected_summary_printed = False
+    consecutive_failures = 0
 
     while True:
-        response = poll_deliveries(server_base_url, access_token, wait_seconds)
-        deliveries = response.get("deliveries", [])
-        if isinstance(deliveries, list) and deliveries:
-            print_delivery_summary([d for d in deliveries if isinstance(d, dict)])
-            delivery_ids = [
-                delivery.get("deliveryId")
-                for delivery in deliveries
-                if isinstance(delivery, dict)
-                and isinstance(delivery.get("deliveryId"), str)
-            ]
-            if delivery_ids:
-                ack_deliveries(server_base_url, access_token, delivery_ids)
+        try:
+            if not connected_summary_printed:
+                directory = read_directory(server_base_url, access_token)
+                actor = directory.get("actor", {})
+                print(
+                    json.dumps(
+                        {
+                            "status": "connected",
+                            "slot": state.get("agentSlotId"),
+                            "actorType": actor.get("type"),
+                            "actorId": actor.get("id"),
+                            "visibleAgents": len(directory.get("agents", [])),
+                        },
+                        ensure_ascii=True,
+                    )
+                )
+                connected_summary_printed = True
+
+            response = poll_deliveries(server_base_url, access_token, wait_seconds)
+            consecutive_failures = 0
+            deliveries = response.get("deliveries", [])
+            if isinstance(deliveries, list) and deliveries:
+                print_delivery_summary(
+                    [d for d in deliveries if isinstance(d, dict)]
+                )
+                delivery_ids = [
+                    delivery.get("deliveryId")
+                    for delivery in deliveries
+                    if isinstance(delivery, dict)
+                    and isinstance(delivery.get("deliveryId"), str)
+                ]
+                if delivery_ids:
+                    try:
+                        ack_deliveries(server_base_url, access_token, delivery_ids)
+                    except (AdapterHttpError, AdapterNetworkError) as exc:
+                        warn(
+                            "delivery ACK failed; the server may redeliver until "
+                            f"the next successful ACK. {exc}"
+                        )
+        except (AdapterHttpError, AdapterNetworkError) as exc:
+            if poll_once:
+                raise
+            if isinstance(exc, AdapterHttpError):
+                if exc.status_code == 401:
+                    raise
+                if exc.status_code == 409 and "polling_not_enabled" in exc.details:
+                    raise
+            backoff_index = min(
+                consecutive_failures,
+                len(DEFAULT_POLL_RETRY_BACKOFF_SECONDS) - 1,
+            )
+            delay_seconds = DEFAULT_POLL_RETRY_BACKOFF_SECONDS[backoff_index]
+            consecutive_failures += 1
+            warn(f"polling failed; retrying in {delay_seconds}s. {exc}")
+            time.sleep(delay_seconds)
+            continue
 
         if poll_once:
             return
@@ -555,6 +639,14 @@ def main() -> int:
     config = merge_config(args)
     mode = normalize_mode(config.get("mode"))
     config["mode"] = mode
+    config["runtime_name"] = (
+        config.get("runtime_name")
+        or os.environ.get("AGENTS_CHAT_RUNTIME_NAME", "").strip()
+        or DEFAULT_RUNTIME_NAME
+    )
+    env_vendor_name = os.environ.get("AGENTS_CHAT_VENDOR_NAME", "").strip()
+    if env_vendor_name and not config.get("vendor_name"):
+        config["vendor_name"] = env_vendor_name
 
     server_base_url = config.get("server_base_url")
     if not server_base_url:
@@ -571,7 +663,10 @@ def main() -> int:
     state["installationId"] = installation["installationId"]
     state["agentSlotId"] = slot
     state = connect_if_needed(state, config, slot)
+    state["runtimeName"] = config.get("runtime_name")
+    state["vendorName"] = config.get("vendor_name")
     save_state(state_dir, state)
+    sync_profile(state, config)
     run_poll_loop(state, args.poll_once, args.poll_wait_seconds)
     return 0
 

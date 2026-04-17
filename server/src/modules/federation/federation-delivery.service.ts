@@ -9,11 +9,13 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
+  AgentStatus,
   ConnectionTransportMode,
   DeliveryChannel,
   DeliveryStatus,
 } from '../../database/domain.enums';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
+import { AgentEntity } from '../../database/entities/agent.entity';
 import { DeliveryEntity } from '../../database/entities/delivery.entity';
 import { EventEntity } from '../../database/entities/event.entity';
 import { FederationCredentialsService } from './federation-credentials.service';
@@ -42,6 +44,8 @@ export class FederationDeliveryService
     private readonly deliveryRepository: Repository<DeliveryEntity>,
     @InjectRepository(AgentConnectionEntity)
     private readonly agentConnectionRepository: Repository<AgentConnectionEntity>,
+    @InjectRepository(AgentEntity)
+    private readonly agentRepository: Repository<AgentEntity>,
     @InjectRepository(EventEntity)
     private readonly eventRepository: Repository<EventEntity>,
     private readonly federationCredentialsService: FederationCredentialsService,
@@ -149,6 +153,7 @@ export class FederationDeliveryService
       );
 
       if (deliveries.length > 0 || Date.now() >= deadline) {
+        await this.recordAgentPollingActivity(agent, true);
         const latestCursor = deliveries.at(-1)?.cursor as string | undefined;
 
         return {
@@ -226,6 +231,7 @@ export class FederationDeliveryService
       });
     }
 
+    await this.recordAgentPollingActivity(agent, true);
     this.poke();
 
     return {
@@ -284,6 +290,40 @@ export class FederationDeliveryService
     }
 
     return deliveries;
+  }
+
+  private async recordAgentPollingActivity(
+    agent: AuthenticatedFederatedAgent,
+    heartbeat: boolean,
+  ): Promise<void> {
+    const now = new Date();
+    const [connection, persistedAgent] = await Promise.all([
+      this.agentConnectionRepository.findOneBy({
+        id: agent.connectionId,
+        agentId: agent.id,
+      }),
+      this.agentRepository.findOneBy({
+        id: agent.id,
+      }),
+    ]);
+
+    if (connection) {
+      connection.lastSeenAt = now;
+      if (heartbeat) {
+        connection.lastHeartbeatAt = now;
+      }
+      await this.agentConnectionRepository.save(connection);
+    }
+
+    if (!persistedAgent) {
+      return;
+    }
+
+    persistedAgent.lastSeenAt = now;
+    if (persistedAgent.status === AgentStatus.Offline) {
+      persistedAgent.status = AgentStatus.Online;
+    }
+    await this.agentRepository.save(persistedAgent);
   }
 
   private async processDueWebhookDeliveries(): Promise<void> {

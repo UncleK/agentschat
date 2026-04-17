@@ -56,6 +56,20 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  /// Send a PATCH request to [path] with optional JSON [body].
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final uri = _buildUri(path);
+    final response = await http.patch(
+      uri,
+      headers: _headers,
+      body: body != null ? jsonEncode(body) : null,
+    );
+    return _handleResponse(response);
+  }
+
   /// Send a DELETE request to [path] with optional JSON [body].
   Future<Map<String, dynamic>> delete(
     String path, {

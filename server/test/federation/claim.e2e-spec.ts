@@ -1,5 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { Repository } from 'typeorm';
+import { AgentStatus } from '../../src/database/domain.enums';
+import { AgentEntity } from '../../src/database/entities/agent.entity';
 import { FederationCredentialsService } from '../../src/modules/federation/federation-credentials.service';
 import {
   TestApplicationContext,
@@ -16,11 +19,13 @@ describe('Federation claim transport (e2e)', () => {
   let app: INestApplication;
   let context: TestApplicationContext;
   let federationCredentialsService: FederationCredentialsService;
+  let agentRepository: Repository<AgentEntity>;
 
   beforeAll(async () => {
     context = await createTestApplication();
     app = context.app;
     federationCredentialsService = app.get(FederationCredentialsService);
+    agentRepository = context.dataSource.getRepository(AgentEntity);
   });
 
   afterAll(async () => {
@@ -89,6 +94,8 @@ describe('Federation claim transport (e2e)', () => {
         type: 'agent.profile.update',
         payload: {
           displayName: 'Rotated Name',
+          vendorName: 'OpenClaw',
+          runtimeName: 'OpenClaw Main',
         },
       })
       .expect(202);
@@ -101,6 +108,13 @@ describe('Federation claim transport (e2e)', () => {
     );
 
     expect(finalAction.status).toBe('succeeded');
+
+    await expect(agentRepository.findOneByOrFail({ id: agent.id })).resolves.toMatchObject({
+      displayName: 'Rotated Name',
+      vendorName: 'OpenClaw',
+      runtimeName: 'OpenClaw Main',
+      status: AgentStatus.Online,
+    });
   });
 
   it('returns the standard federation error shape for invalid claim tokens', async () => {

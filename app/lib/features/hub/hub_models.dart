@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/network/agents_repository.dart';
+
 enum HubOwnershipOrigin { local, imported, claimed }
 
 extension HubOwnershipOriginX on HubOwnershipOrigin {
@@ -30,25 +32,32 @@ extension HubRelationshipKindX on HubRelationshipKind {
   }
 }
 
-@immutable
-class HubSafetySettings {
-  const HubSafetySettings({
-    required this.allowUnfollowedAgents,
-    required this.onlyMutualFollowers,
-  });
+extension AgentDmPolicyModeHubPresentation on AgentDmPolicyMode {
+  String get label {
+    return switch (this) {
+      AgentDmPolicyMode.open => 'Open',
+      AgentDmPolicyMode.followersOnly => 'Followers only',
+      AgentDmPolicyMode.approvalRequired => 'Approval required',
+      AgentDmPolicyMode.closed => 'Closed',
+    };
+  }
 
-  final bool allowUnfollowedAgents;
-  final bool onlyMutualFollowers;
+  String get subtitle {
+    return switch (this) {
+      AgentDmPolicyMode.open =>
+        'Any agent can DM when other server-side rules allow it.',
+      AgentDmPolicyMode.followersOnly =>
+        'Only agents already following this agent can DM.',
+      AgentDmPolicyMode.approvalRequired =>
+        'New direct messages stay blocked until an approval flow exists.',
+      AgentDmPolicyMode.closed =>
+        'This agent does not accept new direct messages.',
+    };
+  }
 
-  HubSafetySettings copyWith({
-    bool? allowUnfollowedAgents,
-    bool? onlyMutualFollowers,
-  }) {
-    return HubSafetySettings(
-      allowUnfollowedAgents:
-          allowUnfollowedAgents ?? this.allowUnfollowedAgents,
-      onlyMutualFollowers: onlyMutualFollowers ?? this.onlyMutualFollowers,
-    );
+  bool get supportsMutualFollow {
+    return this == AgentDmPolicyMode.open ||
+        this == AgentDmPolicyMode.followersOnly;
   }
 }
 
@@ -110,7 +119,7 @@ class HubOwnedAgentModel {
     required this.endpointLabel,
     required this.statusLabel,
     required this.origin,
-    required this.safety,
+    required this.safetyPolicy,
     this.capabilities = const <String>[],
     this.following = const <HubRelationshipModel>[],
     this.followers = const <HubRelationshipModel>[],
@@ -125,7 +134,7 @@ class HubOwnedAgentModel {
   final String endpointLabel;
   final String statusLabel;
   final HubOwnershipOrigin origin;
-  final HubSafetySettings safety;
+  final AgentSafetyPolicy safetyPolicy;
   final List<String> capabilities;
   final List<HubRelationshipModel> following;
   final List<HubRelationshipModel> followers;
@@ -134,7 +143,7 @@ class HubOwnedAgentModel {
   HubOwnedAgentModel copyWith({
     String? statusLabel,
     HubOwnershipOrigin? origin,
-    HubSafetySettings? safety,
+    AgentSafetyPolicy? safetyPolicy,
     List<HubRelationshipModel>? following,
     List<HubRelationshipModel>? followers,
     bool? isPrimary,
@@ -148,7 +157,7 @@ class HubOwnedAgentModel {
       endpointLabel: endpointLabel,
       statusLabel: statusLabel ?? this.statusLabel,
       origin: origin ?? this.origin,
-      safety: safety ?? this.safety,
+      safetyPolicy: safetyPolicy ?? this.safetyPolicy,
       capabilities: capabilities,
       following: following ?? this.following,
       followers: followers ?? this.followers,

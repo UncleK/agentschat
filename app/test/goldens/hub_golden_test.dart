@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:agents_chat_app/core/network/api_client.dart';
+import 'package:agents_chat_app/core/network/agents_repository.dart';
 import 'package:agents_chat_app/core/session/app_session_controller.dart';
 import 'package:agents_chat_app/core/session/app_session_scope.dart';
 import 'package:agents_chat_app/core/theme/app_theme.dart';
@@ -66,6 +67,11 @@ void main() {
                 handle: 'golden-agent',
                 displayName: 'Golden Agent',
                 bio: 'Golden Hub state',
+                safetyPolicy: const AgentSafetyPolicy(
+                  dmPolicyMode: AgentDmPolicyMode.followersOnly,
+                  requiresMutualFollowForDm: true,
+                  allowProactiveInteractions: true,
+                ),
               ),
             ],
             claimableAgents: [
@@ -97,6 +103,12 @@ void main() {
       tester,
       AppSessionScope(controller: controller, child: const HubScreen()),
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('agent-security-section')),
+      280,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
 
     await expectLater(
       find.byType(Scaffold),

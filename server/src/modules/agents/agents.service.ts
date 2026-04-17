@@ -35,12 +35,31 @@ import { ThreadEntity } from '../../database/entities/thread.entity';
 import { AuthenticatedHuman } from '../auth/auth.types';
 import { FederationCredentialsService } from '../federation/federation-credentials.service';
 import { FederationDeliveryService } from '../federation/federation-delivery.service';
+import type { AuthenticatedFederatedAgent } from '../federation/federation.types';
 
 interface ImportAgentInput {
   handle: string;
   displayName: string;
   avatarUrl?: string | null;
   bio?: string | null;
+}
+
+export type AgentDmPolicyMode =
+  | 'open'
+  | 'followers_only'
+  | 'approval_required'
+  | 'closed';
+
+interface UpdateAgentSafetyPolicyInput {
+  dmPolicyMode?: string;
+  requiresMutualFollowForDm?: boolean;
+  allowProactiveInteractions?: boolean;
+}
+
+export interface AgentSafetyPolicySummary {
+  dmPolicyMode: AgentDmPolicyMode;
+  requiresMutualFollowForDm: boolean;
+  allowProactiveInteractions: boolean;
 }
 
 export interface AgentSummary {
@@ -51,6 +70,7 @@ export interface AgentSummary {
   bio: string | null;
   ownerType: AgentOwnerType;
   status: AgentStatus;
+  safetyPolicy?: AgentSafetyPolicySummary;
 }
 
 export interface PendingClaimSummary {
@@ -512,6 +532,12 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     const connectionIds = agents
       .map((agent) => agent.connection?.id)
       .filter((connectionId): connectionId is string => connectionId != null);
+    const disconnectableAgentIds = agents
+      .filter(
+        (agent) =>
+          agent.connection != null && agent.status !== AgentStatus.Suspended,
+      )
+      .map((agent) => agent.id);
 
     if (connectionIds.length === 0) {
       return {
@@ -519,7 +545,19 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
-    await this.agentConnectionRepository.delete(connectionIds);
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(AgentConnectionEntity).delete(connectionIds);
+      if (disconnectableAgentIds.length > 0) {
+        await manager.getRepository(AgentEntity).update(
+          {
+            id: In(disconnectableAgentIds),
+          },
+          {
+            status: AgentStatus.Offline,
+          },
+        );
+      }
+    });
 
     return {
       disconnectedCount: connectionIds.length,
@@ -551,12 +589,80 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async readSafetyPolicyForFederatedAgent(
+    agent: AuthenticatedFederatedAgent,
+  ): Promise<AgentSafetyPolicySummary> {
+    return this.readAgentSafetyPolicy(agent.id);
+  }
+
+  async readHumanOwnedAgentSafetyPolicy(
+    owner: AuthenticatedHuman,
+    agentId: string,
+  ): Promise<AgentSafetyPolicySummary> {
+    await this.assertHumanOwnsAgent(owner.id, agentId);
+    return this.readAgentSafetyPolicy(agentId);
+  }
+
+  async updateHumanOwnedAgentSafetyPolicy(
+    owner: AuthenticatedHuman,
+    agentId: string,
+    input: UpdateAgentSafetyPolicyInput,
+  ): Promise<AgentSafetyPolicySummary> {
+    const dmPolicyMode = this.parseAgentDmPolicyMode(input.dmPolicyMode);
+    const requiresMutualFollowForDm = this.parseOptionalBooleanField(
+      input.requiresMutualFollowForDm,
+      'requiresMutualFollowForDm',
+    );
+    const allowProactiveInteractions = this.parseOptionalBooleanField(
+      input.allowProactiveInteractions,
+      'allowProactiveInteractions',
+    );
+
+    await this.dataSource.transaction(async (manager) => {
+      const agentRepository = manager.getRepository(AgentEntity);
+      const agentPolicyRepository = manager.getRepository(AgentPolicyEntity);
+      const agent = await this.assertHumanOwnsAgent(
+        owner.id,
+        agentId,
+        agentRepository,
+      );
+      let policy = await agentPolicyRepository.findOneBy({ agentId });
+
+      if (!policy) {
+        policy = agentPolicyRepository.create({ agentId });
+      }
+
+      if (dmPolicyMode !== undefined) {
+        policy.dmAcceptanceMode =
+          this.mapDmPolicyModeToAcceptanceMode(dmPolicyMode);
+      }
+      if (allowProactiveInteractions !== undefined) {
+        policy.allowProactiveInteractions = allowProactiveInteractions;
+      }
+      await agentPolicyRepository.save(policy);
+
+      if (requiresMutualFollowForDm !== undefined) {
+        agent.profileMetadata = this.setBooleanMetadata(
+          agent.profileMetadata,
+          'dmRequiresMutualFollow',
+          requiresMutualFollowForDm,
+        );
+        await agentRepository.save(agent);
+      }
+    });
+
+    return this.readAgentSafetyPolicy(agentId);
+  }
+
   async findEligibleOwnedAgents(ownerUserId: string): Promise<AgentEntity[]> {
     return this.agentRepository.find({
       where: {
         ownerType: AgentOwnerType.Human,
         ownerUserId,
         status: In([...ELIGIBLE_ACTIVE_AGENT_STATUSES]),
+      },
+      relations: {
+        policy: true,
       },
       order: {
         updatedAt: 'DESC',
@@ -795,7 +901,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private serializeAgentSummary(agent: AgentEntity): AgentSummary {
-    return {
+    const summary: AgentSummary = {
       id: agent.id,
       handle: agent.handle,
       displayName: agent.displayName,
@@ -804,6 +910,12 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       ownerType: agent.ownerType,
       status: agent.status,
     };
+
+    if (agent.policy) {
+      summary.safetyPolicy = this.serializeAgentSafetyPolicy(agent);
+    }
+
+    return summary;
   }
 
   private serializePendingClaim(
@@ -1029,6 +1141,167 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     key: string,
   ): boolean {
     return metadata[key] === true;
+  }
+
+  private setBooleanMetadata(
+    metadata: Record<string, unknown>,
+    key: string,
+    value: boolean,
+  ): Record<string, unknown> {
+    return {
+      ...metadata,
+      [key]: value,
+    };
+  }
+
+  private serializeAgentSafetyPolicy(
+    agent: AgentEntity,
+  ): AgentSafetyPolicySummary {
+    const dmAcceptanceMode =
+      agent.policy?.dmAcceptanceMode ?? AgentDmAcceptanceMode.ApprovalRequired;
+
+    return {
+      dmPolicyMode: this.mapAcceptanceModeToDmPolicyMode(dmAcceptanceMode),
+      requiresMutualFollowForDm: this.readBooleanMetadata(
+        agent.profileMetadata,
+        'dmRequiresMutualFollow',
+      ),
+      allowProactiveInteractions:
+        agent.policy?.allowProactiveInteractions ?? true,
+    };
+  }
+
+  private async readAgentSafetyPolicy(
+    agentId: string,
+  ): Promise<AgentSafetyPolicySummary> {
+    const agent = await this.loadAgentWithPolicy(agentId);
+    return this.serializeAgentSafetyPolicy(agent);
+  }
+
+  private async loadAgentWithPolicy(agentId: string): Promise<AgentEntity> {
+    let agent = await this.agentRepository.findOne({
+      where: { id: agentId },
+      relations: {
+        policy: true,
+      },
+    });
+
+    if (!agent) {
+      throw new NotFoundException(`Agent ${agentId} was not found.`);
+    }
+
+    if (agent.policy) {
+      return agent;
+    }
+
+    await this.agentPolicyRepository.save(
+      this.agentPolicyRepository.create({ agentId }),
+    );
+
+    agent = await this.agentRepository.findOne({
+      where: { id: agentId },
+      relations: {
+        policy: true,
+      },
+    });
+
+    if (!agent) {
+      throw new NotFoundException(`Agent ${agentId} was not found.`);
+    }
+
+    return agent;
+  }
+
+  private async assertHumanOwnsAgent(
+    ownerUserId: string,
+    agentId: string,
+    repository: Repository<AgentEntity> = this.agentRepository,
+  ): Promise<AgentEntity> {
+    const agent = await repository.findOneBy({
+      id: agentId,
+      ownerType: AgentOwnerType.Human,
+      ownerUserId,
+    });
+
+    if (!agent) {
+      throw new ForbiddenException(
+        'Humans may only manage safety policy for owned agents.',
+      );
+    }
+
+    return agent;
+  }
+
+  private parseAgentDmPolicyMode(
+    value: unknown,
+  ): AgentDmPolicyMode | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestException(
+        'dmPolicyMode must be open, followers_only, approval_required, or closed.',
+      );
+    }
+
+    const normalized = value.trim().toLowerCase();
+    switch (normalized) {
+      case 'open':
+      case 'followers_only':
+      case 'approval_required':
+      case 'closed':
+        return normalized;
+      default:
+        throw new BadRequestException(
+          'dmPolicyMode must be open, followers_only, approval_required, or closed.',
+        );
+    }
+  }
+
+  private parseOptionalBooleanField(
+    value: unknown,
+    fieldName: string,
+  ): boolean | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value !== 'boolean') {
+      throw new BadRequestException(`${fieldName} must be a boolean.`);
+    }
+
+    return value;
+  }
+
+  private mapAcceptanceModeToDmPolicyMode(
+    value: AgentDmAcceptanceMode,
+  ): AgentDmPolicyMode {
+    switch (value) {
+      case AgentDmAcceptanceMode.Open:
+        return 'open';
+      case AgentDmAcceptanceMode.FollowedOnly:
+        return 'followers_only';
+      case AgentDmAcceptanceMode.ApprovalRequired:
+        return 'approval_required';
+      case AgentDmAcceptanceMode.Closed:
+        return 'closed';
+    }
+  }
+
+  private mapDmPolicyModeToAcceptanceMode(
+    value: AgentDmPolicyMode,
+  ): AgentDmAcceptanceMode {
+    switch (value) {
+      case 'open':
+        return AgentDmAcceptanceMode.Open;
+      case 'followers_only':
+        return AgentDmAcceptanceMode.FollowedOnly;
+      case 'approval_required':
+        return AgentDmAcceptanceMode.ApprovalRequired;
+      case 'closed':
+        return AgentDmAcceptanceMode.Closed;
+    }
   }
 
   private buildBootstrapPath(claimToken: string): string {

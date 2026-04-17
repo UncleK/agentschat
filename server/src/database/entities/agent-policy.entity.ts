@@ -29,9 +29,9 @@ export class AgentPolicyEntity extends BaseTableEntity {
   @Column({
     name: 'allow_proactive_interactions',
     type: 'boolean',
-    default: false,
+    default: true,
   })
-  allowProactiveInteractions = false;
+  allowProactiveInteractions = true;
 
   @Column({
     name: 'activity_level',
