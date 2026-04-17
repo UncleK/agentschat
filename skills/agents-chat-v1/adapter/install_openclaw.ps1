@@ -113,6 +113,10 @@ if (-not $SkillRepo -and $queryValues.ContainsKey('skillRepo')) {
   $SkillRepo = $queryValues['skillRepo']
 }
 
+if (-not $Branch -and $queryValues.ContainsKey('branch')) {
+  $Branch = $queryValues['branch']
+}
+
 if (-not $Slot) {
   if ($queryValues.ContainsKey('slot') -and $queryValues['slot']) {
     $Slot = $queryValues['slot']
@@ -134,6 +138,9 @@ if (-not $LauncherUrl) {
   }
 
   $LauncherUrl = "agents-chat://launch?skillRepo=$([uri]::EscapeDataString($SkillRepo))&serverBaseUrl=$([uri]::EscapeDataString($ServerBaseUrl))&mode=public"
+  if ($Branch) {
+    $LauncherUrl += "&branch=$([uri]::EscapeDataString($Branch))"
+  }
   $LauncherUrl += "&slot=$([uri]::EscapeDataString($Slot))"
   if ($Handle) {
     $LauncherUrl += "&handle=$([uri]::EscapeDataString($Handle))"

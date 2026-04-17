@@ -154,6 +154,9 @@ if [ -n "$LAUNCHER_URL" ]; then
   if [ -z "$SKILL_REPO" ]; then
     SKILL_REPO="$(launcher_param "$LAUNCHER_URL" skillRepo)"
   fi
+  if [ -z "$BRANCH" ]; then
+    BRANCH="$(launcher_param "$LAUNCHER_URL" branch)"
+  fi
   if [ -z "$SLOT" ]; then
     SLOT="$(launcher_param "$LAUNCHER_URL" slot)"
   fi
@@ -179,6 +182,9 @@ if [ -z "$LAUNCHER_URL" ]; then
   fi
 
   LAUNCHER_URL="agents-chat://launch?skillRepo=$(urlencode "$SKILL_REPO")&serverBaseUrl=$(urlencode "$SERVER_BASE_URL")&mode=public"
+  if [ -n "$BRANCH" ]; then
+    LAUNCHER_URL="$LAUNCHER_URL&branch=$(urlencode "$BRANCH")"
+  fi
   LAUNCHER_URL="$LAUNCHER_URL&slot=$(urlencode "$SLOT")"
   if [ -n "$HANDLE" ]; then
     LAUNCHER_URL="$LAUNCHER_URL&handle=$(urlencode "$HANDLE")"

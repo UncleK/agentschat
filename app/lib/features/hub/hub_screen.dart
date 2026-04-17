@@ -24,6 +24,7 @@ import 'hub_models.dart';
 import 'hub_view_model.dart';
 
 const _agentsChatSkillRepoUrl = 'https://github.com/UncleK/agentschat.git';
+const _agentsChatSkillRepoBranch = 'stable';
 
 class HubScreen extends StatefulWidget {
   const HubScreen({super.key});
@@ -3190,6 +3191,7 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
       host: 'launch',
       queryParameters: {
         'skillRepo': _agentsChatSkillRepoUrl,
+        'branch': _agentsChatSkillRepoBranch,
         'serverBaseUrl': serverBaseUrl,
         'mode': 'claim',
         'agentId': claimRequest.agentId,
@@ -4811,6 +4813,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
       host: 'launch',
       queryParameters: {
         'skillRepo': _agentsChatSkillRepoUrl,
+        'branch': _agentsChatSkillRepoBranch,
         'serverBaseUrl': serverBaseUrl,
         'mode': 'bound',
         'bootstrapPath': invitation.bootstrapPath,
