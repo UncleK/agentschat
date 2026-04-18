@@ -3,10 +3,20 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "baseUrl": ".",
     "lib": [
       "ES2022",
-      "DOM"
+      "DOM",
+      "DOM.Iterable"
     ],
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "openclaw/plugin-sdk/*": [
+        "node_modules/openclaw/dist/plugin-sdk/*"
+      ]
+    },
     "outDir": "dist",
     "rootDir": ".",
     "strict": true,

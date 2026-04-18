@@ -30,6 +30,8 @@ class ForumScreen extends StatefulWidget {
   const ForumScreen({
     super.key,
     required this.initialViewModel,
+    this.initialTopicId,
+    this.topicRequestId = 0,
     this.showInlineProposeButton = true,
     this.onProposeActionChanged,
     this.onSearchActionChanged,
@@ -38,6 +40,8 @@ class ForumScreen extends StatefulWidget {
   });
 
   final ForumViewModel initialViewModel;
+  final String? initialTopicId;
+  final int topicRequestId;
   final bool showInlineProposeButton;
   final ValueChanged<VoidCallback?>? onProposeActionChanged;
   final ValueChanged<VoidCallback?>? onSearchActionChanged;
@@ -56,6 +60,7 @@ class _ForumScreenState extends State<ForumScreen> {
   bool _isUsingLiveTopics = false;
   String? _topicsErrorMessage;
   int _topicsRequestId = 0;
+  int _handledTopicRequestId = 0;
 
   @override
   void initState() {
@@ -63,6 +68,9 @@ class _ForumScreenState extends State<ForumScreen> {
     _viewModel = widget.initialViewModel;
     _syncShellProposeAction();
     _syncShellSearchAction();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_maybeHandleInitialTopicRequest());
+    });
   }
 
   @override
@@ -81,6 +89,12 @@ class _ForumScreenState extends State<ForumScreen> {
         (widget.onSearchActionChanged == null);
     if (searchRegistrationChanged) {
       _syncShellSearchAction();
+    }
+    if (oldWidget.topicRequestId != widget.topicRequestId ||
+        oldWidget.initialTopicId != widget.initialTopicId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_maybeHandleInitialTopicRequest());
+      });
     }
   }
 
@@ -108,6 +122,9 @@ class _ForumScreenState extends State<ForumScreen> {
       session.currentActiveAgent?.id ?? '',
     ].join('|');
     if (_sessionSignature == nextSignature) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_maybeHandleInitialTopicRequest());
+      });
       return;
     }
     _sessionSignature = nextSignature;
@@ -142,6 +159,40 @@ class _ForumScreenState extends State<ForumScreen> {
       }
       widget.onSearchActionChanged?.call(_openSearchSheet);
     });
+  }
+
+  Future<void> _maybeHandleInitialTopicRequest() async {
+    if (!mounted) {
+      return;
+    }
+
+    final requestId = widget.topicRequestId;
+    final targetTopicId = widget.initialTopicId?.trim();
+    if (requestId <= 0 ||
+        requestId <= _handledTopicRequestId ||
+        targetTopicId == null ||
+        targetTopicId.isEmpty) {
+      return;
+    }
+
+    var topic = _topicById(targetTopicId);
+    if (topic == null && !_isLoadingTopics) {
+      topic = await _readTopicForBellTarget(targetTopicId);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    if (topic == null) {
+      if (!_isLoadingTopics) {
+        _handledTopicRequestId = requestId;
+      }
+      return;
+    }
+
+    _handledTopicRequestId = requestId;
+    await _openTopicDetail(topic);
   }
 
   void _invalidateLiveRequests() {
@@ -299,6 +350,7 @@ class _ForumScreenState extends State<ForumScreen> {
         _topicsErrorMessage = null;
       });
       _syncShellProposeAction();
+      await _maybeHandleInitialTopicRequest();
     } on ApiException catch (error) {
       if (error.isUnauthorized && isAuthenticated) {
         await session.handleUnauthorized();
@@ -323,6 +375,7 @@ class _ForumScreenState extends State<ForumScreen> {
             : null;
       });
       _syncShellProposeAction();
+      await _maybeHandleInitialTopicRequest();
     } catch (_) {
       if (!mounted) {
         return;
@@ -341,6 +394,7 @@ class _ForumScreenState extends State<ForumScreen> {
             : null;
       });
       _syncShellProposeAction();
+      await _maybeHandleInitialTopicRequest();
     }
   }
 
@@ -393,6 +447,38 @@ class _ForumScreenState extends State<ForumScreen> {
         return topic;
       }
     }
+    return null;
+  }
+
+  Future<ForumTopicModel?> _readTopicForBellTarget(String topicId) async {
+    if (_forumRepository == null) {
+      return null;
+    }
+
+    final session = AppSessionScope.maybeOf(context);
+    try {
+      final topic =
+          session != null &&
+              session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+              session.isAuthenticated
+          ? await _forumRepository!.readTopic(threadId: topicId)
+          : await _forumRepository!.readPublicTopic(threadId: topicId);
+      if (!mounted) {
+        return null;
+      }
+      setState(() {
+        _viewModel = _viewModel.copyWith(topics: _replaceTopicInList(topic));
+      });
+      return topic;
+    } on ApiException catch (error) {
+      if (error.isUnauthorized &&
+          session != null &&
+          session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+          session.isAuthenticated) {
+        await session.handleUnauthorized();
+      }
+    } catch (_) {}
+
     return null;
   }
 
@@ -726,6 +812,9 @@ class _ForumScreenState extends State<ForumScreen> {
         _showSnackBar(error.message);
         return;
       } catch (_) {
+        if (!mounted) {
+          return;
+        }
         _showSnackBar(
           context.localizedText(
             en: 'Unable to publish this topic right now.',

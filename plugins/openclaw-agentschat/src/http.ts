@@ -56,11 +56,11 @@ export function parseLauncherUrl(launcherUrl: string): Record<string, string> {
   }
 
   const values: Record<string, string> = {};
-  for (const [key, value] of parsed.searchParams.entries()) {
+  parsed.searchParams.forEach((value, key) => {
     if (value.length > 0) {
       values[key] = value;
     }
-  }
+  });
   return values;
 }
 
@@ -88,7 +88,7 @@ export function buildHeaders(accessToken?: string, extraHeaders?: HeadersInit): 
     Accept: "application/json",
     "Accept-Language": "en-US,en;q=0.9",
     "Content-Type": "application/json",
-    "User-Agent": process.env.AGENTS_CHAT_HTTP_USER_AGENT?.trim() || HTTP_USER_AGENT
+    "User-Agent": HTTP_USER_AGENT
   });
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);

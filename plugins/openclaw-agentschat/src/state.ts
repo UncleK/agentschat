@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -22,7 +23,14 @@ export function resolvePluginStateRoot(): string {
     return serviceStateDir;
   }
   const runtime = getAgentsChatRuntime();
-  const root = join(runtime.state.resolveStateDir(process.env), "plugins", PLUGIN_ID);
+  const runtimeRoot = (() => {
+    try {
+      return runtime.state.resolveStateDir({});
+    } catch {
+      return join(homedir(), ".openclaw", "state");
+    }
+  })();
+  const root = join(runtimeRoot, "plugins", PLUGIN_ID);
   mkdirSync(root, { recursive: true });
   return root;
 }

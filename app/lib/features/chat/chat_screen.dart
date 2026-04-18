@@ -26,6 +26,8 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     this.initialViewModel,
+    this.initialConversationId,
+    this.conversationRequestId = 0,
     this.chatRepository,
     this.followRepository,
     this.liveConversationTransform,
@@ -34,6 +36,8 @@ class ChatScreen extends StatefulWidget {
   });
 
   final ChatViewModel? initialViewModel;
+  final String? initialConversationId;
+  final int conversationRequestId;
   final ChatRepository? chatRepository;
   final FollowRepository? followRepository;
   final List<ChatConversationModel> Function(
@@ -81,6 +85,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _followRequestErrorConversationId;
   String? _followRequestErrorMessage;
   Timer? _threadRefreshTimer;
+  int _handledConversationRequestId = 0;
 
   @override
   void initState() {
@@ -104,6 +109,9 @@ class _ChatScreenState extends State<ChatScreen> {
       unawaited(_refreshSelectedConversationSilently());
     });
     _syncShellSearchAction();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeHandleInitialConversationRequest();
+    });
   }
 
   @override
@@ -114,6 +122,12 @@ class _ChatScreenState extends State<ChatScreen> {
         (widget.onSearchActionChanged == null);
     if (searchRegistrationChanged) {
       _syncShellSearchAction();
+    }
+    if (oldWidget.conversationRequestId != widget.conversationRequestId ||
+        oldWidget.initialConversationId != widget.initialConversationId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeHandleInitialConversationRequest();
+      });
     }
   }
 
@@ -143,6 +157,9 @@ class _ChatScreenState extends State<ChatScreen> {
       session.currentActiveAgent?.id ?? '',
     ].join('|');
     if (_sessionSignature == nextSignature) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeHandleInitialConversationRequest();
+      });
       return;
     }
     _sessionSignature = nextSignature;
@@ -174,6 +191,32 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       widget.onSearchActionChanged?.call(_openConversationSearchSheet);
     });
+  }
+
+  void _maybeHandleInitialConversationRequest() {
+    if (!mounted) {
+      return;
+    }
+
+    final requestId = widget.conversationRequestId;
+    final targetConversationId = widget.initialConversationId?.trim();
+    if (requestId <= 0 ||
+        requestId <= _handledConversationRequestId ||
+        targetConversationId == null ||
+        targetConversationId.isEmpty) {
+      return;
+    }
+
+    final conversation = _conversationById(targetConversationId);
+    if (conversation == null) {
+      if (!_viewModel.isLoadingThreads) {
+        _handledConversationRequestId = requestId;
+      }
+      return;
+    }
+
+    _handledConversationRequestId = requestId;
+    _selectConversation(conversation);
   }
 
   void _syncConversationSearchController() {
@@ -394,6 +437,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _followRequestErrorMessage = null;
         _clearComposerDraft(unfocus: true);
       });
+      _maybeHandleInitialConversationRequest();
     } on ApiException catch (error) {
       if (error.isUnauthorized) {
         await session.handleUnauthorized();
@@ -424,6 +468,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _followRequestErrorConversationId = null;
         _followRequestErrorMessage = null;
       });
+      _maybeHandleInitialConversationRequest();
     } catch (_) {
       if (!_canApplyAgentScopedResult(
         requestId: requestId,
@@ -450,6 +495,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _followRequestErrorConversationId = null;
         _followRequestErrorMessage = null;
       });
+      _maybeHandleInitialConversationRequest();
     }
   }
 
@@ -938,8 +984,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (session.bootstrapStatus != AppSessionBootstrapStatus.ready) {
       return context.localizedText(
-        en:
-            'Wait for the current session to finish resolving before requesting access.',
+        en: 'Wait for the current session to finish resolving before requesting access.',
         zhHans: '请先等待当前会话完成恢复，再申请访问。',
       );
     }
@@ -1012,8 +1057,7 @@ class _ChatScreenState extends State<ChatScreen> {
         SnackBar(
           content: Text(
             context.localizedText(
-              en:
-                  'Following ${conversation.remoteAgentName} and queued the DM request.',
+              en: 'Following ${conversation.remoteAgentName} and queued the DM request.',
               zhHans: '已关注 ${conversation.remoteAgentName}，并把私信请求加入队列。',
             ),
           ),
@@ -1463,8 +1507,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 zhHans: '请先在 Hub 里选择一个自有智能体来加载私信。',
               )
             : context.localizedText(
-                en:
-                    'Sign in and select an owned agent in Hub to load direct messages.',
+                en: 'Sign in and select an owned agent in Hub to load direct messages.',
                 zhHans: '请先登录，并在 Hub 里选择一个自有智能体来加载私信。',
               ));
     if (_viewModel.isResolvingActiveAgent) {
@@ -1517,30 +1560,21 @@ class _ChatScreenState extends State<ChatScreen> {
         en: 'No direct threads yet',
         zhHans: '还没有私信线程',
       ),
-      message:
-          context.localizedText(
-            en:
-                'No private threads exist yet for ${_viewModel.activeAgentName ?? 'the current agent'}.',
-            zhHans:
-                '${_viewModel.activeAgentName ?? '当前智能体'} 还没有任何私密会话线程。',
-          ),
+      message: context.localizedText(
+        en: 'No private threads exist yet for ${_viewModel.activeAgentName ?? 'the current agent'}.',
+        zhHans: '${_viewModel.activeAgentName ?? '当前智能体'} 还没有任何私密会话线程。',
+      ),
     );
   }
 
   _ChatEmptyState _threadPlaceholderState() {
     if (_viewModel.hasConversations) {
       return _ChatEmptyState(
-        title: context.localizedText(
-          en: 'Select a thread',
-          zhHans: '选择一个线程',
+        title: context.localizedText(en: 'Select a thread', zhHans: '选择一个线程'),
+        message: context.localizedText(
+          en: 'Choose a direct channel for ${_viewModel.activeAgentName ?? 'the current agent'} to inspect messages.',
+          zhHans: '为 ${_viewModel.activeAgentName ?? '当前智能体'} 选择一个私信通道来查看消息。',
         ),
-        message:
-            context.localizedText(
-              en:
-                  'Choose a direct channel for ${_viewModel.activeAgentName ?? 'the current agent'} to inspect messages.',
-              zhHans:
-                  '为 ${_viewModel.activeAgentName ?? '当前智能体'} 选择一个私信通道来查看消息。',
-            ),
       );
     }
     return _railEmptyState();
@@ -1629,13 +1663,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           showDot: false,
                         ),
                       StatusChip(
-                        label:
-                            context.localizedText(
-                              en:
-                                  '${_viewModel.visibleConversations.length} active threads',
-                              zhHans:
-                                  '${_viewModel.visibleConversations.length} 个活跃线程',
-                            ),
+                        label: context.localizedText(
+                          en: '${_viewModel.visibleConversations.length} active threads',
+                          zhHans:
+                              '${_viewModel.visibleConversations.length} 个活跃线程',
+                        ),
                       ),
                       StatusChip(
                         label: _surfaceStatusLabel(selectedConversation),
@@ -2759,23 +2791,21 @@ class _ConversationSearchSheetState extends State<_ConversationSearchSheet> {
                   for (final filter in _quickFilters)
                     ActionChip(
                       key: Key('chat-search-filter-$filter'),
-                      label: Text(
-                        switch (filter) {
-                          'online' => context.localizedText(
-                            en: 'Online',
-                            zhHans: '在线',
-                          ),
-                          'mutual' => context.localizedText(
-                            en: 'Mutual',
-                            zhHans: '互相关注',
-                          ),
-                          'unread' => context.localizedText(
-                            en: 'Unread',
-                            zhHans: '未读',
-                          ),
-                          _ => filter,
-                        },
-                      ),
+                      label: Text(switch (filter) {
+                        'online' => context.localizedText(
+                          en: 'Online',
+                          zhHans: '在线',
+                        ),
+                        'mutual' => context.localizedText(
+                          en: 'Mutual',
+                          zhHans: '互相关注',
+                        ),
+                        'unread' => context.localizedText(
+                          en: 'Unread',
+                          zhHans: '未读',
+                        ),
+                        _ => filter,
+                      }),
                       onPressed: () => _selectQuery(filter),
                     ),
                 ],
@@ -3383,10 +3413,7 @@ class _ThreadTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusLabel = conversation.participantsLabel.trim().isEmpty
-        ? context.localizedText(
-            en: 'private thread',
-            zhHans: '私密线程',
-          )
+        ? context.localizedText(en: 'private thread', zhHans: '私密线程')
         : conversation.participantsLabel;
 
     return DecoratedBox(
@@ -3456,21 +3483,21 @@ class _ThreadTopBar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 7),
-                        Expanded(
-                          child: Text(
+                      Expanded(
+                        child: Text(
                           context.localeAwareCaps(statusLabel),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: AppColors.primary.withValues(alpha: 0.9),
-                                  letterSpacing: context.localeAwareLetterSpacing(
-                                    latin: 1.5,
-                                    chinese: 0.2,
-                                  ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: AppColors.primary.withValues(alpha: 0.9),
+                                letterSpacing: context.localeAwareLetterSpacing(
+                                  latin: 1.5,
+                                  chinese: 0.2,
                                 ),
-                          ),
+                              ),
                         ),
+                      ),
                     ],
                   ),
                 ],
@@ -3485,10 +3512,7 @@ class _ThreadTopBar extends StatelessWidget {
                   key: Key('chat-thread-menu-search'),
                   value: ChatThreadMenuAction.searchThread,
                   child: Text(
-                    context.localizedText(
-                      en: 'Search thread',
-                      zhHans: '搜索线程',
-                    ),
+                    context.localizedText(en: 'Search thread', zhHans: '搜索线程'),
                   ),
                 ),
                 PopupMenuItem<ChatThreadMenuAction>(

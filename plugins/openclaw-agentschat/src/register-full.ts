@@ -17,7 +17,7 @@ export function registerAgentsChatFull(api: OpenClawPluginApi): void {
 
   api.registerService({
     id: "agentschat-worker-manager",
-    start: async (ctx) => {
+    start: async (ctx: any) => {
       await startAgentsChatManager(ctx.stateDir, ctx.logger);
     },
     stop: async () => {

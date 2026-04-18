@@ -7,6 +7,7 @@ import 'core/config/app_environment.dart';
 import 'core/locale/app_localization_extensions.dart';
 import 'core/network/agents_repository.dart';
 import 'core/network/api_exception.dart';
+import 'core/network/chat_repository.dart';
 import 'core/network/notifications_repository.dart';
 import 'core/navigation/app_shell_tab.dart';
 import 'core/network/api_client.dart';
@@ -21,6 +22,7 @@ import 'core/widgets/glass_panel.dart';
 import 'core/widgets/status_chip.dart';
 import 'core/widgets/swipe_back_sheet.dart';
 import 'features/agents_hall/agents_hall_models.dart';
+import 'features/agents_hall/agents_hall_repository.dart';
 import 'features/agents_hall/agents_hall_screen.dart';
 import 'features/agents_hall/agents_hall_view_model.dart';
 import 'features/chat/chat_screen.dart';
@@ -28,8 +30,11 @@ import 'features/chat/chat_view_model.dart';
 import 'features/debate/debate_panel.dart';
 import 'features/debate/debate_screen.dart';
 import 'features/debate/debate_view_model.dart';
+import 'features/forum/forum_models.dart';
+import 'features/forum/forum_repository.dart';
 import 'features/forum/forum_screen.dart';
 import 'features/forum/forum_view_model.dart';
+import 'features/shared/owned_agent_command_sheet.dart';
 import 'features/hub/hub_screen.dart';
 
 class AgentsChatAppShell extends StatefulWidget {
@@ -49,23 +54,35 @@ class AgentsChatAppShell extends StatefulWidget {
 }
 
 class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
+  static const Duration _bellRefreshInterval = Duration(seconds: 12);
+
   AppShellTab _currentTab = AppShellTab.hall;
   final Map<AppShellTab, VoidCallback> _tabPrimaryActions =
       <AppShellTab, VoidCallback>{};
   final Map<AppShellTab, VoidCallback> _tabSearchActions =
       <AppShellTab, VoidCallback>{};
+  String? _hallDetailTargetId;
+  int _hallDetailRequestId = 0;
+  String? _chatThreadTargetId;
+  int _chatThreadRequestId = 0;
+  String? _forumTopicTargetId;
+  int _forumTopicRequestId = 0;
   String? _liveSessionTargetId;
   DebatePanel _liveInitialPanel = DebatePanel.process;
   late final AppSessionController _sessionController;
   late final NotificationsRepository _notificationsRepository;
+  late final AgentsHallRepository _hallRepository;
+  late final ForumRepository _forumRepository;
   late final bool _ownsSessionController;
+  Timer? _bellRefreshTimer;
   List<_ShellNotification> _notifications = const [];
-  List<ConnectedAgentSummary> _connectedAgents = const [];
+  List<HallAgentCardModel> _hallDirectoryAgents = const [];
   NotificationBellState _notificationBellState = NotificationBellState.empty;
   String? _notificationsErrorMessage;
-  String? _connectedAgentsErrorMessage;
+  String? _hallDirectoryErrorMessage;
   String? _notificationsUserId;
   int _notificationsRequestId = 0;
+  bool _isRefreshingBellData = false;
 
   @override
   void initState() {
@@ -87,12 +104,21 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
     _notificationsRepository =
         widget.notificationsRepository ??
         NotificationsRepository(apiClient: apiClient);
+    _hallRepository = AgentsHallRepository(apiClient: apiClient);
+    _forumRepository = ForumRepository(apiClient: apiClient);
     _sessionController.addListener(_handleSessionChanged);
+    _bellRefreshTimer = Timer.periodic(_bellRefreshInterval, (_) {
+      final userId = _liveNotificationsUserId;
+      if (userId != null) {
+        unawaited(_refreshNotifications(userId: userId));
+      }
+    });
     unawaited(_sessionController.bootstrap());
   }
 
   @override
   void dispose() {
+    _bellRefreshTimer?.cancel();
     _sessionController.removeListener(_handleSessionChanged);
     if (_ownsSessionController) {
       _sessionController.dispose();
@@ -109,11 +135,9 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       _currentTab = tab;
     });
 
-    if (tab == AppShellTab.live) {
-      final userId = _liveNotificationsUserId;
-      if (userId != null) {
-        unawaited(_refreshNotifications(userId: userId));
-      }
+    final userId = _liveNotificationsUserId;
+    if (userId != null) {
+      unawaited(_refreshNotifications(userId: userId));
     }
   }
 
@@ -131,6 +155,55 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
     if (userId != null) {
       unawaited(_refreshNotifications(userId: userId));
     }
+  }
+
+  void _openHallAgentDetail(String agentId) {
+    setState(() {
+      _currentTab = AppShellTab.hall;
+      _hallDetailTargetId = agentId;
+      _hallDetailRequestId += 1;
+    });
+  }
+
+  void _openChatThread(String threadId) {
+    setState(() {
+      _currentTab = AppShellTab.chat;
+      _chatThreadTargetId = threadId;
+      _chatThreadRequestId += 1;
+    });
+  }
+
+  void _openForumTopic(String topicId) {
+    setState(() {
+      _currentTab = AppShellTab.forum;
+      _forumTopicTargetId = topicId;
+      _forumTopicRequestId += 1;
+    });
+  }
+
+  Future<void> _openOwnedAgentPrivateChat(String agentId) async {
+    final ownedAgent = _ownedAgentById(agentId);
+    if (ownedAgent == null) {
+      return;
+    }
+
+    setState(() {
+      _currentTab = AppShellTab.hub;
+    });
+
+    await showOwnedAgentCommandSheet(
+      context: context,
+      session: _sessionController,
+      agent: OwnedAgentCommandTarget(
+        id: ownedAgent.id,
+        name: ownedAgent.displayName.trim().isEmpty
+            ? ownedAgent.handle
+            : ownedAgent.displayName,
+        handle: ownedAgent.handle.trim().isEmpty
+            ? ownedAgent.id
+            : ownedAgent.handle,
+      ),
+    );
   }
 
   void _setTabPrimaryAction(AppShellTab tab, VoidCallback? action) {
@@ -179,10 +252,6 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
     });
   }
 
-  bool get _hasUnreadNotifications => _notificationBellState.hasUnread;
-  bool get _hasConnectedAgents => _connectedAgents.isNotEmpty;
-  bool get _hasBellHighlight => _hasUnreadNotifications || _hasConnectedAgents;
-
   String? get _liveNotificationsUserId {
     if (_sessionController.bootstrapStatus != AppSessionBootstrapStatus.ready ||
         !_sessionController.isAuthenticated) {
@@ -196,12 +265,78 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
     return userId;
   }
 
+  String? get _activeBellAgentId {
+    if (_sessionController.bootstrapStatus != AppSessionBootstrapStatus.ready ||
+        !_sessionController.isAuthenticated) {
+      return null;
+    }
+
+    final activeAgentId = _sessionController.currentActiveAgent?.id;
+    if (activeAgentId == null || activeAgentId.isEmpty) {
+      return null;
+    }
+    return activeAgentId;
+  }
+
+  Set<String> get _ownedAgentIds => _sessionController
+      .currentActiveAgentCandidates
+      .map((agent) => agent.id.trim())
+      .where((id) => id.isNotEmpty)
+      .toSet();
+
+  AgentSummary? _ownedAgentById(String agentId) {
+    for (final agent in _sessionController.currentActiveAgentCandidates) {
+      if (agent.id == agentId) {
+        return agent;
+      }
+    }
+    return null;
+  }
+
+  List<HallAgentCardModel> get _hallBellAgents => _hallDirectoryAgents
+      .where((agent) => agent.viewerFollowsAgent && !agent.isOffline)
+      .toList(growable: false);
+
+  List<_ThreadBellGroup> get _chatBellThreads =>
+      _ThreadBellGroup.groupForActiveAgent(
+        _notifications,
+        activeAgentId: _activeBellAgentId,
+        currentHumanId: _sessionController.currentUser?.id,
+        ownedAgentIds: _ownedAgentIds,
+      );
+
+  List<_ForumBellGroup> get _forumBellTopics =>
+      _ForumBellGroup.group(_notifications);
+
+  List<_ShellNotification> get _debateNotifications => _notifications
+      .where((notification) => notification.kind == 'debate.activity')
+      .toList(growable: false);
+
+  List<_LiveDebateAlert> get _activeLiveDebateAlerts =>
+      _LiveDebateAlert.groupActive(_debateNotifications);
+
+  List<_OwnedAgentBellGroup> get _hubBellAgents => _OwnedAgentBellGroup.group(
+    _notifications,
+    ownedAgentLookup: _ownedAgentById,
+    ownedAgentIds: _ownedAgentIds,
+  );
+
+  bool _hasBellHighlightFor(AppShellTab tab) {
+    return switch (tab) {
+      AppShellTab.hall => _hallBellAgents.isNotEmpty,
+      AppShellTab.chat => _chatBellThreads.isNotEmpty,
+      AppShellTab.forum => _forumBellTopics.isNotEmpty,
+      AppShellTab.live => _activeLiveDebateAlerts.isNotEmpty,
+      AppShellTab.hub => _hubBellAgents.isNotEmpty,
+    };
+  }
+
   void _handleSessionChanged() {
     final nextUserId = _liveNotificationsUserId;
     if (nextUserId == null) {
       if (_notificationsUserId == null &&
           _notifications.isEmpty &&
-          _connectedAgents.isEmpty &&
+          _hallDirectoryAgents.isEmpty &&
           !_notificationBellState.hasUnread) {
         return;
       }
@@ -209,10 +344,10 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       setState(() {
         _notificationsUserId = null;
         _notifications = const [];
-        _connectedAgents = const [];
+        _hallDirectoryAgents = const [];
         _notificationBellState = NotificationBellState.empty;
         _notificationsErrorMessage = null;
-        _connectedAgentsErrorMessage = null;
+        _hallDirectoryErrorMessage = null;
       });
       return;
     }
@@ -232,37 +367,58 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
   }
 
   Future<void> _refreshNotifications({required String userId}) async {
+    if (_isRefreshingBellData) {
+      return;
+    }
+
+    _isRefreshingBellData = true;
     final requestId = ++_notificationsRequestId;
-    var nextConnectedAgents = _connectedAgents;
-    String? nextConnectedAgentsError = _connectedAgentsErrorMessage;
+    var nextHallDirectoryAgents = _hallDirectoryAgents;
+    String? nextHallDirectoryError = _hallDirectoryErrorMessage;
     var nextNotifications = _notifications;
     var nextBellState = _notificationBellState;
     String? nextNotificationsError = _notificationsErrorMessage;
+    final activeAgentId = _activeBellAgentId;
 
     try {
-      final connectedResponse = await _sessionController.agentsRepository
-          .readConnectedAgents();
-      nextConnectedAgents = connectedResponse.connectedAgents;
-      nextConnectedAgentsError = null;
+      if (activeAgentId != null) {
+        final hallViewModel = await _hallRepository.readDirectory(
+          activeAgentId: activeAgentId,
+        );
+        nextHallDirectoryAgents = hallViewModel.agents;
+        nextHallDirectoryError = null;
+      } else {
+        nextHallDirectoryAgents = const [];
+        nextHallDirectoryError = null;
+      }
     } on ApiException catch (error) {
       if (!_canApplyNotificationsResult(requestId, userId)) {
+        _isRefreshingBellData = false;
         return;
       }
 
       if (error.isUnauthorized) {
+        _isRefreshingBellData = false;
         await _sessionController.handleUnauthorized();
         return;
       }
 
-      nextConnectedAgentsError =
-          context.l10n.shellConnectedAgentsUnavailable;
+      // ignore: use_build_context_synchronously
+      nextHallDirectoryError = context.localizedText(
+        en: 'Unable to refresh followed agents right now.',
+        zhHans: '暂时无法刷新关注智能体列表。',
+      );
     } catch (_) {
       if (!_canApplyNotificationsResult(requestId, userId)) {
+        _isRefreshingBellData = false;
         return;
       }
 
-      nextConnectedAgentsError =
-          context.l10n.shellConnectedAgentsUnavailable;
+      // ignore: use_build_context_synchronously
+      nextHallDirectoryError = context.localizedText(
+        en: 'Unable to refresh followed agents right now.',
+        zhHans: '暂时无法刷新关注智能体列表。',
+      );
     }
 
     try {
@@ -275,46 +431,73 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       nextNotificationsError = null;
     } on ApiException catch (error) {
       if (!_canApplyNotificationsResult(requestId, userId)) {
+        _isRefreshingBellData = false;
         return;
       }
 
       if (error.isUnauthorized) {
+        _isRefreshingBellData = false;
         await _sessionController.handleUnauthorized();
         return;
       }
 
+      // ignore: use_build_context_synchronously
       nextNotificationsError = context.l10n.shellNotificationsUnavailable;
     } catch (_) {
       if (!_canApplyNotificationsResult(requestId, userId)) {
+        _isRefreshingBellData = false;
         return;
       }
 
+      // ignore: use_build_context_synchronously
       nextNotificationsError = context.l10n.shellNotificationsUnavailable;
     }
 
     if (!_canApplyNotificationsResult(requestId, userId)) {
+      _isRefreshingBellData = false;
       return;
     }
 
     setState(() {
-      _connectedAgents = nextConnectedAgents;
-      _connectedAgentsErrorMessage = nextConnectedAgentsError;
+      _hallDirectoryAgents = nextHallDirectoryAgents;
+      _hallDirectoryErrorMessage = nextHallDirectoryError;
       _notifications = nextNotifications;
       _notificationBellState = nextBellState;
       _notificationsErrorMessage = nextNotificationsError;
     });
+    _isRefreshingBellData = false;
   }
 
-  Future<bool> _markNotificationsRead({required String userId}) async {
+  Future<bool> _markNotificationIdsRead({
+    required String userId,
+    required List<String> notificationIds,
+  }) async {
+    if (notificationIds.isEmpty) {
+      return true;
+    }
+
     final requestId = ++_notificationsRequestId;
     try {
-      final bellState = await _notificationsRepository.markRead(markAll: true);
+      final unreadIds = notificationIds
+          .map((id) => id.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final bellState = await _notificationsRepository.markRead(
+        notificationIds: unreadIds.toList(growable: false),
+      );
       if (!_canApplyNotificationsResult(requestId, userId)) {
         return false;
       }
 
       setState(() {
         _notificationBellState = bellState;
+        _notifications = _notifications
+            .map(
+              (notification) => unreadIds.contains(notification.id)
+                  ? notification.copyWith(isUnread: false)
+                  : notification,
+            )
+            .toList(growable: false);
         _notificationsErrorMessage = null;
       });
       return true;
@@ -325,33 +508,44 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       }
 
       if (mounted) {
-          setState(() {
-            _notificationsErrorMessage =
-                context.l10n.shellNotificationsUnavailable;
-          });
-        }
+        setState(() {
+          _notificationsErrorMessage =
+              context.l10n.shellNotificationsUnavailable;
+        });
+      }
       return false;
     } catch (_) {
       if (mounted) {
         setState(() {
-            _notificationsErrorMessage =
-                context.l10n.shellNotificationsUnavailable;
+          _notificationsErrorMessage =
+              context.l10n.shellNotificationsUnavailable;
         });
       }
       return false;
     }
   }
 
-  List<_ShellNotification> get _debateNotifications => _notifications
-      .where((notification) => notification.kind == 'debate.activity')
-      .toList(growable: false);
+  Future<void> _openCurrentBellSheet() async {
+    switch (_currentTab) {
+      case AppShellTab.hall:
+        await _openHallBellSheet();
+        return;
+      case AppShellTab.chat:
+        await _openChatBellSheet();
+        return;
+      case AppShellTab.forum:
+        await _openForumBellSheet();
+        return;
+      case AppShellTab.live:
+        await _openLiveDebateCenter();
+        return;
+      case AppShellTab.hub:
+        await _openHubBellSheet();
+        return;
+    }
+  }
 
-  List<_LiveDebateAlert> get _activeLiveDebateAlerts =>
-      _LiveDebateAlert.groupActive(_debateNotifications);
-
-  bool get _hasActiveLiveDebateAlerts => _activeLiveDebateAlerts.isNotEmpty;
-
-  Future<void> _openNotificationCenter() async {
+  Future<void> _openHallBellSheet() async {
     final userId = _liveNotificationsUserId;
     if (userId != null) {
       await _refreshNotifications(userId: userId);
@@ -360,26 +554,242 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       return;
     }
 
-    final shouldMarkRead =
-        userId != null &&
-        _notifications.any((notification) => notification.isUnread);
-    await showSwipeBackSheet<void>(
-      context: context,
-      builder: (context) => _NotificationCenterSheet(
-        connectedAgents: _connectedAgents,
-        notifications: _notifications,
-        hasBellHighlight: _hasBellHighlight,
-        isAuthenticated: userId != null,
-        notificationsErrorMessage: _notificationsErrorMessage,
-        connectedAgentsErrorMessage: _connectedAgentsErrorMessage,
-      ),
-    );
+    final navigationTarget =
+        await showSwipeBackSheet<_BellSheetNavigationTarget>(
+          context: context,
+          builder: (context) => _HallBellSheet(
+            agents: _hallBellAgents,
+            isAuthenticated: userId != null,
+            errorMessage: _hallDirectoryErrorMessage,
+            activeAgentName:
+                _sessionController.currentActiveAgent?.displayName.isNotEmpty ==
+                    true
+                ? _sessionController.currentActiveAgent!.displayName
+                : _sessionController.currentActiveAgent?.handle,
+          ),
+        );
 
-    if (!mounted || !shouldMarkRead) {
+    if (!mounted || navigationTarget == null) {
       return;
     }
 
-    final didMarkRead = await _markNotificationsRead(userId: userId);
+    if (navigationTarget.type == _BellSheetNavigationTargetType.hallAgent) {
+      _openHallAgentDetail(navigationTarget.targetId);
+    }
+  }
+
+  Future<void> _openChatBellSheet() async {
+    final userId = _liveNotificationsUserId;
+    if (userId != null) {
+      await _refreshNotifications(userId: userId);
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final threadLookup = await _readChatBellThreadLookup();
+    if (!mounted) {
+      return;
+    }
+
+    final chatThreads = _ThreadBellGroup.groupForActiveAgent(
+      _notifications,
+      activeAgentId: _activeBellAgentId,
+      currentHumanId: _sessionController.currentUser?.id,
+      ownedAgentIds: _ownedAgentIds,
+      threadLookup: threadLookup,
+    );
+    final unreadIds = chatThreads
+        .expand((thread) => thread.notificationIds)
+        .toSet()
+        .toList(growable: false);
+    final navigationTarget = await showSwipeBackSheet<_BellSheetNavigationTarget>(
+      context: context,
+      builder: (context) => _ThreadBellSheet(
+        panelKeyValue: 'chat-bell-sheet',
+        title: context.localizedText(
+          en: 'Unread Direct Messages',
+          zhHans: '未读私信',
+        ),
+        description: userId == null
+            ? context.localizedText(
+                en: 'Sign in and activate an owned agent to review unread direct messages.',
+                zhHans: '登录并激活一个自有智能体后，即可查看未读私信。',
+              )
+            : context.localizedText(
+                en: 'Unread messages sent to your current active agent appear here.',
+                zhHans: '发给你当前激活智能体的未读私信会显示在这里。',
+              ),
+        icon: Icons.mark_email_unread_rounded,
+        accentColor: AppColors.primary,
+        errorMessage: _notificationsErrorMessage,
+        emptyMessage: context.localizedText(
+          en: 'No unread direct messages for the current active agent.',
+          zhHans: '当前激活智能体还没有未读私信。',
+        ),
+        items: [
+          for (final thread in chatThreads)
+            _BellListItem(
+              keyValue: 'chat-bell-${thread.threadId}',
+              title: thread.title,
+              subtitle: thread.subtitle,
+              detail: thread.preview,
+              unreadCount: thread.unreadCount,
+              accentColor: AppColors.primary,
+              icon: Icons.mail_outline_rounded,
+              navigationTarget: _BellSheetNavigationTarget.chatThread(
+                thread.threadId,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (navigationTarget?.type == _BellSheetNavigationTargetType.chatThread) {
+      _openChatThread(navigationTarget!.targetId);
+    }
+
+    if (userId == null || unreadIds.isEmpty) {
+      return;
+    }
+
+    final didMarkRead = await _markNotificationIdsRead(
+      userId: userId,
+      notificationIds: unreadIds,
+    );
+    if (!mounted || !didMarkRead) {
+      return;
+    }
+
+    await _refreshNotifications(userId: userId);
+  }
+
+  Future<Map<String, ChatThreadSummary>> _readChatBellThreadLookup() async {
+    final userId = _liveNotificationsUserId;
+    final activeAgentId = _activeBellAgentId;
+    if (userId == null || activeAgentId == null || activeAgentId.isEmpty) {
+      return const <String, ChatThreadSummary>{};
+    }
+
+    try {
+      final repository = ChatRepository(
+        apiClient: _sessionController.apiClient,
+      );
+      final response = await repository.getThreads(
+        activeAgentId: activeAgentId,
+      );
+      return {
+        for (final thread in response.threads)
+          if (!thread.isOwnedAgentCommandThread) thread.threadId: thread,
+      };
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await _sessionController.handleUnauthorized();
+      }
+    } catch (_) {}
+
+    return const <String, ChatThreadSummary>{};
+  }
+
+  Future<Map<String, ForumTopicModel>> _readForumBellTopicLookup() async {
+    final userId = _liveNotificationsUserId;
+    if (userId == null) {
+      return const <String, ForumTopicModel>{};
+    }
+
+    try {
+      final topics = await _forumRepository.readTopics();
+      return {for (final topic in topics) topic.id: topic};
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await _sessionController.handleUnauthorized();
+      }
+    } catch (_) {}
+
+    return const <String, ForumTopicModel>{};
+  }
+
+  Future<void> _openForumBellSheet() async {
+    final userId = _liveNotificationsUserId;
+    if (userId != null) {
+      await _refreshNotifications(userId: userId);
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final topicLookup = await _readForumBellTopicLookup();
+    if (!mounted) {
+      return;
+    }
+
+    final forumTopics = _forumBellTopics;
+    final unreadIds = forumTopics
+        .expand((topic) => topic.notificationIds)
+        .toSet()
+        .toList(growable: false);
+    final navigationTarget = await showSwipeBackSheet<_BellSheetNavigationTarget>(
+      context: context,
+      builder: (context) => _ThreadBellSheet(
+        title: context.localizedText(en: 'Forum Replies', zhHans: '论坛新回复'),
+        description: userId == null
+            ? context.localizedText(
+                en: 'Sign in and activate an owned agent to review followed topics.',
+                zhHans: '登录并激活一个自有智能体后，即可查看关注话题的新回复。',
+              )
+            : context.localizedText(
+                en: 'New replies in topics your current active agent is tracking appear here.',
+                zhHans: '你当前激活智能体正在关注的话题新回复会显示在这里。',
+              ),
+        icon: Icons.forum_rounded,
+        accentColor: AppColors.primaryFixed,
+        errorMessage: _notificationsErrorMessage,
+        emptyMessage: context.localizedText(
+          en: 'No followed topics have unread replies right now.',
+          zhHans: '当前没有带未读回复的关注话题。',
+        ),
+        items: [
+          for (final topic in forumTopics)
+            _BellListItem(
+              keyValue: 'forum-bell-${topic.threadId}',
+              title:
+                  topicLookup[topic.threadId]?.title ??
+                  context.localizedText(en: 'Forum topic', zhHans: '论坛话题'),
+              subtitle:
+                  topicLookup[topic.threadId]?.authorName ??
+                  context.localizedText(en: 'New reply', zhHans: '有新回复'),
+              detail: topic.preview,
+              unreadCount: topic.unreadCount,
+              accentColor: AppColors.primaryFixed,
+              icon: Icons.forum_rounded,
+              navigationTarget: _BellSheetNavigationTarget.forumTopic(
+                topic.threadId,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (navigationTarget?.type == _BellSheetNavigationTargetType.forumTopic) {
+      _openForumTopic(navigationTarget!.targetId);
+    }
+
+    if (userId == null || unreadIds.isEmpty) {
+      return;
+    }
+
+    final didMarkRead = await _markNotificationIdsRead(
+      userId: userId,
+      notificationIds: unreadIds,
+    );
     if (!mounted || !didMarkRead) {
       return;
     }
@@ -396,29 +806,26 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       return;
     }
 
-    final debateNotifications = _debateNotifications;
-    final unreadDebateIds = debateNotifications
-        .where((notification) => notification.isUnread)
-        .map((notification) => notification.id)
+    final unreadDebateIds = _activeLiveDebateAlerts
+        .expand((alert) => alert.notificationIds)
         .toList(growable: false);
-    final navigationHint = await showSwipeBackSheet<String>(
-      context: context,
-      builder: (context) => _LiveDebateActivitySheet(
-        connectedAgents: _connectedAgents,
-        alerts: _activeLiveDebateAlerts,
-        isAuthenticated: userId != null,
-        notificationsErrorMessage: _notificationsErrorMessage,
-        connectedAgentsErrorMessage: _connectedAgentsErrorMessage,
-      ),
-    );
+    final navigationTarget =
+        await showSwipeBackSheet<_BellSheetNavigationTarget>(
+          context: context,
+          builder: (context) => _LiveDebateActivitySheet(
+            alerts: _activeLiveDebateAlerts,
+            isAuthenticated: userId != null,
+            notificationsErrorMessage: _notificationsErrorMessage,
+          ),
+        );
 
     if (!mounted) {
       return;
     }
 
-    if (navigationHint != null && navigationHint.trim().isNotEmpty) {
+    if (navigationTarget?.type == _BellSheetNavigationTargetType.liveSession) {
       _openLiveDebate(
-        sessionId: navigationHint,
+        sessionId: navigationTarget!.targetId,
         initialPanel: DebatePanel.process,
       );
     }
@@ -427,42 +834,99 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       return;
     }
 
-    final requestId = ++_notificationsRequestId;
-    try {
-      final bellState = await _notificationsRepository.markRead(
-        notificationIds: unreadDebateIds,
-      );
-      if (!_canApplyNotificationsResult(requestId, userId)) {
-        return;
-      }
+    final didMarkRead = await _markNotificationIdsRead(
+      userId: userId,
+      notificationIds: unreadDebateIds,
+    );
+    if (!mounted || !didMarkRead) {
+      return;
+    }
 
-      setState(() {
-        _notificationBellState = bellState;
-        _notifications = _notifications
-            .map((notification) {
-              if (!unreadDebateIds.contains(notification.id)) {
-                return notification;
-              }
-              return notification.copyWith(isUnread: false);
-            })
-            .toList(growable: false);
-      });
-    } on ApiException catch (error) {
-      if (error.isUnauthorized) {
-        await _sessionController.handleUnauthorized();
-      }
-    } catch (_) {}
+    await _refreshNotifications(userId: userId);
+  }
+
+  Future<void> _openHubBellSheet() async {
+    final userId = _liveNotificationsUserId;
+    if (userId != null) {
+      await _refreshNotifications(userId: userId);
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final ownedAgentThreads = _hubBellAgents;
+    final unreadIds = ownedAgentThreads
+        .expand((thread) => thread.notificationIds)
+        .toSet()
+        .toList(growable: false);
+    final navigationTarget = await showSwipeBackSheet<_BellSheetNavigationTarget>(
+      context: context,
+      builder: (context) => _ThreadBellSheet(
+        title: context.localizedText(
+          en: 'Private Agent Messages',
+          zhHans: '自有智能体私信',
+        ),
+        description: userId == null
+            ? context.localizedText(
+                en: 'Sign in to review private messages from your owned agents.',
+                zhHans: '登录后即可查看自有智能体发给你的私有消息。',
+              )
+            : context.localizedText(
+                en: 'Unread private messages from your owned agents appear here.',
+                zhHans: '自有智能体发给你的未读私有消息会显示在这里。',
+              ),
+        icon: Icons.smart_toy_rounded,
+        accentColor: AppColors.primary,
+        errorMessage: _notificationsErrorMessage,
+        emptyMessage: context.localizedText(
+          en: 'No owned agents have unread private messages right now.',
+          zhHans: '当前没有自有智能体给你发送未读私有消息。',
+        ),
+        items: [
+          for (final thread in ownedAgentThreads)
+            _BellListItem(
+              keyValue: 'hub-bell-${thread.agentId}',
+              title: thread.agentName,
+              subtitle: thread.handle,
+              detail: thread.preview,
+              unreadCount: thread.unreadCount,
+              accentColor: AppColors.primary,
+              icon: Icons.chat_bubble_outline_rounded,
+              navigationTarget: _BellSheetNavigationTarget.ownedAgentCommand(
+                thread.agentId,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (navigationTarget?.type ==
+        _BellSheetNavigationTargetType.ownedAgentCommand) {
+      await _openOwnedAgentPrivateChat(navigationTarget!.targetId);
+    }
+
+    if (userId == null || unreadIds.isEmpty) {
+      return;
+    }
+
+    final didMarkRead = await _markNotificationIdsRead(
+      userId: userId,
+      notificationIds: unreadIds,
+    );
+    if (!mounted || !didMarkRead) {
+      return;
+    }
+
+    await _refreshNotifications(userId: userId);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isLiveTab = _currentTab == AppShellTab.live;
-    final highlightedNotifications = isLiveTab
-        ? (_hasActiveLiveDebateAlerts || _hasBellHighlight)
-        : _hasBellHighlight;
-    final notificationAction = isLiveTab
-        ? _openLiveDebateCenter
-        : _openNotificationCenter;
+    final highlightedNotifications = _hasBellHighlightFor(_currentTab);
 
     return AppSessionScope(
       controller: _sessionController,
@@ -485,7 +949,7 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
                       primaryActionKey: _primaryActionKeyFor(_currentTab),
                       onPrimaryAction: _tabPrimaryActions[_currentTab],
                       onOpenSearch: _tabSearchActions[_currentTab],
-                      onOpenNotifications: notificationAction,
+                      onOpenNotifications: _openCurrentBellSheet,
                     ),
                     Expanded(
                       child: AnimatedSwitcher(
@@ -513,6 +977,12 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
                             environment: widget.environment,
                             onRegisterPrimaryAction: _setTabPrimaryAction,
                             onRegisterSearchAction: _setTabSearchAction,
+                            hallDetailTargetId: _hallDetailTargetId,
+                            hallDetailRequestId: _hallDetailRequestId,
+                            chatThreadTargetId: _chatThreadTargetId,
+                            chatThreadRequestId: _chatThreadRequestId,
+                            forumTopicTargetId: _forumTopicTargetId,
+                            forumTopicRequestId: _forumTopicRequestId,
                             onOpenLiveDebate: _openLiveDebate,
                             liveSessionTargetId: _liveSessionTargetId,
                             liveInitialPanel: _liveInitialPanel,
@@ -839,10 +1309,7 @@ class _ShellTabButton extends StatelessWidget {
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
       color: foreground,
       height: 1,
-      letterSpacing: context.localeAwareLetterSpacing(
-        latin: 0.8,
-        chinese: 0,
-      ),
+      letterSpacing: context.localeAwareLetterSpacing(latin: 0.8, chinese: 0),
     );
 
     return Semantics(
@@ -914,6 +1381,12 @@ class _TabSurfaceBuilder extends StatelessWidget {
     required this.environment,
     required this.onRegisterPrimaryAction,
     required this.onRegisterSearchAction,
+    required this.hallDetailTargetId,
+    required this.hallDetailRequestId,
+    required this.chatThreadTargetId,
+    required this.chatThreadRequestId,
+    required this.forumTopicTargetId,
+    required this.forumTopicRequestId,
     required this.onOpenLiveDebate,
     required this.liveSessionTargetId,
     required this.liveInitialPanel,
@@ -925,6 +1398,12 @@ class _TabSurfaceBuilder extends StatelessWidget {
   onRegisterPrimaryAction;
   final void Function(AppShellTab tab, VoidCallback? action)
   onRegisterSearchAction;
+  final String? hallDetailTargetId;
+  final int hallDetailRequestId;
+  final String? chatThreadTargetId;
+  final int chatThreadRequestId;
+  final String? forumTopicTargetId;
+  final int forumTopicRequestId;
   final void Function({String? sessionId, DebatePanel initialPanel})
   onOpenLiveDebate;
   final String? liveSessionTargetId;
@@ -937,6 +1416,8 @@ class _TabSurfaceBuilder extends StatelessWidget {
         tab: tab,
         environment: environment,
         onRegisterSearchAction: onRegisterSearchAction,
+        detailAgentId: hallDetailTargetId,
+        detailRequestId: hallDetailRequestId,
         onOpenLiveDebate: onOpenLiveDebate,
       ),
       AppShellTab.forum => _ForumSurface(
@@ -944,11 +1425,15 @@ class _TabSurfaceBuilder extends StatelessWidget {
         environment: environment,
         onRegisterPrimaryAction: onRegisterPrimaryAction,
         onRegisterSearchAction: onRegisterSearchAction,
+        topicTargetId: forumTopicTargetId,
+        topicRequestId: forumTopicRequestId,
       ),
       AppShellTab.chat => _ChatSurface(
         tab: tab,
         environment: environment,
         onRegisterSearchAction: onRegisterSearchAction,
+        threadTargetId: chatThreadTargetId,
+        threadRequestId: chatThreadRequestId,
       ),
       AppShellTab.live => _LiveSurface(
         tab: tab,
@@ -967,6 +1452,8 @@ class _HallSurface extends StatelessWidget {
     required this.tab,
     required this.environment,
     required this.onRegisterSearchAction,
+    required this.detailAgentId,
+    required this.detailRequestId,
     required this.onOpenLiveDebate,
   });
 
@@ -974,6 +1461,8 @@ class _HallSurface extends StatelessWidget {
   final AppEnvironment environment;
   final void Function(AppShellTab tab, VoidCallback? action)
   onRegisterSearchAction;
+  final String? detailAgentId;
+  final int detailRequestId;
   final void Function({String? sessionId, DebatePanel initialPanel})
   onOpenLiveDebate;
 
@@ -989,6 +1478,8 @@ class _HallSurface extends StatelessWidget {
                 unreadCount: 0,
               ),
             ),
+      initialDetailAgentId: detailAgentId,
+      detailRequestId: detailRequestId,
       onSearchActionChanged: (action) {
         onRegisterSearchAction(AppShellTab.hall, action);
       },
@@ -1003,6 +1494,8 @@ class _ForumSurface extends StatelessWidget {
     required this.environment,
     required this.onRegisterPrimaryAction,
     required this.onRegisterSearchAction,
+    required this.topicTargetId,
+    required this.topicRequestId,
   });
 
   final AppShellTab tab;
@@ -1011,6 +1504,8 @@ class _ForumSurface extends StatelessWidget {
   onRegisterPrimaryAction;
   final void Function(AppShellTab tab, VoidCallback? action)
   onRegisterSearchAction;
+  final String? topicTargetId;
+  final int topicRequestId;
 
   @override
   Widget build(BuildContext context) {
@@ -1018,6 +1513,8 @@ class _ForumSurface extends StatelessWidget {
       initialViewModel: environment.flavor == AppFlavor.local
           ? ForumViewModel.signedInSample()
           : ForumViewModel.empty(),
+      initialTopicId: topicTargetId,
+      topicRequestId: topicRequestId,
       showInlineProposeButton: false,
       onProposeActionChanged: (action) {
         onRegisterPrimaryAction(AppShellTab.forum, action);
@@ -1034,12 +1531,16 @@ class _ChatSurface extends StatelessWidget {
     required this.tab,
     required this.environment,
     required this.onRegisterSearchAction,
+    required this.threadTargetId,
+    required this.threadRequestId,
   });
 
   final AppShellTab tab;
   final AppEnvironment environment;
   final void Function(AppShellTab tab, VoidCallback? action)
   onRegisterSearchAction;
+  final String? threadTargetId;
+  final int threadRequestId;
 
   @override
   Widget build(BuildContext context) {
@@ -1047,6 +1548,8 @@ class _ChatSurface extends StatelessWidget {
       initialViewModel: environment.flavor == AppFlavor.local
           ? ChatViewModel.signedInSample()
           : ChatViewModel.resolvingActiveAgent(),
+      initialConversationId: threadTargetId,
+      conversationRequestId: threadRequestId,
       onSearchActionChanged: (action) {
         onRegisterSearchAction(AppShellTab.chat, action);
       },
@@ -1098,6 +1601,7 @@ class _HubSurface extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _NotificationCenterSheet extends StatelessWidget {
   const _NotificationCenterSheet({
     required this.connectedAgents,
@@ -1158,12 +1662,15 @@ class _NotificationCenterSheet extends StatelessWidget {
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
                               hasBellHighlight
-                                  ? context.l10n
+                                  ? context
+                                        .l10n
                                         .shellNotificationCenterDescriptionHighlighted
                                   : isAuthenticated
-                                  ? context.l10n
+                                  ? context
+                                        .l10n
                                         .shellNotificationCenterDescriptionCaughtUp
-                                  : context.l10n
+                                  : context
+                                        .l10n
                                         .shellNotificationCenterDescriptionSignedOut,
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
@@ -1227,117 +1734,59 @@ class _NotificationCenterSheet extends StatelessWidget {
 
 class _LiveDebateActivitySheet extends StatelessWidget {
   const _LiveDebateActivitySheet({
-    required this.connectedAgents,
     required this.alerts,
     required this.isAuthenticated,
     required this.notificationsErrorMessage,
-    required this.connectedAgentsErrorMessage,
   });
 
-  final List<ConnectedAgentSummary> connectedAgents;
   final List<_LiveDebateAlert> alerts;
   final bool isAuthenticated;
   final String? notificationsErrorMessage;
-  final String? connectedAgentsErrorMessage;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.sm,
+    return _ThreadBellSheet(
+      panelKeyValue: 'live-debate-activity-sheet',
+      title: context.localizedText(
+        en: 'Live Debate Activity',
+        zhHans: 'Live 动态',
       ),
-      child: GlassPanel(
-        key: const Key('live-debate-activity-sheet'),
-        borderRadius: AppRadii.hero,
-        padding: EdgeInsets.zero,
-        accentColor: AppColors.tertiary,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.76,
-          ),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const _ToneIcon(
-                        icon: Icons.notifications_active_rounded,
-                        accentColor: AppColors.tertiary,
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              context.l10n.shellLiveActivityTitle,
-                              style: Theme.of(context).textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: AppSpacing.xxs),
-                            Text(
-                              isAuthenticated
-                                  ? context.l10n
-                                        .shellLiveActivityDescriptionSignedIn
-                                  : context.l10n
-                                        .shellLiveActivityDescriptionSignedOut,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  _ConnectedAgentsSection(
-                    connectedAgents: connectedAgents,
-                    isAuthenticated: isAuthenticated,
-                    errorMessage: connectedAgentsErrorMessage,
-                  ),
-                  if (connectedAgents.isNotEmpty ||
-                      connectedAgentsErrorMessage != null)
-                    const SizedBox(height: AppSpacing.lg),
-                  if (notificationsErrorMessage != null) ...[
-                    Text(
-                      notificationsErrorMessage!,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: AppColors.error),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                  if (alerts.isEmpty)
-                    Text(
-                      notificationsErrorMessage != null
-                          ? context.l10n.shellNotificationCenterTryAgain
-                          : isAuthenticated
-                          ? context.l10n.shellLiveActivityEmpty
-                          : context.l10n.shellLiveActivitySignInPrompt,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    )
-                  else
-                    for (var index = 0; index < alerts.length; index += 1) ...[
-                      _LiveDebateAlertRow(alert: alerts[index]),
-                      if (index != alerts.length - 1)
-                        const SizedBox(height: AppSpacing.md),
-                    ],
-                  const SizedBox(height: AppSpacing.lg),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: SwipeBackSheetBackButton(),
-                  ),
-                ],
-              ),
+      description: isAuthenticated
+          ? context.localizedText(
+              en: 'Debates involving agents your current agent follows appear here while they are active.',
+              zhHans: '你当前智能体关注的智能体一旦正在参与辩论，就会显示在这里。',
+            )
+          : context.localizedText(
+              en: 'Sign in and activate an owned agent to review live debates from followed agents.',
+              zhHans: '登录并激活一个自有智能体后，即可查看关注智能体的进行中辩论。',
             ),
+      icon: Icons.graphic_eq_rounded,
+      accentColor: AppColors.tertiary,
+      errorMessage: notificationsErrorMessage,
+      emptyMessage: notificationsErrorMessage != null
+          ? context.l10n.shellNotificationCenterTryAgain
+          : isAuthenticated
+          ? context.localizedText(
+              en: 'No followed agents are in an active debate right now.',
+              zhHans: '当前没有你关注的智能体正在辩论。',
+            )
+          : context.localizedText(
+              en: 'Sign in to review live debates from followed agents.',
+              zhHans: '登录后即可查看关注智能体的实时辩论。',
+            ),
+      items: [
+        for (final alert in alerts)
+          _BellListItem(
+            keyValue: 'live-bell-${alert.id}',
+            title: alert.localizedTitle(context),
+            subtitle: alert.localizedSubtitle(context),
+            detail: alert.localizedDetail(context),
+            unreadCount: alert.unreadCount,
+            accentColor: AppColors.tertiary,
+            icon: Icons.sensors_rounded,
+            navigationTarget: _BellSheetNavigationTarget.liveSession(alert.id),
           ),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -1473,6 +1922,7 @@ class _ConnectedAgentRow extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _LiveDebateAlertRow extends StatelessWidget {
   const _LiveDebateAlertRow({required this.alert});
 
@@ -1484,7 +1934,9 @@ class _LiveDebateAlertRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         key: Key('live-debate-alert-${alert.id}'),
-        onTap: () => Navigator.of(context).pop(alert.navigationHint),
+        onTap: () => Navigator.of(
+          context,
+        ).pop(_BellSheetNavigationTarget.liveSession(alert.id)),
         borderRadius: AppRadii.large,
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -1630,6 +2082,413 @@ class _ToneIcon extends StatelessWidget {
   }
 }
 
+enum _BellSheetNavigationTargetType {
+  hallAgent,
+  chatThread,
+  forumTopic,
+  liveSession,
+  ownedAgentCommand,
+}
+
+class _BellSheetNavigationTarget {
+  const _BellSheetNavigationTarget._({
+    required this.type,
+    required this.targetId,
+  });
+
+  final _BellSheetNavigationTargetType type;
+  final String targetId;
+
+  factory _BellSheetNavigationTarget.hallAgent(String targetId) {
+    return _BellSheetNavigationTarget._(
+      type: _BellSheetNavigationTargetType.hallAgent,
+      targetId: targetId,
+    );
+  }
+
+  factory _BellSheetNavigationTarget.chatThread(String targetId) {
+    return _BellSheetNavigationTarget._(
+      type: _BellSheetNavigationTargetType.chatThread,
+      targetId: targetId,
+    );
+  }
+
+  factory _BellSheetNavigationTarget.forumTopic(String targetId) {
+    return _BellSheetNavigationTarget._(
+      type: _BellSheetNavigationTargetType.forumTopic,
+      targetId: targetId,
+    );
+  }
+
+  factory _BellSheetNavigationTarget.liveSession(String targetId) {
+    return _BellSheetNavigationTarget._(
+      type: _BellSheetNavigationTargetType.liveSession,
+      targetId: targetId,
+    );
+  }
+
+  factory _BellSheetNavigationTarget.ownedAgentCommand(String targetId) {
+    return _BellSheetNavigationTarget._(
+      type: _BellSheetNavigationTargetType.ownedAgentCommand,
+      targetId: targetId,
+    );
+  }
+}
+
+class _BellListItem {
+  const _BellListItem({
+    required this.keyValue,
+    required this.title,
+    required this.accentColor,
+    required this.icon,
+    required this.navigationTarget,
+    this.subtitle,
+    this.detail,
+    this.unreadCount = 0,
+  });
+
+  final String keyValue;
+  final String title;
+  final String? subtitle;
+  final String? detail;
+  final int unreadCount;
+  final Color accentColor;
+  final IconData icon;
+  final _BellSheetNavigationTarget navigationTarget;
+}
+
+class _HallBellSheet extends StatelessWidget {
+  const _HallBellSheet({
+    required this.agents,
+    required this.isAuthenticated,
+    required this.errorMessage,
+    required this.activeAgentName,
+  });
+
+  final List<HallAgentCardModel> agents;
+  final bool isAuthenticated;
+  final String? errorMessage;
+  final String? activeAgentName;
+
+  @override
+  Widget build(BuildContext context) {
+    final agentName = _trimmedString(activeAgentName);
+    final description = !isAuthenticated
+        ? context.localizedText(
+            en: 'Sign in and activate one of your agents to review followed agents that are online.',
+            zhHans: '登录并激活一个自有智能体后，即可查看它关注且当前在线的智能体。',
+          )
+        : agentName == null
+        ? context.localizedText(
+            en: 'Online agents followed by your current active agent appear here.',
+            zhHans: '你当前激活智能体关注且在线的智能体会显示在这里。',
+          )
+        : context.localizedText(
+            en: '$agentName is following these agents and they are online now.',
+            zhHans: '$agentName 关注的这些智能体现在都在线。',
+          );
+
+    return _ThreadBellSheet(
+      panelKeyValue: 'hall-bell-sheet',
+      title: context.localizedText(
+        en: 'Followed Agents Online',
+        zhHans: '关注的智能体在线',
+      ),
+      description: description,
+      icon: Icons.people_alt_rounded,
+      accentColor: AppColors.primary,
+      errorMessage: errorMessage,
+      emptyMessage: isAuthenticated
+          ? context.localizedText(
+              en: 'No followed agents are online right now.',
+              zhHans: '当前没有你关注且在线的智能体。',
+            )
+          : context.localizedText(
+              en: 'Sign in to review agents followed by your active agent.',
+              zhHans: '登录后即可查看当前激活智能体关注的对象。',
+            ),
+      items: [
+        for (final agent in agents)
+          _BellListItem(
+            keyValue: 'hall-bell-${agent.id}',
+            title: agent.name,
+            subtitle: agent.displayHandle ?? agent.presenceLabel,
+            detail: _firstNonEmptyText([
+              agent.hallCardSummary,
+              agent.headline,
+              agent.description,
+            ]),
+            unreadCount: 0,
+            accentColor: agent.isDebating
+                ? AppColors.tertiary
+                : AppColors.primary,
+            icon: agent.isDebating
+                ? Icons.graphic_eq_rounded
+                : Icons.smart_toy_rounded,
+            navigationTarget: _BellSheetNavigationTarget.hallAgent(agent.id),
+          ),
+      ],
+    );
+  }
+}
+
+class _ThreadBellSheet extends StatelessWidget {
+  const _ThreadBellSheet({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.accentColor,
+    required this.errorMessage,
+    required this.emptyMessage,
+    required this.items,
+    this.panelKeyValue,
+  });
+
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color accentColor;
+  final String? errorMessage;
+  final String emptyMessage;
+  final List<_BellListItem> items;
+  final String? panelKeyValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.sm,
+      ),
+      child: GlassPanel(
+        key: panelKeyValue == null ? null : Key(panelKeyValue!),
+        borderRadius: AppRadii.hero,
+        padding: EdgeInsets.zero,
+        accentColor: accentColor,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                  AppSpacing.xl,
+                  AppSpacing.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: SwipeBackSheetBackButton(),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _ToneIcon(icon: icon, accentColor: accentColor),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineMedium,
+                              ),
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                description,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        errorMessage!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Flexible(
+                child: items.isEmpty
+                    ? SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.xl,
+                          0,
+                          AppSpacing.xl,
+                          AppSpacing.xl,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            emptyMessage,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.xl,
+                          0,
+                          AppSpacing.xl,
+                          AppSpacing.xl,
+                        ),
+                        itemCount: items.length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSpacing.md),
+                        itemBuilder: (context, index) {
+                          return _BellListRow(item: items[index]);
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BellListRow extends StatelessWidget {
+  const _BellListRow({required this.item});
+
+  final _BellListItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = _trimmedString(item.subtitle);
+    final detail = _trimmedString(item.detail);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: Key(item.keyValue),
+        borderRadius: AppRadii.large,
+        onTap: () => Navigator.of(context).pop(item.navigationTarget),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow.withValues(alpha: 0.82),
+            borderRadius: AppRadii.large,
+            border: Border.all(
+              color: item.accentColor.withValues(
+                alpha: item.unreadCount > 0 ? 0.28 : 0.14,
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ToneIcon(icon: item.icon, accentColor: item.accentColor),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          if (item.unreadCount > 0) ...[
+                            const SizedBox(width: AppSpacing.sm),
+                            _BellUnreadBadge(
+                              count: item.unreadCount,
+                              accentColor: item.accentColor,
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: item.accentColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                      if (detail != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          detail,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BellUnreadBadge extends StatelessWidget {
+  const _BellUnreadBadge({required this.count, required this.accentColor});
+
+  final int count;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : '$count';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: 0.14),
+        borderRadius: AppRadii.pill,
+        border: Border.all(color: accentColor.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xxs,
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: accentColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 String _formatBellTimestamp(BuildContext context, String value) {
   final parsed = DateTime.tryParse(value);
   if (parsed == null) {
@@ -1642,6 +2501,296 @@ String _formatBellTimestamp(BuildContext context, String value) {
   ).add_Hm().format(normalized);
 }
 
+String? _trimmedString(Object? value) {
+  final text = value as String?;
+  if (text == null) {
+    return null;
+  }
+
+  final normalized = text.trim();
+  if (normalized.isEmpty) {
+    return null;
+  }
+
+  return normalized;
+}
+
+String? _firstNonEmptyText(Iterable<String?> values) {
+  for (final value in values) {
+    final normalized = _trimmedString(value);
+    if (normalized != null) {
+      return normalized;
+    }
+  }
+  return null;
+}
+
+String? _normalizeHandle(String? handle) {
+  final normalized = _trimmedString(handle);
+  if (normalized == null) {
+    return null;
+  }
+  return normalized.startsWith('@') ? normalized : '@$normalized';
+}
+
+class _ThreadBellGroup {
+  const _ThreadBellGroup({
+    required this.threadId,
+    required this.title,
+    required this.preview,
+    required this.unreadCount,
+    required this.notificationIds,
+    this.subtitle,
+    this.createdAt,
+  });
+
+  final String threadId;
+  final String title;
+  final String? subtitle;
+  final String preview;
+  final int unreadCount;
+  final List<String> notificationIds;
+  final DateTime? createdAt;
+
+  static List<_ThreadBellGroup> groupForActiveAgent(
+    List<_ShellNotification> notifications, {
+    required String? activeAgentId,
+    required String? currentHumanId,
+    required Set<String> ownedAgentIds,
+    Map<String, ChatThreadSummary> threadLookup =
+        const <String, ChatThreadSummary>{},
+  }) {
+    if (activeAgentId == null || activeAgentId.isEmpty) {
+      return const <_ThreadBellGroup>[];
+    }
+
+    final grouped = <String, List<_ShellNotification>>{};
+    for (final notification in notifications) {
+      final threadId = notification.threadId;
+      if (!notification.isUnread ||
+          notification.kind != 'dm.received' ||
+          notification.targetType != 'agent' ||
+          notification.targetId != activeAgentId ||
+          threadId == null ||
+          threadId.isEmpty ||
+          notification.actorUserId == currentHumanId ||
+          ownedAgentIds.contains(notification.actorAgentId)) {
+        continue;
+      }
+
+      grouped
+          .putIfAbsent(threadId, () => <_ShellNotification>[])
+          .add(notification);
+    }
+
+    final groups = <_ThreadBellGroup>[];
+    for (final entry in grouped.entries) {
+      final items = entry.value;
+      if (items.isEmpty) {
+        continue;
+      }
+      items.sort(_compareNotificationByCreatedAtDesc);
+      final latest = items.first;
+      final thread = threadLookup[entry.key];
+      groups.add(
+        _ThreadBellGroup(
+          threadId: entry.key,
+          title:
+              _trimmedString(thread?.counterpart.displayName) ??
+              _trimmedString(
+                latest.payloadMetadata['counterpartDisplayName'],
+              ) ??
+              _trimmedString(latest.payloadMetadata['authorName']) ??
+              'Direct message',
+          subtitle:
+              _normalizeHandle(thread?.counterpart.handle) ??
+              _trimmedString(latest.payloadMetadata['counterpartHandle']),
+          preview:
+              _firstNonEmptyText([
+                latest.payloadContent,
+                thread?.lastMessage.preview,
+              ]) ??
+              'Open this conversation to review the latest message.',
+          unreadCount: items.length,
+          notificationIds: items
+              .map((notification) => notification.id)
+              .toList(growable: false),
+          createdAt: latest.createdAt,
+        ),
+      );
+    }
+
+    groups.sort(_compareBellGroupByCreatedAtDesc);
+    return groups;
+  }
+}
+
+class _ForumBellGroup {
+  const _ForumBellGroup({
+    required this.threadId,
+    required this.preview,
+    required this.unreadCount,
+    required this.notificationIds,
+    this.createdAt,
+  });
+
+  final String threadId;
+  final String preview;
+  final int unreadCount;
+  final List<String> notificationIds;
+  final DateTime? createdAt;
+
+  static List<_ForumBellGroup> group(List<_ShellNotification> notifications) {
+    final grouped = <String, List<_ShellNotification>>{};
+    for (final notification in notifications) {
+      final threadId = notification.threadId;
+      if (!notification.isUnread ||
+          notification.kind != 'forum.reply' ||
+          threadId == null ||
+          threadId.isEmpty) {
+        continue;
+      }
+
+      grouped
+          .putIfAbsent(threadId, () => <_ShellNotification>[])
+          .add(notification);
+    }
+
+    final groups = <_ForumBellGroup>[];
+    for (final entry in grouped.entries) {
+      final items = entry.value;
+      if (items.isEmpty) {
+        continue;
+      }
+      items.sort(_compareNotificationByCreatedAtDesc);
+      final latest = items.first;
+      groups.add(
+        _ForumBellGroup(
+          threadId: entry.key,
+          preview:
+              _trimmedString(latest.payloadContent) ??
+              'Open this topic to review the latest reply.',
+          unreadCount: items.length,
+          notificationIds: items
+              .map((notification) => notification.id)
+              .toList(growable: false),
+          createdAt: latest.createdAt,
+        ),
+      );
+    }
+
+    groups.sort(_compareBellGroupByCreatedAtDesc);
+    return groups;
+  }
+}
+
+class _OwnedAgentBellGroup {
+  const _OwnedAgentBellGroup({
+    required this.agentId,
+    required this.agentName,
+    required this.handle,
+    required this.preview,
+    required this.unreadCount,
+    required this.notificationIds,
+    this.createdAt,
+  });
+
+  final String agentId;
+  final String agentName;
+  final String handle;
+  final String preview;
+  final int unreadCount;
+  final List<String> notificationIds;
+  final DateTime? createdAt;
+
+  static List<_OwnedAgentBellGroup> group(
+    List<_ShellNotification> notifications, {
+    required AgentSummary? Function(String agentId) ownedAgentLookup,
+    required Set<String> ownedAgentIds,
+  }) {
+    final grouped = <String, List<_ShellNotification>>{};
+    for (final notification in notifications) {
+      final actorAgentId = notification.actorAgentId;
+      if (!notification.isUnread ||
+          notification.kind != 'dm.received' ||
+          notification.targetType != 'human' ||
+          actorAgentId == null ||
+          actorAgentId.isEmpty ||
+          !ownedAgentIds.contains(actorAgentId)) {
+        continue;
+      }
+
+      grouped
+          .putIfAbsent(actorAgentId, () => <_ShellNotification>[])
+          .add(notification);
+    }
+
+    final groups = <_OwnedAgentBellGroup>[];
+    for (final entry in grouped.entries) {
+      final items = entry.value;
+      if (items.isEmpty) {
+        continue;
+      }
+      items.sort(_compareNotificationByCreatedAtDesc);
+      final latest = items.first;
+      final agent = ownedAgentLookup(entry.key);
+      final displayName = _trimmedString(agent?.displayName);
+      final handle = _trimmedString(agent?.handle);
+      groups.add(
+        _OwnedAgentBellGroup(
+          agentId: entry.key,
+          agentName: displayName ?? handle ?? entry.key,
+          handle: _normalizeHandle(handle) ?? entry.key,
+          preview:
+              _trimmedString(latest.payloadContent) ??
+              'Open the private command thread to review the latest message.',
+          unreadCount: items.length,
+          notificationIds: items
+              .map((notification) => notification.id)
+              .toList(growable: false),
+          createdAt: latest.createdAt,
+        ),
+      );
+    }
+
+    groups.sort(_compareBellGroupByCreatedAtDesc);
+    return groups;
+  }
+}
+
+int _compareNotificationByCreatedAtDesc(
+  _ShellNotification left,
+  _ShellNotification right,
+) {
+  final leftTime = left.createdAt;
+  final rightTime = right.createdAt;
+  if (leftTime == null && rightTime == null) {
+    return 0;
+  }
+  if (leftTime == null) {
+    return 1;
+  }
+  if (rightTime == null) {
+    return -1;
+  }
+  return rightTime.compareTo(leftTime);
+}
+
+int _compareBellGroupByCreatedAtDesc(dynamic left, dynamic right) {
+  final leftTime = left.createdAt as DateTime?;
+  final rightTime = right.createdAt as DateTime?;
+  if (leftTime == null && rightTime == null) {
+    return 0;
+  }
+  if (leftTime == null) {
+    return 1;
+  }
+  if (rightTime == null) {
+    return -1;
+  }
+  return rightTime.compareTo(leftTime);
+}
+
 class _ShellNotification {
   const _ShellNotification({
     required this.id,
@@ -1650,7 +2799,12 @@ class _ShellNotification {
     required this.accentColor,
     required this.isUnread,
     required this.eventType,
+    required this.threadId,
     required this.targetId,
+    required this.targetType,
+    required this.actorAgentId,
+    required this.actorUserId,
+    required this.payloadMetadata,
     required this.navigationHint,
     required this.createdAt,
   });
@@ -1661,7 +2815,12 @@ class _ShellNotification {
   final Color accentColor;
   final bool isUnread;
   final String eventType;
+  final String? threadId;
   final String? targetId;
+  final String? targetType;
+  final String? actorAgentId;
+  final String? actorUserId;
+  final Map<String, dynamic> payloadMetadata;
   final String navigationHint;
   final DateTime? createdAt;
 
@@ -1669,14 +2828,20 @@ class _ShellNotification {
     final kind = record.kind ?? '';
     final payload = record.payload;
     final eventType = payload['eventType'] as String? ?? '';
+    final metadata = payload['metadata'];
     return _ShellNotification(
       id: record.id,
       kind: kind,
-      payloadContent: payload['content'] as String?,
+      payloadContent: _trimmedString(payload['content']),
       accentColor: _accentColorFor(kind),
       isUnread: record.isUnread,
       eventType: eventType,
-      targetId: payload['targetId'] as String?,
+      threadId: _trimmedString(record.threadId),
+      targetId: _trimmedString(payload['targetId']),
+      targetType: _trimmedString(payload['targetType']),
+      actorAgentId: _trimmedString(payload['actorAgentId']),
+      actorUserId: _trimmedString(payload['actorUserId']),
+      payloadMetadata: metadata is Map<String, dynamic> ? metadata : const {},
       navigationHint: _navigationHintFor(record),
       createdAt: DateTime.tryParse(record.createdAt ?? ''),
     );
@@ -1691,7 +2856,9 @@ class _ShellNotification {
       case 'debate.activity':
         return context.l10n.shellNotificationTitleDebateActivity;
       default:
-        return kind.isEmpty ? context.l10n.shellNotificationTitleFallback : kind;
+        return kind.isEmpty
+            ? context.l10n.shellNotificationTitleFallback
+            : kind;
     }
   }
 
@@ -1733,7 +2900,12 @@ class _ShellNotification {
       accentColor: accentColor,
       isUnread: isUnread ?? this.isUnread,
       eventType: eventType,
+      threadId: threadId,
       targetId: targetId,
+      targetType: targetType,
+      actorAgentId: actorAgentId,
+      actorUserId: actorUserId,
+      payloadMetadata: payloadMetadata,
       navigationHint: navigationHint,
       createdAt: createdAt,
     );
@@ -1767,17 +2939,19 @@ class _LiveDebateAlert {
     required this.id,
     required this.eventType,
     required this.payloadContent,
-    required this.navigationHint,
     required this.unreadCount,
+    required this.notificationIds,
     required this.createdAt,
+    required this.payloadMetadata,
   });
 
   final String id;
   final String eventType;
   final String? payloadContent;
-  final String navigationHint;
   final int unreadCount;
+  final List<String> notificationIds;
   final DateTime? createdAt;
+  final Map<String, dynamic> payloadMetadata;
 
   static List<_LiveDebateAlert> groupActive(
     List<_ShellNotification> notifications,
@@ -1805,9 +2979,13 @@ class _LiveDebateAlert {
           id: entry.key,
           eventType: latest.eventType,
           payloadContent: latest.payloadContent,
-          navigationHint: latest.navigationHint,
           unreadCount: items.where((item) => item.isUnread).length,
+          notificationIds: items
+              .where((item) => item.isUnread)
+              .map((item) => item.id)
+              .toList(growable: false),
           createdAt: latest.createdAt,
+          payloadMetadata: latest.payloadMetadata,
         ),
       );
     }
@@ -1852,7 +3030,22 @@ class _LiveDebateAlert {
     if (payloadContent != null && payloadContent!.trim().isNotEmpty) {
       return payloadContent!.trim();
     }
+    final turnNumber = payloadMetadata['turnNumber'];
+    if (turnNumber is num) {
+      return context.localizedText(
+        en: 'Turn ${turnNumber.round()} has fresh live activity.',
+        zhHans: '第 ${turnNumber.round()} 回合有新的现场动态。',
+      );
+    }
     return context.l10n.shellNotificationDetailDebateActivity;
+  }
+
+  String? localizedSubtitle(BuildContext context) {
+    final stance = _trimmedString(payloadMetadata['stance']);
+    if (stance != null) {
+      return context.localeAwareCaps(stance.replaceAll('_', ' '));
+    }
+    return null;
   }
 
   static bool _isActiveEventType(String eventType) {
@@ -1869,5 +3062,4 @@ class _LiveDebateAlert {
         return false;
     }
   }
-
 }

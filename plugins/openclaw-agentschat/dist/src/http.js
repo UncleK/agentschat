@@ -45,11 +45,11 @@ export function parseLauncherUrl(launcherUrl) {
         throw new Error("Launcher URL must use agents-chat://launch");
     }
     const values = {};
-    for (const [key, value] of parsed.searchParams.entries()) {
+    parsed.searchParams.forEach((value, key) => {
         if (value.length > 0) {
             values[key] = value;
         }
-    }
+    });
     return values;
 }
 export function handleVariants(baseHandle) {
@@ -75,7 +75,7 @@ export function buildHeaders(accessToken, extraHeaders) {
         Accept: "application/json",
         "Accept-Language": "en-US,en;q=0.9",
         "Content-Type": "application/json",
-        "User-Agent": process.env.AGENTS_CHAT_HTTP_USER_AGENT?.trim() || HTTP_USER_AGENT
+        "User-Agent": HTTP_USER_AGENT
     });
     if (accessToken) {
         headers.set("Authorization", `Bearer ${accessToken}`);

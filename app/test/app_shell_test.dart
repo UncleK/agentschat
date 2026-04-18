@@ -137,7 +137,7 @@ void main() {
   });
 
   testWidgets(
-    'notification center loads live notifications and marks them read',
+    'chat bell lists unread direct messages for the active agent and marks them read',
     (WidgetTester tester) async {
       final notificationsRepository = _FakeNotificationsRepository()
         ..enqueueBellState(
@@ -145,42 +145,80 @@ void main() {
         )
         ..enqueueList(
           NotificationListResponse(
-            notifications: [_notificationRecord(readAt: null)],
-          ),
-        )
-        ..enqueueList(
-          NotificationListResponse(
-            notifications: [_notificationRecord(readAt: null)],
+            notifications: [
+              _notificationRecord(
+                readAt: null,
+                payload: const {
+                  'content': 'Backend-sourced hello.',
+                  'targetType': 'agent',
+                  'targetId': 'agt-shell',
+                },
+              ),
+            ],
           ),
         )
         ..enqueueBellState(
           const NotificationBellState(hasUnread: true, unreadCount: 1),
         )
+        ..enqueueList(
+          NotificationListResponse(
+            notifications: [
+              _notificationRecord(
+                readAt: null,
+                payload: const {
+                  'content': 'Backend-sourced hello.',
+                  'targetType': 'agent',
+                  'targetId': 'agt-shell',
+                },
+              ),
+            ],
+          ),
+        )
+        ..enqueueBellState(
+          const NotificationBellState(hasUnread: true, unreadCount: 1),
+        )
+        ..enqueueList(
+          NotificationListResponse(
+            notifications: [
+              _notificationRecord(
+                readAt: null,
+                payload: const {
+                  'content': 'Backend-sourced hello.',
+                  'targetType': 'agent',
+                  'targetId': 'agt-shell',
+                },
+              ),
+            ],
+          ),
+        )
+        ..enqueueBellState(
+          const NotificationBellState(hasUnread: false, unreadCount: 0),
+        )
+        ..enqueueList(
+          NotificationListResponse(
+            notifications: [
+              _notificationRecord(
+                readAt: '2026-04-03T12:00:00.000Z',
+                payload: const {
+                  'content': 'Backend-sourced hello.',
+                  'targetType': 'agent',
+                  'targetId': 'agt-shell',
+                },
+              ),
+            ],
+          ),
+        )
+        ..enqueueBellState(
+          const NotificationBellState(hasUnread: false, unreadCount: 0),
+        )
         ..enqueueMarkReadResult(
-          const NotificationBellState(hasUnread: false, unreadCount: 0),
-        )
-        ..enqueueList(
-          NotificationListResponse(
-            notifications: [
-              _notificationRecord(readAt: '2026-04-03T12:00:00.000Z'),
-            ],
-          ),
-        )
-        ..enqueueBellState(
-          const NotificationBellState(hasUnread: false, unreadCount: 0),
-        )
-        ..enqueueList(
-          NotificationListResponse(
-            notifications: [
-              _notificationRecord(readAt: '2026-04-03T12:00:00.000Z'),
-            ],
-          ),
-        )
-        ..enqueueBellState(
           const NotificationBellState(hasUnread: false, unreadCount: 0),
         );
 
       await pumpShell(tester, notificationsRepository: notificationsRepository);
+
+      await tester.tap(find.byKey(const Key('tab-chat')));
+      await tester.pumpAndSettle();
 
       expect(_notificationBellMaterial(tester).color, _highlightedBellColor);
 
@@ -191,74 +229,47 @@ void main() {
       await tester.tap(find.byKey(const Key('notification-center-button')));
       await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const Key('notification-center-sheet')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('notification-row-notif-live-1')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('chat-bell-sheet')), findsOneWidget);
+      expect(find.byKey(const Key('chat-bell-thr-1')), findsOneWidget);
+      expect(find.text('Backend-sourced hello.'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('sheet-bottom-back-button')));
       await tester.pumpAndSettle();
 
       expect(notificationsRepository.markReadRequests, hasLength(1));
-      expect(notificationsRepository.markReadRequests.single.markAll, isTrue);
+      expect(notificationsRepository.markReadRequests.single.notificationIds, [
+        'notif-live-1',
+      ]);
       expect(_notificationBellMaterial(tester).color, _idleBellColor);
-
-      await tester.tap(find.byKey(const Key('notification-center-button')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('UNREAD'), findsNothing);
     },
   );
 
-  testWidgets('notification bell highlights when connected agents exist', (
+  testWidgets('live bell highlights when followed agents are debating', (
     WidgetTester tester,
   ) async {
-    final agentsRepository = _FakeAgentsRepository()
-      ..connectedAgents = const [
-        ConnectedAgentSummary(
-          id: 'agt-conn-1',
-          handle: 'agt-conn-1',
-          displayName: 'Connected One',
-          avatarUrl: null,
-          bio: null,
-          ownerType: 'human',
-          status: 'online',
-          protocolVersion: '1.0',
-          transportMode: 'webhook',
-          pollingEnabled: false,
-          lastSeenAt: '2026-04-13T08:00:00.000Z',
-          lastHeartbeatAt: '2026-04-13T08:01:00.000Z',
+    final notificationsRepository = _FakeNotificationsRepository()
+      ..enqueueBellState(
+        const NotificationBellState(hasUnread: true, unreadCount: 1),
+      )
+      ..enqueueList(
+        NotificationListResponse(
+          notifications: [
+            _notificationRecord(
+              readAt: null,
+              kind: 'debate.activity',
+              payload: const {
+                'eventType': 'debate.started',
+                'targetType': 'debate_session',
+                'targetId': 'debate-1',
+              },
+            ),
+          ],
         ),
-      ];
+      );
 
-    final sessionController = AppSessionController(
-      apiClient: ApiClient(baseUrl: environment.apiBaseUrl),
-      authRepository: _FakeAuthRepository(),
-      agentsRepository: agentsRepository,
-      storage: _InMemoryAppSessionStorage(token: 'token-shell'),
-    );
-    await tester.binding.setSurfaceSize(const Size(430, 932));
-    addTearDown(() async {
-      sessionController.dispose();
-      await tester.binding.setSurfaceSize(null);
-    });
-    await tester.pumpWidget(
-      MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark(),
-        darkTheme: AppTheme.dark(),
-        themeMode: ThemeMode.dark,
-        home: AgentsChatAppShell(
-          environment: environment,
-          sessionController: sessionController,
-          notificationsRepository: _FakeNotificationsRepository(),
-        ),
-      ),
-    );
+    await pumpShell(tester, notificationsRepository: notificationsRepository);
+
+    await tester.tap(find.byKey(const Key('tab-live')));
     await tester.pumpAndSettle();
 
     expect(_notificationBellMaterial(tester).color, _highlightedBellColor);
@@ -266,45 +277,40 @@ void main() {
     await tester.tap(find.byKey(const Key('notification-center-button')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('live-debate-activity-sheet')), findsOneWidget);
+    expect(find.byKey(const Key('live-bell-debate-1')), findsOneWidget);
+  });
+
+  testWidgets('chat bell shows an empty state instead of old sample rows', (
+    WidgetTester tester,
+  ) async {
+    final notificationsRepository = _FakeNotificationsRepository()
+      ..enqueueBellState(
+        const NotificationBellState(hasUnread: false, unreadCount: 0),
+      )
+      ..enqueueList(const NotificationListResponse(notifications: []))
+      ..enqueueBellState(
+        const NotificationBellState(hasUnread: false, unreadCount: 0),
+      );
+
+    await pumpShell(tester, notificationsRepository: notificationsRepository);
+
+    await tester.tap(find.byKey(const Key('tab-chat')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('notification-center-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-bell-sheet')), findsOneWidget);
     expect(
-      find.byKey(const Key('connected-agent-row-agt-conn-1')),
+      find.text('No unread direct messages for the current active agent.'),
       findsOneWidget,
     );
-    expect(find.text('Connected One'), findsOneWidget);
+    expect(find.byKey(const Key('chat-bell-thr-1')), findsNothing);
   });
 
   testWidgets(
-    'notification center shows empty live state instead of sample rows',
-    (WidgetTester tester) async {
-      final notificationsRepository = _FakeNotificationsRepository()
-        ..enqueueBellState(
-          const NotificationBellState(hasUnread: false, unreadCount: 0),
-        )
-        ..enqueueList(const NotificationListResponse(notifications: []))
-        ..enqueueBellState(
-          const NotificationBellState(hasUnread: false, unreadCount: 0),
-        );
-
-      await pumpShell(tester, notificationsRepository: notificationsRepository);
-
-      await tester.tap(find.byKey(const Key('notification-center-button')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('notification-center-sheet')),
-        findsOneWidget,
-      );
-      expect(find.text('No notifications yet.'), findsOneWidget);
-      expect(
-        find.byKey(const Key('notification-row-notif-claim-confirmed')),
-        findsNothing,
-      );
-      expect(find.text('Orbit-9 claim confirmed'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'notification bell 401 signs the shell out instead of showing an empty authenticated inbox',
+    'notification bell 401 signs the shell out before chat is opened',
     (WidgetTester tester) async {
       final notificationsRepository = _FakeNotificationsRepository()
         ..enqueueBellError(
@@ -313,25 +319,53 @@ void main() {
 
       await pumpShell(tester, notificationsRepository: notificationsRepository);
 
-      await tester.tap(find.byKey(const Key('notification-center-button')));
+      await tester.tap(find.byKey(const Key('tab-chat')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Sign in to view notifications.'), findsOneWidget);
-      expect(find.text('No notifications yet.'), findsNothing);
+      expect(
+        find.text(
+          'Sign in and select an owned agent in Hub to load direct messages.',
+        ),
+        findsOneWidget,
+      );
     },
   );
 
   testWidgets(
-    'notification center preserves prior data and shows an explicit error on refresh failure',
+    'chat bell preserves prior rows and shows an explicit error on refresh failure',
     (WidgetTester tester) async {
       final notificationsRepository = _FakeNotificationsRepository()
         ..enqueueBellState(
-          const NotificationBellState(hasUnread: false, unreadCount: 0),
+          const NotificationBellState(hasUnread: true, unreadCount: 1),
         )
         ..enqueueList(
           NotificationListResponse(
             notifications: [
-              _notificationRecord(readAt: '2026-04-03T12:00:00.000Z'),
+              _notificationRecord(
+                readAt: null,
+                payload: const {
+                  'content': 'Backend-sourced hello.',
+                  'targetType': 'agent',
+                  'targetId': 'agt-shell',
+                },
+              ),
+            ],
+          ),
+        )
+        ..enqueueBellState(
+          const NotificationBellState(hasUnread: true, unreadCount: 1),
+        )
+        ..enqueueList(
+          NotificationListResponse(
+            notifications: [
+              _notificationRecord(
+                readAt: null,
+                payload: const {
+                  'content': 'Backend-sourced hello.',
+                  'targetType': 'agent',
+                  'targetId': 'agt-shell',
+                },
+              ),
             ],
           ),
         )
@@ -341,22 +375,18 @@ void main() {
 
       await pumpShell(tester, notificationsRepository: notificationsRepository);
 
+      await tester.tap(find.byKey(const Key('tab-chat')));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.byKey(const Key('notification-center-button')));
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const Key('notification-center-error')),
-        findsOneWidget,
-      );
-      expect(
         find.text('Notifications are temporarily unavailable.'),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const Key('notification-row-notif-live-1')),
-        findsOneWidget,
-      );
-      expect(find.text('Try again in a moment.'), findsNothing);
+      expect(find.byKey(const Key('chat-bell-thr-1')), findsOneWidget);
+      expect(find.text('Backend-sourced hello.'), findsOneWidget);
     },
   );
 
@@ -431,7 +461,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('surface-hall')), findsOneWidget);
       expect(find.byKey(const Key('agent-card-agt-debating-1')), findsNothing);
-      expect(find.text('Sign in to browse agents'), findsOneWidget);
+      expect(find.text('No agents available yet'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('tab-chat')));
       await tester.pumpAndSettle();
@@ -459,13 +489,17 @@ Material _notificationBellMaterial(WidgetTester tester) {
   );
 }
 
-NotificationRecord _notificationRecord({required String? readAt}) {
+NotificationRecord _notificationRecord({
+  required String? readAt,
+  String kind = 'dm.received',
+  Map<String, dynamic> payload = const {'content': 'Backend-sourced hello.'},
+}) {
   return NotificationRecord(
     id: 'notif-live-1',
-    kind: 'dm.received',
+    kind: kind,
     eventId: 'evt-1',
     threadId: 'thr-1',
-    payload: const {'content': 'Backend-sourced hello.'},
+    payload: payload,
     readAt: readAt,
     createdAt: '2026-04-03T11:00:00.000Z',
   );

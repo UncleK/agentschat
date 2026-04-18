@@ -30,6 +30,8 @@ class AgentsHallScreen extends StatefulWidget {
       agents: <HallAgentCardModel>[],
       bellState: HallBellState(mode: HallBellMode.quiet, unreadCount: 0),
     ),
+    this.initialDetailAgentId,
+    this.detailRequestId = 0,
     this.hallRepository,
     this.followRepository,
     this.chatRepository,
@@ -39,6 +41,8 @@ class AgentsHallScreen extends StatefulWidget {
   });
 
   final AgentsHallViewModel initialViewModel;
+  final String? initialDetailAgentId;
+  final int detailRequestId;
   final AgentsHallRepository? hallRepository;
   final FollowRepository? followRepository;
   final ChatRepository? chatRepository;
@@ -64,12 +68,16 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
   int _directoryRequestId = 0;
   int _followRequestId = 0;
   int _messageRequestId = 0;
+  int _handledDetailRequestId = 0;
 
   @override
   void initState() {
     super.initState();
     _viewModel = widget.initialViewModel;
     _syncShellSearchAction();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeHandleInitialDetailRequest();
+    });
   }
 
   @override
@@ -80,6 +88,12 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         (widget.onSearchActionChanged == null);
     if (searchRegistrationChanged) {
       _syncShellSearchAction();
+    }
+    if (oldWidget.detailRequestId != widget.detailRequestId ||
+        oldWidget.initialDetailAgentId != widget.initialDetailAgentId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeHandleInitialDetailRequest();
+      });
     }
   }
 
@@ -124,10 +138,48 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       session.currentActiveAgent?.id ?? '',
     ].join('|');
     if (_sessionSignature == nextSignature) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeHandleInitialDetailRequest();
+      });
       return;
     }
     _sessionSignature = nextSignature;
     unawaited(_syncDirectory(session));
+  }
+
+  void _maybeHandleInitialDetailRequest() {
+    if (!mounted) {
+      return;
+    }
+
+    final requestId = widget.detailRequestId;
+    final targetAgentId = widget.initialDetailAgentId?.trim();
+    if (requestId <= 0 ||
+        requestId <= _handledDetailRequestId ||
+        targetAgentId == null ||
+        targetAgentId.isEmpty) {
+      return;
+    }
+
+    final session = AppSessionScope.maybeOf(context);
+    final effectiveViewModel = _viewModelForSession(session);
+    HallAgentCardModel? targetAgent;
+    for (final agent in effectiveViewModel.agents) {
+      if (agent.id == targetAgentId) {
+        targetAgent = agent;
+        break;
+      }
+    }
+
+    if (targetAgent == null) {
+      if (!_isLoadingDirectory) {
+        _handledDetailRequestId = requestId;
+      }
+      return;
+    }
+
+    _handledDetailRequestId = requestId;
+    _openDetails(targetAgent);
   }
 
   void _openDetails(HallAgentCardModel agent) {
@@ -232,6 +284,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         _isLoadingDirectory = false;
         _directoryLoadError = null;
       });
+      _maybeHandleInitialDetailRequest();
     } on ApiException catch (error) {
       if (error.isUnauthorized && isAuthenticated) {
         await session.handleUnauthorized();
@@ -245,6 +298,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         _directoryLoadError = isAuthenticated ? error.message : null;
         _isUsingLiveDirectory = false;
       });
+      _maybeHandleInitialDetailRequest();
     } catch (_) {
       if (!mounted) {
         return;
@@ -256,6 +310,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
             : null;
         _isUsingLiveDirectory = false;
       });
+      _maybeHandleInitialDetailRequest();
     }
   }
 
