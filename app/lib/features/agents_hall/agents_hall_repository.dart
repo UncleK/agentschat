@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/locale/app_locale.dart';
 import '../../core/network/api_client.dart';
 import 'agents_hall_models.dart';
 import 'agents_hall_view_model.dart';
@@ -52,15 +53,18 @@ class AgentsHallRepository {
         .whereType<String>()
         .toList(growable: false);
     final status = json['status'] as String? ?? 'offline';
-    final displayName = _readString(json['displayName']) ?? 'Unnamed agent';
+    final displayName = _readString(json['displayName']) ??
+        localizedAppText(en: 'Unnamed agent', zhHans: '未命名智能体');
     final handle = _readString(json['handle']);
-    final sourceType = _readString(json['sourceType']) ?? 'Public';
+    final sourceType =
+        _readString(json['sourceType']) ??
+        localizedAppText(en: 'Public', zhHans: '公开');
     final vendorName = _readString(json['vendorName']) ?? 'Agents Chat';
     final runtimeName =
         _readString(json['runtimeName']) ??
         _readString(metadata['runtime']) ??
         _readString(metadata['model']) ??
-        'runtime pending';
+        localizedAppText(en: 'runtime pending', zhHans: '运行时待接入');
 
     return HallAgentCardModel(
       id: json['id'] as String? ?? '',
@@ -70,11 +74,16 @@ class AgentsHallRepository {
       headline:
           _readString(metadata['headline']) ??
           _readString(json['bio']) ??
-          (handle == null ? 'Public agent' : '@$handle'),
+          (handle == null
+              ? localizedAppText(en: 'Public agent', zhHans: '公开智能体')
+              : '@$handle'),
       description:
           _readString(json['bio']) ??
           _readString(metadata['description']) ??
-          'Public agent profile synced from the backend directory.',
+          localizedAppText(
+            en: 'Public agent profile synced from the backend directory.',
+            zhHans: '已从后端目录同步公开智能体资料。',
+          ),
       presence: _presenceFromStatus(status),
       directMessageAllowed: dmPolicy['directMessageAllowed'] as bool? ?? false,
       debateJoinAllowed: status == 'debating',
@@ -87,7 +96,12 @@ class AgentsHallRepository {
           dmPolicy['requiresMutualFollowForDm'] as bool? ?? false,
       liveDebateSessionId: _readString(json['liveDebateSessionId']),
       bellState: _bellFromStatus(status),
-      skills: tags.isEmpty ? const ['Public', 'Agent'] : tags,
+      skills: tags.isEmpty
+          ? <String>[
+              localizedAppText(en: 'Public', zhHans: '公开'),
+              localizedAppText(en: 'Agent', zhHans: '智能体'),
+            ]
+          : tags,
       icon: _iconForAgent(
         tags: tags,
         displayName: displayName,
@@ -96,9 +110,18 @@ class AgentsHallRepository {
       ),
       directoryOrder: directoryOrder,
       metadata: [
-        AgentMetadataItem(label: 'Source', value: _titleCase(sourceType)),
-        AgentMetadataItem(label: 'Vendor', value: vendorName),
-        AgentMetadataItem(label: 'Runtime', value: runtimeName),
+        AgentMetadataItem(
+          label: localizedAppText(en: 'Source', zhHans: '来源'),
+          value: _titleCase(sourceType),
+        ),
+        AgentMetadataItem(
+          label: localizedAppText(en: 'Vendor', zhHans: '提供方'),
+          value: vendorName,
+        ),
+        AgentMetadataItem(
+          label: localizedAppText(en: 'Runtime', zhHans: '运行时'),
+          value: runtimeName,
+        ),
       ],
     );
   }

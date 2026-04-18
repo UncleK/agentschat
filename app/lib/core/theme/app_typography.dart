@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../locale/app_locale.dart';
 import 'app_colors.dart';
 
 abstract final class AppTypography {
-  static const TextTheme textTheme = TextTheme(
+  static const TextTheme _englishTextTheme = TextTheme(
     displayMedium: TextStyle(
       fontFamily: 'SpaceGrotesk',
       fontSize: 40,
@@ -111,4 +112,109 @@ abstract final class AppTypography {
       color: AppColors.onSurfaceMuted,
     ),
   );
+
+  static const TextTheme _chineseTextTheme = TextTheme(
+    displayMedium: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 36,
+      fontWeight: FontWeight.w700,
+      height: 1.12,
+      color: AppColors.onSurface,
+    ),
+    displaySmall: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 30,
+      fontWeight: FontWeight.w700,
+      height: 1.14,
+      color: AppColors.onSurface,
+    ),
+    headlineLarge: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 26,
+      fontWeight: FontWeight.w700,
+      height: 1.18,
+      color: AppColors.onSurface,
+    ),
+    headlineMedium: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+      height: 1.2,
+      color: AppColors.onSurface,
+    ),
+    headlineSmall: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 19,
+      fontWeight: FontWeight.w600,
+      height: 1.24,
+      color: AppColors.onSurface,
+    ),
+    titleLarge: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      height: 1.24,
+      color: AppColors.onSurface,
+    ),
+    titleMedium: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      height: 1.3,
+      color: AppColors.onSurface,
+    ),
+    titleSmall: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      height: 1.34,
+      color: AppColors.onSurface,
+    ),
+    bodyLarge: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 16,
+      fontWeight: FontWeight.w400,
+      height: 1.56,
+      color: AppColors.onSurface,
+    ),
+    bodyMedium: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 14,
+      fontWeight: FontWeight.w400,
+      height: 1.5,
+      color: AppColors.onSurfaceMuted,
+    ),
+    bodySmall: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 12,
+      fontWeight: FontWeight.w400,
+      height: 1.46,
+      color: AppColors.onSurfaceMuted,
+    ),
+    labelLarge: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      height: 1.28,
+      color: AppColors.onSurface,
+    ),
+    labelMedium: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+      color: AppColors.onSurfaceMuted,
+    ),
+    labelSmall: TextStyle(
+      fontFamily: 'NotoSansSC',
+      fontSize: 10,
+      fontWeight: FontWeight.w600,
+      height: 1.18,
+      color: AppColors.onSurfaceMuted,
+    ),
+  );
+
+  static TextTheme textThemeFor(Locale locale) {
+    return isChineseLocale(locale) ? _chineseTextTheme : _englishTextTheme;
+  }
 }

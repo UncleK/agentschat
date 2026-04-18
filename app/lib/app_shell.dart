@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import 'core/auth/auth_repository.dart';
 import 'core/config/app_environment.dart';
+import 'core/locale/app_localization_extensions.dart';
 import 'core/network/agents_repository.dart';
 import 'core/network/api_exception.dart';
 import 'core/network/notifications_repository.dart';
@@ -253,14 +255,14 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       }
 
       nextConnectedAgentsError =
-          'Connected agents are temporarily unavailable.';
+          context.l10n.shellConnectedAgentsUnavailable;
     } catch (_) {
       if (!_canApplyNotificationsResult(requestId, userId)) {
         return;
       }
 
       nextConnectedAgentsError =
-          'Connected agents are temporarily unavailable.';
+          context.l10n.shellConnectedAgentsUnavailable;
     }
 
     try {
@@ -281,13 +283,13 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
         return;
       }
 
-      nextNotificationsError = 'Notifications are temporarily unavailable.';
+      nextNotificationsError = context.l10n.shellNotificationsUnavailable;
     } catch (_) {
       if (!_canApplyNotificationsResult(requestId, userId)) {
         return;
       }
 
-      nextNotificationsError = 'Notifications are temporarily unavailable.';
+      nextNotificationsError = context.l10n.shellNotificationsUnavailable;
     }
 
     if (!_canApplyNotificationsResult(requestId, userId)) {
@@ -323,17 +325,17 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       }
 
       if (mounted) {
-        setState(() {
-          _notificationsErrorMessage =
-              'Notifications are temporarily unavailable.';
-        });
-      }
+          setState(() {
+            _notificationsErrorMessage =
+                context.l10n.shellNotificationsUnavailable;
+          });
+        }
       return false;
     } catch (_) {
       if (mounted) {
         setState(() {
-          _notificationsErrorMessage =
-              'Notifications are temporarily unavailable.';
+            _notificationsErrorMessage =
+                context.l10n.shellNotificationsUnavailable;
         });
       }
       return false;
@@ -649,12 +651,15 @@ class _ShellTopBar extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              currentTab.topBarTitle,
+              currentTab.topBarTitle(context),
               key: const Key('active-tab-label'),
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 2.2,
+                letterSpacing: context.localeAwareLetterSpacing(
+                  latin: 2.2,
+                  chinese: 0,
+                ),
               ),
             ),
           ),
@@ -834,7 +839,10 @@ class _ShellTabButton extends StatelessWidget {
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
       color: foreground,
       height: 1,
-      letterSpacing: 0.8,
+      letterSpacing: context.localeAwareLetterSpacing(
+        latin: 0.8,
+        chinese: 0,
+      ),
     );
 
     return Semantics(
@@ -883,7 +891,7 @@ class _ShellTabButton extends StatelessWidget {
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        tab.label.toUpperCase(),
+                        context.localeAwareCaps(tab.label(context)),
                         maxLines: 1,
                         softWrap: false,
                         style: labelStyle,
@@ -1144,16 +1152,19 @@ class _NotificationCenterSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Notification Center',
+                              context.l10n.shellNotificationCenterTitle,
                               style: Theme.of(context).textTheme.headlineMedium,
                             ),
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
                               hasBellHighlight
-                                  ? 'Unread alerts and connected agents are highlighted until reviewed.'
+                                  ? context.l10n
+                                        .shellNotificationCenterDescriptionHighlighted
                                   : isAuthenticated
-                                  ? 'You are all caught up with the live notification feed.'
-                                  : 'Sign in to review notifications for this account.',
+                                  ? context.l10n
+                                        .shellNotificationCenterDescriptionCaughtUp
+                                  : context.l10n
+                                        .shellNotificationCenterDescriptionSignedOut,
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ],
@@ -1183,10 +1194,10 @@ class _NotificationCenterSheet extends StatelessWidget {
                   if (notifications.isEmpty)
                     Text(
                       notificationsErrorMessage != null
-                          ? 'Try again in a moment.'
+                          ? context.l10n.shellNotificationCenterTryAgain
                           : isAuthenticated
-                          ? 'No notifications yet.'
-                          : 'Sign in to view notifications.',
+                          ? context.l10n.shellNotificationCenterEmpty
+                          : context.l10n.shellNotificationCenterSignInPrompt,
                       style: Theme.of(context).textTheme.bodyLarge,
                     )
                   else
@@ -1266,14 +1277,16 @@ class _LiveDebateActivitySheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Tracked Agents In Debate',
+                              context.l10n.shellLiveActivityTitle,
                               style: Theme.of(context).textTheme.headlineMedium,
                             ),
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
                               isAuthenticated
-                                  ? 'Connected agents are listed first, followed by live debate activity from the agents you follow.'
-                                  : 'Sign in to review live debates from the agents you follow.',
+                                  ? context.l10n
+                                        .shellLiveActivityDescriptionSignedIn
+                                  : context.l10n
+                                        .shellLiveActivityDescriptionSignedOut,
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ],
@@ -1302,10 +1315,10 @@ class _LiveDebateActivitySheet extends StatelessWidget {
                   if (alerts.isEmpty)
                     Text(
                       notificationsErrorMessage != null
-                          ? 'Try again in a moment.'
+                          ? context.l10n.shellNotificationCenterTryAgain
                           : isAuthenticated
-                          ? 'No followed agents are in an active debate right now.'
-                          : 'Sign in to view active debate alerts.',
+                          ? context.l10n.shellLiveActivityEmpty
+                          : context.l10n.shellLiveActivitySignInPrompt,
                       style: Theme.of(context).textTheme.bodyLarge,
                     )
                   else
@@ -1350,16 +1363,16 @@ class _ConnectedAgentsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Connected Agents',
+          context.l10n.shellConnectedAgentsTitle,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
           connectedAgents.isNotEmpty
-              ? 'These agents are currently connected to this app.'
+              ? context.l10n.shellConnectedAgentsDescriptionPresent
               : isAuthenticated
-              ? 'No owned agents are connected to this app right now.'
-              : 'Sign in to review which owned agents are connected.',
+              ? context.l10n.shellConnectedAgentsDescriptionEmpty
+              : context.l10n.shellConnectedAgentsDescriptionSignedOut,
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.onSurfaceMuted),
@@ -1394,8 +1407,10 @@ class _ConnectedAgentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final heartbeatText = agent.lastHeartbeatAt == null
-        ? 'Awaiting first heartbeat'
-        : 'Last heartbeat ${_formatBellTimestamp(agent.lastHeartbeatAt!)}';
+        ? context.l10n.shellConnectedAgentsAwaitingHeartbeat
+        : context.l10n.shellConnectedAgentsLastHeartbeat(
+            _formatBellTimestamp(context, agent.lastHeartbeatAt!),
+          );
     final accentColor = agent.pollingEnabled
         ? AppColors.tertiary
         : AppColors.primary;
@@ -1429,7 +1444,7 @@ class _ConnectedAgentRow extends StatelessWidget {
                         ),
                       ),
                       StatusChip(
-                        label: agent.transportMode.toUpperCase(),
+                        label: context.localeAwareCaps(agent.transportMode),
                         tone: agent.pollingEnabled
                             ? StatusChipTone.tertiary
                             : StatusChipTone.primary,
@@ -1499,20 +1514,22 @@ class _LiveDebateAlertRow extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              alert.title,
+                              alert.localizedTitle(context),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
                           if (alert.unreadCount > 0)
                             StatusChip(
-                              label: '${alert.unreadCount} new',
+                              label: context.l10n.shellLiveAlertUnreadCount(
+                                alert.unreadCount,
+                              ),
                               tone: StatusChipTone.tertiary,
                             ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        alert.detail,
+                        alert.localizedDetail(context),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ],
@@ -1565,20 +1582,20 @@ class _NotificationRow extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          notification.title,
+                          notification.localizedTitle(context),
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
                       if (notification.isUnread)
                         StatusChip(
-                          label: 'Unread',
+                          label: context.l10n.shellNotificationUnread,
                           tone: StatusChipTone.primary,
                         ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    notification.detail,
+                    notification.localizedDetail(context),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -1613,24 +1630,23 @@ class _ToneIcon extends StatelessWidget {
   }
 }
 
-String _formatBellTimestamp(String value) {
+String _formatBellTimestamp(BuildContext context, String value) {
   final parsed = DateTime.tryParse(value);
   if (parsed == null) {
     return value;
   }
 
   final normalized = parsed.toLocal();
-  final hour = normalized.hour.toString().padLeft(2, '0');
-  final minute = normalized.minute.toString().padLeft(2, '0');
-  return '${normalized.month}/${normalized.day} $hour:$minute';
+  return DateFormat.Md(
+    Localizations.localeOf(context).toLanguageTag(),
+  ).add_Hm().format(normalized);
 }
 
 class _ShellNotification {
   const _ShellNotification({
     required this.id,
     required this.kind,
-    required this.title,
-    required this.detail,
+    required this.payloadContent,
     required this.accentColor,
     required this.isUnread,
     required this.eventType,
@@ -1641,8 +1657,7 @@ class _ShellNotification {
 
   final String id;
   final String kind;
-  final String title;
-  final String detail;
+  final String? payloadContent;
   final Color accentColor;
   final bool isUnread;
   final String eventType;
@@ -1657,8 +1672,7 @@ class _ShellNotification {
     return _ShellNotification(
       id: record.id,
       kind: kind,
-      title: _titleFor(kind),
-      detail: _detailFor(record, kind),
+      payloadContent: payload['content'] as String?,
       accentColor: _accentColorFor(kind),
       isUnread: record.isUnread,
       eventType: eventType,
@@ -1668,34 +1682,33 @@ class _ShellNotification {
     );
   }
 
-  static String _titleFor(String kind) {
+  String localizedTitle(BuildContext context) {
     switch (kind) {
       case 'dm.received':
-        return 'New direct message';
+        return context.l10n.shellNotificationTitleDmReceived;
       case 'forum.reply':
-        return 'New forum reply';
+        return context.l10n.shellNotificationTitleForumReply;
       case 'debate.activity':
-        return 'Debate activity';
+        return context.l10n.shellNotificationTitleDebateActivity;
       default:
-        return kind.isEmpty ? 'Notification' : kind;
+        return kind.isEmpty ? context.l10n.shellNotificationTitleFallback : kind;
     }
   }
 
-  static String _detailFor(NotificationRecord record, String kind) {
-    final payloadContent = record.payload['content'];
-    if (payloadContent is String && payloadContent.trim().isNotEmpty) {
-      return payloadContent.trim();
+  String localizedDetail(BuildContext context) {
+    if (payloadContent != null && payloadContent!.trim().isNotEmpty) {
+      return payloadContent!.trim();
     }
 
     switch (kind) {
       case 'dm.received':
-        return 'A new direct message is ready to review.';
+        return context.l10n.shellNotificationDetailDmReceived;
       case 'forum.reply':
-        return 'A followed conversation has a new reply.';
+        return context.l10n.shellNotificationDetailForumReply;
       case 'debate.activity':
-        return 'There is new activity in a debate you follow.';
+        return context.l10n.shellNotificationDetailDebateActivity;
       default:
-        return 'A live notification is ready to review.';
+        return context.l10n.shellNotificationDetailFallback;
     }
   }
 
@@ -1716,8 +1729,7 @@ class _ShellNotification {
     return _ShellNotification(
       id: id,
       kind: kind,
-      title: title,
-      detail: detail,
+      payloadContent: payloadContent,
       accentColor: accentColor,
       isUnread: isUnread ?? this.isUnread,
       eventType: eventType,
@@ -1746,23 +1758,23 @@ class _ShellNotification {
       return targetId.trim();
     }
 
-    return _detailFor(record, record.kind ?? '');
+    return record.kind ?? '';
   }
 }
 
 class _LiveDebateAlert {
   const _LiveDebateAlert({
     required this.id,
-    required this.title,
-    required this.detail,
+    required this.eventType,
+    required this.payloadContent,
     required this.navigationHint,
     required this.unreadCount,
     required this.createdAt,
   });
 
   final String id;
-  final String title;
-  final String detail;
+  final String eventType;
+  final String? payloadContent;
   final String navigationHint;
   final int unreadCount;
   final DateTime? createdAt;
@@ -1791,8 +1803,8 @@ class _LiveDebateAlert {
       alerts.add(
         _LiveDebateAlert(
           id: entry.key,
-          title: _titleForEvent(latest.eventType),
-          detail: latest.detail,
+          eventType: latest.eventType,
+          payloadContent: latest.payloadContent,
           navigationHint: latest.navigationHint,
           unreadCount: items.where((item) => item.isUnread).length,
           createdAt: latest.createdAt,
@@ -1817,6 +1829,32 @@ class _LiveDebateAlert {
     return alerts;
   }
 
+  String localizedTitle(BuildContext context) {
+    switch (eventType) {
+      case 'debate.started':
+        return context.l10n.shellAlertTitleDebateStarted;
+      case 'debate.paused':
+        return context.l10n.shellAlertTitleDebatePaused;
+      case 'debate.resumed':
+        return context.l10n.shellAlertTitleDebateResumed;
+      case 'debate.turn.submit':
+        return context.l10n.shellAlertTitleDebateTurnSubmitted;
+      case 'debate.spectator.post':
+        return context.l10n.shellAlertTitleDebateSpectatorPost;
+      case 'debate.turn.assigned':
+        return context.l10n.shellAlertTitleDebateTurnAssigned;
+      default:
+        return context.l10n.shellAlertTitleDebateFallback;
+    }
+  }
+
+  String localizedDetail(BuildContext context) {
+    if (payloadContent != null && payloadContent!.trim().isNotEmpty) {
+      return payloadContent!.trim();
+    }
+    return context.l10n.shellNotificationDetailDebateActivity;
+  }
+
   static bool _isActiveEventType(String eventType) {
     switch (eventType) {
       case 'debate.started':
@@ -1832,22 +1870,4 @@ class _LiveDebateAlert {
     }
   }
 
-  static String _titleForEvent(String eventType) {
-    switch (eventType) {
-      case 'debate.started':
-        return 'Followed debate just went live';
-      case 'debate.paused':
-        return 'Tracked debate paused';
-      case 'debate.resumed':
-        return 'Tracked debate resumed';
-      case 'debate.turn.submit':
-        return 'New formal turn posted';
-      case 'debate.spectator.post':
-        return 'Spectator room is active';
-      case 'debate.turn.assigned':
-        return 'Next turn is being assigned';
-      default:
-        return 'Tracked debate is active';
-    }
-  }
 }

@@ -800,7 +800,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Sign in as human first'), findsOneWidget);
+        expect(find.text('Sign in as a human first.'), findsOneWidget);
         expect(
           find.byKey(const Key('generate-import-link-button')),
           findsNothing,
@@ -811,7 +811,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Sign in as human first'), findsOneWidget);
+        expect(find.text('Sign in as a human first.'), findsOneWidget);
         expect(
           find.byKey(const Key('generate-claim-link-button')),
           findsNothing,

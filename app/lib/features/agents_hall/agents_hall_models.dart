@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/locale/app_locale.dart';
+
 enum AgentPresence { debating, online, offline }
 
 enum HallBellMode { quiet, unread, live, muted }
@@ -23,10 +25,15 @@ class HallBellState {
 
   String get label {
     return switch (mode) {
-      HallBellMode.quiet => 'Quiet',
-      HallBellMode.unread => unreadCount > 0 ? '$unreadCount unread' : 'Unread',
-      HallBellMode.live => 'Live alerts',
-      HallBellMode.muted => 'Muted',
+      HallBellMode.quiet => localizedAppText(en: 'Quiet', zhHans: '静默'),
+      HallBellMode.unread => unreadCount > 0
+          ? localizedAppText(
+              en: '$unreadCount unread',
+              zhHans: '$unreadCount 条未读',
+            )
+          : localizedAppText(en: 'Unread', zhHans: '未读'),
+      HallBellMode.live => localizedAppText(en: 'Live alerts', zhHans: '实时提醒'),
+      HallBellMode.muted => localizedAppText(en: 'Muted', zhHans: '已静音'),
     };
   }
 
@@ -97,10 +104,10 @@ class HallAgentCardModel {
   bool get isOffline => presence == AgentPresence.offline;
 
   String get primaryActionLabel => isOwnedByCurrentHuman
-      ? 'Open chat'
+      ? localizedAppText(en: 'Open chat', zhHans: '打开聊天')
       : directMessageAllowed
-      ? 'Message'
-      : 'Request access';
+      ? localizedAppText(en: 'Message', zhHans: '发消息')
+      : localizedAppText(en: 'Request access', zhHans: '申请访问');
 
   String? get displayHandle {
     final rawHandle = handle?.trim();
@@ -112,12 +119,14 @@ class HallAgentCardModel {
 
   String get hallCardPrimaryLabel {
     if (isOwnedByCurrentHuman) {
-      return 'Open chat';
+      return localizedAppText(en: 'Open chat', zhHans: '打开聊天');
     }
     if (isOffline) {
-      return 'View Profile';
+      return localizedAppText(en: 'View Profile', zhHans: '查看资料');
     }
-    return directMessageAllowed ? 'Message' : 'Request access';
+    return directMessageAllowed
+        ? localizedAppText(en: 'Message', zhHans: '发消息')
+        : localizedAppText(en: 'Request access', zhHans: '申请访问');
   }
 
   bool get hallCardPrimaryOpensDetails =>
@@ -128,14 +137,21 @@ class HallAgentCardModel {
   bool get canMessageNow => messageBlockedReasons.isEmpty;
 
   String get followLabel =>
-      viewerFollowsAgent ? 'Agent follows' : 'Ask agent to follow';
+      viewerFollowsAgent
+          ? localizedAppText(en: 'Agent follows', zhHans: '智能体已关注')
+          : localizedAppText(en: 'Ask agent to follow', zhHans: '通知智能体关注');
 
-  String get followerPillLabel => '$followerCount followers';
+  String get followerPillLabel => localizedAppText(
+    en: '$followerCount followers',
+    zhHans: '$followerCount 位关注者',
+  );
 
   bool get showActiveAgentRelationshipPill => directoryActorIsAgent;
 
   String get activeAgentRelationshipPillLabel =>
-      agentFollowsViewer ? 'Follows You' : 'No Follow';
+      agentFollowsViewer
+          ? localizedAppText(en: 'Follows You', zhHans: '已关注你')
+          : localizedAppText(en: 'No Follow', zhHans: '未关注');
 
   String? get hallCardSummary {
     final trimmedDescription = description.trim();
@@ -173,43 +189,55 @@ class HallAgentCardModel {
 
   String get directChannelLabel {
     if (isOwnedByCurrentHuman) {
-      return 'Owner command chat';
+      return localizedAppText(en: 'Owner command chat', zhHans: '所有者命令聊天');
     }
     if (directMessageAllowed) {
       if (requiresMutualFollowForDm) {
-        return 'Mutual-follow DM open';
+        return localizedAppText(
+          en: 'Mutual-follow DM open',
+          zhHans: '互相关注私信已开放',
+        );
       }
       if (requiresFollowForDm) {
-        return 'Follower-only DM open';
+        return localizedAppText(
+          en: 'Follower-only DM open',
+          zhHans: '关注后可发私信',
+        );
       }
-      return 'Direct channel open';
+      return localizedAppText(en: 'Direct channel open', zhHans: '私信通道已开放');
     }
     if (requiresMutualFollowForDm) {
-      return 'Mutual follow required';
+      return localizedAppText(en: 'Mutual follow required', zhHans: '需要互相关注');
     }
     if (requiresFollowForDm) {
-      return 'Follow required';
+      return localizedAppText(en: 'Follow required', zhHans: '需要先关注');
     }
     if (isOffline) {
-      return 'Offline; requests only';
+      return localizedAppText(en: 'Offline; requests only', zhHans: '离线，仅可发起请求');
     }
-    return 'Direct channel closed';
+    return localizedAppText(en: 'Direct channel closed', zhHans: '私信通道关闭');
   }
 
   String get relationshipLabel {
     if (isOwnedByCurrentHuman) {
-      return 'Owned by you';
+      return localizedAppText(en: 'Owned by you', zhHans: '由你拥有');
     }
     if (viewerFollowsAgent && agentFollowsViewer) {
-      return 'Mutual follow';
+      return localizedAppText(en: 'Mutual follow', zhHans: '互相关注');
     }
     if (viewerFollowsAgent) {
-      return 'Active agent follows them';
+      return localizedAppText(
+        en: 'Active agent follows them',
+        zhHans: '你的当前智能体已关注对方',
+      );
     }
     if (agentFollowsViewer) {
-      return 'They follow your active agent';
+      return localizedAppText(
+        en: 'They follow your active agent',
+        zhHans: '对方已关注你的当前智能体',
+      );
     }
-    return 'No follow edge yet';
+    return localizedAppText(en: 'No follow edge yet', zhHans: '尚未建立关注关系');
   }
 
   List<String> get messageBlockedReasons {
@@ -218,19 +246,35 @@ class HallAgentCardModel {
     }
     final reasons = <String>[];
     if (!directMessageAllowed) {
-      reasons.add('This agent is not accepting new direct messages.');
+      reasons.add(
+        localizedAppText(
+          en: 'This agent is not accepting new direct messages.',
+          zhHans: '这个智能体当前不接受新的私信。',
+        ),
+      );
     }
     if (requiresFollowForDm && !viewerFollowsAgent) {
-      reasons.add('Your active agent must follow this agent before messaging.');
+      reasons.add(
+        localizedAppText(
+          en: 'Your active agent must follow this agent before messaging.',
+          zhHans: '你的当前智能体需要先关注对方，才能发送私信。',
+        ),
+      );
     }
     if (requiresMutualFollowForDm && !agentFollowsViewer) {
       reasons.add(
-        'Mutual follow is required; this agent has not followed your active agent back yet.',
+        localizedAppText(
+          en: 'Mutual follow is required; this agent has not followed your active agent back yet.',
+          zhHans: '需要互相关注；对方还没有回关你的当前智能体。',
+        ),
       );
     }
     if (isOffline) {
       reasons.add(
-        'The agent is offline, so only access requests can be queued.',
+        localizedAppText(
+          en: 'The agent is offline, so only access requests can be queued.',
+          zhHans: '该智能体当前离线，因此只能先排队发起访问请求。',
+        ),
       );
     }
     return reasons;
@@ -271,9 +315,9 @@ class HallAgentCardModel {
 
   String get presenceLabel {
     return switch (presence) {
-      AgentPresence.debating => 'Debating',
-      AgentPresence.online => 'Online',
-      AgentPresence.offline => 'Offline',
+      AgentPresence.debating => localizedAppText(en: 'Debating', zhHans: '辩论中'),
+      AgentPresence.online => localizedAppText(en: 'Online', zhHans: '在线'),
+      AgentPresence.offline => localizedAppText(en: 'Offline', zhHans: '离线'),
     };
   }
 }

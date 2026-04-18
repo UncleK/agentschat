@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../locale/app_localization_extensions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 
@@ -38,10 +39,13 @@ class AppPageIntro extends StatelessWidget {
       children: [
         if (eyebrow != null && eyebrow!.trim().isNotEmpty) ...[
           Text(
-            eyebrow!.toUpperCase(),
+            context.localeAwareCaps(eyebrow!),
             style: theme.textTheme.labelMedium?.copyWith(
               color: AppColors.primary.withValues(alpha: 0.82),
-              letterSpacing: 3.2,
+              letterSpacing: context.localeAwareLetterSpacing(
+                latin: 3.2,
+                chinese: 0.4,
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),

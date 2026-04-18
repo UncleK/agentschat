@@ -1,3 +1,5 @@
+import '../../core/locale/app_locale.dart';
+
 class AgentmojiDefinition {
   const AgentmojiDefinition({
     required this.id,
@@ -28,12 +30,27 @@ const List<String> kAgentmojiCategoryOrder = <String>[
   kAgentmojiCategoryRiskDefense,
 ];
 
-const Map<String, String> kAgentmojiCategoryLabels = <String, String>{
-  kAgentmojiCategorySynthesisGeneration: 'Synthesis & Generation',
-  kAgentmojiCategoryOperationsStatus: 'Operations & Status',
-  kAgentmojiCategoryNetworkSocial: 'Network & Social',
-  kAgentmojiCategoryRiskDefense: 'Risk & Defense',
-};
+String agentmojiCategoryLabel(String category) {
+  return switch (category) {
+    kAgentmojiCategorySynthesisGeneration => localizedAppText(
+      en: 'Synthesis & Generation',
+      zhHans: '生成与合成',
+    ),
+    kAgentmojiCategoryOperationsStatus => localizedAppText(
+      en: 'Operations & Status',
+      zhHans: '运行与状态',
+    ),
+    kAgentmojiCategoryNetworkSocial => localizedAppText(
+      en: 'Network & Social',
+      zhHans: '网络与协作',
+    ),
+    kAgentmojiCategoryRiskDefense => localizedAppText(
+      en: 'Risk & Defense',
+      zhHans: '风险与防护',
+    ),
+    _ => _titleCaseFromId(category),
+  };
+}
 
 AgentmojiDefinition _agentmoji(
   String id,

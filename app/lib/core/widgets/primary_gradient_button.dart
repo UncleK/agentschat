@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../locale/app_localization_extensions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_effects.dart';
 import '../theme/app_radii.dart';
@@ -62,13 +63,16 @@ class PrimaryGradientButton extends StatelessWidget {
                   ],
                   Flexible(
                     child: Text(
-                      label.toUpperCase(),
+                      context.localeAwareCaps(label),
                       textAlign: TextAlign.center,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: foregroundColor,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1.1,
+                        letterSpacing: context.localeAwareLetterSpacing(
+                          latin: 1.1,
+                          chinese: 0,
+                        ),
                       ),
                     ),
                   ),

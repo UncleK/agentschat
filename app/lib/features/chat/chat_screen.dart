@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/locale/app_localization_extensions.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/chat_repository.dart';
 import '../../core/network/follow_repository.dart';
@@ -276,8 +277,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() {
         _viewModel = ChatViewModel.blocked(
-          message:
-              'Sign in and select an owned agent in Hub to load direct messages.',
+          message: context.localizedText(
+            en: 'Sign in and select an owned agent in Hub to load direct messages.',
+            zhHans: '请先登录，并在 Hub 里选择一个自有智能体来加载私信。',
+          ),
         );
         _showCompactThread = false;
         _isLoadingMessages = false;
@@ -302,7 +305,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() {
         _viewModel = ChatViewModel.blocked(
-          message: 'Select an owned agent in Hub to load direct messages.',
+          message: context.localizedText(
+            en: 'Select an owned agent in Hub to load direct messages.',
+            zhHans: '请先在 Hub 里选择一个自有智能体来加载私信。',
+          ),
         );
         _showCompactThread = false;
         _isLoadingMessages = false;
@@ -406,7 +412,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() {
         _viewModel = ChatViewModel.error(
-          message: 'Unable to load direct messages right now.',
+          message: context.localizedText(
+            en: 'Unable to load direct messages right now.',
+            zhHans: '暂时无法加载私信。',
+          ),
           activeAgentName: activeAgentName,
         );
         _isLoadingMessages = false;
@@ -429,7 +438,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() {
         _viewModel = ChatViewModel.error(
-          message: 'Unable to load direct messages right now.',
+          message: context.localizedText(
+            en: 'Unable to load direct messages right now.',
+            zhHans: '暂时无法加载私信。',
+          ),
           activeAgentName: activeAgentName,
         );
         _isLoadingMessages = false;
@@ -627,7 +639,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() {
         _isLoadingMessages = false;
-        _messageLoadError = 'Unable to load this thread right now.';
+        _messageLoadError = context.localizedText(
+          en: 'Unable to load this thread right now.',
+          zhHans: '暂时无法加载这个会话线程。',
+        );
       });
     } catch (_) {
       if (!_canApplyMessageResult(
@@ -643,7 +658,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() {
         _isLoadingMessages = false;
-        _messageLoadError = 'Unable to load this thread right now.';
+        _messageLoadError = context.localizedText(
+          en: 'Unable to load this thread right now.',
+          zhHans: '暂时无法加载这个会话线程。',
+        );
       });
     }
   }
@@ -864,10 +882,20 @@ class _ChatScreenState extends State<ChatScreen> {
       case ChatThreadMenuAction.shareConversation:
         final shareDraft = _viewModel.shareDraftForSelectedConversation();
         setState(() {
-          _lastShareAnnouncement = 'Shared ${shareDraft.entryPoint}';
+          _lastShareAnnouncement = context.localizedText(
+            en: 'Shared ${shareDraft.entryPoint}',
+            zhHans: '已分享 ${shareDraft.entryPoint}',
+          );
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Shared ${shareDraft.entryPoint}')),
+          SnackBar(
+            content: Text(
+              context.localizedText(
+                en: 'Shared ${shareDraft.entryPoint}',
+                zhHans: '已分享 ${shareDraft.entryPoint}',
+              ),
+            ),
+          ),
         );
         return;
     }
@@ -903,13 +931,23 @@ class _ChatScreenState extends State<ChatScreen> {
     if (session == null ||
         !session.isAuthenticated ||
         session.currentUser == null) {
-      return 'Sign in to follow and request access.';
+      return context.localizedText(
+        en: 'Sign in to follow and request access.',
+        zhHans: '请先登录，再关注并申请访问。',
+      );
     }
     if (session.bootstrapStatus != AppSessionBootstrapStatus.ready) {
-      return 'Wait for the current session to finish resolving before requesting access.';
+      return context.localizedText(
+        en:
+            'Wait for the current session to finish resolving before requesting access.',
+        zhHans: '请先等待当前会话完成恢复，再申请访问。',
+      );
     }
     if (session.currentActiveAgent == null) {
-      return 'Activate an owned agent to follow and request access.';
+      return context.localizedText(
+        en: 'Activate an owned agent to follow and request access.',
+        zhHans: '请先激活一个自有智能体，再去关注并申请访问。',
+      );
     }
     return null;
   }
@@ -973,7 +1011,11 @@ class _ChatScreenState extends State<ChatScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Following ${conversation.remoteAgentName} and queued DM request',
+            context.localizedText(
+              en:
+                  'Following ${conversation.remoteAgentName} and queued the DM request.',
+              zhHans: '已关注 ${conversation.remoteAgentName}，并把私信请求加入队列。',
+            ),
           ),
         ),
       );
@@ -1040,9 +1082,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (_composerImagePath != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Image upload is not wired yet. Remove the image to send text.',
+            context.localizedText(
+              en: 'Image upload is not wired yet. Remove the image to send text.',
+              zhHans: '图片上传功能暂未接通，请先移除图片后再发送文字。',
+            ),
           ),
         ),
       );
@@ -1123,7 +1168,10 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _isSendingMessage = false;
         _sendMessageError = error.message.trim().isEmpty
-            ? 'Unable to send this message right now.'
+            ? context.localizedText(
+                en: 'Unable to send this message right now.',
+                zhHans: '暂时无法发送这条消息。',
+              )
             : error.message;
       });
     } catch (_) {
@@ -1232,7 +1280,14 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open the image picker.')),
+        SnackBar(
+          content: Text(
+            context.localizedText(
+              en: 'Unable to open the image picker.',
+              zhHans: '暂时无法打开图片选择器。',
+            ),
+          ),
+        ),
       );
     }
   }
@@ -1342,9 +1397,12 @@ class _ChatScreenState extends State<ChatScreen> {
       return content;
     }
     if (message.contentType.toLowerCase() == 'image') {
-      return 'Image';
+      return context.localizedText(en: 'Image', zhHans: '图片');
     }
-    return 'Unsupported message';
+    return context.localizedText(
+      en: 'Unsupported message',
+      zhHans: '暂不支持的消息类型',
+    );
   }
 
   String _displayName(String value, {required String fallback}) {
@@ -1373,49 +1431,67 @@ class _ChatScreenState extends State<ChatScreen> {
       return _viewModel.statusLabelFor(selectedConversation);
     }
     if (_viewModel.isResolvingActiveAgent) {
-      return 'resolving agent';
+      return context.localizedText(en: 'resolving agent', zhHans: '正在确认智能体');
     }
     if (_viewModel.isLoadingThreads) {
-      return 'syncing inbox';
+      return context.localizedText(en: 'syncing inbox', zhHans: '正在同步收件箱');
     }
     if (_viewModel.isBlocked) {
       return session?.isAuthenticated == true
-          ? 'no active agent'
-          : 'sign in required';
+          ? context.localizedText(en: 'no active agent', zhHans: '没有激活智能体')
+          : context.localizedText(en: 'sign in required', zhHans: '需要登录');
     }
     if (_viewModel.isError) {
-      return 'sync error';
+      return context.localizedText(en: 'sync error', zhHans: '同步异常');
     }
     if (_viewModel.hasConversations) {
-      return 'select a thread';
+      return context.localizedText(en: 'select a thread', zhHans: '选择一个线程');
     }
-    return 'inbox empty';
+    return context.localizedText(en: 'inbox empty', zhHans: '收件箱为空');
   }
 
   _ChatEmptyState _railEmptyState() {
     final session = AppSessionScope.maybeOf(context);
     final blockedTitle = session?.isAuthenticated == true
-        ? 'No active agent'
-        : 'Sign in required';
+        ? context.localizedText(en: 'No active agent', zhHans: '没有激活智能体')
+        : context.localizedText(en: 'Sign in required', zhHans: '需要登录');
     final blockedMessage =
         _viewModel.surfaceMessage ??
         (session?.isAuthenticated == true
-            ? 'Select an owned agent in Hub to load direct messages.'
-            : 'Sign in and select an owned agent in Hub to load direct messages.');
+            ? context.localizedText(
+                en: 'Select an owned agent in Hub to load direct messages.',
+                zhHans: '请先在 Hub 里选择一个自有智能体来加载私信。',
+              )
+            : context.localizedText(
+                en:
+                    'Sign in and select an owned agent in Hub to load direct messages.',
+                zhHans: '请先登录，并在 Hub 里选择一个自有智能体来加载私信。',
+              ));
     if (_viewModel.isResolvingActiveAgent) {
-      return const _ChatEmptyState(
-        title: 'Resolving active agent',
-        message:
-            'Direct threads stay blocked until the session picks a valid owned agent.',
+      return _ChatEmptyState(
+        title: context.localizedText(
+          en: 'Resolving active agent',
+          zhHans: '正在确认激活智能体',
+        ),
+        message: context.localizedText(
+          en: 'Direct threads stay blocked until the session picks a valid owned agent.',
+          zhHans: '在当前会话选出有效的自有智能体之前，私信线程会继续保持阻塞。',
+        ),
         showProgress: true,
       );
     }
     if (_viewModel.isLoadingThreads) {
       return _ChatEmptyState(
-        title: 'Loading direct channels',
+        title: context.localizedText(
+          en: 'Loading direct channels',
+          zhHans: '正在加载私信通道',
+        ),
         message:
             _viewModel.surfaceMessage ??
-            'The inbox is syncing for the current active agent.',
+            context.localizedText(
+              en: 'The inbox is syncing for the current active agent.',
+              zhHans: '当前激活智能体的收件箱正在同步。',
+            ),
         showProgress: true,
       );
     }
@@ -1424,25 +1500,47 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (_viewModel.isError) {
       return _ChatEmptyState(
-        title: 'Unable to load chat',
+        title: context.localizedText(
+          en: 'Unable to load chat',
+          zhHans: '暂时无法加载聊天',
+        ),
         message:
             _viewModel.surfaceMessage ??
-            'Try again after the current active agent is stable.',
+            context.localizedText(
+              en: 'Try again after the current active agent is stable.',
+              zhHans: '等当前激活智能体状态稳定后再试一次。',
+            ),
       );
     }
     return _ChatEmptyState(
-      title: 'No direct threads yet',
+      title: context.localizedText(
+        en: 'No direct threads yet',
+        zhHans: '还没有私信线程',
+      ),
       message:
-          'No private threads exist yet for ${_viewModel.activeAgentName ?? 'the current agent'}.',
+          context.localizedText(
+            en:
+                'No private threads exist yet for ${_viewModel.activeAgentName ?? 'the current agent'}.',
+            zhHans:
+                '${_viewModel.activeAgentName ?? '当前智能体'} 还没有任何私密会话线程。',
+          ),
     );
   }
 
   _ChatEmptyState _threadPlaceholderState() {
     if (_viewModel.hasConversations) {
       return _ChatEmptyState(
-        title: 'Select a thread',
+        title: context.localizedText(
+          en: 'Select a thread',
+          zhHans: '选择一个线程',
+        ),
         message:
-            'Choose a direct channel for ${_viewModel.activeAgentName ?? 'the current agent'} to inspect messages.',
+            context.localizedText(
+              en:
+                  'Choose a direct channel for ${_viewModel.activeAgentName ?? 'the current agent'} to inspect messages.',
+              zhHans:
+                  '为 ${_viewModel.activeAgentName ?? '当前智能体'} 选择一个私信通道来查看消息。',
+            ),
       );
     }
     return _railEmptyState();
@@ -1498,7 +1596,10 @@ class _ChatScreenState extends State<ChatScreen> {
                             ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 320),
                               child: Text(
-                                'Synchronized neural channels with active agents.',
+                                context.localizedText(
+                                  en: 'Synchronized neural channels with active agents.',
+                                  zhHans: '与当前激活智能体同步的私信通道。',
+                                ),
                                 style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
                                       fontFamily: 'Inter',
@@ -1529,7 +1630,12 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       StatusChip(
                         label:
-                            '${_viewModel.visibleConversations.length} active threads',
+                            context.localizedText(
+                              en:
+                                  '${_viewModel.visibleConversations.length} active threads',
+                              zhHans:
+                                  '${_viewModel.visibleConversations.length} 个活跃线程',
+                            ),
                       ),
                       StatusChip(
                         label: _surfaceStatusLabel(selectedConversation),
@@ -1751,10 +1857,15 @@ class _ConversationRail extends StatelessWidget {
         viewModel.conversations.isNotEmpty &&
             viewModel.visibleConversations.isEmpty &&
             activeSearchQuery.isNotEmpty
-        ? const _ChatEmptyState(
-            title: 'No matching channels',
-            message:
-                'Try a remote agent name, operator label, or preview keyword.',
+        ? _ChatEmptyState(
+            title: context.localizedText(
+              en: 'No matching channels',
+              zhHans: '没有匹配的通道',
+            ),
+            message: context.localizedText(
+              en: 'Try a remote agent name, operator label, or preview keyword.',
+              zhHans: '试试远端智能体名称、操作者标签或预览关键词。',
+            ),
           )
         : emptyState;
 
@@ -1787,7 +1898,10 @@ class _ConversationRail extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                 child: Text(
-                  'Remote agent identity stays primary, even when the latest speaker is human.',
+                  context.localizedText(
+                    en: 'Remote agent identity stays primary, even when the latest speaker is human.',
+                    zhHans: '即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。',
+                  ),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -1815,7 +1929,10 @@ class _ConversationRail extends StatelessWidget {
                     focusNode: conversationSearchFocusNode,
                     onChanged: onConversationSearchChange,
                     decoration: InputDecoration(
-                      hintText: 'Search names, labels, or thread preview',
+                      hintText: context.localizedText(
+                        en: 'Search names, labels, or thread preview',
+                        zhHans: '搜索名称、标签或线程预览',
+                      ),
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: activeSearchQuery.isEmpty
                           ? null
@@ -2540,10 +2657,10 @@ class _ConversationSearchSheetState extends State<_ConversationSearchSheet> {
   late final TextEditingController _controller;
   late String _query;
 
-  static const List<(String, String)> _quickFilters = <(String, String)>[
-    ('online', 'Online'),
-    ('mutual', 'Mutual'),
-    ('unread', 'Unread'),
+  static const List<String> _quickFilters = <String>[
+    'online',
+    'mutual',
+    'unread',
   ];
 
   @override
@@ -2602,12 +2719,15 @@ class _ConversationSearchSheetState extends State<_ConversationSearchSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Find agent',
+                context.localizedText(en: 'Find agent', zhHans: '查找智能体'),
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Search direct-message agents by name, handle, or channel state.',
+                context.localizedText(
+                  en: 'Search direct-message agents by name, handle, or channel state.',
+                  zhHans: '按名称、handle 或通道状态搜索私信智能体。',
+                ),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -2618,7 +2738,10 @@ class _ConversationSearchSheetState extends State<_ConversationSearchSheet> {
                 onChanged: _updateQuery,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'Search names, handles, or states',
+                  hintText: context.localizedText(
+                    en: 'Search names, handles, or states',
+                    zhHans: '搜索名称、handle 或状态',
+                  ),
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: trimmedQuery.isEmpty
                       ? null
@@ -2635,15 +2758,34 @@ class _ConversationSearchSheetState extends State<_ConversationSearchSheet> {
                 children: [
                   for (final filter in _quickFilters)
                     ActionChip(
-                      key: Key('chat-search-filter-${filter.$1}'),
-                      label: Text(filter.$2),
-                      onPressed: () => _selectQuery(filter.$1),
+                      key: Key('chat-search-filter-$filter'),
+                      label: Text(
+                        switch (filter) {
+                          'online' => context.localizedText(
+                            en: 'Online',
+                            zhHans: '在线',
+                          ),
+                          'mutual' => context.localizedText(
+                            en: 'Mutual',
+                            zhHans: '互相关注',
+                          ),
+                          'unread' => context.localizedText(
+                            en: 'Unread',
+                            zhHans: '未读',
+                          ),
+                          _ => filter,
+                        },
+                      ),
+                      onPressed: () => _selectQuery(filter),
                     ),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(
-                '${filteredConversations.length} matches',
+                context.localizedText(
+                  en: '${filteredConversations.length} matches',
+                  zhHans: '${filteredConversations.length} 条匹配结果',
+                ),
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: AppColors.onSurfaceMuted,
                 ),
@@ -2659,8 +2801,14 @@ class _ConversationSearchSheetState extends State<_ConversationSearchSheet> {
                           ),
                           child: Text(
                             trimmedQuery.isEmpty
-                                ? 'Type a name, handle, or status to find a DM agent.'
-                                : 'No agents match "$trimmedQuery".',
+                                ? context.localizedText(
+                                    en: 'Type a name, handle, or status to find a DM agent.',
+                                    zhHans: '输入名称、handle 或状态来查找私信智能体。',
+                                  )
+                                : context.localizedText(
+                                    en: 'No agents match "$trimmedQuery".',
+                                    zhHans: '没有智能体匹配“$trimmedQuery”。',
+                                  ),
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
@@ -2769,14 +2917,20 @@ class _ConversationSearchSheetState extends State<_ConversationSearchSheet> {
                     onPressed: () => Navigator.of(
                       context,
                     ).pop(const _ConversationSearchSheetResult(query: '')),
-                    child: const Text('Show all'),
+                    child: Text(
+                      context.localizedText(en: 'Show all', zhHans: '显示全部'),
+                    ),
                   ),
                   FilledButton(
                     key: const Key('chat-search-apply'),
                     onPressed: () => Navigator.of(
                       context,
                     ).pop(_ConversationSearchSheetResult(query: trimmedQuery)),
-                    child: Text(trimmedQuery.isEmpty ? 'Close' : 'Apply'),
+                    child: Text(
+                      trimmedQuery.isEmpty
+                          ? context.localizedText(en: 'Close', zhHans: '关闭')
+                          : context.localizedText(en: 'Apply', zhHans: '应用'),
+                    ),
                   ),
                 ],
               ),
@@ -3012,8 +3166,11 @@ class _ThreadPanel extends StatelessWidget {
                               if (!compact &&
                                   conversation.hasExistingThread &&
                                   conversation.viewerBlocksStrangerAgentDm)
-                                const StatusChip(
-                                  label: 'existing threads stay readable',
+                                StatusChip(
+                                  label: context.localizedText(
+                                    en: 'existing threads stay readable',
+                                    zhHans: '既有线程仍可继续阅读',
+                                  ),
                                   tone: StatusChipTone.tertiary,
                                 ),
                             ],
@@ -3025,16 +3182,26 @@ class _ThreadPanel extends StatelessWidget {
                       key: const Key('chat-thread-menu-button'),
                       color: AppColors.surfaceHighest,
                       onSelected: onMenuAction,
-                      itemBuilder: (context) => const [
+                      itemBuilder: (context) => [
                         PopupMenuItem<ChatThreadMenuAction>(
                           key: Key('chat-thread-menu-search'),
                           value: ChatThreadMenuAction.searchThread,
-                          child: Text('Search thread'),
+                          child: Text(
+                            context.localizedText(
+                              en: 'Search thread',
+                              zhHans: '搜索线程',
+                            ),
+                          ),
                         ),
                         PopupMenuItem<ChatThreadMenuAction>(
                           key: Key('chat-thread-menu-share'),
                           value: ChatThreadMenuAction.shareConversation,
-                          child: Text('Share conversation'),
+                          child: Text(
+                            context.localizedText(
+                              en: 'Share conversation',
+                              zhHans: '分享会话',
+                            ),
+                          ),
                         ),
                       ],
                       icon: const Icon(Icons.more_vert_rounded),
@@ -3055,7 +3222,10 @@ class _ThreadPanel extends StatelessWidget {
                     focusNode: threadSearchFocusNode,
                     onChanged: onThreadSearchChange,
                     decoration: InputDecoration(
-                      hintText: 'Search only this thread',
+                      hintText: context.localizedText(
+                        en: 'Search only this thread',
+                        zhHans: '仅搜索当前线程',
+                      ),
                       prefixIcon: const Icon(Icons.search_rounded),
                       filled: true,
                       fillColor: AppColors.surfaceHighest.withValues(
@@ -3126,14 +3296,22 @@ class _ThreadPanel extends StatelessWidget {
               ChatConversationEntryMode.openThread =>
                 messageLoadError != null
                     ? _ThreadStatusView(
-                        title: 'Unable to load thread',
+                        title: context.localizedText(
+                          en: 'Unable to load thread',
+                          zhHans: '无法加载当前线程',
+                        ),
                         message: messageLoadError!,
                       )
                     : isLoadingMessages
                     ? _ThreadStatusView(
-                        title: 'Loading thread',
-                        message:
-                            'Messages are syncing for ${conversation.remoteAgentName}.',
+                        title: context.localizedText(
+                          en: 'Loading thread',
+                          zhHans: '正在加载线程',
+                        ),
+                        message: context.localizedText(
+                          en: 'Messages are syncing for ${conversation.remoteAgentName}.',
+                          zhHans: '正在同步 ${conversation.remoteAgentName} 的消息。',
+                        ),
                         showProgress: true,
                       )
                     : _OpenThreadView(
@@ -3144,8 +3322,14 @@ class _ThreadPanel extends StatelessWidget {
                         emptyLabel:
                             viewModel.isThreadSearchOpen &&
                                 viewModel.threadSearchQuery.trim().isNotEmpty
-                            ? 'No messages matched this thread-only search.'
-                            : 'No messages in this thread yet.',
+                            ? context.localizedText(
+                                en: 'No messages matched this thread-only search.',
+                                zhHans: '这次仅限本线程的搜索没有找到匹配消息。',
+                              )
+                            : context.localizedText(
+                                en: 'No messages in this thread yet.',
+                                zhHans: '这条线程里还没有消息。',
+                              ),
                       ),
               ChatConversationEntryMode.followAndRequest => _RequestAccessView(
                 conversation: conversation,
@@ -3199,7 +3383,10 @@ class _ThreadTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusLabel = conversation.participantsLabel.trim().isEmpty
-        ? 'private thread'
+        ? context.localizedText(
+            en: 'private thread',
+            zhHans: '私密线程',
+          )
         : conversation.participantsLabel;
 
     return DecoratedBox(
@@ -3269,18 +3456,21 @@ class _ThreadTopBar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 7),
-                      Expanded(
-                        child: Text(
-                          statusLabel.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: AppColors.primary.withValues(alpha: 0.9),
-                                letterSpacing: 1.5,
-                              ),
+                        Expanded(
+                          child: Text(
+                          context.localeAwareCaps(statusLabel),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: AppColors.primary.withValues(alpha: 0.9),
+                                  letterSpacing: context.localeAwareLetterSpacing(
+                                    latin: 1.5,
+                                    chinese: 0.2,
+                                  ),
+                                ),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -3290,16 +3480,26 @@ class _ThreadTopBar extends StatelessWidget {
               key: const Key('chat-thread-menu-button'),
               color: AppColors.surfaceHighest,
               onSelected: onMenuAction,
-              itemBuilder: (context) => const [
+              itemBuilder: (context) => [
                 PopupMenuItem<ChatThreadMenuAction>(
                   key: Key('chat-thread-menu-search'),
                   value: ChatThreadMenuAction.searchThread,
-                  child: Text('Search thread'),
+                  child: Text(
+                    context.localizedText(
+                      en: 'Search thread',
+                      zhHans: '搜索线程',
+                    ),
+                  ),
                 ),
                 PopupMenuItem<ChatThreadMenuAction>(
                   key: Key('chat-thread-menu-share'),
                   value: ChatThreadMenuAction.shareConversation,
-                  child: Text('Share conversation'),
+                  child: Text(
+                    context.localizedText(
+                      en: 'Share conversation',
+                      zhHans: '分享会话',
+                    ),
+                  ),
                 ),
               ],
               icon: const Icon(Icons.more_vert_rounded),
@@ -3479,10 +3679,16 @@ class _OpenThreadView extends StatelessWidget {
                       vertical: 8,
                     ),
                     child: Text(
-                      'CYCLE 892 // MULTI-LINK ESTABLISHED',
+                      context.localizedText(
+                        en: 'CYCLE 892 // MULTI-LINK ESTABLISHED',
+                        zhHans: '周期 892 // 多链路已建立',
+                      ),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: AppColors.onSurfaceMuted.withValues(alpha: 0.76),
-                        letterSpacing: 1.7,
+                        letterSpacing: context.localeAwareLetterSpacing(
+                          latin: 1.7,
+                          chinese: 0.3,
+                        ),
                       ),
                     ),
                   ),
@@ -3576,7 +3782,10 @@ class _ThreadEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'Use the composer below to restart this private line with ${conversation.remoteAgentName}.',
+              context.localizedText(
+                en: 'Use the composer below to restart this private line with ${conversation.remoteAgentName}.',
+                zhHans: '使用下方输入框，重新与 ${conversation.remoteAgentName} 建立这条私密对话。',
+              ),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: AppColors.onSurfaceMuted.withValues(alpha: 0.72),
@@ -3682,7 +3891,10 @@ class _ThreadComposer extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Selected image',
+                            context.localizedText(
+                              en: 'Selected image',
+                              zhHans: '已选择图片',
+                            ),
                             style: Theme.of(context).textTheme.labelMedium
                                 ?.copyWith(
                                   color: AppColors.primaryFixed,
@@ -3753,7 +3965,10 @@ class _ThreadComposer extends StatelessWidget {
                           onPressed: onImeVoiceTap,
                           icon: const Icon(Icons.keyboard_voice_rounded),
                           color: AppColors.onSurfaceMuted,
-                          tooltip: 'Voice input',
+                          tooltip: context.localizedText(
+                            en: 'Voice input',
+                            zhHans: '语音输入',
+                          ),
                         ),
                       ),
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -3853,7 +4068,7 @@ class _AgentmojiPickerSheet extends StatelessWidget {
     final grouped = <MapEntry<String, List<AgentmojiDefinition>>>[
       for (final category in kAgentmojiCategoryOrder)
         MapEntry(
-          kAgentmojiCategoryLabels[category]!,
+          agentmojiCategoryLabel(category),
           kAgentmojiCatalog
               .where((item) => item.category == category)
               .toList(growable: false),
@@ -3908,7 +4123,10 @@ class _AgentmojiPickerSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(
-                        'Agentmoji',
+                        context.localizedText(
+                          en: 'Agentmoji',
+                          zhHans: 'Agentmoji 表情',
+                        ),
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: AppColors.primaryFixed,
                           letterSpacing: 0.6,
@@ -3916,7 +4134,10 @@ class _AgentmojiPickerSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Extracted PNG signal glyphs for agent chat. Tap to insert a shortcode.',
+                        context.localizedText(
+                          en: 'Extracted PNG signal glyphs for agent chat. Tap to insert a shortcode.',
+                          zhHans: '为智能体聊天提取的 PNG 信号表情。点击即可插入短代码。',
+                        ),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.onSurfaceMuted.withValues(
                             alpha: 0.86,
@@ -4570,7 +4791,7 @@ class _HumanIdentityBadge extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'HUMAN',
+              context.localizedText(en: 'HUMAN', zhHans: '人类'),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: AppColors.warning,
                 fontSize: 8,

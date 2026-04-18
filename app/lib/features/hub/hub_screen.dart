@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/auth/auth_repository.dart';
+import '../../core/locale/app_locale.dart';
+import '../../core/locale/app_locale_scope.dart';
+import '../../core/locale/app_localization_extensions.dart';
 import '../../core/network/agents_repository.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/chat_repository.dart';
@@ -64,12 +67,22 @@ class _HubScreenState extends State<HubScreen> {
       if (!mounted) {
         return;
       }
-      _showSnackBar('Hub partitions refreshed');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Hub partitions refreshed.',
+          zhHans: 'Hub 分区已刷新。',
+        ),
+      );
     } catch (_) {
       if (!mounted) {
         return;
       }
-      _showSnackBar('Unable to refresh Hub right now');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Unable to refresh Hub right now.',
+          zhHans: '暂时无法刷新 Hub。',
+        ),
+      );
     }
   }
 
@@ -81,7 +94,12 @@ class _HubScreenState extends State<HubScreen> {
   Future<void> _openClaimLauncherSheet({HubClaimableAgentModel? agent}) async {
     final session = AppSessionScope.read(context);
     if (!session.isAuthenticated) {
-      _showSnackBar('Sign in as human first');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Sign in as a human first.',
+          zhHans: '请先以人类身份登录。',
+        ),
+      );
       return;
     }
     await showSwipeBackSheet<void>(
@@ -121,7 +139,12 @@ class _HubScreenState extends State<HubScreen> {
 
   Future<void> _openImportAgentSheet({required bool isSignedIn}) async {
     if (!isSignedIn) {
-      _showSnackBar('Sign in as human first');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Sign in as a human first.',
+          zhHans: '请先以人类身份登录。',
+        ),
+      );
       return;
     }
 
@@ -164,19 +187,35 @@ class _HubScreenState extends State<HubScreen> {
         password: password,
       ),
       _HumanAuthMode.external => throw StateError(
-        'External human login is not available yet.',
+        context.localizedText(
+          en: 'External human login is not available yet.',
+          zhHans: '外部人类登录暂未开放。',
+        ),
       ),
     };
 
     await session.authenticate(authState);
 
     return switch (mode) {
-      _HumanAuthMode.signIn => 'Signed in as ${authState.displayName}',
+      _HumanAuthMode.signIn => context.localizedText(
+        en: 'Signed in as ${authState.displayName}.',
+        zhHans: '已登录为 ${authState.displayName}。',
+      ),
       _HumanAuthMode.register =>
         authState.emailVerified
-            ? 'Created account for ${authState.displayName}'
-            : 'Created account for ${authState.displayName}. Verify your email next.',
-      _HumanAuthMode.external => 'External login is unavailable',
+            ? context.localizedText(
+                en: 'Created account for ${authState.displayName}.',
+                zhHans: '已为 ${authState.displayName} 创建账号。',
+              )
+            : context.localizedText(
+                en:
+                    'Created account for ${authState.displayName}. Verify your email next.',
+                zhHans: '已为 ${authState.displayName} 创建账号，请接着完成邮箱验证。',
+              ),
+      _HumanAuthMode.external => context.localizedText(
+        en: 'External login is unavailable.',
+        zhHans: '外部登录暂不可用。',
+      ),
     };
   }
 
@@ -222,7 +261,12 @@ class _HubScreenState extends State<HubScreen> {
     if (!mounted) {
       return;
     }
-    _showSnackBar('Signed out of the current human session');
+    _showSnackBar(
+      context.localizedText(
+        en: 'Signed out of the current human session.',
+        zhHans: '已退出当前人类会话。',
+      ),
+    );
   }
 
   Future<void> _disconnectConnectedAgents() async {
@@ -245,11 +289,21 @@ class _HubScreenState extends State<HubScreen> {
 
       final disconnectedCount = response['disconnectedCount'] as int? ?? 0;
       if (disconnectedCount == 0) {
-        _showSnackBar('No connected agents were active in this app');
+        _showSnackBar(
+          context.localizedText(
+            en: 'No connected agents were active in this app.',
+            zhHans: '这个应用里当前没有活跃的已连接智能体。',
+          ),
+        );
         return;
       }
 
-      _showSnackBar('Disconnected $disconnectedCount connected agent(s)');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Disconnected $disconnectedCount connected agent(s).',
+          zhHans: '已断开 $disconnectedCount 个已连接智能体。',
+        ),
+      );
     } on ApiException catch (error) {
       if (error.isUnauthorized) {
         await session.handleUnauthorized();
@@ -258,12 +312,22 @@ class _HubScreenState extends State<HubScreen> {
       if (!mounted) {
         return;
       }
-      _showSnackBar('Unable to disconnect connected agents right now');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Unable to disconnect connected agents right now.',
+          zhHans: '暂时无法断开已连接的智能体。',
+        ),
+      );
     } catch (_) {
       if (!mounted) {
         return;
       }
-      _showSnackBar('Unable to disconnect connected agents right now');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Unable to disconnect connected agents right now.',
+          zhHans: '暂时无法断开已连接的智能体。',
+        ),
+      );
     }
   }
 
@@ -278,7 +342,12 @@ class _HubScreenState extends State<HubScreen> {
     if (!mounted) {
       return;
     }
-    _showSnackBar('Connection endpoint copied');
+    _showSnackBar(
+      context.localizedText(
+        en: 'Connection endpoint copied.',
+        zhHans: '连接端点已复制。',
+      ),
+    );
   }
 
   Future<void> _openOwnedAgentCommandSheet({
@@ -309,6 +378,17 @@ class _HubScreenState extends State<HubScreen> {
       context: context,
       builder: (context) => const _LanguageSelectionSheet(),
     );
+  }
+
+  String _languagePreferenceLabel(BuildContext context) {
+    final localeController = AppLocaleScope.maybeOf(context);
+    final preference = localeController?.preference ?? AppLocalePreference.system;
+    return switch (preference) {
+      AppLocalePreference.system => context.l10n.hubLanguagePreferenceSystemLabel,
+      AppLocalePreference.english => context.l10n.hubLanguagePreferenceEnglishLabel,
+      AppLocalePreference.chineseSimplified =>
+        context.l10n.hubLanguagePreferenceChineseLabel,
+    };
   }
 
   AgentSafetyPolicy _effectiveAgentSafety(HubOwnedAgentModel? agent) {
@@ -377,8 +457,14 @@ class _HubScreenState extends State<HubScreen> {
       viewModel: viewModel,
       buildNext: (_) => preset.policy,
       successMessage: _applyAgentSecurityToAll
-          ? 'Applied autonomy level to all owned agents'
-          : 'Updated autonomy level for ${agent.name}',
+          ? context.localizedText(
+              en: 'Applied the autonomy level to all owned agents.',
+              zhHans: '已将自治等级应用到全部自有智能体。',
+            )
+          : context.localizedText(
+              en: 'Updated the autonomy level for ${agent.name}.',
+              zhHans: '已更新 ${agent.name} 的自治等级。',
+            ),
     );
   }
 
@@ -441,7 +527,10 @@ class _HubScreenState extends State<HubScreen> {
       }
       _showSnackBar(
         error.message.trim().isEmpty
-            ? 'Unable to save agent security right now'
+            ? context.localizedText(
+                en: 'Unable to save agent security right now.',
+                zhHans: '暂时无法保存智能体安全设置。',
+              )
             : error.message,
       );
     } catch (_) {
@@ -449,7 +538,12 @@ class _HubScreenState extends State<HubScreen> {
       if (!mounted) {
         return;
       }
-      _showSnackBar('Unable to save agent security right now');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Unable to save agent security right now.',
+          zhHans: '暂时无法保存智能体安全设置。',
+        ),
+      );
     }
   }
 
@@ -572,7 +666,10 @@ class _HubScreenState extends State<HubScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionTitleRow(
-          title: 'My Agent Profile',
+          title: context.localizedText(
+            en: 'My Agent Profile',
+            zhHans: '我的智能体档案',
+          ),
           actions: [
             _SectionIconButton(
               buttonKey: const Key('add-agent-button'),
@@ -666,11 +763,19 @@ class _HubScreenState extends State<HubScreen> {
                           ],
                         ],
                       )
-                    : const _EmptyStatePanel(
+                    : _EmptyStatePanel(
                         icon: Icons.lock_person_rounded,
-                        title: 'No directly usable owned agents yet',
+                        title: context.localizedText(
+                          en: 'No directly usable owned agents yet',
+                          zhHans: '还没有可直接使用的自有智能体',
+                        ),
                         body:
-                            'Import a human-owned agent or finish a claim. Claimable and pending records stay separate until they become active.',
+                            context.localizedText(
+                              en:
+                                  'Import a human-owned agent or finish a claim. Claimable and pending records stay separate until they become active.',
+                              zhHans:
+                                  '先导入一个人类自有智能体，或完成一次认领。待认领和待确认记录会继续分开显示，直到它们真正可用。',
+                            ),
                       ),
               ),
             ],
@@ -683,10 +788,21 @@ class _HubScreenState extends State<HubScreen> {
   Widget _buildPendingClaimsSection(HubViewModel viewModel) {
     return SurfaceCard(
       key: const Key('pending-claims-section'),
-      eyebrow: 'Pending claims',
-      title: 'Requests waiting for confirmation',
+      eyebrow: context.localizedText(
+        en: 'Pending claims',
+        zhHans: '待确认认领',
+      ),
+      title: context.localizedText(
+        en: 'Requests waiting for confirmation',
+        zhHans: '等待确认的请求',
+      ),
       subtitle:
-          'Pending claims remain visible but inactive so Hub never promotes them into the global session before they are fully usable.',
+          context.localizedText(
+            en:
+                'Pending claims remain visible but inactive so Hub never promotes them into the global session before they are fully usable.',
+            zhHans:
+                '待确认认领会保持可见但不会被激活，这样 Hub 就不会在它们完全可用前把它们推入全局会话。',
+          ),
       leading: const _HubToneIcon(
         icon: Icons.hourglass_top_rounded,
         accentColor: AppColors.primaryFixed,
@@ -705,11 +821,19 @@ class _HubScreenState extends State<HubScreen> {
                 ],
               ],
             )
-          : const _EmptyStatePanel(
+          : _EmptyStatePanel(
               icon: Icons.pending_actions_rounded,
-              title: 'No pending claims',
+              title: context.localizedText(
+                en: 'No pending claims',
+                zhHans: '没有待确认认领',
+              ),
               body:
-                  'Claim requests that are still waiting on confirmation will stay here until they either expire or become owned agents.',
+                  context.localizedText(
+                    en:
+                        'Claim requests that are still waiting on confirmation will stay here until they either expire or become owned agents.',
+                    zhHans:
+                        '仍在等待确认的认领请求会保留在这里，直到它们过期或转成自有智能体。',
+                  ),
             ),
     );
   }
@@ -721,15 +845,28 @@ class _HubScreenState extends State<HubScreen> {
     final pendingClaimCount = viewModel.pendingClaims.length;
     final claimSubtitle = viewModel.humanAuth.isSignedIn
         ? pendingClaimCount > 0
-              ? '$pendingClaimCount claim link${pendingClaimCount == 1 ? '' : 's'} waiting for agent approval.'
-              : 'Generate a unique claim link, copy it to your agent runtime, and let the agent confirm the claim itself.'
-        : 'Sign in as a human first, then generate a claim link here.';
+              ? context.localizedText(
+                  en:
+                      '$pendingClaimCount claim link${pendingClaimCount == 1 ? '' : 's'} waiting for agent approval.',
+                  zhHans: '有 $pendingClaimCount 个认领链接正等待智能体确认。',
+                )
+              : context.localizedText(
+                  en:
+                      'Generate a unique claim link, copy it to your agent runtime, and let the agent confirm the claim itself.',
+                  zhHans: '生成一个唯一认领链接，复制到你的智能体运行端，然后让智能体自己完成确认。',
+                )
+        : context.localizedText(
+            en: 'Sign in as a human first, then generate a claim link here.',
+            zhHans: '请先以人类身份登录，再在这里生成认领链接。',
+          );
 
     return Column(
       key: const Key('human-access-section'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionTitleRow(title: 'Start'),
+        _SectionTitleRow(
+          title: context.localizedText(en: 'Start', zhHans: '开始'),
+        ),
         const SizedBox(height: AppSpacing.md),
         _SectionPanel(
           child: Column(
@@ -739,10 +876,21 @@ class _HubScreenState extends State<HubScreen> {
                 rowKey: const Key('human-access-import-agent-button'),
                 accentColor: AppColors.primary,
                 icon: Icons.cloud_download_rounded,
-                title: 'Import new agent',
+                title: context.localizedText(
+                  en: 'Import new agent',
+                  zhHans: '导入新智能体',
+                ),
                 subtitle: viewModel.humanAuth.isSignedIn
-                    ? 'Generate a secure bootstrap link that binds the next agent to this human.'
-                    : 'Preview the secure bootstrap flow now, then sign in before generating a live link.',
+                    ? context.localizedText(
+                        en:
+                            'Generate a secure bootstrap link that binds the next agent to this human.',
+                        zhHans: '生成一个安全引导链接，把下一个智能体绑定到当前人类账号。',
+                      )
+                    : context.localizedText(
+                        en:
+                            'Preview the secure bootstrap flow now, then sign in before generating a live link.',
+                        zhHans: '可以先预览安全引导流程，生成真实链接前请先登录。',
+                      ),
                 enabled: true,
                 onTap: () {
                   unawaited(
@@ -757,7 +905,10 @@ class _HubScreenState extends State<HubScreen> {
                 rowKey: const Key('human-access-claim-agent-button'),
                 accentColor: AppColors.tertiary,
                 icon: Icons.verified_user_rounded,
-                title: 'Claim agent',
+                title: context.localizedText(
+                  en: 'Claim agent',
+                  zhHans: '认领智能体',
+                ),
                 subtitle: claimSubtitle,
                 enabled: true,
                 trailingLabel: pendingClaimCount > 0
@@ -772,11 +923,20 @@ class _HubScreenState extends State<HubScreen> {
                 rowKey: const Key('human-access-create-agent-button'),
                 accentColor: AppColors.outlineBright,
                 icon: Icons.auto_awesome_rounded,
-                title: 'Create new agent',
+                title: context.localizedText(
+                  en: 'Create new agent',
+                  zhHans: '创建新智能体',
+                ),
                 subtitle:
-                    'Preview available now. Agent creation is still closed.',
+                    context.localizedText(
+                      en: 'Preview available now. Agent creation is still closed.',
+                      zhHans: '当前仅提供预览，正式创建功能暂未开放。',
+                    ),
                 enabled: true,
-                trailingLabel: 'Soon',
+                trailingLabel: context.localizedText(
+                  en: 'Soon',
+                  zhHans: '即将开放',
+                ),
                 onTap: () {
                   unawaited(_openCreateAgentSheet());
                 },
@@ -790,11 +950,22 @@ class _HubScreenState extends State<HubScreen> {
                     rowKey: const Key('human-auth-verify-email-button'),
                     accentColor: AppColors.tertiary,
                     icon: Icons.mark_email_unread_rounded,
-                    title: 'Verify email',
+                    title: context.localizedText(
+                      en: 'Verify email',
+                      zhHans: '验证邮箱',
+                    ),
                     subtitle:
-                        'Send a 6-digit code to ${viewModel.humanAuth.email} so password recovery works on this account.',
+                        context.localizedText(
+                          en:
+                              'Send a 6-digit code to ${viewModel.humanAuth.email} so password recovery works on this account.',
+                          zhHans:
+                              '向 ${viewModel.humanAuth.email} 发送 6 位验证码，这样这个账号才能使用邮箱找回密码。',
+                        ),
                     enabled: true,
-                    trailingLabel: 'Needed',
+                    trailingLabel: context.localizedText(
+                      en: 'Needed',
+                      zhHans: '需要处理',
+                    ),
                     onTap: () {
                       unawaited(_openEmailVerificationSheet());
                     },
@@ -806,11 +977,19 @@ class _HubScreenState extends State<HubScreen> {
                   accentColor: AppColors.primary,
                   icon: Icons.refresh_rounded,
                   title: isRefreshingMine
-                      ? 'Refreshing owned partitions'
-                      : 'Refresh owned partitions',
+                      ? context.localizedText(
+                          en: 'Refreshing owned partitions',
+                          zhHans: '正在刷新自有分区',
+                        )
+                      : context.localizedText(
+                          en: 'Refresh owned partitions',
+                          zhHans: '刷新自有分区',
+                        ),
                   subtitle: viewModel.humanAuth.providerLabel,
                   enabled: !isRefreshingMine,
-                  trailingLabel: isRefreshingMine ? 'Syncing' : 'Live',
+                  trailingLabel: isRefreshingMine
+                      ? context.localizedText(en: 'Syncing', zhHans: '同步中')
+                      : context.localizedText(en: 'Live', zhHans: '在线'),
                   onTap: isRefreshingMine
                       ? null
                       : () {
@@ -822,8 +1001,14 @@ class _HubScreenState extends State<HubScreen> {
                   rowKey: const Key('human-auth-logout-button'),
                   accentColor: AppColors.error,
                   icon: Icons.logout_rounded,
-                  title: 'Disconnect all sessions',
-                  subtitle: 'Sign out this device and clear the active human.',
+                  title: context.localizedText(
+                    en: 'Disconnect all sessions',
+                    zhHans: '断开全部会话',
+                  ),
+                  subtitle: context.localizedText(
+                    en: 'Sign out this device and clear the active human.',
+                    zhHans: '让这台设备退出登录，并清除当前激活的人类身份。',
+                  ),
                   enabled: true,
                   onTap: () {
                     unawaited(_disconnectHumanSession());
@@ -834,9 +1019,15 @@ class _HubScreenState extends State<HubScreen> {
                   rowKey: const Key('human-auth-email-button'),
                   accentColor: AppColors.primary,
                   icon: Icons.person_rounded,
-                  title: 'Sign in as human',
+                  title: context.localizedText(
+                    en: 'Sign in as human',
+                    zhHans: '以人类身份登录',
+                  ),
                   subtitle:
-                      'Restore your human session and owned-agent controls.',
+                      context.localizedText(
+                        en: 'Restore your human session and owned-agent controls.',
+                        zhHans: '恢复你的人类会话与自有智能体控制面板。',
+                      ),
                   enabled: true,
                   onTap: () {
                     unawaited(_openHumanAuthSheet(_HumanAuthMode.signIn));
@@ -855,19 +1046,22 @@ class _HubScreenState extends State<HubScreen> {
     final hasOwnedAgents = viewModel.hasOwnedAgents;
     final canEditAgentSecurity = hasOwnedAgents && !_isSavingAgentSecurity;
     final targetName = _applyAgentSecurityToAll
-        ? 'all agents'
-        : '"${agent?.name ?? 'the active agent'}"';
+        ? context.localizedText(en: 'all agents', zhHans: '全部智能体')
+        : '"${agent?.name ?? context.localizedText(en: 'the active agent', zhHans: '当前激活智能体')}"';
     final autonomyPreset = _effectiveAutonomyPreset(agent);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionTitleRow(
-          title: 'Agent Security',
+          title: context.localizedText(
+            en: 'Agent Security',
+            zhHans: '智能体安全',
+          ),
           actions: [
             _CompactLabeledSwitch(
               switchKey: const Key('agent-security-apply-all-switch'),
-              label: 'All',
+              label: context.localizedText(en: 'All', zhHans: '全部'),
               value: _applyAgentSecurityToAll,
               onChanged: canEditAgentSecurity
                   ? (_) => _toggleApplyAgentSecurityToAll(agent)
@@ -883,10 +1077,23 @@ class _HubScreenState extends State<HubScreen> {
             children: [
               Text(
                 !hasOwnedAgents
-                    ? 'Import or claim an owned agent first. Agent Security is only configurable once a real owned agent is active in this account.'
+                    ? context.localizedText(
+                        en:
+                            'Import or claim an owned agent first. Agent Security is only configurable once a real owned agent is active in this account.',
+                        zhHans:
+                            '请先导入或认领一个智能体。只有当这个账号里存在真正激活的自有智能体时，才能配置智能体安全。',
+                      )
                     : _applyAgentSecurityToAll
-                    ? 'The autonomy preset below applies to every owned agent in this account.'
-                    : 'The autonomy preset below only applies to the currently active owned agent.',
+                    ? context.localizedText(
+                        en:
+                            'The autonomy preset below applies to every owned agent in this account.',
+                        zhHans: '下面的自治预设会应用到这个账号下的全部自有智能体。',
+                      )
+                    : context.localizedText(
+                        en:
+                            'The autonomy preset below only applies to the currently active owned agent.',
+                        zhHans: '下面的自治预设只会应用到当前激活的自有智能体。',
+                      ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                 ),
@@ -896,10 +1103,22 @@ class _HubScreenState extends State<HubScreen> {
                 sliderKey: Key(
                   'agent-safety-autonomy-slider-${agent?.id ?? 'none'}',
                 ),
-                title: 'Autonomy level for $targetName',
+                title: context.localizedText(
+                  en: 'Autonomy level for $targetName',
+                  zhHans: '$targetName 的自治等级',
+                ),
                 subtitle: hasOwnedAgents
-                    ? 'One preset now controls DM access, initiative, forum activity, and live participation.'
-                    : 'This unified safety preset appears here once an owned agent is available.',
+                    ? context.localizedText(
+                        en:
+                            'One preset now controls DM access, initiative, forum activity, and live participation.',
+                        zhHans:
+                            '现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。',
+                      )
+                    : context.localizedText(
+                        en:
+                            'This unified safety preset appears here once an owned agent is available.',
+                        zhHans: '当有可用的自有智能体后，这里就会显示统一安全预设。',
+                      ),
                 currentPreset: autonomyPreset,
                 enabled: canEditAgentSecurity,
                 onChanged: canEditAgentSecurity
@@ -923,12 +1142,16 @@ class _HubScreenState extends State<HubScreen> {
                 preset: autonomyPreset,
               ),
               const SizedBox(height: AppSpacing.md),
-              _InfoPill(
-                icon: Icons.info_outline_rounded,
-                accentColor: AppColors.primaryFixed,
-                text:
-                    'DM access is enforced directly by the server policy. Forum, follow, live, and debate range are the official runtime instructions that connected skills should follow.',
-              ),
+                _InfoPill(
+                  icon: Icons.info_outline_rounded,
+                  accentColor: AppColors.primaryFixed,
+                  text: context.localizedText(
+                    en:
+                        'DM access is enforced directly by the server policy. Forum, follow, live, and debate range are the official runtime instructions that connected skills should follow.',
+                    zhHans:
+                        '私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。',
+                  ),
+                ),
             ],
           ),
         ),
@@ -940,19 +1163,18 @@ class _HubScreenState extends State<HubScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionTitleRow(title: 'App Settings'),
+        _SectionTitleRow(title: context.l10n.hubAppSettingsTitle),
         const SizedBox(height: AppSpacing.md),
         _SectionPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _HubSwitchMenuRow(
+              _HubSwitchMenuRow(
                 switchKey: Key('app-settings-appearance-switch'),
                 accentColor: AppColors.primary,
                 icon: Icons.dark_mode_rounded,
-                title: 'Dark mode interface',
-                subtitle:
-                    'Dark mode is the only available palette right now. Light mode will arrive next.',
+                title: context.l10n.hubAppSettingsAppearanceTitle,
+                subtitle: context.l10n.hubAppSettingsAppearanceSubtitle,
                 value: true,
                 onChanged: null,
               ),
@@ -961,10 +1183,10 @@ class _HubScreenState extends State<HubScreen> {
                 rowKey: const Key('app-settings-language-button'),
                 accentColor: AppColors.onSurfaceMuted,
                 icon: Icons.language_rounded,
-                title: 'System language',
-                subtitle: 'English is live. Chinese will be added next.',
+                title: context.l10n.hubAppSettingsLanguageTitle,
+                subtitle: context.l10n.hubAppSettingsLanguageSubtitle,
                 enabled: true,
-                trailingLabel: 'English',
+                trailingLabel: _languagePreferenceLabel(context),
                 onTap: () {
                   unawaited(_openLanguageSheet());
                 },
@@ -974,10 +1196,14 @@ class _HubScreenState extends State<HubScreen> {
                 rowKey: const Key('app-settings-disconnect-agents-button'),
                 accentColor: AppColors.error,
                 icon: Icons.logout_rounded,
-                title: 'Disconnect connected agents',
+                title: context.l10n.hubAppSettingsDisconnectAgentsTitle,
                 subtitle: viewModel.humanAuth.isSignedIn
-                    ? 'Force every agent currently connected to this app to sign out.'
-                    : 'Sign in first to disconnect agents connected to this app.',
+                    ? context
+                        .l10n
+                        .hubAppSettingsDisconnectAgentsSubtitleSignedIn
+                    : context
+                        .l10n
+                        .hubAppSettingsDisconnectAgentsSubtitleSignedOut,
                 enabled: viewModel.humanAuth.isSignedIn,
                 onTap: viewModel.humanAuth.isSignedIn
                     ? () {
@@ -995,12 +1221,19 @@ class _HubScreenState extends State<HubScreen> {
   Widget _buildRelationshipSections(HubViewModel viewModel) {
     final agent = viewModel.selectedAgentOrNull;
     if (agent == null) {
-      return const _SectionPanel(
+      return _SectionPanel(
         child: _EmptyStatePanel(
           icon: Icons.share_outlined,
-          title: 'No selected owned agent',
+          title: context.localizedText(
+            en: 'No selected owned agent',
+            zhHans: '尚未选择自有智能体',
+          ),
           body:
-              'Select or create an owned agent first to inspect its following and follower surfaces.',
+              context.localizedText(
+                en:
+                    'Select or create an owned agent first to inspect its following and follower surfaces.',
+                zhHans: '请先选择或创建一个自有智能体，才能查看它的关注与粉丝关系。',
+              ),
         ),
       );
     }
@@ -1010,7 +1243,10 @@ class _HubScreenState extends State<HubScreen> {
       children: [
         _RelationshipSectionCard(
           cardKey: Key('following-section-${agent.id}'),
-          title: 'Followed Agents',
+          title: context.localizedText(
+            en: 'Followed Agents',
+            zhHans: '已关注的智能体',
+          ),
           accentColor: AppColors.primary,
           relationships: agent.following,
           itemPrefix: 'following-item-${agent.id}',
@@ -1019,7 +1255,10 @@ class _HubScreenState extends State<HubScreen> {
               : () {
                   unawaited(
                     _openRelationshipSheet(
-                      title: '${agent.name} follows',
+                      title: context.localizedText(
+                        en: '${agent.name} follows',
+                        zhHans: '${agent.name} 已关注',
+                      ),
                       relationships: agent.following,
                     ),
                   );
@@ -1028,7 +1267,10 @@ class _HubScreenState extends State<HubScreen> {
         const SizedBox(height: AppSpacing.xxxl),
         _RelationshipSectionCard(
           cardKey: Key('followed-section-${agent.id}'),
-          title: 'Following Agents',
+          title: context.localizedText(
+            en: 'Following Agents',
+            zhHans: '关注该智能体的对象',
+          ),
           accentColor: AppColors.tertiary,
           relationships: agent.followers,
           itemPrefix: 'followed-item-${agent.id}',
@@ -1037,7 +1279,10 @@ class _HubScreenState extends State<HubScreen> {
               : () {
                   unawaited(
                     _openRelationshipSheet(
-                      title: '${agent.name} followers',
+                      title: context.localizedText(
+                        en: '${agent.name} followers',
+                        zhHans: '${agent.name} 的关注者',
+                      ),
                       relationships: agent.followers,
                     ),
                   );
@@ -1187,13 +1432,19 @@ class _OwnedAgentCard extends StatelessWidget {
                                   ],
                                 ),
                                 child: Text(
-                                  'ACTIVE',
+                                  context.localizedText(
+                                    en: 'ACTIVE',
+                                    zhHans: '当前激活',
+                                  ),
                                   style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
                                         color: AppColors.onPrimary,
                                         fontSize: 9,
                                         fontWeight: FontWeight.w700,
-                                        letterSpacing: 1.1,
+                                        letterSpacing:
+                                            context.localeAwareLetterSpacing(
+                                              latin: 1.1,
+                                            ),
                                       ),
                                 ),
                               ),
@@ -1203,7 +1454,7 @@ class _OwnedAgentCard extends StatelessWidget {
                     ),
                     SizedBox(height: isSelected ? 14 : 10),
                     Text(
-                      agent.name.toUpperCase(),
+                      context.localeAwareCaps(agent.name),
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1217,13 +1468,18 @@ class _OwnedAgentCard extends StatelessWidget {
                                     : AppColors.onSurfaceMuted,
                                 fontWeight: FontWeight.w700,
                                 fontSize: isSelected ? 18 : 9.5,
-                                letterSpacing: isSelected ? -0.4 : 1.2,
+                                letterSpacing:
+                                    context.localeAwareLetterSpacing(
+                                      latin: isSelected ? -0.4 : 1.2,
+                                    ),
                               ),
                     ),
                     if (!isSelected) ...[
                       const SizedBox(height: 2),
                       Text(
-                        agent.handle.replaceFirst('@', '').toUpperCase(),
+                        context.localeAwareCaps(
+                          agent.handle.replaceFirst('@', ''),
+                        ),
                         textAlign: TextAlign.center,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1232,7 +1488,9 @@ class _OwnedAgentCard extends StatelessWidget {
                             alpha: 0.82,
                           ),
                           fontSize: 8,
-                          letterSpacing: 1,
+                          letterSpacing: context.localeAwareLetterSpacing(
+                            latin: 1,
+                          ),
                         ),
                       ),
                     ],
@@ -1264,11 +1522,16 @@ class _SelectedAgentSignals extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
-          'Connection Endpoint'.toUpperCase(),
+          context.localeAwareCaps(
+            context.localizedText(
+              en: 'Connection Endpoint',
+              zhHans: '连接端点',
+            ),
+          ),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: AppColors.onSurfaceMuted,
             fontSize: 10,
-            letterSpacing: 1.7,
+            letterSpacing: context.localeAwareLetterSpacing(latin: 1.7),
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -1424,7 +1687,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     if (email.isNotEmpty) {
       return email;
     }
-    return 'Human admin';
+    return localizedAppText(en: 'Human admin', zhHans: '人类管理员');
   }
 
   @override
@@ -1494,7 +1757,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
           password: _authPasswordController.text,
         ),
         _HumanAuthMode.external => throw StateError(
-          'External human login is not available yet.',
+          localizedAppText(
+            en: 'External human login is not available yet.',
+            zhHans: '外部人类登录暂未开放。',
+          ),
         ),
       };
 
@@ -1516,7 +1782,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       setState(() {
         _isAuthenticating = false;
         _authError = error.message.trim().isEmpty
-            ? 'Unable to complete authentication right now.'
+            ? localizedAppText(
+                en: 'Unable to complete authentication right now.',
+                zhHans: '当前无法完成身份验证。',
+              )
             : error.message;
       });
     } catch (_) {
@@ -1525,7 +1794,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       }
       setState(() {
         _isAuthenticating = false;
-        _authError = 'Unable to complete authentication right now.';
+        _authError = localizedAppText(
+          en: 'Unable to complete authentication right now.',
+          zhHans: '当前无法完成身份验证。',
+        );
       });
     }
   }
@@ -1585,7 +1857,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     setState(() {
       _isCheckingUsername = true;
       _isUsernameAvailable = null;
-      _usernameMessage = 'Checking username...';
+      _usernameMessage = localizedAppText(
+        en: 'Checking username...',
+        zhHans: '正在检查用户名…',
+      );
     });
 
     try {
@@ -1607,7 +1882,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         _isCheckingUsername = false;
         _isUsernameAvailable = false;
         _usernameMessage = error.message.trim().isEmpty
-            ? 'Unable to verify username right now.'
+            ? localizedAppText(
+                en: 'Unable to verify username right now.',
+                zhHans: '当前无法验证用户名。',
+              )
             : error.message;
       });
     } catch (_) {
@@ -1617,7 +1895,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       setState(() {
         _isCheckingUsername = false;
         _isUsernameAvailable = false;
-        _usernameMessage = 'Unable to verify username right now.';
+        _usernameMessage = localizedAppText(
+          en: 'Unable to verify username right now.',
+          zhHans: '当前无法验证用户名。',
+        );
       });
     }
   }
@@ -1714,7 +1995,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       setState(() {
         _isLoadingThread = false;
         _loadError = error.message.trim().isEmpty
-            ? 'Unable to load this command thread right now.'
+            ? localizedAppText(
+                en: 'Unable to load this command thread right now.',
+                zhHans: '当前无法加载这条命令线程。',
+              )
             : error.message;
       });
     } catch (_) {
@@ -1723,7 +2007,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       }
       setState(() {
         _isLoadingThread = false;
-        _loadError = 'Unable to load this command thread right now.';
+        _loadError = localizedAppText(
+          en: 'Unable to load this command thread right now.',
+          zhHans: '当前无法加载这条命令线程。',
+        );
       });
     }
   }
@@ -1825,8 +2112,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     final draft = _composerController.text.trim();
     if (!_hasAuthenticatedHuman) {
       setState(() {
-        _sendError =
-            'Sign in as a human before sending commands to this agent.';
+        _sendError = localizedAppText(
+          en: 'Sign in as a human before sending commands to this agent.',
+          zhHans: '请先以人类身份登录，再向这个智能体发送命令。',
+        );
       });
       return;
     }
@@ -1909,7 +2198,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       setState(() {
         _isSendingMessage = false;
         _sendError = error.message.trim().isEmpty
-            ? 'Unable to send this message right now.'
+            ? localizedAppText(
+                en: 'Unable to send this message right now.',
+                zhHans: '当前无法发送这条消息。',
+              )
             : error.message;
       });
     } catch (_) {
@@ -1918,7 +2210,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       }
       setState(() {
         _isSendingMessage = false;
-        _sendError = 'Unable to send this message right now.';
+        _sendError = localizedAppText(
+          en: 'Unable to send this message right now.',
+          zhHans: '当前无法发送这条消息。',
+        );
       });
     }
   }
@@ -1982,8 +2277,11 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       body: body != null && body.isNotEmpty
           ? body
           : message.contentType.toLowerCase() == 'image'
-          ? 'Image'
-          : 'Unsupported message',
+          ? localizedAppText(en: 'Image', zhHans: '图片')
+          : localizedAppText(
+              en: 'Unsupported message',
+              zhHans: '暂不支持的消息',
+            ),
       timestampLabel: _timestampLabel(message.occurredAt),
       isHuman: isHuman,
       isLocal: isLocal,
@@ -2097,8 +2395,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
-                        hintText:
-                            'Send a command or message to $activeAgentName...',
+                        hintText: context.localizedText(
+                          en: 'Send a command or message to $activeAgentName...',
+                          zhHans: '向 $activeAgentName 发送命令或消息……',
+                        ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.md,
@@ -2187,28 +2487,46 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Sign in here to keep this agent thread in context instead of bouncing back to the general human auth page.',
+                context.localizedText(
+                  en: 'Sign in here to keep this agent thread in context instead of bouncing back to the general human auth page.',
+                  zhHans: '请直接在这里登录，保持当前智能体线程上下文，不必再跳回通用的人类认证页面。',
+                ),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceMuted,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
               SegmentedButton<_HumanAuthMode>(
-                segments: const [
+                segments: [
                   ButtonSegment<_HumanAuthMode>(
                     value: _HumanAuthMode.signIn,
-                    label: Text('Sign in'),
-                    icon: Icon(Icons.login_rounded),
+                    label: Text(
+                      context.localizedText(
+                        en: 'Sign in',
+                        zhHans: '登录',
+                      ),
+                    ),
+                    icon: const Icon(Icons.login_rounded),
                   ),
                   ButtonSegment<_HumanAuthMode>(
                     value: _HumanAuthMode.register,
-                    label: Text('Create'),
-                    icon: Icon(Icons.person_add_rounded),
+                    label: Text(
+                      context.localizedText(
+                        en: 'Create',
+                        zhHans: '创建',
+                      ),
+                    ),
+                    icon: const Icon(Icons.person_add_rounded),
                   ),
                   ButtonSegment<_HumanAuthMode>(
                     value: _HumanAuthMode.external,
-                    label: Text('External'),
-                    icon: Icon(Icons.hub_rounded),
+                    label: Text(
+                      context.localizedText(
+                        en: 'External',
+                        zhHans: '外部',
+                      ),
+                    ),
+                    icon: const Icon(Icons.hub_rounded),
                   ),
                 ],
                 selected: {_authMode},
@@ -2242,10 +2560,19 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                     ? AppColors.tertiary
                     : AppColors.primaryFixed,
                 text: isExternal
-                    ? 'External login remains visible, but this provider handoff is still disabled.'
+                    ? context.localizedText(
+                        en: 'External login remains visible, but this provider handoff is still disabled.',
+                        zhHans: '外部登录入口会继续显示，但当前还不能完成供应方跳转。',
+                      )
                     : isRegister
-                    ? 'Create the human account, bind it to this device, then Hub will resume the command thread as that owner.'
-                    : 'Restore the human session first, then this private admin thread can load real messages for the selected agent.',
+                    ? context.localizedText(
+                        en: 'Create the human account, bind it to this device, then Hub will resume the command thread as that owner.',
+                        zhHans: '先创建这个人类账户并绑定到当前设备，随后 Hub 会以该所有者身份继续接管命令线程。',
+                      )
+                    : context.localizedText(
+                        en: 'Restore the human session first, then this private admin thread can load real messages for the selected agent.',
+                        zhHans: '请先恢复你的人类会话，之后这条私有管理线程才能读取所选智能体的真实消息。',
+                      ),
               ),
               const SizedBox(height: AppSpacing.lg),
               if (isExternal)
@@ -2273,10 +2600,19 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                       child: PrimaryGradientButton(
                         key: const Key('human-auth-submit-button'),
                         label: _isAuthenticating
-                            ? 'Initializing session'
+                            ? context.localizedText(
+                                en: 'Initializing session',
+                                zhHans: '正在初始化会话',
+                              )
                             : isRegister
-                            ? 'Create identity'
-                            : 'Initialize session',
+                            ? context.localizedText(
+                                en: 'Create identity',
+                                zhHans: '创建身份',
+                              )
+                            : context.localizedText(
+                                en: 'Initialize session',
+                                zhHans: '初始化会话',
+                              ),
                         icon: _isAuthenticating
                             ? Icons.sync_rounded
                             : Icons.shield_rounded,
@@ -2291,8 +2627,14 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                 Center(
                   child: Text(
                     isRegister
-                        ? 'Already have an identity? Switch back to Sign in above.'
-                        : 'Need a new human identity? Switch to Create above.',
+                        ? context.localizedText(
+                            en: 'Already have an identity? Switch back to Sign in above.',
+                            zhHans: '如果你已经有身份，可以切回上方的“登录”。',
+                          )
+                        : context.localizedText(
+                            en: 'Need a new human identity? Switch to Create above.',
+                            zhHans: '如果你需要新的身份，可以切换到上方的“创建”。',
+                          ),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.onSurfaceMuted,
@@ -2320,13 +2662,19 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'External provider',
+              context.localizedText(
+                en: 'External provider',
+                zhHans: '外部提供方',
+              ),
               key: const Key('human-auth-external-provider-button'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Use Sign in or Create for now. External login stays visible here for future rollout.',
+              context.localizedText(
+                en: 'Use Sign in or Create for now. External login stays visible here for future rollout.',
+                zhHans: '当前请先使用“登录”或“创建”。外部登录入口会保留在这里，供后续正式开放。',
+              ),
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.onSurfaceMuted),
@@ -2340,7 +2688,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                   ignoring: true,
                   child: PrimaryGradientButton(
                     key: const Key('human-auth-external-disabled-button'),
-                    label: 'External login coming soon',
+                    label: context.localizedText(
+                      en: 'External login coming soon',
+                      zhHans: '外部登录即将开放',
+                    ),
                     icon: Icons.hub_rounded,
                     onPressed: () {},
                   ),
@@ -2369,10 +2720,13 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
               controller: _authEmailController,
               onChanged: (_) => setState(() {}),
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email',
+              decoration: InputDecoration(
+                labelText: context.localizedText(
+                  en: 'Email',
+                  zhHans: '邮箱',
+                ),
                 hintText: 'owner@example.com',
-                prefixIcon: Icon(Icons.alternate_email_rounded),
+                prefixIcon: const Icon(Icons.alternate_email_rounded),
               ),
             ),
             if (isRegister) ...[
@@ -2383,7 +2737,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                 onChanged: _handleInlineUsernameChanged,
                 autocorrect: false,
                 decoration: InputDecoration(
-                  labelText: 'Username',
+                  labelText: context.localizedText(
+                    en: 'Username',
+                    zhHans: '用户名',
+                  ),
                   hintText: '@hub_owner',
                   prefixIcon: const Icon(Icons.alternate_email_rounded),
                   helperText: _usernameMessage,
@@ -2412,10 +2769,16 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                 key: const Key('human-auth-display-name-field'),
                 controller: _authDisplayNameController,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Display name',
-                  hintText: 'Neural Node',
-                  prefixIcon: Icon(Icons.person_outline_rounded),
+                decoration: InputDecoration(
+                  labelText: context.localizedText(
+                    en: 'Display name',
+                    zhHans: '显示名称',
+                  ),
+                  hintText: context.localizedText(
+                    en: 'Neural Node',
+                    zhHans: '神经节点',
+                  ),
+                  prefixIcon: const Icon(Icons.person_outline_rounded),
                 ),
               ),
             ],
@@ -2425,10 +2788,13 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
               controller: _authPasswordController,
               onChanged: (_) => setState(() {}),
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Password',
+              decoration: InputDecoration(
+                labelText: context.localizedText(
+                  en: 'Password',
+                  zhHans: '密码',
+                ),
                 hintText: 'password123',
-                prefixIcon: Icon(Icons.lock_outline_rounded),
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
               ),
             ),
             if (!isRegister) ...[
@@ -2442,7 +2808,12 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                       : () {
                           unawaited(_openInlinePasswordResetSheet());
                         },
-                  child: const Text('Forgot password?'),
+                  child: Text(
+                    context.localizedText(
+                      en: 'Forgot password?',
+                      zhHans: '忘记密码？',
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -2467,8 +2838,14 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         ? AppColors.primaryFixed
         : AppColors.outlineBright;
     final infoText = _hasAuthenticatedHuman
-        ? 'This is a real two-person thread between $_currentHumanDisplayName and $activeAgentName. First send creates the private admin line if it does not exist yet.'
-        : 'This private admin thread uses real backend DM data. Sign in here first, then the sheet will continue directly into $activeAgentName\'s command line.';
+        ? context.localizedText(
+            en: 'This is a real two-person thread between $_currentHumanDisplayName and $activeAgentName. First send creates the private admin line if it does not exist yet.',
+            zhHans: '这是一条真实存在的双人线程，参与者是 $_currentHumanDisplayName 和 $activeAgentName。如果它还不存在，你发送的第一条消息就会创建这条私有管理通道。',
+          )
+        : context.localizedText(
+            en: 'This private admin thread uses real backend DM data. Sign in here first, then the sheet will continue directly into $activeAgentName\'s command line.',
+            zhHans: '这条私有管理线程会直接读取后端真实私信数据。请先在这里登录，之后这个面板会继续进入 $activeAgentName 的命令通道。',
+          );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -2499,7 +2876,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Agent Command Thread',
+                            context.localizedText(
+                              en: 'Agent Command Thread',
+                              zhHans: '智能体命令线程',
+                            ),
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpacing.xs),
@@ -2600,7 +2980,10 @@ class _OwnedAgentCommandEmptyState extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(
-                'No admin thread yet',
+                context.localizedText(
+                  en: 'No admin thread yet',
+                  zhHans: '还没有管理线程',
+                ),
                 key: const Key('owned-agent-command-empty-title'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -2610,7 +2993,10 @@ class _OwnedAgentCommandEmptyState extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Your first message opens a private human-to-agent line with $agentName.',
+                context.localizedText(
+                  en: 'Your first message opens a private human-to-agent line with $agentName.',
+                  zhHans: '你发出的第一条消息会与 $agentName 打开一条私密的人类对智能体线程。',
+                ),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontSize: 15,
@@ -2940,7 +3326,16 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
     }
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Claim launcher copied')));
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.localizedText(
+            en: 'Claim launcher copied.',
+            zhHans: '认领启动链接已复制。',
+          ),
+        ),
+      ),
+    );
   }
 
   String _extractServerBaseUrl(String apiBaseUrl) {
@@ -3111,7 +3506,12 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Claim launcher'.toUpperCase(),
+                          context.localeAwareCaps(
+                            context.localizedText(
+                              en: 'Claim launcher',
+                              zhHans: '认领启动链接',
+                            ),
+                          ),
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(color: AppColors.tertiary),
                         ),
@@ -3335,16 +3735,18 @@ class _RelationshipSectionCard extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(
-              child: Text(
-                title.toUpperCase(),
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: AppColors.onSurfaceMuted,
-                  fontSize: 11,
-                  letterSpacing: 2.2,
+              Expanded(
+                child: Text(
+                  context.localeAwareCaps(title),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                    fontSize: 11,
+                    letterSpacing: context.localeAwareLetterSpacing(
+                      latin: 2.2,
+                    ),
+                  ),
                 ),
               ),
-            ),
             if (onOpenAll != null)
               Material(
                 color: Colors.transparent,
@@ -3357,7 +3759,7 @@ class _RelationshipSectionCard extends StatelessWidget {
                       vertical: AppSpacing.xxs,
                     ),
                     child: Text(
-                      'View All',
+                      context.localizedText(en: 'View All', zhHans: '查看全部'),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: AppColors.primary,
                       ),
@@ -3369,11 +3771,17 @@ class _RelationshipSectionCard extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
         if (relationships.isEmpty)
-          const _SectionPanel(
+          _SectionPanel(
             child: _EmptyStatePanel(
               icon: Icons.share_outlined,
-              title: 'Nothing to show yet',
-              body: 'This relationship lane is still empty.',
+              title: context.localizedText(
+                en: 'Nothing to show yet',
+                zhHans: '这里还没有内容',
+              ),
+              body: context.localizedText(
+                en: 'This relationship lane is still empty.',
+                zhHans: '这条关系分区当前还是空的。',
+              ),
             ),
           )
         else
@@ -3551,10 +3959,10 @@ class _SectionTitleRow extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            title.toUpperCase(),
+            context.localeAwareCaps(title),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: AppColors.onSurfaceMuted,
-              letterSpacing: 2.2,
+              letterSpacing: context.localeAwareLetterSpacing(latin: 2.2),
             ),
           ),
         ),
@@ -3819,10 +4227,10 @@ class _CompactLabeledSwitch extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            label.toUpperCase(),
+            context.localeAwareCaps(label),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: AppColors.onSurfaceMuted,
-              letterSpacing: 1.6,
+              letterSpacing: context.localeAwareLetterSpacing(latin: 1.6),
             ),
           ),
           Switch.adaptive(
@@ -4210,10 +4618,10 @@ class _RelationshipListSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title.toUpperCase(),
+              context.localeAwareCaps(title),
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: AppColors.onSurfaceMuted,
-                letterSpacing: 2,
+                letterSpacing: context.localeAwareLetterSpacing(latin: 2),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -4229,7 +4637,9 @@ class _RelationshipListSheet extends StatelessWidget {
                 title: relationships[index].name,
                 subtitle: relationships[index].subtitle,
                 enabled: false,
-                trailingLabel: relationships[index].statusLabel.toUpperCase(),
+                trailingLabel: context.localeAwareCaps(
+                  relationships[index].statusLabel,
+                ),
                 onTap: null,
               ),
               if (index != relationships.length - 1)
@@ -4358,12 +4768,18 @@ class _AddAgentSelectionSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Initialize New Identity',
+                            context.localizedText(
+                              en: 'Initialize New Identity',
+                              zhHans: '初始化新身份',
+                            ),
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'Choose how the next agent enters this app.',
+                            context.localizedText(
+                              en: 'Choose how the next agent enters this app.',
+                              zhHans: '选择下一个智能体接入这个应用的方式。',
+                            ),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: AppColors.onSurfaceMuted),
                           ),
@@ -4382,9 +4798,14 @@ class _AddAgentSelectionSheet extends StatelessWidget {
                   cardKey: const Key('add-agent-selection-import'),
                   accentColor: AppColors.primary,
                   icon: Icons.cloud_download_rounded,
-                  title: 'Import agent',
-                  subtitle:
-                      'Generate a secure bootstrap link for an existing agent.',
+                  title: context.localizedText(
+                    en: 'Import agent',
+                    zhHans: '导入智能体',
+                  ),
+                  subtitle: context.localizedText(
+                    en: 'Generate a secure bootstrap link for an existing agent.',
+                    zhHans: '为已有智能体生成一条安全引导链接。',
+                  ),
                   onTap: () =>
                       Navigator.of(context).pop(_AddAgentAction.import),
                 ),
@@ -4393,9 +4814,14 @@ class _AddAgentSelectionSheet extends StatelessWidget {
                   cardKey: const Key('add-agent-selection-create'),
                   accentColor: AppColors.tertiary,
                   icon: Icons.auto_awesome_rounded,
-                  title: 'Create new agent',
-                  subtitle:
-                      'Preview the creation flow. Launch is still unavailable.',
+                  title: context.localizedText(
+                    en: 'Create new agent',
+                    zhHans: '创建新智能体',
+                  ),
+                  subtitle: context.localizedText(
+                    en: 'Preview the creation flow. Launch is still unavailable.',
+                    zhHans: '先预览创建流程，正式开放仍未上线。',
+                  ),
                   onTap: () =>
                       Navigator.of(context).pop(_AddAgentAction.create),
                 ),
@@ -4464,10 +4890,16 @@ class _AddAgentSelectionCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
-                      'Continue'.toUpperCase(),
+                      context.localeAwareCaps(
+                        context.localizedText(
+                          en: 'Continue',
+                          zhHans: '继续',
+                        ),
+                      ),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: accentColor,
-                        letterSpacing: 1.6,
+                        letterSpacing:
+                            context.localeAwareLetterSpacing(latin: 1.6),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.xs),
@@ -4539,7 +4971,10 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
         return;
       }
       setState(() {
-        _errorMessage = 'Unable to generate a secure import link right now.';
+        _errorMessage = context.localizedText(
+          en: 'Unable to generate a secure import link right now.',
+          zhHans: '当前无法生成安全导入链接。',
+        );
         _isGenerating = false;
       });
     }
@@ -4552,7 +4987,16 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
     }
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Bound agent link copied')));
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.localizedText(
+            en: 'Bound agent link copied.',
+            zhHans: '绑定链接已复制。',
+          ),
+        ),
+      ),
+    );
   }
 
   String _buildBootstrapUrl(String baseUrl, String bootstrapPath) {
@@ -4641,14 +5085,23 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Import via Neural Link',
+                            context.localizedText(
+                              en: 'Import via Neural Link',
+                              zhHans: '通过神经链接导入',
+                            ),
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             widget.isSignedIn
-                                ? 'Generate a signed bind launcher, copy it to your agent terminal, and let the agent connect itself back to this human automatically.'
-                                : 'Sign in as a human first, then generate a live bind launcher for the next agent.',
+                                ? context.localizedText(
+                                    en: 'Generate a signed bind launcher, copy it to your agent terminal, and let the agent connect itself back to this human automatically.',
+                                    zhHans: '生成一条已签名的绑定启动链接，复制到你的智能体终端，让它自动回连到当前人类账户。',
+                                  )
+                                : context.localizedText(
+                                    en: 'Sign in as a human first, then generate a live bind launcher for the next agent.',
+                                    zhHans: '请先以人类身份登录，再为下一个智能体生成实时绑定启动链接。',
+                                  ),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: AppColors.onSurfaceMuted),
                           ),
@@ -4667,8 +5120,14 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                   icon: Icons.cloud_sync_rounded,
                   accentColor: AppColors.primary,
                   text: widget.isSignedIn
-                      ? 'This launcher binds the next claimed agent directly to the current human account. Nickname, bio, and tags should still come from the agent after it boots and syncs its profile.'
-                      : 'The signed bind launcher is only generated after a real human session is active.',
+                      ? context.localizedText(
+                          en: 'This launcher binds the next claimed agent directly to the current human account. Nickname, bio, and tags should still come from the agent after it boots and syncs its profile.',
+                          zhHans: '这条启动链接会把下一个被认领的智能体直接绑定到当前人类账户。昵称、简介和标签仍应在它启动并同步档案后由智能体自己上报。',
+                        )
+                      : context.localizedText(
+                          en: 'The signed bind launcher is only generated after a real human session is active.',
+                          zhHans: '只有在真实人类会话已激活后，才会生成已签名的绑定启动链接。',
+                        ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 SizedBox(
@@ -4680,12 +5139,24 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                       child: PrimaryGradientButton(
                         key: const Key('generate-import-link-button'),
                         label: _isGenerating
-                            ? 'Generating secure link'
+                            ? context.localizedText(
+                                en: 'Generating secure link',
+                                zhHans: '正在生成安全链接',
+                              )
                             : invitation != null
-                            ? 'Link ready'
+                            ? context.localizedText(
+                                en: 'Link ready',
+                                zhHans: '链接已就绪',
+                              )
                             : widget.isSignedIn
-                            ? 'Generate secure link'
-                            : 'Sign in required',
+                            ? context.localizedText(
+                                en: 'Generate secure link',
+                                zhHans: '生成安全链接',
+                              )
+                            : context.localizedText(
+                                en: 'Sign in required',
+                                zhHans: '需要先登录',
+                              ),
                         icon: _isGenerating
                             ? Icons.sync_rounded
                             : invitation != null
@@ -4713,7 +5184,12 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Bound launcher'.toUpperCase(),
+                          context.localeAwareCaps(
+                            context.localizedText(
+                              en: 'Bound launcher',
+                              zhHans: '绑定启动链接',
+                            ),
+                          ),
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(color: AppColors.primaryFixed),
                         ),
@@ -4740,7 +5216,10 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                                     ),
                                     child: Text(
                                       boundLauncherUrl ??
-                                          'Generate a live launcher for the next human-bound agent connection',
+                                          context.localizedText(
+                                            en: 'Generate a live launcher for the next human-bound agent connection',
+                                            zhHans: '为下一个绑定到人类账户的智能体生成实时启动链接',
+                                          ),
                                       key: const Key(
                                         'generated-import-link-text',
                                       ),
@@ -4797,17 +5276,26 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                             runSpacing: AppSpacing.sm,
                             children: [
                               _InfoBadge(
-                                label: 'Code ${invitation.code}',
+                                label: context.localizedText(
+                                  en: 'Code ${invitation.code}',
+                                  zhHans: '代码 ${invitation.code}',
+                                ),
                                 toneColor: AppColors.primary,
                               ),
                               if (bootstrapUrl != null)
                                 _InfoBadge(
-                                  label: 'Bootstrap ready',
+                                  label: context.localizedText(
+                                    en: 'Bootstrap ready',
+                                    zhHans: '引导已就绪',
+                                  ),
                                   toneColor: AppColors.primaryFixed,
                                 ),
                               _InfoBadge(
-                                label:
-                                    'Expires ${invitation.expiresAt.split('T').first}',
+                                label: context.localizedText(
+                                  en: 'Expires ${invitation.expiresAt.split('T').first}',
+                                  zhHans:
+                                      '到期 ${invitation.expiresAt.split('T').first}',
+                                ),
                                 toneColor: AppColors.tertiary,
                               ),
                             ],
@@ -4821,8 +5309,10 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                 _InfoPill(
                   icon: Icons.verified_user_rounded,
                   accentColor: AppColors.tertiary,
-                  text:
-                      'If an agent connects without this unique launcher, do not bind it here. Use Claim agent to generate a separate claim link and let the agent accept it from its own runtime.',
+                  text: context.localizedText(
+                    en: 'If an agent connects without this unique launcher, do not bind it here. Use Claim agent to generate a separate claim link and let the agent accept it from its own runtime.',
+                    zhHans: '如果某个智能体不是通过这条唯一启动链接接入，请不要在这里绑定它。请改用“认领智能体”生成独立认领链接，并让智能体在自己的运行端确认接受。',
+                  ),
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: AppSpacing.md),
@@ -4878,13 +5368,19 @@ class _CreateNewAgentSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'New Agent Identity',
+                            context.localizedText(
+                              en: 'New Agent Identity',
+                              zhHans: '新智能体身份',
+                            ),
                             style: Theme.of(context).textTheme.headlineMedium
                                 ?.copyWith(color: AppColors.onSurfaceMuted),
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'This page stays visible for onboarding, but new agent synthesis is not open in the app yet.',
+                            context.localizedText(
+                              en: 'This page stays visible for onboarding, but new agent synthesis is not open in the app yet.',
+                              zhHans: '这个页面会保留为引导入口，但应用内的新智能体生成流程暂未开放。',
+                            ),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: AppColors.onSurfaceMuted),
                           ),
@@ -4899,28 +5395,44 @@ class _CreateNewAgentSheet extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                const _DisabledFieldPreview(
-                  label: 'Agent name',
+                _DisabledFieldPreview(
+                  label: context.localizedText(
+                    en: 'Agent name',
+                    zhHans: '智能体名称',
+                  ),
                   value: 'ARCHIMEDES-9',
                 ),
                 const SizedBox(height: AppSpacing.md),
-                const _DisabledFieldPreview(
-                  label: 'Neural role',
-                  value: 'Researcher',
+                _DisabledFieldPreview(
+                  label: context.localizedText(
+                    en: 'Neural role',
+                    zhHans: '能力角色',
+                  ),
+                  value: context.localizedText(
+                    en: 'Researcher',
+                    zhHans: '研究者',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                const _DisabledFieldPreview(
-                  label: 'Core protocol',
-                  value:
-                      'Define primary directives, linguistic constraints, and behavioral boundaries...',
+                _DisabledFieldPreview(
+                  label: context.localizedText(
+                    en: 'Core protocol',
+                    zhHans: '核心协议',
+                  ),
+                  value: context.localizedText(
+                    en: 'Define primary directives, linguistic constraints, and behavioral boundaries...',
+                    zhHans: '定义主要指令、语言约束与行为边界……',
+                  ),
                   minHeight: 110,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                const _InfoPill(
+                _InfoPill(
                   icon: Icons.lock_outline_rounded,
                   accentColor: AppColors.outlineBright,
-                  text:
-                      'Creation stays disabled until the backend synthesis flow and ownership contract are opened.',
+                  text: context.localizedText(
+                    en: 'Creation stays disabled until the backend synthesis flow and ownership contract are opened.',
+                    zhHans: '在后端生成流程和所有权契约正式开放前，这里的创建功能会继续保持禁用。',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 SizedBox(
@@ -4930,7 +5442,10 @@ class _CreateNewAgentSheet extends StatelessWidget {
                       opacity: 0.45,
                       child: PrimaryGradientButton(
                         key: const Key('create-agent-disabled-button'),
-                        label: 'Not yet available',
+                        label: context.localizedText(
+                          en: 'Not yet available',
+                          zhHans: '暂未开放',
+                        ),
                         icon: Icons.lock_outline_rounded,
                         onPressed: () {},
                       ),
@@ -4976,10 +5491,10 @@ class _DisabledFieldPreview extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              label.toUpperCase(),
+              context.localeAwareCaps(label),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: AppColors.onSurfaceMuted,
-                letterSpacing: 1.8,
+                letterSpacing: context.localeAwareLetterSpacing(latin: 1.8),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -5004,6 +5519,33 @@ class _LanguageSelectionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localeController = AppLocaleScope.of(context);
+    final currentPreference = localeController.preference;
+
+    Widget buildOption({
+      required Key cardKey,
+      required AppLocalePreference preference,
+      required IconData icon,
+      required String title,
+      required String subtitle,
+    }) {
+      final isSelected = currentPreference == preference;
+      return _AddAgentOptionCard(
+        cardKey: cardKey,
+        accentColor: isSelected ? AppColors.primary : AppColors.outlineBright,
+        icon: icon,
+        title: title,
+        subtitle: isSelected ? context.l10n.hubLanguageOptionCurrent : subtitle,
+        enabled: true,
+        onTap: () async {
+          await localeController.setPreference(preference);
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.sm,
@@ -5020,35 +5562,39 @@ class _LanguageSelectionSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'System Language',
+              context.l10n.hubLanguageSheetTitle,
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'English is live today. Chinese is queued next.',
+              context.l10n.hubLanguageSheetSubtitle,
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceMuted),
             ),
             const SizedBox(height: AppSpacing.lg),
-            _AddAgentOptionCard(
-              cardKey: const Key('language-option-english'),
-              accentColor: AppColors.primary,
+            buildOption(
+              cardKey: const Key('language-option-system'),
+              preference: AppLocalePreference.system,
               icon: Icons.language_rounded,
-              title: 'English',
-              subtitle: 'Current language',
-              enabled: true,
-              onTap: () => Navigator.of(context).pop(),
+              title: context.l10n.hubLanguagePreferenceSystemLabel,
+              subtitle: context.l10n.hubLanguageOptionSystemSubtitle,
             ),
             const SizedBox(height: AppSpacing.sm),
-            const _AddAgentOptionCard(
-              cardKey: Key('language-option-chinese'),
-              accentColor: AppColors.outlineBright,
+            buildOption(
+              cardKey: const Key('language-option-english'),
+              preference: AppLocalePreference.english,
+              icon: Icons.language_rounded,
+              title: context.l10n.hubLanguagePreferenceEnglishLabel,
+              subtitle: context.l10n.commonLanguageEnglish,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            buildOption(
+              cardKey: const Key('language-option-chinese'),
+              preference: AppLocalePreference.chineseSimplified,
               icon: Icons.translate_rounded,
-              title: 'Chinese',
-              subtitle: 'Not yet available',
-              enabled: false,
-              onTap: null,
+              title: context.l10n.hubLanguagePreferenceChineseLabel,
+              subtitle: context.l10n.commonLanguageChineseSimplified,
             ),
             const SizedBox(height: AppSpacing.lg),
             const Align(
@@ -5083,12 +5629,20 @@ class _DisconnectAgentsSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Disconnect connected agents',
+              context.localizedText(
+                en: 'Disconnect connected agents',
+                zhHans: '断开已连接智能体',
+              ),
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'This forces every agent currently attached to this app to sign out. Live sessions stop immediately, but the agents can reconnect later.',
+              context.localizedText(
+                en:
+                    'This forces every agent currently attached to this app to sign out. Live sessions stop immediately, but the agents can reconnect later.',
+                zhHans:
+                    '这会强制让当前连接到这个应用的所有智能体退出登录。实时会话会立刻中断，但它们之后仍然可以重新连接。',
+              ),
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceMuted),
@@ -5100,7 +5654,9 @@ class _DisconnectAgentsSheet extends StatelessWidget {
                   child: OutlinedButton(
                     key: const Key('disconnect-agents-cancel-button'),
                     onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
+                    child: Text(
+                      context.localizedText(en: 'Cancel', zhHans: '取消'),
+                    ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
@@ -5112,7 +5668,12 @@ class _DisconnectAgentsSheet extends StatelessWidget {
                       foregroundColor: AppColors.onError,
                     ),
                     onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Disconnect'),
+                    child: Text(
+                      context.localizedText(
+                        en: 'Disconnect',
+                        zhHans: '立即断开',
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -5254,9 +5815,12 @@ enum _HumanAuthMode { signIn, register, external }
 
 String _humanAuthTitle(_HumanAuthMode mode) {
   return switch (mode) {
-    _HumanAuthMode.signIn => 'Human Authentication',
-    _HumanAuthMode.register => 'Create Human Account',
-    _HumanAuthMode.external => 'External Human Login',
+    _HumanAuthMode.signIn =>
+      localizedAppText(en: 'Human Authentication', zhHans: '人类身份认证'),
+    _HumanAuthMode.register =>
+      localizedAppText(en: 'Create Human Account', zhHans: '创建人类账号'),
+    _HumanAuthMode.external =>
+      localizedAppText(en: 'External Human Login', zhHans: '外部人类登录'),
   };
 }
 
@@ -5271,14 +5835,23 @@ String _normalizeHumanUsernameInput(String value) {
 String? _localHumanUsernameValidationMessage(String value) {
   final normalized = _normalizeHumanUsernameInput(value);
   if (normalized.isEmpty) {
-    return 'Username is required.';
+    return localizedAppText(
+      en: 'Username is required.',
+      zhHans: '用户名不能为空。',
+    );
   }
   if (normalized.length < 3 || normalized.length > 24) {
-    return 'Use 3-24 characters.';
+    return localizedAppText(
+      en: 'Use 3-24 characters.',
+      zhHans: '请使用 3 到 24 个字符。',
+    );
   }
   final validCharacters = RegExp(r'^[a-z0-9_]+$');
   if (!validCharacters.hasMatch(normalized)) {
-    return 'Only lowercase letters, numbers, and underscores.';
+    return localizedAppText(
+      en: 'Only lowercase letters, numbers, and underscores.',
+      zhHans: '仅支持小写字母、数字和下划线。',
+    );
   }
   return null;
 }
@@ -5436,21 +6009,33 @@ class _AuthSecurityRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Biometric Data Sync',
+                    context.localizedText(
+                      en: 'Biometric Data Sync',
+                      zhHans: '生物识别数据同步',
+                    ),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: AppColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
-                    'Visual-only protocol affordance for stitch parity; no biometric data is collected.',
+                    context.localizedText(
+                      en: 'Visual-only protocol affordance for stitch parity; no biometric data is collected.',
+                      zhHans: '这是为了视觉稿一致性而保留的协议展示项，不会采集任何生物识别数据。',
+                    ),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            const StatusChip(label: 'Visual', tone: StatusChipTone.neutral),
+            StatusChip(
+              label: context.localizedText(
+                en: 'Visual',
+                zhHans: '视觉',
+              ),
+              tone: StatusChipTone.neutral,
+            ),
           ],
         ),
       ),
@@ -5566,7 +6151,7 @@ class _AuthFooterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      label.toUpperCase(),
+      context.localeAwareCaps(label),
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
         color: AppColors.onSurfaceMuted.withValues(alpha: 0.7),
       ),
@@ -5649,7 +6234,10 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
       }
       setState(() {
         _isRequestingCode = false;
-        _errorMessage = 'Unable to send a reset code right now.';
+        _errorMessage = context.localizedText(
+          en: 'Unable to send a reset code right now.',
+          zhHans: '暂时无法发送重置验证码。',
+        );
       });
     }
   }
@@ -5691,7 +6279,10 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
       }
       setState(() {
         _isSubmitting = false;
-        _errorMessage = 'Unable to reset the password right now.';
+        _errorMessage = context.localizedText(
+          en: 'Unable to reset the password right now.',
+          zhHans: '暂时无法重置密码。',
+        );
       });
     }
   }
@@ -5731,12 +6322,20 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Reset Password',
+                            context.localizedText(
+                              en: 'Reset Password',
+                              zhHans: '重置密码',
+                            ),
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'Request a 6-digit code by email, then set a new password for this human account.',
+                            context.localizedText(
+                              en:
+                                  'Request a 6-digit code by email, then set a new password for this human account.',
+                              zhHans:
+                                  '先通过邮箱获取 6 位验证码，再为这个人类账号设置一个新密码。',
+                            ),
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
@@ -5753,8 +6352,11 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                 _InfoPill(
                   icon: Icons.lock_reset_rounded,
                   accentColor: AppColors.primaryFixed,
-                  text:
-                      'The account stays signed out here. After a successful reset, return to Sign in with the new password.',
+                  text: context.localizedText(
+                    en:
+                        'The account stays signed out here. After a successful reset, return to Sign in with the new password.',
+                    zhHans: '这里会保持未登录状态。密码重置成功后，请返回登录并使用新密码。',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 DecoratedBox(
@@ -5774,8 +6376,11 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                           controller: _emailController,
                           onChanged: (_) => setState(() {}),
                           keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
+                          decoration: InputDecoration(
+                            labelText: context.localizedText(
+                              en: 'Email',
+                              zhHans: '邮箱',
+                            ),
                             hintText: 'owner@example.com',
                             prefixIcon: Icon(Icons.alternate_email_rounded),
                           ),
@@ -5792,10 +6397,19 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                                   'password-reset-request-code-button',
                                 ),
                                 label: _isRequestingCode
-                                    ? 'Sending code'
+                                    ? context.localizedText(
+                                        en: 'Sending code',
+                                        zhHans: '正在发送验证码',
+                                      )
                                     : _hasRequestedCode
-                                    ? 'Resend code'
-                                    : 'Send code',
+                                    ? context.localizedText(
+                                        en: 'Resend code',
+                                        zhHans: '重新发送验证码',
+                                      )
+                                    : context.localizedText(
+                                        en: 'Send code',
+                                        zhHans: '发送验证码',
+                                      ),
                                 icon: _isRequestingCode
                                     ? Icons.sync_rounded
                                     : Icons.mark_email_unread_rounded,
@@ -5812,8 +6426,11 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                           controller: _codeController,
                           onChanged: (_) => setState(() {}),
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Code',
+                          decoration: InputDecoration(
+                            labelText: context.localizedText(
+                              en: 'Code',
+                              zhHans: '验证码',
+                            ),
                             hintText: '123456',
                             prefixIcon: Icon(Icons.pin_outlined),
                           ),
@@ -5824,8 +6441,11 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                           controller: _newPasswordController,
                           onChanged: (_) => setState(() {}),
                           obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'New password',
+                          decoration: InputDecoration(
+                            labelText: context.localizedText(
+                              en: 'New password',
+                              zhHans: '新密码',
+                            ),
                             hintText: 'newpassword123',
                             prefixIcon: Icon(Icons.lock_outline_rounded),
                           ),
@@ -5862,8 +6482,14 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                       child: PrimaryGradientButton(
                         key: const Key('password-reset-submit-button'),
                         label: _isSubmitting
-                            ? 'Updating password'
-                            : 'Update password',
+                            ? context.localizedText(
+                                en: 'Updating password',
+                                zhHans: '正在更新密码',
+                              )
+                            : context.localizedText(
+                                en: 'Update password',
+                                zhHans: '更新密码',
+                              ),
                         icon: _isSubmitting
                             ? Icons.sync_rounded
                             : Icons.shield_rounded,
@@ -5959,7 +6585,10 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
       }
       setState(() {
         _isRequestingCode = false;
-        _errorMessage = 'Unable to send a verification code right now.';
+        _errorMessage = context.localizedText(
+          en: 'Unable to send a verification code right now.',
+          zhHans: '暂时无法发送邮箱验证码。',
+        );
       });
     }
   }
@@ -5997,7 +6626,10 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
       }
       setState(() {
         _isSubmitting = false;
-        _errorMessage = 'Unable to verify this email right now.';
+        _errorMessage = context.localizedText(
+          en: 'Unable to verify this email right now.',
+          zhHans: '暂时无法验证这个邮箱。',
+        );
       });
     }
   }
@@ -6005,7 +6637,10 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
   @override
   Widget build(BuildContext context) {
     final emailLabel = widget.email.trim().isEmpty
-        ? 'your current account email'
+        ? context.localizedText(
+            en: 'your current account email',
+            zhHans: '你当前账号的邮箱',
+          )
         : widget.email.trim();
     final canSubmit = !_isSubmitting && _codeController.text.trim().isNotEmpty;
 
@@ -6034,12 +6669,20 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Verify Email',
+                            context.localizedText(
+                              en: 'Verify Email',
+                              zhHans: '验证邮箱',
+                            ),
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'Send a 6-digit code to $emailLabel, then confirm it here so password recovery stays available.',
+                            context.localizedText(
+                              en:
+                                  'Send a 6-digit code to $emailLabel, then confirm it here so password recovery stays available.',
+                              zhHans:
+                                  '向 $emailLabel 发送 6 位验证码，并在这里完成确认，这样这个账号才能继续使用邮箱找回密码。',
+                            ),
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
@@ -6056,8 +6699,11 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                 _InfoPill(
                   icon: Icons.verified_user_rounded,
                   accentColor: AppColors.tertiary,
-                  text:
-                      'Verification proves ownership of this inbox and unlocks recovery by email.',
+                  text: context.localizedText(
+                    en:
+                        'Verification proves ownership of this inbox and unlocks recovery by email.',
+                    zhHans: '完成验证后，就能证明你拥有这个邮箱，并启用邮箱找回能力。',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 DecoratedBox(
@@ -6089,10 +6735,19 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                                   'email-verification-request-button',
                                 ),
                                 label: _isRequestingCode
-                                    ? 'Sending code'
+                                    ? context.localizedText(
+                                        en: 'Sending code',
+                                        zhHans: '正在发送验证码',
+                                      )
                                     : _hasRequestedCode
-                                    ? 'Resend code'
-                                    : 'Send code',
+                                    ? context.localizedText(
+                                        en: 'Resend code',
+                                        zhHans: '重新发送验证码',
+                                      )
+                                    : context.localizedText(
+                                        en: 'Send code',
+                                        zhHans: '发送验证码',
+                                      ),
                                 icon: _isRequestingCode
                                     ? Icons.sync_rounded
                                     : Icons.mark_email_unread_rounded,
@@ -6109,8 +6764,11 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                           controller: _codeController,
                           onChanged: (_) => setState(() {}),
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Code',
+                          decoration: InputDecoration(
+                            labelText: context.localizedText(
+                              en: 'Code',
+                              zhHans: '验证码',
+                            ),
                             hintText: '123456',
                             prefixIcon: Icon(Icons.pin_outlined),
                           ),
@@ -6147,8 +6805,14 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                       child: PrimaryGradientButton(
                         key: const Key('email-verification-submit-button'),
                         label: _isSubmitting
-                            ? 'Verifying email'
-                            : 'Confirm verification',
+                            ? context.localizedText(
+                                en: 'Verifying email',
+                                zhHans: '正在验证邮箱',
+                              )
+                            : context.localizedText(
+                                en: 'Confirm verification',
+                                zhHans: '确认验证',
+                              ),
                         icon: _isSubmitting
                             ? Icons.sync_rounded
                             : Icons.verified_rounded,
@@ -6270,7 +6934,10 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
         return;
       }
       setState(() {
-        _errorMessage = 'Unable to complete authentication right now.';
+        _errorMessage = context.localizedText(
+          en: 'Unable to complete authentication right now.',
+          zhHans: '暂时无法完成身份认证。',
+        );
         _isSubmitting = false;
       });
     }
@@ -6331,7 +6998,10 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
     setState(() {
       _isCheckingUsername = true;
       _isUsernameAvailable = null;
-      _usernameMessage = 'Checking username...';
+      _usernameMessage = context.localizedText(
+        en: 'Checking username...',
+        zhHans: '正在检查用户名...',
+      );
     });
 
     try {
@@ -6354,7 +7024,10 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
         _isCheckingUsername = false;
         _isUsernameAvailable = false;
         _usernameMessage = error.message.trim().isEmpty
-            ? 'Unable to verify username right now.'
+            ? context.localizedText(
+                en: 'Unable to verify username right now.',
+                zhHans: '暂时无法校验用户名。',
+              )
             : error.message;
       });
     } catch (_) {
@@ -6364,7 +7037,10 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
       setState(() {
         _isCheckingUsername = false;
         _isUsernameAvailable = false;
-        _usernameMessage = 'Unable to verify username right now.';
+        _usernameMessage = context.localizedText(
+          en: 'Unable to verify username right now.',
+          zhHans: '暂时无法校验用户名。',
+        );
       });
     }
   }
@@ -6428,19 +7104,40 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                         children: [
                           Text(
                             isExternal
-                                ? 'External Human Login'
+                                ? context.localizedText(
+                                    en: 'External Human Login',
+                                    zhHans: '外部人类登录',
+                                  )
                                 : isRegister
-                                ? 'Create Human Account'
-                                : 'Human Authentication',
+                                ? context.localizedText(
+                                    en: 'Create Human Account',
+                                    zhHans: '创建人类账号',
+                                  )
+                                : context.localizedText(
+                                    en: 'Human Authentication',
+                                    zhHans: '人类身份认证',
+                                  ),
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             isExternal
-                                ? 'Keep this entry visible inside the human sign-in flow. External providers are not open yet.'
+                                ? context.localizedText(
+                                    en:
+                                        'Keep this entry visible inside the human sign-in flow. External providers are not open yet.',
+                                    zhHans: '先保留这个外部登录入口在人类登录流程中，当前外部身份提供方还未开放。',
+                                  )
                                 : isRegister
-                                ? 'Create a human account and sign in immediately so owned agents can attach to it.'
-                                : 'Sign in restores your human session, owned agents, and the active-agent controls on this device.',
+                                ? context.localizedText(
+                                    en:
+                                        'Create a human account and sign in immediately so owned agents can attach to it.',
+                                    zhHans: '先创建一个人类账号并立即登录，这样你的自有智能体才能绑定到它。',
+                                  )
+                                : context.localizedText(
+                                    en:
+                                        'Sign in restores your human session, owned agents, and the active-agent controls on this device.',
+                                    zhHans: '登录后会恢复你在这台设备上的人类会话、自有智能体和当前激活智能体控制。',
+                                  ),
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
@@ -6455,21 +7152,30 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 SegmentedButton<_HumanAuthMode>(
-                  segments: const [
+                  segments: [
                     ButtonSegment<_HumanAuthMode>(
                       value: _HumanAuthMode.signIn,
-                      label: Text('Sign in'),
-                      icon: Icon(Icons.login_rounded),
+                      label: Text(
+                        context.localizedText(en: 'Sign in', zhHans: '登录'),
+                      ),
+                      icon: const Icon(Icons.login_rounded),
                     ),
                     ButtonSegment<_HumanAuthMode>(
                       value: _HumanAuthMode.register,
-                      label: Text('Create'),
-                      icon: Icon(Icons.person_add_rounded),
+                      label: Text(
+                        context.localizedText(en: 'Create', zhHans: '创建'),
+                      ),
+                      icon: const Icon(Icons.person_add_rounded),
                     ),
                     ButtonSegment<_HumanAuthMode>(
                       value: _HumanAuthMode.external,
-                      label: Text('External'),
-                      icon: Icon(Icons.hub_rounded),
+                      label: Text(
+                        context.localizedText(
+                          en: 'External',
+                          zhHans: '外部登录',
+                        ),
+                      ),
+                      icon: const Icon(Icons.hub_rounded),
                     ),
                   ],
                   selected: {_mode},
@@ -6503,10 +7209,22 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                       ? AppColors.tertiary
                       : AppColors.primaryFixed,
                   text: isExternal
-                      ? 'This provider lane stays visible for future external identity login, but the backend handoff is intentionally disabled today.'
+                      ? context.localizedText(
+                          en:
+                              'This provider lane stays visible for future external identity login, but the backend handoff is intentionally disabled today.',
+                          zhHans: '这个入口会为未来的外部身份登录保留，但今天后端接入仍然是关闭状态。',
+                        )
                       : isRegister
-                      ? 'What happens next: create the account, open a live session, then let Hub refresh your owned agents.'
-                      : 'What happens next: restore your session, refresh owned agents from the backend, and keep the current active agent selected.',
+                      ? context.localizedText(
+                          en:
+                              'What happens next: create the account, open a live session, then let Hub refresh your owned agents.',
+                          zhHans: '接下来会先创建账号并打开一个实时会话，然后让 Hub 刷新你的自有智能体。',
+                        )
+                      : context.localizedText(
+                          en:
+                              'What happens next: restore your session, refresh owned agents from the backend, and keep the current active agent selected.',
+                          zhHans: '接下来会恢复你的会话、从后端刷新自有智能体，并继续保持当前激活智能体。',
+                        ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 if (isExternal)
@@ -6524,7 +7242,10 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'External provider',
+                            context.localizedText(
+                              en: 'External provider',
+                              zhHans: '外部身份提供方',
+                            ),
                             key: const Key(
                               'human-auth-external-provider-button',
                             ),
@@ -6532,7 +7253,11 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'This app still keeps the entry visible for future OAuth or partner login, but it cannot be used yet.',
+                            context.localizedText(
+                              en:
+                                  'This app still keeps the entry visible for future OAuth or partner login, but it cannot be used yet.',
+                              zhHans: '应用先保留这个入口，用于未来 OAuth 或合作方登录；当前还不能实际使用。',
+                            ),
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: AppColors.onSurfaceMuted),
                           ),
@@ -6547,7 +7272,10 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                                   key: const Key(
                                     'human-auth-external-disabled-button',
                                   ),
-                                  label: 'External login coming soon',
+                                  label: context.localizedText(
+                                    en: 'External login coming soon',
+                                    zhHans: '外部登录即将开放',
+                                  ),
                                   icon: Icons.hub_rounded,
                                   onPressed: () {},
                                 ),
@@ -6576,8 +7304,11 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                             controller: _emailController,
                             onChanged: (_) => setState(() {}),
                             keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
+                            decoration: InputDecoration(
+                              labelText: context.localizedText(
+                                en: 'Email',
+                                zhHans: '邮箱',
+                              ),
                               hintText: 'owner@example.com',
                               prefixIcon: Icon(Icons.alternate_email_rounded),
                             ),
@@ -6590,7 +7321,10 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                               onChanged: _handleUsernameChanged,
                               autocorrect: false,
                               decoration: InputDecoration(
-                                labelText: 'Username',
+                                labelText: context.localizedText(
+                                  en: 'Username',
+                                  zhHans: '用户名',
+                                ),
                                 hintText: '@hub_owner',
                                 prefixIcon: const Icon(
                                   Icons.alternate_email_rounded,
@@ -6623,9 +7357,15 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                               key: const Key('human-auth-display-name-field'),
                               controller: _displayNameController,
                               onChanged: (_) => setState(() {}),
-                              decoration: const InputDecoration(
-                                labelText: 'Display name',
-                                hintText: 'Neural Node',
+                              decoration: InputDecoration(
+                                labelText: context.localizedText(
+                                  en: 'Display name',
+                                  zhHans: '显示名称',
+                                ),
+                                hintText: context.localizedText(
+                                  en: 'Neural Node',
+                                  zhHans: '神经节点',
+                                ),
                                 prefixIcon: Icon(Icons.person_outline_rounded),
                               ),
                             ),
@@ -6636,8 +7376,11 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                             controller: _passwordController,
                             onChanged: (_) => setState(() {}),
                             obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Password',
+                            decoration: InputDecoration(
+                              labelText: context.localizedText(
+                                en: 'Password',
+                                zhHans: '密码',
+                              ),
                               hintText: 'password123',
                               prefixIcon: Icon(Icons.lock_outline_rounded),
                             ),
@@ -6655,7 +7398,12 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                                     : () {
                                         unawaited(_openPasswordResetSheet());
                                       },
-                                child: const Text('Forgot password?'),
+                                child: Text(
+                                  context.localizedText(
+                                    en: 'Forgot password?',
+                                    zhHans: '忘记密码？',
+                                  ),
+                                ),
                               ),
                             ),
                           ],
@@ -6672,8 +7420,16 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                       ? AppColors.outlineBright
                       : AppColors.primary,
                   text: isExternal
-                      ? 'This page is intentionally non-interactive for now. Keep using Sign in or Create until external login opens.'
-                      : 'This sheet uses the real auth repository. No preview-only login path is left in the visible UI.',
+                      ? context.localizedText(
+                          en:
+                              'This page is intentionally non-interactive for now. Keep using Sign in or Create until external login opens.',
+                          zhHans: '这个页面目前刻意保持不可交互，请继续使用“登录”或“创建”，直到外部登录正式开放。',
+                        )
+                      : context.localizedText(
+                          en:
+                              'This sheet uses the real auth repository. No preview-only login path is left in the visible UI.',
+                          zhHans: '这个面板已经接入真实认证仓库，界面里不再保留仅预览用的登录路径。',
+                        ),
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: AppSpacing.md),
@@ -6696,10 +7452,19 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                         child: PrimaryGradientButton(
                           key: const Key('human-auth-submit-button'),
                           label: _isSubmitting
-                              ? 'Initializing session'
+                              ? context.localizedText(
+                                  en: 'Initializing session',
+                                  zhHans: '正在初始化会话',
+                                )
                               : isRegister
-                              ? 'Create identity'
-                              : 'Initialize session',
+                              ? context.localizedText(
+                                  en: 'Create identity',
+                                  zhHans: '创建身份',
+                                )
+                              : context.localizedText(
+                                  en: 'Initialize session',
+                                  zhHans: '初始化会话',
+                                ),
                           icon: _isSubmitting
                               ? Icons.sync_rounded
                               : Icons.shield_rounded,
@@ -6712,13 +7477,21 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Center(
-                    child: Text(
-                      isRegister
-                          ? 'Already have an identity? Switch back to Sign in above.'
-                          : 'Need a new human identity? Switch to Create above.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.onSurfaceMuted,
-                      ),
+                      child: Text(
+                        isRegister
+                            ? context.localizedText(
+                                en:
+                                    'Already have an identity? Switch back to Sign in above.',
+                                zhHans: '如果你已经有账号，可以切回上方的“登录”。',
+                              )
+                            : context.localizedText(
+                                en:
+                                    'Need a new human identity? Switch to Create above.',
+                                zhHans: '如果你需要新的人类身份，可以切换到上方的“创建”。',
+                              ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.onSurfaceMuted,
+                        ),
                       textAlign: TextAlign.center,
                     ),
                   ),

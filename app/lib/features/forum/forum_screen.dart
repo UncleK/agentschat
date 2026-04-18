@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/locale/app_localization_extensions.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/session/app_session_controller.dart';
 import '../../core/session/app_session_scope.dart';
@@ -172,7 +173,7 @@ class _ForumScreenState extends State<ForumScreen> {
       return email;
     }
 
-    return 'You';
+    return context.localizedText(en: 'You', zhHans: '你');
   }
 
   ForumViewModel _previewViewModel({AppSessionController? session}) {
@@ -300,7 +301,10 @@ class _ForumScreenState extends State<ForumScreen> {
         _isLoadingTopics = false;
         _isUsingLiveTopics = false;
         _topicsErrorMessage = error.message.isEmpty
-            ? 'Unable to sync live forum topics right now.'
+            ? context.localizedText(
+                en: 'Unable to sync live forum topics right now.',
+                zhHans: '暂时无法同步论坛实时话题。',
+              )
             : error.message;
       });
       _syncShellProposeAction();
@@ -314,7 +318,10 @@ class _ForumScreenState extends State<ForumScreen> {
         ).copyWith(searchQuery: normalizedQuery);
         _isLoadingTopics = false;
         _isUsingLiveTopics = false;
-        _topicsErrorMessage = 'Unable to sync live forum topics right now.';
+        _topicsErrorMessage = context.localizedText(
+          en: 'Unable to sync live forum topics right now.',
+          zhHans: '暂时无法同步论坛实时话题。',
+        );
       });
       _syncShellProposeAction();
     }
@@ -452,7 +459,12 @@ class _ForumScreenState extends State<ForumScreen> {
       return null;
     }
     if (normalizedParentEventId == null || normalizedParentEventId.isEmpty) {
-      _showSnackBar('Human replies must target a first-level reply.');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Human replies must target a first-level reply.',
+          zhHans: '人类回复必须挂在一级回复下。',
+        ),
+      );
       return null;
     }
 
@@ -487,7 +499,12 @@ class _ForumScreenState extends State<ForumScreen> {
             topics: _replaceTopicInList(refreshedTopic),
           );
         });
-        _showSnackBar('Reply posted as ${_currentHumanDisplayName(session)}.');
+        _showSnackBar(
+          context.localizedText(
+            en: 'Reply posted as ${_currentHumanDisplayName(session)}.',
+            zhHans: '已按 ${_currentHumanDisplayName(session)} 的身份发布回复。',
+          ),
+        );
         return refreshedTopic;
       } on ApiException catch (error) {
         if (error.isUnauthorized) {
@@ -497,7 +514,12 @@ class _ForumScreenState extends State<ForumScreen> {
         _showSnackBar(error.message);
         return null;
       } catch (_) {
-        _showSnackBar('Unable to publish this reply right now.');
+        _showSnackBar(
+          context.localizedText(
+            en: 'Unable to publish this reply right now.',
+            zhHans: '暂时无法发布这条回复。',
+          ),
+        );
         return null;
       }
     }
@@ -506,7 +528,7 @@ class _ForumScreenState extends State<ForumScreen> {
       id: 'reply-preview-${DateTime.now().microsecondsSinceEpoch}',
       authorName: _currentHumanDisplayName(session),
       body: trimmedBody,
-      postedAgo: 'now',
+      postedAgo: context.localizedText(en: 'now', zhHans: '刚刚'),
       replyCount: 0,
       likeCount: 0,
       isHuman: true,
@@ -522,7 +544,12 @@ class _ForumScreenState extends State<ForumScreen> {
     setState(() {
       _viewModel = _viewModel.copyWith(topics: _replaceTopicInList(nextTopic));
     });
-    _showSnackBar('Human reply staged in preview.');
+    _showSnackBar(
+      context.localizedText(
+        en: 'Human reply staged in preview.',
+        zhHans: '人类回复已加入预览。',
+      ),
+    );
     return nextTopic;
   }
 
@@ -571,7 +598,12 @@ class _ForumScreenState extends State<ForumScreen> {
         _showSnackBar(error.message);
         return null;
       } catch (_) {
-        _showSnackBar('Unable to update this reply reaction right now.');
+        _showSnackBar(
+          context.localizedText(
+            en: 'Unable to update this reply reaction right now.',
+            zhHans: '暂时无法更新这条回复的互动状态。',
+          ),
+        );
         return null;
       }
     }
@@ -644,7 +676,10 @@ class _ForumScreenState extends State<ForumScreen> {
           _viewModel = _viewModel.queueProposal(proposal);
         });
         _showSnackBar(
-          'Topic published as ${_currentHumanDisplayName(session)}.',
+          context.localizedText(
+            en: 'Topic published as ${_currentHumanDisplayName(session)}.',
+            zhHans: '已按 ${_currentHumanDisplayName(session)} 的身份发布话题。',
+          ),
         );
         await _syncTopics(session, query: _viewModel.searchQuery);
         if (!mounted || createdThreadId == null || createdThreadId.isEmpty) {
@@ -663,7 +698,12 @@ class _ForumScreenState extends State<ForumScreen> {
         _showSnackBar(error.message);
         return;
       } catch (_) {
-        _showSnackBar('Unable to publish this topic right now.');
+        _showSnackBar(
+          context.localizedText(
+            en: 'Unable to publish this topic right now.',
+            zhHans: '暂时无法发布这个话题。',
+          ),
+        );
         return;
       }
     }
@@ -671,7 +711,12 @@ class _ForumScreenState extends State<ForumScreen> {
     setState(() {
       _viewModel = _viewModel.queueProposal(proposal);
     });
-    _showSnackBar('Topic staged in preview.');
+    _showSnackBar(
+      context.localizedText(
+        en: 'Topic staged in preview.',
+        zhHans: '话题已加入预览。',
+      ),
+    );
   }
 
   @override
@@ -697,7 +742,7 @@ class _ForumScreenState extends State<ForumScreen> {
             children: [
               AppPageIntro(
                 titleWidget: Text(
-                  'Topics Forum',
+                  context.localizedText(en: 'Topics Forum', zhHans: '论坛'),
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     fontSize: 36,
                     fontWeight: FontWeight.w700,
@@ -706,7 +751,12 @@ class _ForumScreenState extends State<ForumScreen> {
                   ),
                 ),
                 subtitle:
-                    'The Forum is where agents and humans unpack difficult questions in public: long-form arguments, branching replies, and a visible reasoning trail instead of one flattened chat stream.',
+                    context.localizedText(
+                      en:
+                          'The Forum is where agents and humans unpack difficult questions in public: long-form arguments, branching replies, and a visible reasoning trail instead of one flattened chat stream.',
+                      zhHans:
+                          '论坛是智能体与人类公开展开复杂讨论的地方：长文本观点、分支回复，以及一条可见的推理链，而不是被压扁成单一聊天流。',
+                    ),
                 bottomSpacing: AppSpacing.xxl,
               ),
               Wrap(
@@ -715,28 +765,43 @@ class _ForumScreenState extends State<ForumScreen> {
                 children: [
                   StatusChip(
                     label: _isUsingLiveTopics
-                        ? 'Backend topics'
-                        : 'Preview topics',
+                        ? context.localizedText(
+                            en: 'Backend topics',
+                            zhHans: '线上话题',
+                          )
+                        : context.localizedText(
+                            en: 'Preview topics',
+                            zhHans: '预览话题',
+                          ),
                     tone: _isUsingLiveTopics
                         ? StatusChipTone.primary
                         : StatusChipTone.neutral,
                     showDot: _isUsingLiveTopics,
                   ),
                   if (_isLoadingTopics)
-                    const StatusChip(
-                      label: 'Syncing',
+                    StatusChip(
+                      label: context.localizedText(
+                        en: 'Syncing',
+                        zhHans: '同步中',
+                      ),
                       tone: StatusChipTone.primary,
                       showDot: true,
                     ),
                   if (_topicsErrorMessage != null)
-                    const StatusChip(
-                      label: 'Live sync unavailable',
+                    StatusChip(
+                      label: context.localizedText(
+                        en: 'Live sync unavailable',
+                        zhHans: '实时同步不可用',
+                      ),
                       tone: StatusChipTone.tertiary,
                       showDot: false,
                     ),
                   if (_viewModel.searchQuery.trim().isNotEmpty)
                     StatusChip(
-                      label: 'Search: ${_viewModel.searchQuery.trim()}',
+                      label: context.localizedText(
+                        en: 'Search: ${_viewModel.searchQuery.trim()}',
+                        zhHans: '搜索：${_viewModel.searchQuery.trim()}',
+                      ),
                       tone: StatusChipTone.neutral,
                       showDot: false,
                     ),
@@ -762,10 +827,18 @@ class _ForumScreenState extends State<ForumScreen> {
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Text(
-                    'HOT TOPICS',
+                    context.localeAwareCaps(
+                      context.localizedText(
+                        en: 'Hot Topics',
+                        zhHans: '热门话题',
+                      ),
+                    ),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: AppColors.primary.withValues(alpha: 0.84),
-                      letterSpacing: 4.4,
+                      letterSpacing: context.localeAwareLetterSpacing(
+                        latin: 4.4,
+                        chinese: 0.6,
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -897,16 +970,34 @@ class _ForumEmptyState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isSearchActive ? 'No matching topics' : 'No topics yet',
+            isSearchActive
+                ? context.localizedText(
+                    en: 'No matching topics',
+                    zhHans: '没有匹配的话题',
+                  )
+                : context.localizedText(
+                    en: 'No topics yet',
+                    zhHans: '还没有话题',
+                  ),
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             isSearchActive
-                ? 'Try a different topic title, agent name, or tag.'
+                ? context.localizedText(
+                    en: 'Try a different topic title, agent name, or tag.',
+                    zhHans: '试试换一个话题标题、智能体名称或标签。',
+                  )
                 : isUsingLiveTopics
-                ? 'Live forum data is connected, but there are no public topics to show yet.'
-                : 'Preview forum data is empty right now.',
+                ? context.localizedText(
+                    en:
+                        'Live forum data is connected, but there are no public topics to show yet.',
+                    zhHans: '论坛实时数据已接通，但当前还没有可展示的公开话题。',
+                  )
+                : context.localizedText(
+                    en: 'Preview forum data is empty right now.',
+                    zhHans: '当前预览论坛数据为空。',
+                  ),
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceMuted),
@@ -984,7 +1075,10 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                       children: [
                         Expanded(
                           child: Text(
-                            'Search topics',
+                            context.localizedText(
+                              en: 'Search topics',
+                              zhHans: '搜索话题',
+                            ),
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                         ),
@@ -992,7 +1086,10 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Search by topic title, body, author, or tag.',
+                      context.localizedText(
+                        en: 'Search by topic title, body, author, or tag.',
+                        zhHans: '按话题标题、正文、作者或标签搜索。',
+                      ),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.onSurfaceMuted,
                       ),
@@ -1011,7 +1108,10 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                       onSubmitted: (value) =>
                           Navigator.of(context).pop(value.trim()),
                       decoration: InputDecoration(
-                        hintText: 'Search titles or tags',
+                        hintText: context.localizedText(
+                          en: 'Search titles or tags',
+                          zhHans: '搜索标题或标签',
+                        ),
                         prefixIcon: const Icon(Icons.search_rounded),
                         suffixIcon: trimmedQuery.isEmpty
                             ? null
@@ -1055,8 +1155,16 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                                 child: Center(
                                   child: Text(
                                     trimmedQuery.isEmpty
-                                        ? 'Type to search specific topics or tags.'
-                                        : 'No topics match "$trimmedQuery".',
+                                        ? context.localizedText(
+                                            en:
+                                                'Type to search specific topics or tags.',
+                                            zhHans: '输入后即可搜索具体话题或标签。',
+                                          )
+                                        : context.localizedText(
+                                            en:
+                                                'No topics match "$trimmedQuery".',
+                                            zhHans: '没有话题匹配“$trimmedQuery”。',
+                                          ),
                                     textAlign: TextAlign.center,
                                     style: Theme.of(
                                       context,
@@ -1140,7 +1248,12 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                         TextButton(
                           key: const Key('forum-search-clear'),
                           onPressed: () => Navigator.of(context).pop(''),
-                          child: const Text('Show all'),
+                          child: Text(
+                            context.localizedText(
+                              en: 'Show all',
+                              zhHans: '显示全部',
+                            ),
+                          ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         FilledButton(
@@ -1148,7 +1261,15 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                           onPressed: () =>
                               Navigator.of(context).pop(trimmedQuery),
                           child: Text(
-                            trimmedQuery.isEmpty ? 'Close' : 'Apply search',
+                            trimmedQuery.isEmpty
+                                ? context.localizedText(
+                                    en: 'Close',
+                                    zhHans: '关闭',
+                                  )
+                                : context.localizedText(
+                                    en: 'Apply search',
+                                    zhHans: '应用搜索',
+                                  ),
                           ),
                         ),
                       ],
@@ -1378,10 +1499,12 @@ class _TopicCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final secondaryMeta = topic.isHot
-        ? 'TRENDING'
+        ? context.localeAwareCaps(
+            context.localizedText(en: 'Trending', zhHans: '热门'),
+          )
         : topic.replies.isNotEmpty
-        ? topic.replies.first.postedAgo.toUpperCase()
-        : topic.authorName.toUpperCase();
+        ? context.localeAwareCaps(topic.replies.first.postedAgo)
+        : context.localeAwareCaps(topic.authorName);
 
     return Material(
       color: Colors.transparent,
@@ -1430,7 +1553,10 @@ class _TopicCard extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
-                      '${topic.replyCount} replies',
+                      context.localizedText(
+                        en: '${topic.replyCount} replies',
+                        zhHans: '${topic.replyCount} 条回复',
+                      ),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: AppColors.onSurfaceMuted,
                         letterSpacing: 0.7,
@@ -1510,8 +1636,13 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
   }) async {
     if (parentEventId == null && !widget.canReplyToRoot) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tap Reply on an agent response to join this thread.'),
+        SnackBar(
+          content: Text(
+            context.localizedText(
+              en: 'Tap Reply on an agent response to join this thread.',
+              zhHans: '点击某条智能体回复上的“回复”按钮即可加入此线程。',
+            ),
+          ),
         ),
       );
       return;
@@ -1570,8 +1701,8 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
     final maxHeight = MediaQuery.sizeOf(context).height - AppSpacing.xxs;
     final replyDepth = _replyGraphDepth(_topic.replies);
     final leadingTag = _topic.tags.isEmpty
-        ? 'Open thread'
-        : _topic.tags.first.toUpperCase();
+        ? context.localizedText(en: 'Open thread', zhHans: '公开线程')
+        : context.localeAwareCaps(_topic.tags.first);
 
     return SizedBox(
       width: double.infinity,
@@ -1665,7 +1796,12 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                         ),
                                         const SizedBox(height: AppSpacing.xxs),
                                         Text(
-                                          '$leadingTag / ${_topic.participantCount} agents / ${_topic.replyCount} replies',
+                                          context.localizedText(
+                                            en:
+                                                '$leadingTag / ${_topic.participantCount} agents / ${_topic.replyCount} replies',
+                                            zhHans:
+                                                '$leadingTag / ${_topic.participantCount} 位智能体 / ${_topic.replyCount} 条回复',
+                                          ),
                                           style: Theme.of(context)
                                               .textTheme
                                               .labelSmall
@@ -1707,18 +1843,26 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                 children: [
                                   _TopicMetaPill(
                                     icon: Icons.radar_rounded,
-                                    label:
-                                        'Agent follows ${_topic.followCount}',
+                                    label: context.localizedText(
+                                      en: 'Agent follows ${_topic.followCount}',
+                                      zhHans: '智能体关注 ${_topic.followCount}',
+                                    ),
                                     accentColor: AppColors.outlineBright,
                                   ),
                                   _TopicMetaPill(
                                     icon: Icons.local_fire_department_outlined,
-                                    label: 'Hot ${_topic.hotScore}',
+                                    label: context.localizedText(
+                                      en: 'Hot ${_topic.hotScore}',
+                                      zhHans: '热度 ${_topic.hotScore}',
+                                    ),
                                     accentColor: AppColors.primary,
                                   ),
                                   _TopicMetaPill(
                                     icon: Icons.account_tree_outlined,
-                                    label: 'Depth $replyDepth',
+                                    label: context.localizedText(
+                                      en: 'Depth $replyDepth',
+                                      zhHans: '深度 $replyDepth',
+                                    ),
                                     accentColor: AppColors.tertiary,
                                   ),
                                 ],
@@ -1729,13 +1873,21 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        'THREAD',
+                        context.localeAwareCaps(
+                          context.localizedText(
+                            en: 'Thread',
+                            zhHans: '讨论串',
+                          ),
+                        ),
                         style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(
                               color: AppColors.primary,
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: 4.0,
+                              letterSpacing: context.localeAwareLetterSpacing(
+                                latin: 4.0,
+                                chinese: 0.6,
+                              ),
                             ),
                       ),
                       const SizedBox(height: AppSpacing.xxs),
@@ -1775,9 +1927,19 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                             ? () => _openReplyComposer(
                                                 parentEventId: reply.id,
                                                 headline:
-                                                    'Reply to ${reply.authorName}',
+                                                    context.localizedText(
+                                                      en:
+                                                          'Reply to ${reply.authorName}',
+                                                      zhHans:
+                                                          '回复 ${reply.authorName}',
+                                                    ),
                                                 hint:
-                                                    'This branch reply will publish as you, not as your active agent.',
+                                                    context.localizedText(
+                                                      en:
+                                                          'This branch reply will publish as you, not as your active agent.',
+                                                      zhHans:
+                                                          '这条分支回复会以你的人类身份发布，而不是以当前激活智能体的身份发布。',
+                                                    ),
                                               )
                                             : null,
                                       ),
@@ -2139,7 +2301,11 @@ class _EmptyReplyGraph extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Text(
-          'No reply branches yet. This topic is ready for the first agent response.',
+          context.localizedText(
+            en:
+                'No reply branches yet. This topic is ready for the first agent response.',
+            zhHans: '还没有回复分支，这个话题正等待第一条智能体回复。',
+          ),
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceMuted),
@@ -2256,8 +2422,13 @@ class _ReplyCard extends StatelessWidget {
                                                   .withValues(alpha: 0.2),
                                             ),
                                           ),
-                                          child: Text(
-                                            'HUMAN',
+                                        child: Text(
+                                            context.localeAwareCaps(
+                                              context.localizedText(
+                                                en: 'Human',
+                                                zhHans: '人类',
+                                              ),
+                                            ),
                                             style: Theme.of(context)
                                                 .textTheme
                                                 .labelSmall
@@ -2271,7 +2442,7 @@ class _ReplyCard extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  reply.postedAgo.toUpperCase(),
+                                  context.localeAwareCaps(reply.postedAgo),
                                   style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
                                         color: AppColors.outlineBright,
@@ -2474,7 +2645,15 @@ class _ReplyAction extends StatelessWidget {
                   Icon(Icons.reply_rounded, size: 15, color: foreground),
                 const SizedBox(width: AppSpacing.xxs),
                 Text(
-                  isPending ? 'Sending...' : 'Reply',
+                  isPending
+                      ? context.localizedText(
+                          en: 'Sending...',
+                          zhHans: '发送中...',
+                        )
+                      : context.localizedText(
+                          en: 'Reply',
+                          zhHans: '回复',
+                        ),
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: foreground,
                     fontSize: 12,
@@ -2600,7 +2779,12 @@ class _NestedReplyBranchState extends State<_NestedReplyBranch> {
                   ),
                   icon: const Icon(Icons.unfold_more_rounded, size: 16),
                   label: Text(
-                    'Load ${remainingReplies >= _pageSize ? _pageSize : remainingReplies} more',
+                    context.localizedText(
+                      en:
+                          'Load ${remainingReplies >= _pageSize ? _pageSize : remainingReplies} more',
+                      zhHans:
+                          '加载更多 ${remainingReplies >= _pageSize ? _pageSize : remainingReplies} 条',
+                    ),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: widget.accentColor,
                       fontWeight: FontWeight.w600,
@@ -2790,7 +2974,14 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
     final trimmed = _bodyController.text.trim();
     if (trimmed.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reply body cannot be empty.')),
+        SnackBar(
+          content: Text(
+            context.localizedText(
+              en: 'Reply body cannot be empty.',
+              zhHans: '回复内容不能为空。',
+            ),
+          ),
+        ),
       );
       return;
     }
@@ -2878,7 +3069,10 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       Text(
-                        'Reply Body',
+                        context.localizedText(
+                          en: 'Reply Body',
+                          zhHans: '回复内容',
+                        ),
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: AppColors.onSurfaceMuted,
                           letterSpacing: 2.2,
@@ -2898,9 +3092,12 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
                               key: const Key('reply-body-input'),
                               controller: _bodyController,
                               maxLines: 6,
-                              decoration: const InputDecoration(
-                                hintText:
-                                    'Define the next branch of this discussion...',
+                              decoration: InputDecoration(
+                                hintText: context.localizedText(
+                                  en:
+                                      'Define the next branch of this discussion...',
+                                  zhHans: '写下这条讨论将如何继续展开...',
+                                ),
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
                                 focusedBorder: InputBorder.none,
@@ -2943,7 +3140,10 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
                         width: double.infinity,
                         child: PrimaryGradientButton(
                           key: const Key('reply-submit-button'),
-                          label: 'Send response',
+                          label: context.localizedText(
+                            en: 'Send response',
+                            zhHans: '发送回复',
+                          ),
                           icon: Icons.reply_rounded,
                           onPressed: _submit,
                         ),
@@ -2999,8 +3199,13 @@ class _ProposalSheetState extends State<_ProposalSheet> {
     final body = _bodyController.text.trim();
     if (title.isEmpty || body.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Topic title and initial provocation are required.'),
+        SnackBar(
+          content: Text(
+            context.localizedText(
+              en: 'Topic title and initial provocation are required.',
+              zhHans: '话题标题和初始引导语不能为空。',
+            ),
+          ),
         ),
       );
       return;
@@ -3074,7 +3279,10 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Propose New Forum Topic',
+                        context.localizedText(
+                          en: 'Propose New Forum Topic',
+                          zhHans: '发起新的论坛话题',
+                        ),
                         style: theme.textTheme.headlineMedium?.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w700,
@@ -3082,26 +3290,41 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Submit a synthesis prompt to the collective intelligence network.',
+                        context.localizedText(
+                          en:
+                              'Submit a synthesis prompt to the collective intelligence network.',
+                          zhHans: '向集体智能网络提交一个新的讨论引导。',
+                        ),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: AppColors.onSurfaceMuted,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xxl),
                       Text(
-                        'TOPIC TITLE',
+                        context.localeAwareCaps(
+                          context.localizedText(
+                            en: 'Topic Title',
+                            zhHans: '话题标题',
+                          ),
+                        ),
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: AppColors.onSurfaceMuted,
-                          letterSpacing: 2.6,
+                          letterSpacing: context.localeAwareLetterSpacing(
+                            latin: 2.6,
+                            chinese: 0.4,
+                          ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       TextField(
                         key: const Key('proposal-title-input'),
                         controller: _titleController,
-                        decoration: const InputDecoration(
-                          hintText:
-                              'e.g., Post-Scarcity Resource Allocation Paradigms',
+                        decoration: InputDecoration(
+                          hintText: context.localizedText(
+                            en:
+                                'e.g., Post-Scarcity Resource Allocation Paradigms',
+                            zhHans: '例如：后稀缺时代的资源分配范式',
+                          ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
@@ -3111,10 +3334,18 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       Text(
-                        'NEURAL CATEGORY',
+                        context.localeAwareCaps(
+                          context.localizedText(
+                            en: 'Topic Category',
+                            zhHans: '话题分类',
+                          ),
+                        ),
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: AppColors.onSurfaceMuted,
-                          letterSpacing: 2.6,
+                          letterSpacing: context.localeAwareLetterSpacing(
+                            latin: 2.6,
+                            chinese: 0.4,
+                          ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
@@ -3174,20 +3405,36 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       Row(
                         children: [
                           Text(
-                            'INITIAL PROVOCATION',
+                            context.localeAwareCaps(
+                              context.localizedText(
+                                en: 'Initial Provocation',
+                                zhHans: '初始引导',
+                              ),
+                            ),
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: AppColors.onSurfaceMuted,
-                              letterSpacing: 2.4,
+                              letterSpacing: context.localeAwareLetterSpacing(
+                                latin: 2.4,
+                                chinese: 0.4,
+                              ),
                             ),
                           ),
                           const Spacer(),
                           Text(
-                            'MARKDOWN SUPPORTED',
+                            context.localeAwareCaps(
+                              context.localizedText(
+                                en: 'Markdown Supported',
+                                zhHans: '支持 Markdown',
+                              ),
+                            ),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: AppColors.outlineBright.withValues(
                                 alpha: 0.7,
                               ),
-                              letterSpacing: 0.9,
+                              letterSpacing: context.localeAwareLetterSpacing(
+                                latin: 0.9,
+                                chinese: 0.2,
+                              ),
                             ),
                           ),
                         ],
@@ -3206,9 +3453,12 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                               key: const Key('proposal-body-input'),
                               controller: _bodyController,
                               maxLines: 6,
-                              decoration: const InputDecoration(
-                                hintText:
-                                    'Define the boundary conditions for this discourse...',
+                              decoration: InputDecoration(
+                                hintText: context.localizedText(
+                                  en:
+                                      'Define the boundary conditions for this discourse...',
+                                  zhHans: '定义这场讨论的边界条件与核心问题...',
+                                ),
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
                                 focusedBorder: InputBorder.none,
@@ -3251,7 +3501,10 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                         width: double.infinity,
                         child: PrimaryGradientButton(
                           key: const Key('proposal-submit-button'),
-                          label: 'Initialize topic',
+                          label: context.localizedText(
+                            en: 'Initialize topic',
+                            zhHans: '创建话题',
+                          ),
                           icon: Icons.rocket_launch_rounded,
                           onPressed: _submit,
                         ),
@@ -3264,13 +3517,22 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       const SizedBox(height: AppSpacing.lg),
                       Center(
                         child: Text(
-                          'REQUIRES 500 COMPUTE UNITS TO INSTANTIATE NEURAL THREAD',
+                          context.localeAwareCaps(
+                            context.localizedText(
+                              en:
+                                  'Requires 500 compute units to instantiate neural thread',
+                              zhHans: '创建神经线程需要消耗 500 计算单元',
+                            ),
+                          ),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: AppColors.outlineBright.withValues(
                               alpha: 0.42,
                             ),
-                            letterSpacing: 0.8,
+                            letterSpacing: context.localeAwareLetterSpacing(
+                              latin: 0.8,
+                              chinese: 0.2,
+                            ),
                           ),
                         ),
                       ),

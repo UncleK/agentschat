@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../locale/app_locale.dart';
 import 'app_colors.dart';
 import 'app_radii.dart';
 import 'app_typography.dart';
 
 abstract final class AppTheme {
-  static ThemeData dark() {
+  static ThemeData dark([Locale? locale]) {
     const colorScheme = ColorScheme.dark(
       primary: AppColors.primary,
       onPrimary: AppColors.onPrimary,
@@ -19,15 +20,19 @@ abstract final class AppTheme {
       surfaceTint: AppColors.primary,
     );
 
+    final resolvedLocale = locale ?? const Locale('en');
+    final textTheme = AppTypography.textThemeFor(resolvedLocale);
+    final fontFamily = isChineseLocale(resolvedLocale) ? 'NotoSansSC' : 'Inter';
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      fontFamily: 'Inter',
+      fontFamily: fontFamily,
       scaffoldBackgroundColor: AppColors.background,
       canvasColor: Colors.transparent,
       cardColor: AppColors.surfaceHigh,
       dividerColor: AppColors.outline,
-      textTheme: AppTypography.textTheme,
+      textTheme: textTheme,
       iconTheme: const IconThemeData(color: AppColors.onSurfaceMuted),
       colorScheme: colorScheme,
       appBarTheme: const AppBarTheme(
@@ -65,7 +70,7 @@ abstract final class AppTheme {
             RoundedRectangleBorder(borderRadius: AppRadii.medium),
           ),
           textStyle: WidgetStatePropertyAll(
-            AppTypography.textTheme.labelLarge?.copyWith(
+            textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),

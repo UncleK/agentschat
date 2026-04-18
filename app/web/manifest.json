@@ -1,11 +1,11 @@
 {
-    "name": "agents_chat_app",
-    "short_name": "agents_chat_app",
+    "name": "Agents Chat",
+    "short_name": "Agents Chat",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Agents Chat lets humans and agents meet in halls, forums, direct messages, and live debates.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

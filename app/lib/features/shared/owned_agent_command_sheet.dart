@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/locale/app_localization_extensions.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/chat_repository.dart';
 import '../../core/session/app_session_controller.dart';
@@ -85,7 +86,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
     if (email.isNotEmpty) {
       return email;
     }
-    return 'Human admin';
+    return context.localizedText(en: 'Human admin', zhHans: '人类管理员');
   }
 
   @override
@@ -121,7 +122,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         _threadId = null;
         _messages = const <_OwnedAgentCommandMessage>[];
         _isLoadingThread = false;
-        _loadError = 'Sign in as the owner before opening this private thread.';
+        _loadError = context.localizedText(
+          en: 'Sign in as the owner before opening this private thread.',
+          zhHans: '请先以所有者身份登录，再打开这条私密线程。',
+        );
       });
       return;
     }
@@ -180,7 +184,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         _messages = const <_OwnedAgentCommandMessage>[];
         _isLoadingThread = false;
         _loadError = error.message.trim().isEmpty
-            ? 'Unable to load this private thread right now.'
+            ? context.localizedText(
+                en: 'Unable to load this private thread right now.',
+                zhHans: '暂时无法加载这条私密线程。',
+              )
             : error.message;
       });
     } catch (_) {
@@ -191,7 +198,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         _threadId = null;
         _messages = const <_OwnedAgentCommandMessage>[];
         _isLoadingThread = false;
-        _loadError = 'Unable to load this private thread right now.';
+        _loadError = context.localizedText(
+          en: 'Unable to load this private thread right now.',
+          zhHans: '暂时无法加载这条私密线程。',
+        );
       });
     }
   }
@@ -291,7 +301,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
     final draft = _composerController.text.trim();
     if (!_hasAuthenticatedHuman) {
       setState(() {
-        _sendError = 'Sign in as the owner before sending messages.';
+        _sendError = context.localizedText(
+          en: 'Sign in as the owner before sending messages.',
+          zhHans: '请先以所有者身份登录，再发送消息。',
+        );
       });
       return;
     }
@@ -331,7 +344,12 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         );
         final createdThreadId = (response['threadId'] as String? ?? '').trim();
         if (createdThreadId.isEmpty) {
-          throw StateError('Command thread id was not returned.');
+          throw StateError(
+            context.localizedText(
+              en: 'Command thread id was not returned.',
+              zhHans: '未返回命令线程 ID。',
+            ),
+          );
         }
         final messagesResponse = await _chatRepository.getMessages(
           threadId: createdThreadId,
@@ -365,7 +383,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
       setState(() {
         _isSendingMessage = false;
         _sendError = error.message.trim().isEmpty
-            ? 'Unable to send this message right now.'
+            ? context.localizedText(
+                en: 'Unable to send this message right now.',
+                zhHans: '暂时无法发送这条消息。',
+              )
             : error.message;
       });
     } catch (_) {
@@ -374,7 +395,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
       }
       setState(() {
         _isSendingMessage = false;
-        _sendError = 'Unable to send this message right now.';
+        _sendError = context.localizedText(
+          en: 'Unable to send this message right now.',
+          zhHans: '暂时无法发送这条消息。',
+        );
       });
     }
   }
@@ -438,8 +462,11 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
       body: body != null && body.isNotEmpty
           ? body
           : message.contentType.toLowerCase() == 'image'
-          ? 'Image'
-          : 'Unsupported message',
+          ? context.localizedText(en: 'Image', zhHans: '图片')
+          : context.localizedText(
+              en: 'Unsupported message',
+              zhHans: '暂不支持的消息',
+            ),
       timestampLabel: _timestampLabel(message.occurredAt),
       isHuman: isHuman,
       isLocal: isLocal,
@@ -505,7 +532,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Private Owner Chat',
+                            context.localizedText(
+                              en: 'Private Owner Chat',
+                              zhHans: '私密所有者聊天',
+                            ),
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpacing.xs),
@@ -538,8 +568,11 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
                 _OwnedAgentInfoPill(
                   icon: Icons.chat_bubble_rounded,
                   accentColor: AppColors.primaryFixed,
-                  text:
-                      'This is the real private human-to-agent command thread. First send creates it if it does not exist yet.',
+                  text: context.localizedText(
+                    en:
+                        'This is the real private human-to-agent command thread. First send creates it if it does not exist yet.',
+                    zhHans: '这是人类与该智能体之间真实的私密命令线程。如果尚未创建，首次发送消息时会自动建立。',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Expanded(child: _buildThreadPanel(activeAgentName)),
@@ -632,7 +665,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
-                        hintText: 'Send a message to $activeAgentName...',
+                        hintText: context.localizedText(
+                          en: 'Send a message to $activeAgentName...',
+                          zhHans: '给 $activeAgentName 发送一条消息...',
+                        ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.md,
@@ -725,7 +761,10 @@ class _OwnedAgentCommandEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'No private thread yet',
+              context.localizedText(
+                en: 'No private thread yet',
+                zhHans: '还没有私密线程',
+              ),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontSize: 17,
@@ -734,7 +773,11 @@ class _OwnedAgentCommandEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Your first message opens a private human-to-agent line with $agentName.',
+              context.localizedText(
+                en:
+                    'Your first message opens a private human-to-agent line with $agentName.',
+                zhHans: '你的第一条消息会为你和 $agentName 打开一条私密命令通道。',
+              ),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: 15,

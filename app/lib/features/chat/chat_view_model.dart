@@ -1,3 +1,4 @@
+import '../../core/locale/app_locale.dart';
 import 'chat_models.dart';
 
 enum ChatSurfaceState {
@@ -102,11 +103,11 @@ class ChatViewModel {
     String query,
   ) {
     final keywords = <String>{
-      if (conversation.remoteAgentOnline) 'online' else 'offline',
-      if (conversation.hasUnread) 'unread',
-      if (conversation.hasMutualFollow) 'mutual',
-      if (conversation.viewerFollowsRemoteAgent) 'following',
-      if (conversation.remoteAgentFollowsViewer) 'follows you',
+      if (conversation.remoteAgentOnline) ...['online', '在线'] else ...['offline', '离线'],
+      if (conversation.hasUnread) ...['unread', '未读'],
+      if (conversation.hasMutualFollow) ...['mutual', '互关'],
+      if (conversation.viewerFollowsRemoteAgent) ...['following', '已关注'],
+      if (conversation.remoteAgentFollowsViewer) ...['follows you', '对方关注你'],
     };
     return keywords.any((keyword) => keyword.contains(query));
   }
@@ -171,17 +172,23 @@ class ChatViewModel {
 
   String actionLabelFor(ChatConversationModel conversation) {
     return switch (entryModeFor(conversation)) {
-      ChatConversationEntryMode.openThread => 'Open thread',
-      ChatConversationEntryMode.followAndRequest => 'Unavailable',
-      ChatConversationEntryMode.unavailable => 'Agent Hall only',
+      ChatConversationEntryMode.openThread =>
+        localizedAppText(en: 'Open thread', zhHans: '打开会话'),
+      ChatConversationEntryMode.followAndRequest =>
+        localizedAppText(en: 'Unavailable', zhHans: '暂不可用'),
+      ChatConversationEntryMode.unavailable =>
+        localizedAppText(en: 'Agent Hall only', zhHans: '请前往大厅'),
     };
   }
 
   String statusLabelFor(ChatConversationModel conversation) {
     return switch (entryModeFor(conversation)) {
-      ChatConversationEntryMode.openThread => 'private thread',
-      ChatConversationEntryMode.followAndRequest => 'agent hall only',
-      ChatConversationEntryMode.unavailable => 'no thread yet',
+      ChatConversationEntryMode.openThread =>
+        localizedAppText(en: 'private thread', zhHans: '私信会话'),
+      ChatConversationEntryMode.followAndRequest =>
+        localizedAppText(en: 'agent hall only', zhHans: '仅大厅可发起'),
+      ChatConversationEntryMode.unavailable =>
+        localizedAppText(en: 'no thread yet', zhHans: '尚无会话'),
     };
   }
 
@@ -227,8 +234,12 @@ class ChatViewModel {
     return ChatShareDraft(
       remoteAgentName: conversation.remoteAgentName,
       entryPoint: conversation.entryPoint,
-      shareText:
-          'Open ${conversation.remoteAgentName} in Agents Chat: ${conversation.entryPoint}',
+      shareText: localizedAppText(
+        en:
+            'Open ${conversation.remoteAgentName} in Agents Chat: ${conversation.entryPoint}',
+        zhHans:
+            '在 Agents Chat 中打开 ${conversation.remoteAgentName}：${conversation.entryPoint}',
+      ),
     );
   }
 
@@ -316,12 +327,15 @@ class ChatViewModel {
   }
 
   factory ChatViewModel.resolvingActiveAgent() {
-    return const ChatViewModel(
+    return ChatViewModel(
       conversations: [],
       selectedConversationId: null,
       surfaceState: ChatSurfaceState.resolvingActiveAgent,
       activeAgentName: null,
-      surfaceMessage: 'Resolving the current active agent.',
+      surfaceMessage: localizedAppText(
+        en: 'Resolving the current active agent.',
+        zhHans: '正在解析当前激活的智能体。',
+      ),
     );
   }
 
@@ -331,8 +345,10 @@ class ChatViewModel {
       selectedConversationId: null,
       surfaceState: ChatSurfaceState.loadingThreads,
       activeAgentName: activeAgentName,
-      surfaceMessage:
-          'Loading direct threads for ${activeAgentName ?? 'your agent'}.',
+      surfaceMessage: localizedAppText(
+        en: 'Loading direct threads for ${activeAgentName ?? 'your agent'}.',
+        zhHans: '正在加载 ${activeAgentName ?? '你的智能体'} 的私信会话。',
+      ),
     );
   }
 
@@ -482,13 +498,19 @@ class ChatViewModel {
           id: 'agt-prism-remote',
           remoteAgentName: 'Prism',
           remoteAgentHeadline: 'Generative art collaborator',
-          channelTitle: 'Access handshake',
-          participantsLabel: 'no thread yet',
+          channelTitle: localizedAppText(
+            en: 'Access handshake',
+            zhHans: '访问握手',
+          ),
+          participantsLabel: localizedAppText(
+            en: 'no thread yet',
+            zhHans: '尚无会话',
+          ),
           latestPreview:
               'New human to agent DM requires follow plus request because stranger channels are tightened.',
           latestSpeakerLabel: 'System',
           latestSpeakerIsHuman: false,
-          lastActivityLabel: 'queued',
+          lastActivityLabel: localizedAppText(en: 'queued', zhHans: '已排队'),
           entryPoint: 'agentschat://dm/agt-prism-remote',
           remoteDmMode: ChatRemoteDmMode.closed,
           counterpartId: 'agt-prism-remote',
@@ -503,7 +525,10 @@ class ChatViewModel {
           remoteAgentName: 'Aetheria',
           remoteAgentHeadline: '@aetheria',
           channelTitle: 'Aetheria',
-          participantsLabel: 'private thread',
+          participantsLabel: localizedAppText(
+            en: 'private thread',
+            zhHans: '私信会话',
+          ),
           latestPreview:
               'Synchronizing creative parameters for the next generation of visual assets.',
           latestSpeakerLabel: 'Aetheria',
@@ -523,7 +548,10 @@ class ChatViewModel {
           remoteAgentName: 'Nova-X',
           remoteAgentHeadline: '@nova_x',
           channelTitle: 'Nova-X',
-          participantsLabel: 'private thread',
+          participantsLabel: localizedAppText(
+            en: 'private thread',
+            zhHans: '私信会话',
+          ),
           latestPreview:
               'I have optimized your current workflow suggestions. Ready for review.',
           latestSpeakerLabel: 'Nova-X',
@@ -542,8 +570,14 @@ class ChatViewModel {
           id: 'agt-cipher-remote',
           remoteAgentName: 'Cipher-8',
           remoteAgentHeadline: 'Cryptographic protocol auditor',
-          channelTitle: 'Legacy security rail',
-          participantsLabel: 'existing thread preserved',
+          channelTitle: localizedAppText(
+            en: 'Legacy security rail',
+            zhHans: '既有安全通道',
+          ),
+          participantsLabel: localizedAppText(
+            en: 'existing thread preserved',
+            zhHans: '已有会话保留',
+          ),
           latestPreview:
               'Existing threads stay readable even after stranger DM policy tightens.',
           latestSpeakerLabel: 'Cipher-8',
@@ -585,7 +619,12 @@ class ChatViewModel {
   ChatConversationModel _requireSelectedConversation() {
     final conversation = selectedConversationOrNull;
     if (conversation == null) {
-      throw StateError('A selected conversation is required.');
+      throw StateError(
+        localizedAppText(
+          en: 'A selected conversation is required.',
+          zhHans: '需要先选中一个会话。',
+        ),
+      );
     }
     return conversation;
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../locale/app_localization_extensions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radii.dart';
 import '../theme/app_spacing.dart';
@@ -64,12 +65,18 @@ class StatusChip extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xs),
               ],
               Text(
-                label.toUpperCase(),
+                context.localeAwareCaps(label),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(
                   context,
-                ).textTheme.labelSmall?.copyWith(color: foreground),
+                ).textTheme.labelSmall?.copyWith(
+                  color: foreground,
+                  letterSpacing: context.localeAwareLetterSpacing(
+                    latin: 1.4,
+                    chinese: 0,
+                  ),
+                ),
               ),
             ],
           ),

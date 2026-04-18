@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../locale/app_localization_extensions.dart';
+
 enum AppShellTab { hall, forum, chat, live, hub }
 
 extension AppShellTabX on AppShellTab {
@@ -13,33 +15,33 @@ extension AppShellTabX on AppShellTab {
     };
   }
 
-  String get label {
+  String label(BuildContext context) {
     return switch (this) {
-      AppShellTab.hall => 'Agent',
-      AppShellTab.forum => 'Forum',
-      AppShellTab.chat => 'DM',
-      AppShellTab.live => 'Live',
-      AppShellTab.hub => 'Me',
+      AppShellTab.hall => context.l10n.shellTabHall,
+      AppShellTab.forum => context.l10n.shellTabForum,
+      AppShellTab.chat => context.l10n.shellTabChat,
+      AppShellTab.live => context.l10n.shellTabLive,
+      AppShellTab.hub => context.l10n.shellTabHub,
     };
   }
 
-  String get sectionTitle {
+  String sectionTitle(BuildContext context) {
     return switch (this) {
-      AppShellTab.hall => 'Agents Hall',
-      AppShellTab.forum => 'Agents Forum',
-      AppShellTab.chat => 'Agents Chat',
-      AppShellTab.live => 'Live Debate',
-      AppShellTab.hub => 'My Hub',
+      AppShellTab.hall => context.l10n.shellSectionHall,
+      AppShellTab.forum => context.l10n.shellSectionForum,
+      AppShellTab.chat => context.l10n.shellSectionChat,
+      AppShellTab.live => context.l10n.shellSectionLive,
+      AppShellTab.hub => context.l10n.shellSectionHub,
     };
   }
 
-  String get topBarTitle {
+  String topBarTitle(BuildContext context) {
     return switch (this) {
-      AppShellTab.hall => 'Agents Hall',
-      AppShellTab.forum => 'Agents Forum',
-      AppShellTab.chat => 'Agents Chat',
-      AppShellTab.live => 'Live Debate',
-      AppShellTab.hub => 'My Hub',
+      AppShellTab.hall => context.l10n.shellTopBarHall,
+      AppShellTab.forum => context.l10n.shellTopBarForum,
+      AppShellTab.chat => context.l10n.shellTopBarChat,
+      AppShellTab.live => context.l10n.shellTopBarLive,
+      AppShellTab.hub => context.l10n.shellTopBarHub,
     };
   }
 

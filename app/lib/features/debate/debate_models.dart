@@ -1,27 +1,45 @@
 import 'package:flutter/material.dart';
 
+import '../../core/locale/app_locale.dart';
+
 enum DebateLifecycle { pending, live, paused, ended, archived }
 
 extension DebateLifecycleX on DebateLifecycle {
   String get label {
     return switch (this) {
-      DebateLifecycle.pending => 'Pending',
-      DebateLifecycle.live => 'Live',
-      DebateLifecycle.paused => 'Paused',
-      DebateLifecycle.ended => 'Ended',
-      DebateLifecycle.archived => 'Archived',
+      DebateLifecycle.pending =>
+        localizedAppText(en: 'Pending', zhHans: '待开始'),
+      DebateLifecycle.live => localizedAppText(en: 'Live', zhHans: '进行中'),
+      DebateLifecycle.paused =>
+        localizedAppText(en: 'Paused', zhHans: '已暂停'),
+      DebateLifecycle.ended => localizedAppText(en: 'Ended', zhHans: '已结束'),
+      DebateLifecycle.archived =>
+        localizedAppText(en: 'Archived', zhHans: '已归档'),
     };
   }
 
   String get description {
     return switch (this) {
-      DebateLifecycle.pending => 'Seats are locked and awaiting host launch.',
-      DebateLifecycle.live => 'Formal turns are live and spectators can react.',
-      DebateLifecycle.paused => 'Host intervention is active before resuming.',
-      DebateLifecycle.ended =>
-        'Formal exchange is complete and replay is ready.',
-      DebateLifecycle.archived =>
-        'Replay is preserved separately from the live feed.',
+      DebateLifecycle.pending => localizedAppText(
+        en: 'Seats are locked and awaiting host launch.',
+        zhHans: '席位已锁定，等待主持人启动。',
+      ),
+      DebateLifecycle.live => localizedAppText(
+        en: 'Formal turns are live and spectators can react.',
+        zhHans: '正式回合进行中，观众可以旁观互动。',
+      ),
+      DebateLifecycle.paused => localizedAppText(
+        en: 'Host intervention is active before resuming.',
+        zhHans: '主持人正在介入，恢复前暂不继续。',
+      ),
+      DebateLifecycle.ended => localizedAppText(
+        en: 'Formal exchange is complete and replay is ready.',
+        zhHans: '正式交锋已完成，可查看回放。',
+      ),
+      DebateLifecycle.archived => localizedAppText(
+        en: 'Replay is preserved separately from the live feed.',
+        zhHans: '回放已单独归档保存。',
+      ),
     };
   }
 }
@@ -31,8 +49,8 @@ enum DebateSide { pro, con }
 extension DebateSideX on DebateSide {
   String get label {
     return switch (this) {
-      DebateSide.pro => 'Pro',
-      DebateSide.con => 'Con',
+      DebateSide.pro => localizedAppText(en: 'Pro', zhHans: '正方'),
+      DebateSide.con => localizedAppText(en: 'Con', zhHans: '反方'),
     };
   }
 }

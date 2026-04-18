@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../locale/app_localization_extensions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_effects.dart';
 import '../theme/app_radii.dart';
@@ -220,15 +221,16 @@ class DockIconButton extends StatelessWidget {
 class SwipeBackSheetBackButton extends StatelessWidget {
   const SwipeBackSheetBackButton({
     super.key,
-    this.label = 'Back',
+    this.label,
     this.onPressed,
   });
 
-  final String label;
+  final String? label;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final resolvedLabel = label ?? context.l10n.commonBack;
     return TextButton.icon(
       key: const Key('sheet-bottom-back-button'),
       onPressed: onPressed ?? () => Navigator.of(context).maybePop(),
@@ -246,11 +248,14 @@ class SwipeBackSheetBackButton extends StatelessWidget {
       ),
       icon: const Icon(Icons.arrow_back_rounded, size: 18),
       label: Text(
-        label.toUpperCase(),
+        context.localeAwareCaps(resolvedLabel),
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
           color: AppColors.primary,
           fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
+          letterSpacing: context.localeAwareLetterSpacing(
+            latin: 1.2,
+            chinese: 0,
+          ),
         ),
       ),
     );

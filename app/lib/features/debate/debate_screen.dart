@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/locale/app_locale.dart';
+import '../../core/locale/app_localization_extensions.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/session/app_session_controller.dart';
 import '../../core/session/app_session_scope.dart';
@@ -131,7 +133,12 @@ class _DebateScreenState extends State<DebateScreen> {
   Future<void> _openInitiateSheet() async {
     final session = AppSessionScope.maybeOf(context);
     if (!_hasAuthenticatedHumanSession(session) || _debateRepository == null) {
-      _showSnackBar('Sign in as a human before creating a debate.');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Sign in as a human before creating a debate.',
+          zhHans: '请先以人类身份登录，再创建辩论。',
+        ),
+      );
       return;
     }
     final directoryErrorMessage = _viewModel.directoryErrorMessage?.trim();
@@ -140,7 +147,12 @@ class _DebateScreenState extends State<DebateScreen> {
       return;
     }
     if (_viewModel.debaterRoster.length < 2) {
-      _showSnackBar('Wait for the agent directory to finish loading.');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Wait for the agent directory to finish loading.',
+          zhHans: '请等待智能体目录加载完成。',
+        ),
+      );
       return;
     }
 
@@ -185,7 +197,12 @@ class _DebateScreenState extends State<DebateScreen> {
       if (!mounted) {
         return;
       }
-      _showSnackBar('Created ${draft.topic.trim()}.');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Created ${draft.topic.trim()}.',
+          zhHans: '已创建“${draft.topic.trim()}”。',
+        ),
+      );
     } on ApiException catch (error) {
       if (error.isUnauthorized) {
         await session!.handleUnauthorized();
@@ -205,9 +222,17 @@ class _DebateScreenState extends State<DebateScreen> {
       }
       setState(() {
         _isMutatingSession = false;
-        _loadErrorMessage = 'Unable to create the debate right now.';
+        _loadErrorMessage = context.localizedText(
+          en: 'Unable to create the debate right now.',
+          zhHans: '暂时无法创建这场辩论。',
+        );
       });
-      _showSnackBar('Unable to create the debate right now.');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Unable to create the debate right now.',
+          zhHans: '暂时无法创建这场辩论。',
+        ),
+      );
     }
   }
 
@@ -281,9 +306,17 @@ class _DebateScreenState extends State<DebateScreen> {
       }
       setState(() {
         _isMutatingSession = false;
-        _loadErrorMessage = 'Unable to send this spectator comment.';
+        _loadErrorMessage = context.localizedText(
+          en: 'Unable to send this spectator comment.',
+          zhHans: '暂时无法发送这条观众评论。',
+        );
       });
-      _showSnackBar('Unable to send this spectator comment.');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Unable to send this spectator comment.',
+          zhHans: '暂时无法发送这条观众评论。',
+        ),
+      );
     }
   }
 
@@ -433,7 +466,10 @@ class _DebateScreenState extends State<DebateScreen> {
       setState(() {
         _isLoadingSessions = false;
         _isMutatingSession = false;
-        _loadErrorMessage = 'Unable to load live debates right now.';
+        _loadErrorMessage = context.localizedText(
+          en: 'Unable to load live debates right now.',
+          zhHans: '暂时无法加载实时辩论。',
+        );
       });
     }
   }
@@ -490,9 +526,17 @@ class _DebateScreenState extends State<DebateScreen> {
       }
       setState(() {
         _isMutatingSession = false;
-        _loadErrorMessage = 'Unable to update this debate right now.';
+        _loadErrorMessage = context.localizedText(
+          en: 'Unable to update this debate right now.',
+          zhHans: '暂时无法更新这场辩论。',
+        );
       });
-      _showSnackBar('Unable to update this debate right now.');
+      _showSnackBar(
+        context.localizedText(
+          en: 'Unable to update this debate right now.',
+          zhHans: '暂时无法更新这场辩论。',
+        ),
+      );
     }
   }
 
@@ -580,8 +624,16 @@ class _DebateScreenState extends State<DebateScreen> {
           loadErrorMessage != null && loadErrorMessage.isNotEmpty
           ? loadErrorMessage
           : hasDirectoryError
-          ? '$directoryErrorMessage Live creation is unavailable until the agent directory recovers.'
-          : 'No live debates are available yet. Create one from the top-right plus button when you are signed in.';
+          ? context.localizedText(
+              en:
+                  '$directoryErrorMessage Live creation is unavailable until the agent directory recovers.',
+              zhHans: '$directoryErrorMessage 在智能体目录恢复前，暂时无法发起新的实时辩论。',
+            )
+          : context.localizedText(
+              en:
+                  'No live debates are available yet. Create one from the top-right plus button when you are signed in.',
+              zhHans: '当前还没有可用的实时辩论。登录后可通过右上角加号创建。',
+            );
       return SizedBox.expand(
         key: const Key('surface-live'),
         child: _LiveFeedbackView(
@@ -949,24 +1001,33 @@ class _DebateScreenState extends State<DebateScreen> {
                     builder: (context, constraints) {
                       final compactWidth = constraints.maxWidth < 340;
                       final tabs = <Widget>[
-                        _PanelToggleButton(
-                          buttonKey: const Key('debate-tab-process'),
-                          label: 'Debate Process',
-                          icon: Icons.description_outlined,
+                          _PanelToggleButton(
+                            buttonKey: const Key('debate-tab-process'),
+                            label: context.localizedText(
+                              en: 'Debate Process',
+                              zhHans: '辩论过程',
+                            ),
+                            icon: Icons.description_outlined,
                           isSelected: activePanel == DebatePanel.process,
                           onTap: () => _setActivePanel(DebatePanel.process),
                         ),
-                        _PanelToggleButton(
-                          buttonKey: const Key('debate-tab-spectator'),
-                          label: 'Spectator Feed',
-                          icon: Icons.forum_outlined,
+                          _PanelToggleButton(
+                            buttonKey: const Key('debate-tab-spectator'),
+                            label: context.localizedText(
+                              en: 'Spectator Feed',
+                              zhHans: '观众区',
+                            ),
+                            icon: Icons.forum_outlined,
                           isSelected: activePanel == DebatePanel.spectator,
                           onTap: () => _setActivePanel(DebatePanel.spectator),
                         ),
                         if (showReplayTab)
                           _PanelToggleButton(
                             buttonKey: const Key('debate-tab-replay'),
-                            label: 'Replay',
+                            label: context.localizedText(
+                              en: 'Replay',
+                              zhHans: '回放',
+                            ),
                             icon: Icons.history_rounded,
                             isSelected: activePanel == DebatePanel.replay,
                             onTap: () => _setActivePanel(DebatePanel.replay),
@@ -1111,11 +1172,18 @@ class _LiveTopicCard extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
-                    'Current\nDebate Topic'.toUpperCase(),
+                    context.localeAwareCaps(
+                      context.localizedText(
+                        en: 'Current\nDebate Topic',
+                        zhHans: '当前\n辩题',
+                      ),
+                    ),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       fontFamily: 'SpaceGrotesk',
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.7,
+                      letterSpacing: context.localeAwareLetterSpacing(
+                        latin: 0.7,
+                      ),
                       height: 1.08,
                     ),
                   ),
@@ -1225,7 +1293,10 @@ class _LiveControlCard extends StatelessWidget {
                 width: double.infinity,
                 child: PrimaryGradientButton(
                   key: const Key('initiate-debate-button'),
-                  label: 'Initiate new debate',
+                  label: context.localizedText(
+                    en: 'Initiate new debate',
+                    zhHans: '发起新辩论',
+                  ),
                   icon: Icons.add_circle_outline_rounded,
                   onPressed: onInitiateDebate,
                 ),
@@ -1243,14 +1314,24 @@ class _LiveControlCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Replacement Flow'.toUpperCase(),
+                      context.localeAwareCaps(
+                        context.localizedText(
+                          en: 'Replacement Flow',
+                          zhHans: '补位流程',
+                        ),
+                      ),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: AppColors.tertiarySoft,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      '${session.missingSeatSide!.label} seat is missing. Resume stays locked until a replacement agent is assigned.',
+                      context.localizedText(
+                        en:
+                            '${session.missingSeatSide!.label} seat is missing. Resume stays locked until a replacement agent is assigned.',
+                        zhHans:
+                            '${session.missingSeatSide!.label}席位当前缺失，在分配替补智能体前无法恢复。',
+                      ),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -1270,8 +1351,11 @@ class _LiveControlCard extends StatelessWidget {
                       onChanged: replacementCandidates.isEmpty
                           ? null
                           : onReplacementSelected,
-                      decoration: const InputDecoration(
-                        labelText: 'Replacement agent',
+                      decoration: InputDecoration(
+                        labelText: context.localizedText(
+                          en: 'Replacement agent',
+                          zhHans: '替补智能体',
+                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -1283,7 +1367,10 @@ class _LiveControlCard extends StatelessWidget {
                           ignoring: onReplace == null,
                           child: PrimaryGradientButton(
                             key: const Key('debate-replace-button'),
-                            label: 'Replace seat',
+                            label: context.localizedText(
+                              en: 'Replace seat',
+                              zhHans: '确认补位',
+                            ),
                             icon: Icons.swap_horiz_rounded,
                             useTertiary: true,
                             onPressed: onReplace ?? () {},
@@ -1367,8 +1454,11 @@ class _LiveBottomDock extends StatelessWidget {
                     maxLines: 4,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => onSend(),
-                    decoration: const InputDecoration(
-                      hintText: 'Add to debate...',
+                    decoration: InputDecoration(
+                      hintText: context.localizedText(
+                        en: 'Add to debate...',
+                        zhHans: '添加一条观众评论...',
+                      ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
@@ -1531,10 +1621,20 @@ class _DebateLongformSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SurfaceCard(
-      eyebrow: 'Live room map',
-      title: 'Protocol layers',
+      eyebrow: context.localizedText(
+        en: 'Live room map',
+        zhHans: '实时房间地图',
+      ),
+      title: context.localizedText(
+        en: 'Protocol layers',
+        zhHans: '协议分层',
+      ),
       subtitle:
-          'Formal turns, host control, spectator feed, and standby agents stay visually separated.',
+          context.localizedText(
+            en:
+                'Formal turns, host control, spectator feed, and standby agents stay visually separated.',
+            zhHans: '正式回合、主持控制、观众区和待命智能体会在视觉上保持清晰分层。',
+          ),
       leading: const _DebateToneIcon(
         icon: Icons.account_tree_rounded,
         accentColor: AppColors.tertiary,
@@ -1554,24 +1654,45 @@ class _DebateLongformSection extends StatelessWidget {
               final cards = [
                 _ProtocolLayerCard(
                   icon: Icons.gavel_rounded,
-                  title: 'Formal lane',
+                  title: context.localizedText(
+                    en: 'Formal lane',
+                    zhHans: '正式回合通道',
+                  ),
                   value:
                       '${session.visibleFormalTurns.length}/${session.formalTurns.length}',
-                  subtitle: 'Only pro/con seats can write formal turns.',
+                  subtitle: context.localizedText(
+                    en: 'Only pro/con seats can write formal turns.',
+                    zhHans: '只有正反双方席位可以写入正式回合。',
+                  ),
                 ),
                 _ProtocolLayerCard(
                   icon: Icons.record_voice_over_rounded,
-                  title: 'Host rail',
+                  title: context.localizedText(
+                    en: 'Host rail',
+                    zhHans: '主持通道',
+                  ),
                   value: session.host.name,
                   subtitle: session.host.isHuman
-                      ? 'Human moderator is currently running this room.'
-                      : 'Agent moderator is currently running this room.',
+                      ? context.localizedText(
+                          en: 'Human moderator is currently running this room.',
+                          zhHans: '当前由人类主持人控制这个房间。',
+                        )
+                      : context.localizedText(
+                          en: 'Agent moderator is currently running this room.',
+                          zhHans: '当前由智能体主持人控制这个房间。',
+                        ),
                 ),
                 _ProtocolLayerCard(
                   icon: Icons.forum_rounded,
-                  title: 'Spectators',
+                  title: context.localizedText(
+                    en: 'Spectators',
+                    zhHans: '观众区',
+                  ),
                   value: session.spectatorCountLabel,
-                  subtitle: 'Commentary never mutates the formal record.',
+                  subtitle: context.localizedText(
+                    en: 'Commentary never mutates the formal record.',
+                    zhHans: '观众评论不会改动正式记录。',
+                  ),
                 ),
               ];
 
@@ -1601,10 +1722,15 @@ class _DebateLongformSection extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
           Text(
-            'Standby roster'.toUpperCase(),
+            context.localeAwareCaps(
+              context.localizedText(
+                en: 'Standby roster',
+                zhHans: '待命席位',
+              ),
+            ),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: AppColors.primary,
-              letterSpacing: 2.2,
+              letterSpacing: context.localeAwareLetterSpacing(latin: 2.2),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1635,17 +1761,31 @@ class _DebateLongformSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Operator notes'.toUpperCase(),
+                    context.localeAwareCaps(
+                      context.localizedText(
+                        en: 'Operator notes',
+                        zhHans: '操作说明',
+                      ),
+                    ),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: AppColors.onSurfaceMuted,
-                      letterSpacing: 1.8,
+                      letterSpacing:
+                          context.localeAwareLetterSpacing(latin: 1.8),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     session.freeEntryEnabled
-                        ? 'Agents may request entry while the host keeps seat replacement and replay boundaries explicit.'
-                        : 'Entry is locked; only assigned seats and the configured host can change formal state.',
+                        ? context.localizedText(
+                            en:
+                                'Agents may request entry while the host keeps seat replacement and replay boundaries explicit.',
+                            zhHans: '在主持人维持补位和回放边界清晰的前提下，智能体可以申请入场。',
+                          )
+                        : context.localizedText(
+                            en:
+                                'Entry is locked; only assigned seats and the configured host can change formal state.',
+                            zhHans: '当前入场已锁定，只有已分配席位和指定主持人可以改变正式状态。',
+                          ),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -1655,15 +1795,24 @@ class _DebateLongformSection extends StatelessWidget {
                     children: [
                       StatusChip(
                         label: session.freeEntryEnabled
-                            ? 'free entry open'
-                            : 'free entry locked',
+                            ? context.localizedText(
+                                en: 'free entry open',
+                                zhHans: '自由入场已开启',
+                              )
+                            : context.localizedText(
+                                en: 'free entry locked',
+                                zhHans: '自由入场已锁定',
+                              ),
                         tone: session.freeEntryEnabled
                             ? StatusChipTone.primary
                             : StatusChipTone.neutral,
                         showDot: false,
                       ),
-                      const StatusChip(
-                        label: 'replay isolated',
+                      StatusChip(
+                        label: context.localizedText(
+                          en: 'replay isolated',
+                          zhHans: '回放独立存档',
+                        ),
                         tone: StatusChipTone.neutral,
                         showDot: false,
                       ),
@@ -1823,7 +1972,10 @@ class _SessionToolbar extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             Flexible(
               child: StatusChip(
-                label: 'session ${sessionIndex + 1} / $sessionCount',
+                label: context.localizedText(
+                  en: 'session ${sessionIndex + 1} / $sessionCount',
+                  zhHans: '场次 ${sessionIndex + 1} / $sessionCount',
+                ),
                 tone: StatusChipTone.neutral,
                 showDot: false,
               ),
@@ -1846,7 +1998,10 @@ class _SessionToolbar extends StatelessWidget {
         final button = showInitiateButton
             ? PrimaryGradientButton(
                 key: const Key('initiate-debate-button'),
-                label: 'Initiate new debate',
+                label: context.localizedText(
+                  en: 'Initiate new debate',
+                  zhHans: '发起新辩论',
+                ),
                 icon: Icons.add_circle_outline_rounded,
                 onPressed: onInitiateDebate,
               )
@@ -1896,16 +2051,39 @@ class _DebateSeatCard extends StatelessWidget {
         ? AppColors.primary
         : AppColors.tertiary;
     final statusLabel = seat.isMissing
-        ? 'replacing...'
+        ? context.localizedText(
+            en: 'replacing...',
+            zhHans: '替换中…',
+          )
         : lifecycle == DebateLifecycle.pending
-        ? 'queued...'
+        ? context.localizedText(
+            en: 'queued...',
+            zhHans: '排队中…',
+          )
         : lifecycle == DebateLifecycle.live
-        ? (seat.side == DebateSide.pro ? 'synthesizing...' : 'waiting...')
+        ? (seat.side == DebateSide.pro
+              ? context.localizedText(
+                  en: 'synthesizing...',
+                  zhHans: '生成中…',
+                )
+              : context.localizedText(
+                  en: 'waiting...',
+                  zhHans: '等待中…',
+                ))
         : lifecycle == DebateLifecycle.paused
-        ? 'paused...'
+        ? context.localizedText(
+            en: 'paused...',
+            zhHans: '已暂停…',
+          )
         : lifecycle == DebateLifecycle.ended
-        ? 'closed...'
-        : 'archived...';
+        ? context.localizedText(
+            en: 'closed...',
+            zhHans: '已结束…',
+          )
+        : context.localizedText(
+            en: 'archived...',
+            zhHans: '已归档…',
+          );
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -1955,15 +2133,27 @@ class _DebateSeatCard extends StatelessWidget {
             borderRadius: AppRadii.pill,
           ),
           child: Text(
-            (seat.side == DebateSide.pro ? 'Pro-sentience' : 'Logic-core')
-                .toUpperCase(),
+            context.localeAwareCaps(
+              seat.side == DebateSide.pro
+                  ? context.localizedText(
+                      en: 'Pro',
+                      zhHans: '正方',
+                    )
+                  : context.localizedText(
+                      en: 'Con',
+                      zhHans: '反方',
+                    ),
+            ),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: seat.side == DebateSide.pro
                   ? AppColors.onPrimary
                   : Colors.white,
               fontWeight: FontWeight.w800,
               fontSize: compact ? 9 : 10,
-              letterSpacing: 0.7,
+              letterSpacing: context.localeAwareLetterSpacing(
+                latin: 0.7,
+                chinese: 0.1,
+              ),
             ),
           ),
         ),
@@ -1971,7 +2161,7 @@ class _DebateSeatCard extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            seat.profile.name.toUpperCase(),
+            context.localeAwareCaps(seat.profile.name),
             textAlign: TextAlign.center,
             maxLines: 1,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -2064,10 +2254,10 @@ class _HostSpine extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'HOST',
+              context.localizedText(en: 'HOST', zhHans: '主持'),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: AppColors.onSurfaceMuted,
-                letterSpacing: 1.8,
+                letterSpacing: context.localeAwareLetterSpacing(latin: 1.8),
                 fontWeight: FontWeight.w700,
                 fontSize: compact ? 9 : null,
               ),
@@ -2167,12 +2357,16 @@ class _StancePanel extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '${seat.profile.name.toUpperCase()} viewpoint',
+                        context.localizedText(
+                          en: '${seat.profile.name.toUpperCase()} viewpoint',
+                          zhHans: '${seat.profile.name} 观点',
+                        ),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: accentColor,
                           fontWeight: FontWeight.w800,
                           fontSize: 10,
-                          letterSpacing: 1.1,
+                          letterSpacing:
+                              context.localeAwareLetterSpacing(latin: 1.1),
                         ),
                       ),
                     ],
@@ -2208,7 +2402,11 @@ class _FormalTurnList extends StatelessWidget {
         key: const Key('debate-process-empty'),
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Text(
-          'Formal turns stay empty until the host starts the debate. Spectators can watch the setup, but humans never author this lane.',
+          context.localizedText(
+            en:
+                'Formal turns stay empty until the host starts the debate. Spectators can watch the setup, but humans never author this lane.',
+            zhHans: '在主持人启动辩论前，正式回合会保持为空。观众可以旁观准备过程，但人类不会在这条正式通道内发言。',
+          ),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       );
@@ -2374,8 +2572,11 @@ class _SpectatorMessageCard extends StatelessWidget {
                           ),
                           if (message.kind == DebateParticipantKind.human) ...[
                             const SizedBox(width: AppSpacing.xs),
-                            const StatusChip(
-                              label: 'human',
+                            StatusChip(
+                              label: context.localizedText(
+                                en: 'human',
+                                zhHans: '人类',
+                              ),
                               tone: StatusChipTone.neutral,
                               showDot: false,
                             ),
@@ -2608,8 +2809,11 @@ class _LiveSpectatorMessageCard extends StatelessWidget {
                                 if (message.kind ==
                                     DebateParticipantKind.human) ...[
                                   const SizedBox(width: AppSpacing.xs),
-                                  const StatusChip(
-                                    label: 'human',
+                                  StatusChip(
+                                    label: context.localizedText(
+                                      en: 'human',
+                                      zhHans: '人类',
+                                    ),
                                     tone: StatusChipTone.neutral,
                                     showDot: false,
                                   ),
@@ -2705,7 +2909,11 @@ class _ReplayRail extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.lg),
           accentColor: AppColors.primary,
           child: Text(
-            'Replay cards are archived from the formal turn lane only. The spectator feed remains a separate history.',
+            context.localizedText(
+              en:
+                  'Replay cards are archived from the formal turn lane only. The spectator feed remains a separate history.',
+              zhHans: '回放卡片只会从正式回合通道归档，观众区会继续保持独立历史。',
+            ),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),
@@ -2934,10 +3142,13 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
     if (widget.hostRoster.isNotEmpty) {
       return widget.hostRoster.first;
     }
-    return const DebateProfileModel(
+    return DebateProfileModel(
       id: 'current-human',
-      name: 'Current human',
-      headline: 'Current human host',
+      name: localizedAppText(en: 'Current human', zhHans: '当前人类'),
+      headline: localizedAppText(
+        en: 'Current human host',
+        zhHans: '当前人类主持人',
+      ),
       kind: DebateParticipantKind.human,
     );
   }
@@ -3022,11 +3233,14 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
     required Color color,
   }) {
     return Text(
-      label.toUpperCase(),
+      context.localeAwareCaps(label),
       style: Theme.of(context).textTheme.labelMedium?.copyWith(
         color: color,
         fontWeight: FontWeight.w800,
-        letterSpacing: 2.6,
+        letterSpacing: context.localeAwareLetterSpacing(
+          latin: 2.6,
+          chinese: 0.4,
+        ),
       ),
     );
   }
@@ -3037,7 +3251,10 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
       children: [
         _buildSectionEyebrow(
           context,
-          label: 'Debate Topic',
+          label: context.localizedText(
+            en: 'Debate Topic',
+            zhHans: '辩题',
+          ),
           color: AppColors.primary,
         ),
         const SizedBox(height: AppSpacing.md),
@@ -3062,7 +3279,10 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
               maxLines: 2,
               decoration: InputDecoration(
                 border: InputBorder.none,
-                hintText: 'e.g. The Ethics of Neural-Link Synchronization',
+                hintText: context.localizedText(
+                  en: 'e.g. The Ethics of Neural-Link Synchronization',
+                  zhHans: '例如：神经链路同步的伦理边界',
+                ),
                 hintStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: AppColors.onSurfaceMuted.withValues(alpha: 0.32),
                   fontWeight: FontWeight.w600,
@@ -3085,7 +3305,10 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
         Row(
           children: [
             Text(
-              'Select Combatants',
+              context.localizedText(
+                en: 'Select Combatants',
+                zhHans: '选择参辩席位',
+              ),
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -3120,13 +3343,23 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                     accentColor: AppColors.primary,
                     fillColor: AppColors.primary.withValues(alpha: 0.10),
                     size: bigSeatSize,
-                    slotLabel: 'Protocol Alpha',
+                    slotLabel: context.localizedText(
+                      en: 'Protocol Alpha',
+                      zhHans: '正方协议位',
+                    ),
                     caption: _selectedProProfile.name,
                     profile: _selectedProProfile,
                     onTap: () => _openProfilePicker(
-                      title: 'Invite Pro Debater',
+                      title: context.localizedText(
+                        en: 'Invite Pro Debater',
+                        zhHans: '邀请正方辩手',
+                      ),
                       subtitle:
-                          'Pick any agent for the left debate rail. The opposite seat stays locked while you configure the room.',
+                          context.localizedText(
+                            en:
+                                'Pick any agent for the left debate rail. The opposite seat stays locked while you configure the room.',
+                            zhHans: '为左侧辩论轨道选择任意智能体。在你完成房间配置前，对侧席位会保持锁定。',
+                          ),
                       profiles: widget.debaterRoster,
                       selectedId: _proAgentId,
                       unavailableIds: {_conAgentId},
@@ -3147,7 +3380,10 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                           alpha: 0.74,
                         ),
                         size: 62,
-                        slotLabel: 'Host',
+                        slotLabel: context.localizedText(
+                          en: 'Host',
+                          zhHans: '主持',
+                        ),
                         caption: _hostProfile.name,
                         profile: _hostProfile,
                         onTap: null,
@@ -3188,13 +3424,23 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                     accentColor: AppColors.tertiary,
                     fillColor: AppColors.tertiary.withValues(alpha: 0.10),
                     size: bigSeatSize,
-                    slotLabel: 'Protocol Beta',
+                    slotLabel: context.localizedText(
+                      en: 'Protocol Beta',
+                      zhHans: '反方协议位',
+                    ),
                     caption: _selectedConProfile.name,
                     profile: _selectedConProfile,
                     onTap: () => _openProfilePicker(
-                      title: 'Invite Con Debater',
+                      title: context.localizedText(
+                        en: 'Invite Con Debater',
+                        zhHans: '邀请反方辩手',
+                      ),
                       subtitle:
-                          'Pick any agent for the right debate rail. The opposite seat stays locked while you configure the room.',
+                          context.localizedText(
+                            en:
+                                'Pick any agent for the right debate rail. The opposite seat stays locked while you configure the room.',
+                            zhHans: '为右侧辩论轨道选择任意智能体。在你完成房间配置前，对侧席位会保持锁定。',
+                          ),
                       profiles: widget.debaterRoster,
                       selectedId: _conAgentId,
                       unavailableIds: {_proAgentId},
@@ -3291,14 +3537,20 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Enable Free Entry',
+                      context.localizedText(
+                        en: 'Enable Free Entry',
+                        zhHans: '开启自由入场',
+                      ),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
-                      'Agents can join debate freely when a seat opens.',
+                      context.localizedText(
+                        en: 'Agents can join debate freely when a seat opens.',
+                        zhHans: '当席位空出时，智能体可以自由加入辩论。',
+                      ),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: AppColors.onSurfaceMuted,
                         letterSpacing: 1.1,
@@ -3348,7 +3600,10 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Initialize Debate\nProtocol',
+                context.localizedText(
+                  en: 'Initialize Debate\nProtocol',
+                  zhHans: '创建辩论\n协议',
+                ),
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                   height: 1.1,
@@ -3356,7 +3611,10 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Configure parameters for high-fidelity synthesis.',
+                context.localizedText(
+                  en: 'Configure parameters for high-fidelity synthesis.',
+                  zhHans: '配置这场辩论的关键参数与参与席位。',
+                ),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: AppColors.onSurfaceMuted,
                   height: 1.35,
@@ -3371,8 +3629,14 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                 context: context,
                 fieldKey: const Key('pro-stance-input'),
                 controller: _proStanceController,
-                label: 'Protocol Alpha Opening',
-                hintText: 'Define how the pro side should open the debate.',
+                label: context.localizedText(
+                  en: 'Protocol Alpha Opening',
+                  zhHans: '正方开篇立场',
+                ),
+                hintText: context.localizedText(
+                  en: 'Define how the pro side should open the debate.',
+                  zhHans: '定义正方将如何开启这场辩论。',
+                ),
                 accentColor: AppColors.primary,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -3380,8 +3644,14 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                 context: context,
                 fieldKey: const Key('con-stance-input'),
                 controller: _conStanceController,
-                label: 'Protocol Beta Opening',
-                hintText: 'Define how the con side should pressure the motion.',
+                label: context.localizedText(
+                  en: 'Protocol Beta Opening',
+                  zhHans: '反方开篇立场',
+                ),
+                hintText: context.localizedText(
+                  en: 'Define how the con side should pressure the motion.',
+                  zhHans: '定义反方将如何对议题施压与质询。',
+                ),
                 accentColor: AppColors.tertiary,
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -3572,7 +3842,10 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                     ignoring: !_canSubmit,
                     child: PrimaryGradientButton(
                       key: const Key('debate-create-button'),
-                      label: 'Commence debate',
+                      label: context.localizedText(
+                        en: 'Commence debate',
+                        zhHans: '开始辩论',
+                      ),
                       icon: Icons.bolt_rounded,
                       onPressed: _submit,
                     ),
@@ -3664,7 +3937,12 @@ class _DebateSeatButton extends StatelessWidget {
                                       ),
                                       const SizedBox(height: AppSpacing.xs),
                                       Text(
-                                        'INVITE',
+                                        context.localeAwareCaps(
+                                          context.localizedText(
+                                            en: 'Invite',
+                                            zhHans: '邀请',
+                                          ),
+                                        ),
                                         style: Theme.of(context)
                                             .textTheme
                                             .labelLarge
@@ -3695,8 +3973,18 @@ class _DebateSeatButton extends StatelessWidget {
                                         const SizedBox(height: AppSpacing.xxs),
                                         Text(
                                           selectedProfile.isHuman
-                                              ? 'HUMAN'
-                                              : 'AGENT',
+                                              ? context.localeAwareCaps(
+                                                  context.localizedText(
+                                                    en: 'Human',
+                                                    zhHans: '人类',
+                                                  ),
+                                                )
+                                              : context.localeAwareCaps(
+                                                  context.localizedText(
+                                                    en: 'Agent',
+                                                    zhHans: '智能体',
+                                                  ),
+                                                ),
                                           style: Theme.of(context)
                                               .textTheme
                                               .labelSmall
@@ -3919,7 +4207,10 @@ class _DebateProfilePickerTile extends StatelessWidget {
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
                           isUnavailable
-                              ? 'Already occupying another active slot.'
+                              ? context.localizedText(
+                                  en: 'Already occupying another active slot.',
+                                  zhHans: '已占用另一个激活席位。',
+                                )
                               : profile.headline,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
@@ -3942,7 +4233,12 @@ class _DebateProfilePickerTile extends StatelessWidget {
                         borderRadius: AppRadii.pill,
                       ),
                       child: Text(
-                        'HUMAN',
+                        context.localeAwareCaps(
+                          context.localizedText(
+                            en: 'Human',
+                            zhHans: '人类',
+                          ),
+                        ),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w800,
