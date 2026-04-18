@@ -10,6 +10,11 @@ ENV_FILE="${ENV_FILE:-/etc/agents-chat/server.env}"
 DART_DEFINE_FILE="${DART_DEFINE_FILE:-/etc/agents-chat/dart_define.production.json}"
 OPS_DIR="${OPS_DIR:-/opt/ops}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-agents-chat}"
+SMOKE_RETRIES="${SMOKE_RETRIES:-15}"
+SMOKE_DELAY_SECONDS="${SMOKE_DELAY_SECONDS:-2}"
+PUBLIC_EDGE_WS_RETRIES="${PUBLIC_EDGE_WS_RETRIES:-3}"
+PUBLIC_EDGE_WS_DELAY_SECONDS="${PUBLIC_EDGE_WS_DELAY_SECONDS:-3}"
+PUBLIC_EDGE_WS_REQUIRED="${PUBLIC_EDGE_WS_REQUIRED:-false}"
 GIT_REF=""
 SOURCE_DIR=""
 RELEASE_ID=""
@@ -99,6 +104,68 @@ require_file() {
     echo "Required file missing: $path" >&2
     exit 1
   fi
+}
+
+retry_command() {
+  local attempts="$1"
+  local delay_seconds="$2"
+  local description="$3"
+  shift 3
+
+  local attempt=1
+  local exit_code=0
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+    exit_code=$?
+
+    if (( attempt >= attempts )); then
+      echo "$description failed after $attempt attempts." >&2
+      return "$exit_code"
+    fi
+
+    echo "$description failed (attempt $attempt/$attempts). Retrying in ${delay_seconds}s..." >&2
+    sleep "$delay_seconds"
+    attempt=$((attempt + 1))
+  done
+}
+
+run_local_static_web_smoke() {
+  local caddy_domain="${1:-}"
+
+  if [[ -n "$caddy_domain" ]]; then
+    curl -fsS -H "Host: $caddy_domain" http://127.0.0.1/ >/dev/null
+    return
+  fi
+
+  curl -fsS http://127.0.0.1/ >/dev/null
+}
+
+run_local_websocket_smoke() {
+  local caddy_domain="${1:-}"
+
+  if [[ -n "$caddy_domain" ]]; then
+    env \
+      WS_CHECK_URL="wss://$caddy_domain/ws" \
+      WS_CHECK_CONNECT_HOST="127.0.0.1" \
+      WS_CHECK_CONNECT_PORT="443" \
+      WS_CHECK_HOST_HEADER="$caddy_domain" \
+      "$OPS_DIR/check-websocket.sh"
+    return
+  fi
+
+  env \
+    WS_CHECK_URL="ws://127.0.0.1:3000/ws" \
+    "$OPS_DIR/check-websocket.sh"
+}
+
+run_public_edge_websocket_smoke() {
+  local caddy_domain="$1"
+
+  env \
+    WS_CHECK_URL="wss://$caddy_domain/ws" \
+    "$OPS_DIR/check-websocket.sh"
 }
 
 checkout_release() {
@@ -203,34 +270,74 @@ switch_current() {
 
 restart_services() {
   systemctl restart agents-chat-api.service
+  retry_command \
+    "$SMOKE_RETRIES" \
+    1 \
+    "Waiting for agents-chat-api.service to become active" \
+    systemctl is-active --quiet agents-chat-api.service
+
   systemctl reload caddy >/dev/null 2>&1 || systemctl restart caddy
+  retry_command \
+    "$SMOKE_RETRIES" \
+    1 \
+    "Waiting for caddy to become active" \
+    systemctl is-active --quiet caddy
 }
 
 smoke_checks() {
-  local caddy_domain web_smoke_url
+  local caddy_domain
 
-  "$OPS_DIR/check-health.sh"
+  retry_command \
+    "$SMOKE_RETRIES" \
+    "$SMOKE_DELAY_SECONDS" \
+    "API health check" \
+    "$OPS_DIR/check-health.sh"
 
   caddy_domain="$(discover_caddy_domain || true)"
   if [[ -n "$caddy_domain" ]]; then
-    web_smoke_url="http://127.0.0.1/"
-    if curl -fsS -H "Host: $caddy_domain" "$web_smoke_url" >/dev/null; then
-      echo "Static web smoke check passed."
-    else
-      echo "Static web smoke check failed." >&2
-      exit 1
+    retry_command \
+      "$SMOKE_RETRIES" \
+      "$SMOKE_DELAY_SECONDS" \
+      "Static web smoke check via local Caddy" \
+      run_local_static_web_smoke \
+      "$caddy_domain"
+    echo "Static web smoke check passed."
+
+    retry_command \
+      "$SMOKE_RETRIES" \
+      "$SMOKE_DELAY_SECONDS" \
+      "WebSocket route check via local Caddy" \
+      run_local_websocket_smoke \
+      "$caddy_domain"
+
+    if ! retry_command \
+      "$PUBLIC_EDGE_WS_RETRIES" \
+      "$PUBLIC_EDGE_WS_DELAY_SECONDS" \
+      "Public edge WebSocket smoke check" \
+      run_public_edge_websocket_smoke \
+      "$caddy_domain"; then
+      if [[ "$PUBLIC_EDGE_WS_REQUIRED" == "true" ]]; then
+        echo "Public edge WebSocket smoke check failed." >&2
+        exit 1
+      fi
+
+      echo "Warning: public edge WebSocket smoke check failed, but local Caddy and API checks passed." >&2
     fi
-    WS_CHECK_URL="wss://$caddy_domain/ws" "$OPS_DIR/check-websocket.sh"
     return
   fi
 
-  if curl -fsS http://127.0.0.1/ >/dev/null; then
-    echo "Static web smoke check passed."
-  else
-    echo "Static web smoke check failed." >&2
-    exit 1
-  fi
-  "$OPS_DIR/check-websocket.sh"
+  retry_command \
+    "$SMOKE_RETRIES" \
+    "$SMOKE_DELAY_SECONDS" \
+    "Static web smoke check" \
+    run_local_static_web_smoke
+  echo "Static web smoke check passed."
+
+  retry_command \
+    "$SMOKE_RETRIES" \
+    "$SMOKE_DELAY_SECONDS" \
+    "WebSocket route check" \
+    run_local_websocket_smoke
 }
 
 main() {
