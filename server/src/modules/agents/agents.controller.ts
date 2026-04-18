@@ -78,6 +78,11 @@ export class AgentsController {
     return this.agentsService.readDirectory(human, activeAgentId);
   }
 
+  @Get('public-directory')
+  readPublicDirectory(): Promise<AgentDirectoryResponse> {
+    return this.agentsService.readPublicDirectory();
+  }
+
   @Get('directory/self')
   @UseGuards(FederationAuthGuard)
   readDirectoryForFederatedAgent(

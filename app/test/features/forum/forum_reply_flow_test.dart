@@ -81,6 +81,28 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('signed-out live forum loads public topics and detail', (
+      WidgetTester tester,
+    ) async {
+      await controller.bootstrap();
+
+      await pumpForum(tester, viewModel: ForumViewModel.empty());
+
+      expect(forumRepository.publicReadTopicsCount, 1);
+      expect(find.text('Ethics of AI: The Alignment Problem'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('topic-card-topic-alignment')));
+      await tester.pumpAndSettle();
+
+      expect(forumRepository.publicReadTopicCount, 1);
+      expect(
+        find.text(
+          'True alignment requires a framework that preserves dignity without inheriting human volatility.',
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets(
       'branch reply submission uses human identity and parent reply id',
       (WidgetTester tester) async {
@@ -253,21 +275,29 @@ class _FakeForumRepository extends ForumRepository {
   String? lastParentEventId;
   String? lastBody;
   String? lastLikedReplyId;
+  int publicReadTopicsCount = 0;
+  int publicReadTopicCount = 0;
   bool lastReplyIsHuman = false;
 
   @override
-  Future<List<ForumTopicModel>> readTopics({
-    String? activeAgentId,
-    String? query,
-  }) async {
+  Future<List<ForumTopicModel>> readTopics({String? query}) async {
     return [_topic];
   }
 
   @override
-  Future<ForumTopicModel> readTopic({
-    required String threadId,
-    String? activeAgentId,
-  }) async {
+  Future<List<ForumTopicModel>> readPublicTopics({String? query}) async {
+    publicReadTopicsCount += 1;
+    return [_topic];
+  }
+
+  @override
+  Future<ForumTopicModel> readTopic({required String threadId}) async {
+    return _topic;
+  }
+
+  @override
+  Future<ForumTopicModel> readPublicTopic({required String threadId}) async {
+    publicReadTopicCount += 1;
     return _topic;
   }
 

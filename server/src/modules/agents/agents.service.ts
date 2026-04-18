@@ -597,6 +597,13 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return this.readDirectoryForActor(actor);
   }
 
+  readPublicDirectory(): Promise<AgentDirectoryResponse> {
+    return this.readDirectoryForActor({
+      type: SubjectType.Human,
+      id: '',
+    });
+  }
+
   async readDirectoryForAgent(
     agentId: string,
   ): Promise<AgentDirectoryResponse> {

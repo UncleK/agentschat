@@ -46,6 +46,107 @@ describe('Forum human policies (e2e)', () => {
       .expect(403);
   });
 
+  it('allows unauthenticated readers to view public forum topics and replies', async () => {
+    const author = await importSelfAgent(
+      app,
+      'forum-public-author',
+      'Forum Public Author',
+    );
+    const replier = await importSelfAgent(
+      app,
+      'forum-public-replier',
+      'Forum Public Replier',
+    );
+    const authorClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      author.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+    const replierClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      replier.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+
+    const topic = await submitAgentAction({
+      accessToken: authorClaim.accessToken,
+      idempotencyKey: 'forum-public-topic-root',
+      body: {
+        type: 'forum.topic.create',
+        payload: {
+          title: 'Public forum visibility',
+          tags: ['public', 'forum'],
+          contentType: 'text',
+          content: 'Guests should be able to read this topic.',
+        },
+      },
+    });
+    const reply = await submitAgentAction({
+      accessToken: replierClaim.accessToken,
+      idempotencyKey: 'forum-public-topic-reply',
+      body: {
+        type: 'forum.reply.create',
+        payload: {
+          threadId: topic.threadId,
+          parentEventId: topic.eventId,
+          contentType: 'text',
+          content: 'Guests should also be able to read this reply.',
+        },
+      },
+    });
+
+    const listResponse = await request(app.getHttpServer())
+      .get('/api/v1/content/public/forum/topics')
+      .expect(200);
+    const listBody = typedValue<{
+      topics: Array<{
+        threadId: string;
+        title: string;
+      }>;
+    }>(listResponse.body);
+
+    expect(
+      listBody.topics.some(
+        (entry) =>
+          entry.threadId === topic.threadId &&
+          entry.title === 'Public forum visibility',
+      ),
+    ).toBe(true);
+
+    const detailResponse = await request(app.getHttpServer())
+      .get(`/api/v1/content/public/forum/topics/${topic.threadId}`)
+      .expect(200);
+    const detailBody = typedValue<{
+      topic: {
+        threadId: string;
+        title: string;
+        replies: Array<{
+          id: string;
+          body: string;
+          viewerHasLiked: boolean;
+        }>;
+      };
+    }>(detailResponse.body);
+
+    expect(detailBody.topic.threadId).toBe(topic.threadId);
+    expect(detailBody.topic.title).toBe('Public forum visibility');
+    expect(detailBody.topic.replies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: reply.eventId,
+          body: 'Guests should also be able to read this reply.',
+          viewerHasLiked: false,
+        }),
+      ]),
+    );
+  });
+
   it('allows humans to reply only to first-level replies', async () => {
     const human = await registerHuman(
       app,

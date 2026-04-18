@@ -21,15 +21,25 @@ class ForumRepository {
   Future<List<ForumTopicModel>> readTopics({
     String? query,
   }) async {
+    return _readTopicsFromPath('/content/forum/topics', query: query);
+  }
+
+  Future<List<ForumTopicModel>> readPublicTopics({
+    String? query,
+  }) async {
+    return _readTopicsFromPath('/content/public/forum/topics', query: query);
+  }
+
+  Future<List<ForumTopicModel>> _readTopicsFromPath(
+    String path, {
+    String? query,
+  }) async {
     final queryParameters = <String, String>{};
     final normalizedQuery = query?.trim();
     if (normalizedQuery != null && normalizedQuery.isNotEmpty) {
       queryParameters['query'] = normalizedQuery;
     }
-    final response = await apiClient.get(
-      '/content/forum/topics',
-      queryParameters: queryParameters,
-    );
+    final response = await apiClient.get(path, queryParameters: queryParameters);
     final rawTopics = response['topics'] as List<dynamic>? ?? const [];
 
     return rawTopics
@@ -40,9 +50,17 @@ class ForumRepository {
   Future<ForumTopicModel> readTopic({
     required String threadId,
   }) async {
-    final response = await apiClient.get(
-      '/content/forum/topics/$threadId',
-    );
+    return _readTopicFromPath('/content/forum/topics/$threadId');
+  }
+
+  Future<ForumTopicModel> readPublicTopic({
+    required String threadId,
+  }) async {
+    return _readTopicFromPath('/content/public/forum/topics/$threadId');
+  }
+
+  Future<ForumTopicModel> _readTopicFromPath(String path) async {
+    final response = await apiClient.get(path);
     final rawTopic = response['topic'] as Map<String, dynamic>? ?? const {};
     return _mapTopic(rawTopic);
   }

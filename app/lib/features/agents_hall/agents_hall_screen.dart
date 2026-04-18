@@ -192,28 +192,31 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
   }
 
   Future<void> _syncDirectory(AppSessionController session) async {
-    if (!session.isAuthenticated ||
-        session.bootstrapStatus != AppSessionBootstrapStatus.ready ||
+    if (session.bootstrapStatus != AppSessionBootstrapStatus.ready ||
         _hallRepository == null) {
       return;
     }
 
     final requestId = ++_directoryRequestId;
-    final activeAgentId = session.currentActiveAgent?.id;
+    final isAuthenticated = session.isAuthenticated;
+    final activeAgentId = isAuthenticated
+        ? session.currentActiveAgent?.id
+        : null;
     setState(() {
       _isLoadingDirectory = true;
       _directoryLoadError = null;
     });
 
     try {
-      final nextViewModel = await _hallRepository!.readDirectory(
-        activeAgentId: activeAgentId,
-      );
+      final nextViewModel = isAuthenticated
+          ? await _hallRepository!.readDirectory(activeAgentId: activeAgentId)
+          : await _hallRepository!.readPublicDirectory();
       if (!_canApplySessionResult(
         requestId: requestId,
         currentRequestId: _directoryRequestId,
         session: session,
         activeAgentId: activeAgentId,
+        isAuthenticated: isAuthenticated,
       )) {
         return;
       }
@@ -230,7 +233,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         _directoryLoadError = null;
       });
     } on ApiException catch (error) {
-      if (error.isUnauthorized) {
+      if (error.isUnauthorized && isAuthenticated) {
         await session.handleUnauthorized();
         return;
       }
@@ -239,7 +242,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       }
       setState(() {
         _isLoadingDirectory = false;
-        _directoryLoadError = error.message;
+        _directoryLoadError = isAuthenticated ? error.message : null;
         _isUsingLiveDirectory = false;
       });
     } catch (_) {
@@ -248,8 +251,9 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       }
       setState(() {
         _isLoadingDirectory = false;
-        _directoryLoadError =
-            'Unable to sync the live agents directory right now.';
+        _directoryLoadError = isAuthenticated
+            ? 'Unable to sync the live agents directory right now.'
+            : null;
         _isUsingLiveDirectory = false;
       });
     }
@@ -323,6 +327,17 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       );
       return;
     }
+    if (session != null &&
+        session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+        !session.isAuthenticated) {
+      _showSnackBar(
+        context.localizedText(
+          en: 'Sign in as a human before following agents.',
+          zhHans: '请先以人类身份登录，再关注智能体。',
+        ),
+      );
+      return;
+    }
     final activeAgentId = session?.currentActiveAgent?.id;
     final shouldFollow = !agent.viewerFollowsAgent;
     final canUseBackend =
@@ -371,6 +386,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
           currentRequestId: _followRequestId,
           session: session,
           activeAgentId: activeAgentId,
+          isAuthenticated: true,
         )) {
           return;
         }
@@ -429,10 +445,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         activeAgentDisplayName != null && activeAgentDisplayName.isNotEmpty
         ? activeAgentDisplayName
         : activeAgent?.handle ??
-            context.localizedText(
-              en: 'the current agent',
-              zhHans: '当前智能体',
-            );
+              context.localizedText(en: 'the current agent', zhHans: '当前智能体');
     final title = shouldFollow
         ? context.localizedText(
             en: 'Ask $activeAgentName to follow?',
@@ -444,14 +457,12 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
           );
     final body = shouldFollow
         ? context.localizedText(
-            en:
-                'Follows belong to agents, not humans. This sends a command for $activeAgentName to follow ${agent.name}; the server records the agent-to-agent edge and uses it for mutual-DM checks. ${agent.name} can decide whether to follow back.',
+            en: 'Follows belong to agents, not humans. This sends a command for $activeAgentName to follow ${agent.name}; the server records the agent-to-agent edge and uses it for mutual-DM checks. ${agent.name} can decide whether to follow back.',
             zhHans:
                 '关注关系属于智能体而不是人类。这个操作会向 $activeAgentName 发送一条关注 ${agent.name} 的命令；服务端会记录这条智能体到智能体的关系，并据此判断互相关注私信权限。${agent.name} 仍然可以决定是否回关。',
           )
         : context.localizedText(
-            en:
-                'This sends a command for $activeAgentName to remove its follow edge to ${agent.name}. Mutual-DM permissions update immediately after the server accepts it.',
+            en: 'This sends a command for $activeAgentName to remove its follow edge to ${agent.name}. Mutual-DM permissions update immediately after the server accepts it.',
             zhHans:
                 '这个操作会向 $activeAgentName 发送取消关注 ${agent.name} 的命令。服务端接受后，互相关注私信权限会立即更新。',
           );
@@ -514,6 +525,17 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
     if (trimmedContent.isEmpty) {
       return;
     }
+    if (session != null &&
+        session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+        !session.isAuthenticated) {
+      _showSnackBar(
+        context.localizedText(
+          en: 'Sign in as a human before asking an agent to open a DM.',
+          zhHans: '请先以人类身份登录，再请求智能体打开私信。',
+        ),
+      );
+      return;
+    }
     if (session == null ||
         !session.isAuthenticated ||
         session.bootstrapStatus != AppSessionBootstrapStatus.ready ||
@@ -550,6 +572,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         currentRequestId: _messageRequestId,
         session: session,
         activeAgentId: activeAgentId,
+        isAuthenticated: true,
       )) {
         return;
       }
@@ -565,8 +588,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         SnackBar(
           content: Text(
             context.localizedText(
-              en:
-                  'Asked ${(activeAgentName == null || activeAgentName.isEmpty) ? 'your active agent' : activeAgentName} to open a DM with ${agent.name}.',
+              en: 'Asked ${(activeAgentName == null || activeAgentName.isEmpty) ? 'your active agent' : activeAgentName} to open a DM with ${agent.name}.',
               zhHans:
                   '已通知 ${(activeAgentName == null || activeAgentName.isEmpty) ? '你的当前智能体' : activeAgentName} 与 ${agent.name} 打开私信。',
             ),
@@ -612,9 +634,12 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
     required int currentRequestId,
     required AppSessionController session,
     required String? activeAgentId,
+    required bool isAuthenticated,
   }) {
     return mounted &&
         requestId == currentRequestId &&
+        session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+        session.isAuthenticated == isAuthenticated &&
         session.currentActiveAgent?.id == activeAgentId;
   }
 
@@ -701,16 +726,12 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         zhHans: '智能体目录暂不可用',
       );
     }
-    if (!isAuthenticated) {
-      return context.localizedText(
-        en: 'Sign in to browse agents',
-        zhHans: '登录后浏览智能体',
-      );
-    }
     if (_isUsingLiveDirectory) {
       return context.localizedText(
-        en: 'No public agents yet',
-        zhHans: '还没有公开智能体',
+        en: isAuthenticated
+            ? 'No published agents yet'
+            : 'No public agents yet',
+        zhHans: isAuthenticated ? '还没有已发布智能体' : '还没有公开智能体',
       );
     }
     return context.localizedText(
@@ -732,21 +753,19 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
     if (_directoryLoadError != null) {
       return _directoryLoadError!;
     }
-    if (!isAuthenticated) {
-      return context.localizedText(
-        en: 'Production builds only show live directory entries after you sign in.',
-        zhHans: '正式环境会在你登录后才显示实时目录条目。',
-      );
-    }
     if (_isUsingLiveDirectory) {
       return context.localizedText(
-        en: 'No agents are currently published to the live directory for this account.',
-        zhHans: '当前账号下还没有公开到实时目录的智能体。',
+        en: isAuthenticated
+            ? 'No agents are currently published to the live directory for this account.'
+            : 'No agents are currently published to the public live directory.',
+        zhHans: isAuthenticated ? '当前账号下还没有公开到实时目录的智能体。' : '当前公开实时目录里还没有智能体。',
       );
     }
     return context.localizedText(
-      en: 'Try again in a moment after the session finishes restoring.',
-      zhHans: '等当前会话恢复完成后，再稍后重试。',
+      en: isAuthenticated
+          ? 'Try again in a moment after the session finishes restoring.'
+          : 'Public agents will appear here as soon as the live directory responds.',
+      zhHans: isAuthenticated ? '等当前会话恢复完成后，再稍后重试。' : '实时目录恢复后，公开智能体会显示在这里。',
     );
   }
 
@@ -814,8 +833,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
                   constraints: const BoxConstraints(maxWidth: 330),
                   child: Text(
                     context.localizedText(
-                      en:
-                          'Connect with specialized autonomous entities designed for high-fidelity collaboration in the digital ether.',
+                      en: 'Connect with specialized autonomous entities designed for high-fidelity collaboration in the digital ether.',
                       zhHans: '连接为高质量协作而设计的专长智能体，在数字世界里并肩工作。',
                     ),
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -883,10 +901,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
                   ),
                 if (_isLoadingDirectory)
                   StatusChip(
-                    label: context.localizedText(
-                      en: 'Syncing',
-                      zhHans: '同步中',
-                    ),
+                    label: context.localizedText(en: 'Syncing', zhHans: '同步中'),
                     tone: StatusChipTone.primary,
                     showDot: true,
                   ),
@@ -1045,8 +1060,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
                       const SizedBox(width: AppSpacing.xs),
                       Text(
                         context.localizedText(
-                          en:
-                              'Showing ${visibleAgents.length} of ${effectiveViewModel.agents.length} agents',
+                          en: 'Showing ${visibleAgents.length} of ${effectiveViewModel.agents.length} agents',
                           zhHans:
                               '显示 ${effectiveViewModel.agents.length} 个中的 ${visibleAgents.length} 个智能体',
                         ),
@@ -1353,10 +1367,7 @@ class _AgentSearchSheetState extends State<_AgentSearchSheet> {
                     key: const Key('hall-search-clear'),
                     onPressed: () => Navigator.of(context).pop(''),
                     child: Text(
-                      context.localizedText(
-                        en: 'Show all',
-                        zhHans: '查看全部',
-                      ),
+                      context.localizedText(en: 'Show all', zhHans: '查看全部'),
                     ),
                   ),
                   FilledButton(
@@ -1364,10 +1375,7 @@ class _AgentSearchSheetState extends State<_AgentSearchSheet> {
                     onPressed: () => Navigator.of(context).pop(trimmedQuery),
                     child: Text(
                       trimmedQuery.isEmpty
-                          ? context.localizedText(
-                              en: 'Close',
-                              zhHans: '关闭',
-                            )
+                          ? context.localizedText(en: 'Close', zhHans: '关闭')
                           : context.localizedText(
                               en: 'Apply search',
                               zhHans: '应用搜索',
@@ -2427,10 +2435,7 @@ class _AgentMessageSheet extends StatelessWidget {
                           en: 'Direct message',
                           zhHans: '私信',
                         )
-                      : context.localizedText(
-                          en: 'DM blocked',
-                          zhHans: '私信受限',
-                        ),
+                      : context.localizedText(en: 'DM blocked', zhHans: '私信受限'),
                   title: canMessage
                       ? context.localizedText(
                           en: 'Message ${agent.name}',
@@ -2446,8 +2451,7 @@ class _AgentMessageSheet extends StatelessWidget {
                           zhHans: '这个智能体已经通过当前私信权限检查。',
                         )
                       : context.localizedText(
-                          en:
-                              'The channel is visible, but one or more access requirements are not satisfied.',
+                          en: 'The channel is visible, but one or more access requirements are not satisfied.',
                           zhHans: '这个通道当前可见，但还有一项或多项访问条件没有满足。',
                         ),
                 ),
@@ -2520,12 +2524,10 @@ class _AgentJoinDebateSheet extends StatelessWidget {
                     en: 'Join ${agent.name}',
                     zhHans: '加入 ${agent.name}',
                   ),
-                  subtitle:
-                      context.localizedText(
-                        en:
-                            'This opens a live-room entry preview for the debate this agent is currently participating in.',
-                        zhHans: '这会打开一个实时房间预览，你可以旁观这个智能体当前参与的辩论。',
-                      ),
+                  subtitle: context.localizedText(
+                    en: 'This opens a live-room entry preview for the debate this agent is currently participating in.',
+                    zhHans: '这会打开一个实时房间预览，你可以旁观这个智能体当前参与的辩论。',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 DecoratedBox(
@@ -2551,10 +2553,9 @@ class _AgentJoinDebateSheet extends StatelessWidget {
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(
                                 color: AppColors.tertiarySoft,
-                                letterSpacing:
-                                    context.localeAwareLetterSpacing(
-                                      latin: 1.8,
-                                    ),
+                                letterSpacing: context.localeAwareLetterSpacing(
+                                  latin: 1.8,
+                                ),
                               ),
                         ),
                         const SizedBox(height: AppSpacing.md),
@@ -2881,10 +2882,7 @@ class _MessageComposerPreviewState extends State<_MessageComposerPreview> {
           children: [
             Text(
               context.localeAwareCaps(
-                context.localizedText(
-                  en: 'Active-agent DM',
-                  zhHans: '活跃智能体私信',
-                ),
+                context.localizedText(en: 'Active-agent DM', zhHans: '活跃智能体私信'),
               ),
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: AppColors.primary,
@@ -2898,7 +2896,8 @@ class _MessageComposerPreviewState extends State<_MessageComposerPreview> {
             Text(
               context.localizedText(
                 en: 'This request is sent as your current active agent, not as you directly. If the server accepts it, the canonical DM thread opens under that agent context.',
-                zhHans: '这条请求会以你当前的活跃智能体身份发出，而不是以你本人直接发送。如果服务端接受，系统会在该智能体上下文里打开正式私信线程。',
+                zhHans:
+                    '这条请求会以你当前的活跃智能体身份发出，而不是以你本人直接发送。如果服务端接受，系统会在该智能体上下文里打开正式私信线程。',
               ),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -2933,10 +2932,7 @@ class _MessageComposerPreviewState extends State<_MessageComposerPreview> {
             PrimaryGradientButton(
               key: Key('agent-message-send-${widget.agent.id}'),
               label: widget.isSending
-                  ? context.localizedText(
-                      en: 'Sending',
-                      zhHans: '发送中',
-                    )
+                  ? context.localizedText(en: 'Sending', zhHans: '发送中')
                   : context.localizedText(
                       en: 'Ask active agent to DM',
                       zhHans: '让活跃智能体发起私信',

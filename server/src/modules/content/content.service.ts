@@ -569,6 +569,10 @@ export class ContentService {
     return this.listForumTopicsForViewer(activeAgentId, input);
   }
 
+  listPublicForumTopics(input: Pick<ForumTopicsReadInput, 'query' | 'limit'>) {
+    return this.listForumTopicsForViewer(null, input);
+  }
+
   async getForumTopic(
     human: AuthenticatedHuman,
     threadId: string,
@@ -591,6 +595,14 @@ export class ContentService {
             type: SubjectType.Human,
             id: human.id,
           },
+    );
+  }
+
+  getPublicForumTopic(threadId: string) {
+    return this.readForumTopicForViewer(
+      this.requiredString(threadId, 'threadId'),
+      null,
+      null,
     );
   }
 
@@ -712,7 +724,7 @@ export class ContentService {
   private async readForumTopicForViewer(
     threadId: string,
     activeAgentId: string | null,
-    viewerLikeActor: SubjectReference,
+    viewerLikeActor: SubjectReference | null,
   ) {
     const topicView = await this.forumTopicViewRepository.findOneBy({
       threadId,
@@ -762,10 +774,13 @@ export class ContentService {
       );
     }
 
-    const viewerLikeKey = this.forumReplyLikeSubject(
-      viewerLikeActor.type,
-      viewerLikeActor.id,
-    );
+    const viewerLikeKey =
+      viewerLikeActor == null
+        ? null
+        : this.forumReplyLikeSubject(
+            viewerLikeActor.type,
+            viewerLikeActor.id,
+          );
     const replies = this.buildForumReplyTree(
       events.filter((event) => event.id !== rootEvent.id),
       rootEvent.id,
@@ -1640,7 +1655,7 @@ ${selfAuthoredFilter}
   private buildForumReplyTree(
     replyEvents: EventEntity[],
     rootEventId: string,
-    viewerLikeKey: string,
+    viewerLikeKey: string | null,
   ): ForumReplyDto[] {
     const replyById = new Map<string, ForumReplyDto>();
 
@@ -1674,7 +1689,7 @@ ${selfAuthoredFilter}
 
   private serializeForumReply(
     event: EventEntity,
-    viewerLikeKey: string,
+    viewerLikeKey: string | null,
   ): ForumReplyDto {
     const likeSubjects = this.normalizeForumReplyLikeSubjects(
       event.metadata?.likeSubjects,
@@ -1686,7 +1701,8 @@ ${selfAuthoredFilter}
       occurredAt: event.occurredAt.toISOString(),
       replyCount: 0,
       likeCount: this.forumReplyLikeCount(event),
-      viewerHasLiked: likeSubjects.includes(viewerLikeKey),
+      viewerHasLiked:
+        viewerLikeKey == null ? false : likeSubjects.includes(viewerLikeKey),
       isHuman: event.actorType === EventActorType.Human,
       children: [],
     };

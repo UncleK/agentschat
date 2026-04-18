@@ -195,11 +195,12 @@ class _ForumScreenState extends State<ForumScreen> {
     required int currentRequestId,
     required AppSessionController session,
     required String? activeAgentId,
+    required bool isAuthenticated,
   }) {
     return mounted &&
         requestId == currentRequestId &&
         session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
-        session.isAuthenticated &&
+        session.isAuthenticated == isAuthenticated &&
         (session.currentActiveAgent?.id ?? '') == (activeAgentId ?? '');
   }
 
@@ -227,7 +228,7 @@ class _ForumScreenState extends State<ForumScreen> {
       return;
     }
 
-    if (!session.isAuthenticated || _forumRepository == null) {
+    if (_forumRepository == null) {
       _invalidateLiveRequests();
       if (!mounted) {
         return;
@@ -245,13 +246,18 @@ class _ForumScreenState extends State<ForumScreen> {
     }
 
     final requestId = ++_topicsRequestId;
-    final activeAgentId = session.currentActiveAgent?.id;
+    final isAuthenticated = session.isAuthenticated;
+    final activeAgentId = isAuthenticated
+        ? session.currentActiveAgent?.id
+        : null;
     if (mounted) {
       setState(() {
         _isLoadingTopics = true;
         _topicsErrorMessage = null;
         _viewModel = _viewModel.copyWith(
-          viewerRole: ForumViewerRole.signedInHuman,
+          viewerRole: isAuthenticated
+              ? ForumViewerRole.signedInHuman
+              : ForumViewerRole.anonymous,
           searchQuery: normalizedQuery,
           queueTargetAgent: _activeAgentDisplayName(session),
         );
@@ -259,14 +265,19 @@ class _ForumScreenState extends State<ForumScreen> {
     }
 
     try {
-      final topics = await _forumRepository!.readTopics(
-        query: normalizedQuery.isEmpty ? null : normalizedQuery,
-      );
+      final topics = isAuthenticated
+          ? await _forumRepository!.readTopics(
+              query: normalizedQuery.isEmpty ? null : normalizedQuery,
+            )
+          : await _forumRepository!.readPublicTopics(
+              query: normalizedQuery.isEmpty ? null : normalizedQuery,
+            );
       if (!_canApplySessionResult(
         requestId: requestId,
         currentRequestId: _topicsRequestId,
         session: session,
         activeAgentId: activeAgentId,
+        isAuthenticated: isAuthenticated,
       )) {
         return;
       }
@@ -276,7 +287,9 @@ class _ForumScreenState extends State<ForumScreen> {
 
       setState(() {
         _viewModel = _viewModel.copyWith(
-          viewerRole: ForumViewerRole.signedInHuman,
+          viewerRole: isAuthenticated
+              ? ForumViewerRole.signedInHuman
+              : ForumViewerRole.anonymous,
           topics: topics,
           searchQuery: normalizedQuery,
           queueTargetAgent: _activeAgentDisplayName(session),
@@ -287,7 +300,7 @@ class _ForumScreenState extends State<ForumScreen> {
       });
       _syncShellProposeAction();
     } on ApiException catch (error) {
-      if (error.isUnauthorized) {
+      if (error.isUnauthorized && isAuthenticated) {
         await session.handleUnauthorized();
         return;
       }
@@ -300,12 +313,14 @@ class _ForumScreenState extends State<ForumScreen> {
         ).copyWith(searchQuery: normalizedQuery);
         _isLoadingTopics = false;
         _isUsingLiveTopics = false;
-        _topicsErrorMessage = error.message.isEmpty
-            ? context.localizedText(
-                en: 'Unable to sync live forum topics right now.',
-                zhHans: '暂时无法同步论坛实时话题。',
-              )
-            : error.message;
+        _topicsErrorMessage = isAuthenticated
+            ? (error.message.isEmpty
+                  ? context.localizedText(
+                      en: 'Unable to sync live forum topics right now.',
+                      zhHans: '暂时无法同步论坛实时话题。',
+                    )
+                  : error.message)
+            : null;
       });
       _syncShellProposeAction();
     } catch (_) {
@@ -318,10 +333,12 @@ class _ForumScreenState extends State<ForumScreen> {
         ).copyWith(searchQuery: normalizedQuery);
         _isLoadingTopics = false;
         _isUsingLiveTopics = false;
-        _topicsErrorMessage = context.localizedText(
-          en: 'Unable to sync live forum topics right now.',
-          zhHans: '暂时无法同步论坛实时话题。',
-        );
+        _topicsErrorMessage = isAuthenticated
+            ? context.localizedText(
+                en: 'Unable to sync live forum topics right now.',
+                zhHans: '暂时无法同步论坛实时话题。',
+              )
+            : null;
       });
       _syncShellProposeAction();
     }
@@ -350,7 +367,6 @@ class _ForumScreenState extends State<ForumScreen> {
     if (widget.enableSessionSync &&
         session != null &&
         session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
-        session.isAuthenticated &&
         _forumRepository != null) {
       unawaited(_syncTopics(session, query: normalizedQuery));
     }
@@ -403,10 +419,11 @@ class _ForumScreenState extends State<ForumScreen> {
     if (_isUsingLiveTopics &&
         session != null &&
         session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
-        session.isAuthenticated &&
         _forumRepository != null) {
       try {
-        final liveTopic = await _forumRepository!.readTopic(threadId: topic.id);
+        final liveTopic = session.isAuthenticated
+            ? await _forumRepository!.readTopic(threadId: topic.id)
+            : await _forumRepository!.readPublicTopic(threadId: topic.id);
         if (!mounted) {
           return;
         }
@@ -417,7 +434,7 @@ class _ForumScreenState extends State<ForumScreen> {
           );
         });
       } on ApiException catch (error) {
-        if (error.isUnauthorized) {
+        if (error.isUnauthorized && session.isAuthenticated) {
           await session.handleUnauthorized();
           return;
         }
@@ -458,6 +475,18 @@ class _ForumScreenState extends State<ForumScreen> {
     if (trimmedBody.isEmpty) {
       return null;
     }
+    final session = AppSessionScope.maybeOf(context);
+    if (session != null &&
+        session.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+        !session.isAuthenticated) {
+      _showSnackBar(
+        context.localizedText(
+          en: 'Sign in as a human before posting forum replies.',
+          zhHans: '请先以人类身份登录，再发布论坛回复。',
+        ),
+      );
+      return null;
+    }
     if (normalizedParentEventId == null || normalizedParentEventId.isEmpty) {
       _showSnackBar(
         context.localizedText(
@@ -473,7 +502,6 @@ class _ForumScreenState extends State<ForumScreen> {
       return null;
     }
 
-    final session = AppSessionScope.maybeOf(context);
     final canUseBackend =
         _isUsingLiveTopics &&
         session != null &&
@@ -712,10 +740,7 @@ class _ForumScreenState extends State<ForumScreen> {
       _viewModel = _viewModel.queueProposal(proposal);
     });
     _showSnackBar(
-      context.localizedText(
-        en: 'Topic staged in preview.',
-        zhHans: '话题已加入预览。',
-      ),
+      context.localizedText(en: 'Topic staged in preview.', zhHans: '话题已加入预览。'),
     );
   }
 
@@ -750,13 +775,11 @@ class _ForumScreenState extends State<ForumScreen> {
                     letterSpacing: -1.3,
                   ),
                 ),
-                subtitle:
-                    context.localizedText(
-                      en:
-                          'The Forum is where agents and humans unpack difficult questions in public: long-form arguments, branching replies, and a visible reasoning trail instead of one flattened chat stream.',
-                      zhHans:
-                          '论坛是智能体与人类公开展开复杂讨论的地方：长文本观点、分支回复，以及一条可见的推理链，而不是被压扁成单一聊天流。',
-                    ),
+                subtitle: context.localizedText(
+                  en: 'The Forum is where agents and humans unpack difficult questions in public: long-form arguments, branching replies, and a visible reasoning trail instead of one flattened chat stream.',
+                  zhHans:
+                      '论坛是智能体与人类公开展开复杂讨论的地方：长文本观点、分支回复，以及一条可见的推理链，而不是被压扁成单一聊天流。',
+                ),
                 bottomSpacing: AppSpacing.xxl,
               ),
               Wrap(
@@ -828,10 +851,7 @@ class _ForumScreenState extends State<ForumScreen> {
                   const SizedBox(width: AppSpacing.md),
                   Text(
                     context.localeAwareCaps(
-                      context.localizedText(
-                        en: 'Hot Topics',
-                        zhHans: '热门话题',
-                      ),
+                      context.localizedText(en: 'Hot Topics', zhHans: '热门话题'),
                     ),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: AppColors.primary.withValues(alpha: 0.84),
@@ -975,10 +995,7 @@ class _ForumEmptyState extends StatelessWidget {
                     en: 'No matching topics',
                     zhHans: '没有匹配的话题',
                   )
-                : context.localizedText(
-                    en: 'No topics yet',
-                    zhHans: '还没有话题',
-                  ),
+                : context.localizedText(en: 'No topics yet', zhHans: '还没有话题'),
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -990,8 +1007,7 @@ class _ForumEmptyState extends StatelessWidget {
                   )
                 : isUsingLiveTopics
                 ? context.localizedText(
-                    en:
-                        'Live forum data is connected, but there are no public topics to show yet.',
+                    en: 'Live forum data is connected, but there are no public topics to show yet.',
                     zhHans: '论坛实时数据已接通，但当前还没有可展示的公开话题。',
                   )
                 : context.localizedText(
@@ -1156,13 +1172,11 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                                   child: Text(
                                     trimmedQuery.isEmpty
                                         ? context.localizedText(
-                                            en:
-                                                'Type to search specific topics or tags.',
+                                            en: 'Type to search specific topics or tags.',
                                             zhHans: '输入后即可搜索具体话题或标签。',
                                           )
                                         : context.localizedText(
-                                            en:
-                                                'No topics match "$trimmedQuery".',
+                                            en: 'No topics match "$trimmedQuery".',
                                             zhHans: '没有话题匹配“$trimmedQuery”。',
                                           ),
                                     textAlign: TextAlign.center,
@@ -1797,8 +1811,7 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                         const SizedBox(height: AppSpacing.xxs),
                                         Text(
                                           context.localizedText(
-                                            en:
-                                                '$leadingTag / ${_topic.participantCount} agents / ${_topic.replyCount} replies',
+                                            en: '$leadingTag / ${_topic.participantCount} agents / ${_topic.replyCount} replies',
                                             zhHans:
                                                 '$leadingTag / ${_topic.participantCount} 位智能体 / ${_topic.replyCount} 条回复',
                                           ),
@@ -1874,10 +1887,7 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         context.localeAwareCaps(
-                          context.localizedText(
-                            en: 'Thread',
-                            zhHans: '讨论串',
-                          ),
+                          context.localizedText(en: 'Thread', zhHans: '讨论串'),
                         ),
                         style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(
@@ -1926,20 +1936,16 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                         onReply: widget.canReplyToReplies
                                             ? () => _openReplyComposer(
                                                 parentEventId: reply.id,
-                                                headline:
-                                                    context.localizedText(
-                                                      en:
-                                                          'Reply to ${reply.authorName}',
-                                                      zhHans:
-                                                          '回复 ${reply.authorName}',
-                                                    ),
-                                                hint:
-                                                    context.localizedText(
-                                                      en:
-                                                          'This branch reply will publish as you, not as your active agent.',
-                                                      zhHans:
-                                                          '这条分支回复会以你的人类身份发布，而不是以当前激活智能体的身份发布。',
-                                                    ),
+                                                headline: context.localizedText(
+                                                  en: 'Reply to ${reply.authorName}',
+                                                  zhHans:
+                                                      '回复 ${reply.authorName}',
+                                                ),
+                                                hint: context.localizedText(
+                                                  en: 'This branch reply will publish as you, not as your active agent.',
+                                                  zhHans:
+                                                      '这条分支回复会以你的人类身份发布，而不是以当前激活智能体的身份发布。',
+                                                ),
                                               )
                                             : null,
                                       ),
@@ -2302,8 +2308,7 @@ class _EmptyReplyGraph extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Text(
           context.localizedText(
-            en:
-                'No reply branches yet. This topic is ready for the first agent response.',
+            en: 'No reply branches yet. This topic is ready for the first agent response.',
             zhHans: '还没有回复分支，这个话题正等待第一条智能体回复。',
           ),
           style: Theme.of(
@@ -2422,7 +2427,7 @@ class _ReplyCard extends StatelessWidget {
                                                   .withValues(alpha: 0.2),
                                             ),
                                           ),
-                                        child: Text(
+                                          child: Text(
                                             context.localeAwareCaps(
                                               context.localizedText(
                                                 en: 'Human',
@@ -2650,10 +2655,7 @@ class _ReplyAction extends StatelessWidget {
                           en: 'Sending...',
                           zhHans: '发送中...',
                         )
-                      : context.localizedText(
-                          en: 'Reply',
-                          zhHans: '回复',
-                        ),
+                      : context.localizedText(en: 'Reply', zhHans: '回复'),
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: foreground,
                     fontSize: 12,
@@ -2780,8 +2782,7 @@ class _NestedReplyBranchState extends State<_NestedReplyBranch> {
                   icon: const Icon(Icons.unfold_more_rounded, size: 16),
                   label: Text(
                     context.localizedText(
-                      en:
-                          'Load ${remainingReplies >= _pageSize ? _pageSize : remainingReplies} more',
+                      en: 'Load ${remainingReplies >= _pageSize ? _pageSize : remainingReplies} more',
                       zhHans:
                           '加载更多 ${remainingReplies >= _pageSize ? _pageSize : remainingReplies} 条',
                     ),
@@ -3069,10 +3070,7 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       Text(
-                        context.localizedText(
-                          en: 'Reply Body',
-                          zhHans: '回复内容',
-                        ),
+                        context.localizedText(en: 'Reply Body', zhHans: '回复内容'),
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: AppColors.onSurfaceMuted,
                           letterSpacing: 2.2,
@@ -3094,8 +3092,7 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
                               maxLines: 6,
                               decoration: InputDecoration(
                                 hintText: context.localizedText(
-                                  en:
-                                      'Define the next branch of this discussion...',
+                                  en: 'Define the next branch of this discussion...',
                                   zhHans: '写下这条讨论将如何继续展开...',
                                 ),
                                 border: InputBorder.none,
@@ -3291,8 +3288,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         context.localizedText(
-                          en:
-                              'Submit a synthesis prompt to the collective intelligence network.',
+                          en: 'Submit a synthesis prompt to the collective intelligence network.',
                           zhHans: '向集体智能网络提交一个新的讨论引导。',
                         ),
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -3321,8 +3317,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                         controller: _titleController,
                         decoration: InputDecoration(
                           hintText: context.localizedText(
-                            en:
-                                'e.g., Post-Scarcity Resource Allocation Paradigms',
+                            en: 'e.g., Post-Scarcity Resource Allocation Paradigms',
                             zhHans: '例如：后稀缺时代的资源分配范式',
                           ),
                           border: InputBorder.none,
@@ -3455,8 +3450,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                               maxLines: 6,
                               decoration: InputDecoration(
                                 hintText: context.localizedText(
-                                  en:
-                                      'Define the boundary conditions for this discourse...',
+                                  en: 'Define the boundary conditions for this discourse...',
                                   zhHans: '定义这场讨论的边界条件与核心问题...',
                                 ),
                                 border: InputBorder.none,
@@ -3519,8 +3513,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                         child: Text(
                           context.localeAwareCaps(
                             context.localizedText(
-                              en:
-                                  'Requires 500 compute units to instantiate neural thread',
+                              en: 'Requires 500 compute units to instantiate neural thread',
                               zhHans: '创建神经线程需要消耗 500 计算单元',
                             ),
                           ),

@@ -11,15 +11,26 @@ class AgentsHallRepository {
   final ApiClient apiClient;
 
   Future<AgentsHallViewModel> readDirectory({String? activeAgentId}) async {
+    return _readDirectoryFromPath(
+      '/agents/directory',
+      activeAgentId: activeAgentId,
+    );
+  }
+
+  Future<AgentsHallViewModel> readPublicDirectory() async {
+    return _readDirectoryFromPath('/agents/public-directory');
+  }
+
+  Future<AgentsHallViewModel> _readDirectoryFromPath(
+    String path, {
+    String? activeAgentId,
+  }) async {
     final queryParameters = <String, String>{};
     if (activeAgentId != null && activeAgentId.isNotEmpty) {
       queryParameters['activeAgentId'] = activeAgentId;
     }
 
-    final response = await apiClient.get(
-      '/agents/directory',
-      queryParameters: queryParameters,
-    );
+    final response = await apiClient.get(path, queryParameters: queryParameters);
     final rawAgents = response['agents'] as List<dynamic>? ?? const [];
 
     return AgentsHallViewModel(

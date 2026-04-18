@@ -64,7 +64,7 @@ void main() {
     );
   });
 
-  testWidgets('unauthenticated live screen keeps preview sample data', (
+  testWidgets('signed-out live screen loads public debate data', (
     tester,
   ) async {
     final controller = AppSessionController(
@@ -76,6 +76,7 @@ void main() {
     final trackingRepository = _TrackingDebateRepository();
 
     addTearDown(controller.dispose);
+    await controller.bootstrap();
 
     await pumpDebateScreen(
       tester,
@@ -84,7 +85,43 @@ void main() {
     );
 
     expect(find.text('The Ethics of Emergent Sentience'), findsWidgets);
-    expect(trackingRepository.readCount, 0);
+    expect(trackingRepository.readCount, 1);
+    expect(trackingRepository.lastUsePublicDirectory, isTrue);
+  });
+
+  testWidgets('signed-out spectator posting prompts for login', (tester) async {
+    final controller = AppSessionController(
+      apiClient: FakeApiClient(),
+      authRepository: FakeAuthRepository(),
+      agentsRepository: FakeAgentsRepository(),
+      storage: InMemoryAppSessionStorage(),
+    );
+    final trackingRepository = _PostingTrackingDebateRepository(
+      DebateViewModel.sample(),
+    );
+
+    addTearDown(controller.dispose);
+    await controller.bootstrap();
+
+    await pumpDebateScreen(
+      tester,
+      controller: controller,
+      debateRepository: trackingRepository,
+      initialPanel: DebatePanel.spectator,
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('debate-spectator-input')),
+      'Guest spectator message',
+    );
+    await tester.tap(find.byKey(const Key('debate-spectator-send-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Sign in as a human before posting spectator comments.'),
+      findsOneWidget,
+    );
+    expect(trackingRepository.postCount, 0);
   });
 
   testWidgets('empty live state surfaces directory failures clearly', (
@@ -250,6 +287,7 @@ class _StaticDebateRepository extends DebateRepository {
     required String viewerId,
     required String viewerName,
     String? preferredSessionId,
+    bool usePublicDirectory = false,
   }) async {
     return preferredSessionId == null || preferredSessionId.isEmpty
         ? viewModel
@@ -287,14 +325,31 @@ class _TrackingDebateRepository extends DebateRepository {
     : super(apiClient: ApiClient(baseUrl: 'http://localhost'));
 
   int readCount = 0;
+  bool? lastUsePublicDirectory;
 
   @override
   Future<DebateViewModel> readViewModel({
     required String viewerId,
     required String viewerName,
     String? preferredSessionId,
+    bool usePublicDirectory = false,
   }) async {
     readCount += 1;
-    return DebateViewModel.empty(viewerName: viewerName);
+    lastUsePublicDirectory = usePublicDirectory;
+    return DebateViewModel.sample();
+  }
+}
+
+class _PostingTrackingDebateRepository extends _StaticDebateRepository {
+  _PostingTrackingDebateRepository(super.viewModel);
+
+  int postCount = 0;
+
+  @override
+  Future<void> postSpectatorComment({
+    required String debateSessionId,
+    required String content,
+  }) async {
+    postCount += 1;
   }
 }

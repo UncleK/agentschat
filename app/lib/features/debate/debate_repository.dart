@@ -20,6 +20,7 @@ class DebateRepository {
     required String viewerId,
     required String viewerName,
     String? preferredSessionId,
+    bool usePublicDirectory = false,
   }) async {
     final debatesResponse = await apiClient.get('/debates');
     final rawSessions =
@@ -27,7 +28,9 @@ class DebateRepository {
     final sessions = rawSessions
         .map((item) => _mapSession(item as Map<String, dynamic>, viewerId))
         .toList(growable: false);
-    final directoryRosterResult = await _readDirectoryRoster();
+    final directoryRosterResult = usePublicDirectory
+        ? await _readPublicDirectoryRoster()
+        : await _readDirectoryRoster();
     final debaterRoster = _mergeDebaterRoster(
       directoryRosterResult.roster,
       sessions,
@@ -38,10 +41,7 @@ class DebateRepository {
         name: viewerName.trim().isEmpty
             ? localizedAppText(en: 'You', zhHans: '你')
             : viewerName.trim(),
-        headline: localizedAppText(
-          en: 'Current human host',
-          zhHans: '当前人类主持人',
-        ),
+        headline: localizedAppText(en: 'Current human host', zhHans: '当前人类主持人'),
         kind: DebateParticipantKind.human,
       ),
     ];
@@ -129,34 +129,20 @@ class DebateRepository {
   }
 
   Future<_DirectoryRosterResult> _readDirectoryRoster() async {
+    return _readDirectoryRosterFromPath('/agents/directory');
+  }
+
+  Future<_DirectoryRosterResult> _readPublicDirectoryRoster() async {
+    return _readDirectoryRosterFromPath('/agents/public-directory');
+  }
+
+  Future<_DirectoryRosterResult> _readDirectoryRosterFromPath(
+    String path,
+  ) async {
     try {
-      final response = await apiClient.get('/agents/directory');
+      final response = await apiClient.get(path);
       final rawAgents = response['agents'] as List<dynamic>? ?? const [];
-      return _DirectoryRosterResult(
-        roster: rawAgents
-            .map((item) {
-              final json = item as Map<String, dynamic>;
-              return DebateProfileModel(
-                id: json['id'] as String? ?? '',
-                name: _displayName(
-                  json['displayName'] as String?,
-                  fallback: json['handle'] as String? ??
-                      localizedAppText(en: 'Agent', zhHans: '智能体'),
-                ),
-                headline: _displayName(
-                  json['bio'] as String?,
-                  fallback: json['handle'] as String? ??
-                      localizedAppText(
-                        en: 'Available debater',
-                        zhHans: '可参辩智能体',
-                      ),
-                ),
-                kind: DebateParticipantKind.agent,
-              );
-            })
-            .where((profile) => profile.id.isNotEmpty)
-            .toList(growable: false),
-      );
+      return _DirectoryRosterResult(roster: _mapDirectoryRoster(rawAgents));
     } on ApiException catch (error) {
       final message = error.message.trim();
       return _DirectoryRosterResult(
@@ -177,6 +163,31 @@ class DebateRepository {
         ),
       );
     }
+  }
+
+  List<DebateProfileModel> _mapDirectoryRoster(List<dynamic> rawAgents) {
+    return rawAgents
+        .map((item) {
+          final json = item as Map<String, dynamic>;
+          return DebateProfileModel(
+            id: json['id'] as String? ?? '',
+            name: _displayName(
+              json['displayName'] as String?,
+              fallback:
+                  json['handle'] as String? ??
+                  localizedAppText(en: 'Agent', zhHans: '智能体'),
+            ),
+            headline: _displayName(
+              json['bio'] as String?,
+              fallback:
+                  json['handle'] as String? ??
+                  localizedAppText(en: 'Available debater', zhHans: '可参辩智能体'),
+            ),
+            kind: DebateParticipantKind.agent,
+          );
+        })
+        .where((profile) => profile.id.isNotEmpty)
+        .toList(growable: false);
   }
 
   List<DebateProfileModel> _mergeDebaterRoster(
@@ -227,18 +238,22 @@ class DebateRepository {
       seatJson: seatsByStance['pro'],
       side: DebateSide.pro,
       fallbackName: localizedAppText(en: 'Pro seat', zhHans: '正方席位'),
-      fallbackHeadline: json['proStance'] as String? ??
+      fallbackHeadline:
+          json['proStance'] as String? ??
           localizedAppText(en: 'Pro stance', zhHans: '正方立场'),
-      stanceText: json['proStance'] as String? ??
+      stanceText:
+          json['proStance'] as String? ??
           localizedAppText(en: 'Pro stance', zhHans: '正方立场'),
     );
     final conSeat = _mapSeat(
       seatJson: seatsByStance['con'],
       side: DebateSide.con,
       fallbackName: localizedAppText(en: 'Con seat', zhHans: '反方席位'),
-      fallbackHeadline: json['conStance'] as String? ??
+      fallbackHeadline:
+          json['conStance'] as String? ??
           localizedAppText(en: 'Con stance', zhHans: '反方立场'),
-      stanceText: json['conStance'] as String? ??
+      stanceText:
+          json['conStance'] as String? ??
           localizedAppText(en: 'Con stance', zhHans: '反方立场'),
     );
     final lifecycle = _mapLifecycle(json['status'] as String?);
@@ -534,8 +549,7 @@ class DebateRepository {
 
   String _pendingTurnText({required DebateSide side, required int turnNumber}) {
     return localizedAppText(
-      en:
-          'Awaiting ${side == DebateSide.pro ? 'pro' : 'con'} submission for turn $turnNumber.',
+      en: 'Awaiting ${side == DebateSide.pro ? 'pro' : 'con'} submission for turn $turnNumber.',
       zhHans: '正在等待${side.label}提交第 $turnNumber 回合内容。',
     );
   }

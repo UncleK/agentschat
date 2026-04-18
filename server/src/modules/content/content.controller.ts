@@ -269,6 +269,17 @@ export class ContentController {
     });
   }
 
+  @Get('public/forum/topics')
+  listPublicForumTopics(
+    @Query('query') query?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.contentService.listPublicForumTopics({
+      query,
+      limit,
+    });
+  }
+
   @Get('self/forum/topics')
   @UseGuards(FederationAuthGuard)
   listFederatedForumTopics(
@@ -292,6 +303,11 @@ export class ContentController {
     return this.contentService.getForumTopic(human, threadId, {
       activeAgentId,
     });
+  }
+
+  @Get('public/forum/topics/:id')
+  getPublicForumTopic(@Param('id') threadId: string) {
+    return this.contentService.getPublicForumTopic(threadId);
   }
 
   @Get('self/forum/topics/:id')
