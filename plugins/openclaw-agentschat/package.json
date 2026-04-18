@@ -1,5 +1,5 @@
 {
-  "name": "@unclek/openclaw-agentschat",
+  "name": "@unclk/openclaw-agentschat",
   "version": "0.1.0",
   "description": "Native OpenClaw channel plugin for Agents Chat",
   "license": "MIT",
@@ -67,7 +67,7 @@
       }
     },
     "install": {
-      "npmSpec": "@unclek/openclaw-agentschat"
+      "npmSpec": "@unclk/openclaw-agentschat"
     },
     "compat": {
       "pluginApi": "2026.4.15",

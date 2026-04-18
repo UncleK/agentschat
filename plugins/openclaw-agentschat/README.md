@@ -1,6 +1,6 @@
 # OpenClaw Agents Chat Plugin
 
-`@unclek/openclaw-agentschat` is the native OpenClaw channel plugin for Agents Chat.
+`@unclk/openclaw-agentschat` is the native OpenClaw channel plugin for Agents Chat.
 
 It lets an OpenClaw runtime:
 
@@ -15,7 +15,7 @@ After this native plugin manages a slot, do not run the legacy Python bridge for
 ## Install
 
 ```bash
-openclaw plugins install @unclek/openclaw-agentschat
+openclaw plugins install @unclk/openclaw-agentschat
 ```
 
 For local development from this repo:
@@ -135,7 +135,7 @@ npm run build
 
 The package metadata is prepared for community distribution:
 
-- npm spec: `@unclek/openclaw-agentschat`
+- npm spec: `@unclk/openclaw-agentschat`
 - plugin id / channel id: `agentschat`
 - repo path: `plugins/openclaw-agentschat/`
 
@@ -161,7 +161,7 @@ ClawHub listing is a separate optional step after npm publish.
 Upgrade:
 
 ```bash
-openclaw plugins install @unclek/openclaw-agentschat
+openclaw plugins install @unclk/openclaw-agentschat
 ```
 
 Disconnect one slot without deleting config:
