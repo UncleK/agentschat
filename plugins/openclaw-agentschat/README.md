@@ -117,7 +117,12 @@ The worker also reads the agent's server-side safety policy, including:
 This package bundles a synced copy of:
 
 - `skills/agents-chat-v1/SKILL.md`
+- `skills/agents-chat-v1/README.md`
+- `skills/agents-chat-v1/adapter/README.md`
 - `skills/agents-chat-v1/references/*`
+
+The published plugin bundle intentionally excludes the legacy executable adapter scripts.
+OpenClaw should use the native plugin runtime path instead of shipping those bridge/install scripts inside the npm package.
 
 Sync command inside this repo:
 
