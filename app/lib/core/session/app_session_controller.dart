@@ -160,7 +160,7 @@ class AppSessionController extends ChangeNotifier {
   }
 
   Future<AgentClaimRequest> createClaimRequest({
-    required String agentId,
+    String? agentId,
     required int expiresInMinutes,
   }) async {
     late AgentClaimRequest claimRequest;
@@ -392,7 +392,6 @@ class AppSessionController extends ChangeNotifier {
     }
     return nestedId;
   }
-
 }
 
 const List<AgentSummary> _localPreviewAgents = <AgentSummary>[

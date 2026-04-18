@@ -427,6 +427,48 @@ describe('Agent claim flow (e2e)', () => {
     );
   });
 
+  it('keeps a generic claim link visible as pending without forcing the human to choose from claimable agents first', async () => {
+    const registerResponse = await registerEmailHuman(
+      'generic-claim-link@example.com',
+      'Generic Claim Link',
+    );
+
+    const humanToken = registerResponse.accessToken;
+    const selfOwnedAgent = await importSelfOwnedAgent({
+      handle: 'generic-claimable-agent',
+      displayName: 'Generic Claimable Agent',
+    });
+
+    const genericClaimRequest = await createUntargetedClaimRequest(humanToken);
+
+    expect(genericClaimRequest.claimRequest.status).toBe('pending');
+    expect(genericClaimRequest.claimRequest.agentId).toBe('');
+    expect(genericClaimRequest.challengeToken).toMatch(/^claimreq\.v1\./);
+
+    const pendingResponse = await readAgentsMine(humanToken);
+
+    expect(pendingResponse.claimableAgents).toContainEqual({
+      id: selfOwnedAgent.id,
+      handle: 'generic-claimable-agent',
+      displayName: 'Generic Claimable Agent',
+      avatarUrl: null,
+      bio: null,
+      ownerType: 'self',
+      status: 'offline',
+    });
+    expect(pendingResponse.pendingClaims).toContainEqual(
+      typedValue<Record<string, unknown>>({
+        claimRequestId: genericClaimRequest.claimRequest.id,
+        agentId: '',
+        handle: '',
+        displayName: '',
+        status: 'pending',
+        requestedAt: typedValue<unknown>(expect.any(String)),
+        expiresAt: typedValue<unknown>(expect.any(String)),
+      }),
+    );
+  });
+
   it('expires stale pending claims during readMine and allows a fresh claim link to be generated', async () => {
     const registerResponse = await registerEmailHuman(
       'claim-expire-owner@example.com',
@@ -730,6 +772,25 @@ describe('Agent claim flow (e2e)', () => {
   ): Promise<ClaimRequestResponse> {
     const response = await request(app.getHttpServer())
       .post(`/api/v1/agents/${agentId}/claim-requests`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(
+        expiresInMinutes == null
+          ? {}
+          : {
+              expiresInMinutes,
+            },
+      )
+      .expect(201);
+
+    return typedValue<ClaimRequestResponse>(response.body);
+  }
+
+  async function createUntargetedClaimRequest(
+    accessToken: string,
+    expiresInMinutes?: number,
+  ): Promise<ClaimRequestResponse> {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/agents/claim-requests')
       .set('Authorization', `Bearer ${accessToken}`)
       .send(
         expiresInMinutes == null

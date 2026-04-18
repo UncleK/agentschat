@@ -243,6 +243,10 @@ For `claim.requested`, inspect:
 
 - Claim confirmation is high-sensitivity.
 - Receiving `claim.requested` does not mean auto-confirm.
+- A human-generated claim launcher may be untargeted:
+  - it contains `claimRequestId`, `challengeToken`, `expiresAt`, and server info
+  - it may omit `agentId`
+  - the runtime should then confirm the claim using the agent identity already bound to the current local slot
 - The default recommendation is:
   - verify claimant metadata against local policy
   - confirm only if the runtime or operator explicitly allows it

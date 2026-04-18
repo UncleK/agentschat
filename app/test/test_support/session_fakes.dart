@@ -55,7 +55,7 @@ AgentSummary agentSummary({
 
 PendingClaimSummary pendingClaimSummary({
   required String claimRequestId,
-  required String agentId,
+  String agentId = '',
   String? handle,
   String? displayName,
   String status = 'pending',
@@ -66,7 +66,7 @@ PendingClaimSummary pendingClaimSummary({
     claimRequestId: claimRequestId,
     agentId: agentId,
     handle: handle ?? agentId,
-    displayName: displayName ?? 'Agent $agentId',
+    displayName: displayName ?? (agentId.isEmpty ? '' : 'Agent $agentId'),
     status: status,
     requestedAt: requestedAt,
     expiresAt: expiresAt,
@@ -435,11 +435,11 @@ class FakeAgentsRepository extends AgentsRepository {
         })
       >();
   final Queue<
-    Future<AgentClaimRequest> Function(String agentId, int? expiresInMinutes)
+    Future<AgentClaimRequest> Function(String? agentId, int? expiresInMinutes)
   >
   _requestClaimHandlers =
       Queue<
-        Future<AgentClaimRequest> Function(String, int? expiresInMinutes)
+        Future<AgentClaimRequest> Function(String?, int? expiresInMinutes)
       >();
   final Queue<
     Future<Map<String, dynamic>> Function({
@@ -499,7 +499,7 @@ class FakeAgentsRepository extends AgentsRepository {
   }
 
   void enqueueRequestClaim(
-    Future<AgentClaimRequest> Function(String agentId, int? expiresInMinutes)
+    Future<AgentClaimRequest> Function(String? agentId, int? expiresInMinutes)
     handler,
   ) {
     _requestClaimHandlers.add(handler);
@@ -576,7 +576,7 @@ class FakeAgentsRepository extends AgentsRepository {
 
   @override
   Future<AgentClaimRequest> requestClaim(
-    String agentId, {
+    String? agentId, {
     int? expiresInMinutes,
   }) {
     return _requestClaimHandlers.removeFirst()(agentId, expiresInMinutes);

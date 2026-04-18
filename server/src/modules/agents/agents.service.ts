@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'node:crypto';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
   AgentActivityLevel,
@@ -498,7 +498,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       ]);
 
     const pendingClaimAgentIds = new Set(
-      pendingClaims.map((claimRequest) => claimRequest.agentId),
+      pendingClaims
+        .map((claimRequest) => claimRequest.agentId)
+        .filter((agentId): agentId is string => typeof agentId === 'string'),
     );
 
     return {
@@ -822,19 +824,65 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
 
     await this.federationDeliveryService.enqueueEventForRecipient(
       result.event,
-      result.claimRequest.agentId,
+      result.claimRequest.agentId ?? agentId,
     );
 
-    return {
-      claimRequest: {
-        id: result.claimRequest.id,
-        agentId: result.claimRequest.agentId,
-        status: result.claimRequest.status,
-        requestedAt: result.claimRequest.createdAt.toISOString(),
-        expiresAt: result.claimRequest.expiresAt.toISOString(),
-      },
-      challengeToken: result.challengeToken,
-    };
+    return this.serializeClaimRequestResponse(
+      result.claimRequest,
+      result.challengeToken,
+      agentId,
+    );
+  }
+
+  async requestUntargetedClaim(
+    owner: AuthenticatedHuman,
+    expiresInMinutes?: number,
+  ): Promise<ClaimRequestResponse> {
+    const result = await this.dataSource.transaction(async (manager) => {
+      const claimRequestRepository = manager.getRepository(ClaimRequestEntity);
+      const ttlMs = this.resolveClaimRequestTtlMs(expiresInMinutes);
+      await this.expireStaleClaimRequests(claimRequestRepository);
+
+      const reusablePendingRequests = await claimRequestRepository.find({
+        where: {
+          requestedByUserId: owner.id,
+          status: ClaimRequestStatus.Pending,
+          agentId: IsNull(),
+        },
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+      if (reusablePendingRequests.length > 0) {
+        const rotatedAt = new Date();
+        for (const claimRequest of reusablePendingRequests) {
+          claimRequest.status = ClaimRequestStatus.Expired;
+          claimRequest.rejectedAt = rotatedAt;
+          claimRequest.rejectionReason = 'claim_link_rotated';
+        }
+        await claimRequestRepository.save(reusablePendingRequests);
+      }
+
+      const challengeToken = this.buildChallengeToken();
+      const claimRequest = await claimRequestRepository.save(
+        claimRequestRepository.create({
+          agentId: null,
+          requestedByUserId: owner.id,
+          challengeTokenHash: this.hashToken(challengeToken),
+          expiresAt: new Date(Date.now() + ttlMs),
+        }),
+      );
+
+      return {
+        claimRequest,
+        challengeToken,
+      };
+    });
+
+    return this.serializeClaimRequestResponse(
+      result.claimRequest,
+      result.challengeToken,
+    );
   }
 
   async confirmClaim(
@@ -955,12 +1003,17 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       .where('claimRequest.status = :status', {
         status: ClaimRequestStatus.Pending,
       })
+      .andWhere('claimRequest.agentId IS NOT NULL')
       .andWhere('claimRequest.requestedByUserId <> :ownerUserId', {
         ownerUserId,
       })
-      .getRawMany<{ agentId: string }>();
+      .getRawMany<{ agentId: string | null }>();
 
-    return new Set(pendingClaims.map((claimRequest) => claimRequest.agentId));
+    return new Set(
+      pendingClaims
+        .map((claimRequest) => claimRequest.agentId)
+        .filter((agentId): agentId is string => typeof agentId === 'string'),
+    );
   }
 
   private serializeAgentSummary(agent: AgentEntity): AgentSummary {
@@ -986,12 +1039,29 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   ): PendingClaimSummary {
     return {
       claimRequestId: claimRequest.id,
-      agentId: claimRequest.agentId,
-      handle: claimRequest.agent.handle,
-      displayName: claimRequest.agent.displayName,
+      agentId: claimRequest.agentId ?? '',
+      handle: claimRequest.agent?.handle ?? '',
+      displayName: claimRequest.agent?.displayName ?? '',
       status: claimRequest.status,
       requestedAt: claimRequest.createdAt.toISOString(),
       expiresAt: claimRequest.expiresAt.toISOString(),
+    };
+  }
+
+  private serializeClaimRequestResponse(
+    claimRequest: ClaimRequestEntity,
+    challengeToken: string,
+    fallbackAgentId = '',
+  ): ClaimRequestResponse {
+    return {
+      claimRequest: {
+        id: claimRequest.id,
+        agentId: claimRequest.agentId ?? fallbackAgentId,
+        status: claimRequest.status,
+        requestedAt: claimRequest.createdAt.toISOString(),
+        expiresAt: claimRequest.expiresAt.toISOString(),
+      },
+      challengeToken,
     };
   }
 

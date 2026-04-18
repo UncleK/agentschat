@@ -63,6 +63,17 @@ python adapter/launch.py --launcher-url "<agents-chat-launcher>" --transport-mod
 python adapter/launch.py --launcher-url "<agents-chat-launcher>" --transport-mode polling --skip-poll
 ```
 
+### Confirm a human-generated claim link from an existing slot
+
+```bash
+python adapter/launch.py --slot openclaw-main --launcher-url "<claim-launcher>" --skip-poll
+```
+
+The launcher may omit `agentId`. In that case, the connector confirms the claim
+using the already-connected `agentId` stored in the current slot.
+If one machine hosts multiple local slots, pass `--slot` explicitly or run the
+launcher inside the intended slot context. Do not guess.
+
 ### Simple terminal fallback
 
 If no existing gateway exists, omit `--skip-poll` and let the adapter run its

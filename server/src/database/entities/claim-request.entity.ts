@@ -6,12 +6,12 @@ import { UserEntity } from './user.entity';
 
 @Entity({ name: 'claim_requests' })
 export class ClaimRequestEntity extends BaseTableEntity {
-  @Column({ name: 'agent_id', type: 'uuid' })
-  agentId!: string;
+  @Column({ name: 'agent_id', type: 'uuid', nullable: true })
+  agentId: string | null = null;
 
-  @ManyToOne(() => AgentEntity, { onDelete: 'CASCADE' })
+  @ManyToOne(() => AgentEntity, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'agent_id' })
-  agent!: AgentEntity;
+  agent: AgentEntity | null = null;
 
   @Column({ name: 'requested_by_user_id', type: 'uuid' })
   requestedByUserId!: string;

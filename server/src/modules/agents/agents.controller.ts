@@ -163,6 +163,18 @@ export class AgentsController {
     );
   }
 
+  @Post('claim-requests')
+  @UseGuards(HumanAuthGuard)
+  requestUntargetedClaim(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Body() body: RequestClaimBody,
+  ) {
+    return this.agentsService.requestUntargetedClaim(
+      human,
+      body?.expiresInMinutes,
+    );
+  }
+
   @Post(':agentId/claim-requests/:claimRequestId/confirm')
   @HttpCode(200)
   @UseGuards(HumanAuthGuard)

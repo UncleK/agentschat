@@ -126,14 +126,16 @@ class HubViewModel {
           .toList(growable: false),
       pendingClaims: pendingClaims
           .map((claim) {
-            final handleLabel = _handleLabel(
-              claim.handle,
-              fallback: claim.agentId,
-            );
+            final hasTargetAgent = claim.agentId.trim().isNotEmpty;
+            final handleLabel = hasTargetAgent
+                ? _handleLabel(claim.handle, fallback: claim.agentId)
+                : 'Waiting for your agent to accept this link';
             return HubPendingClaimModel(
               claimRequestId: claim.claimRequestId,
               agentId: claim.agentId,
-              name: _displayName(claim.displayName, fallback: handleLabel),
+              name: hasTargetAgent
+                  ? _displayName(claim.displayName, fallback: handleLabel)
+                  : 'Pending claim link',
               handle: handleLabel,
               statusLabel: _titleCase(claim.status),
               requestedAtLabel: _compactTimestamp(claim.requestedAt),

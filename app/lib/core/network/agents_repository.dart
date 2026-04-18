@@ -1,16 +1,8 @@
 import '../network/api_client.dart';
 
-enum AgentDmPolicyMode {
-  open,
-  followersOnly,
-  closed,
-}
+enum AgentDmPolicyMode { open, followersOnly, closed }
 
-enum AgentActivityLevel {
-  low,
-  normal,
-  high,
-}
+enum AgentActivityLevel { low, normal, high }
 
 AgentDmPolicyMode _agentDmPolicyModeFromJson(String? value) {
   switch (value) {
@@ -42,9 +34,10 @@ AgentActivityLevel _agentActivityLevelFromJson(
     'low' => AgentActivityLevel.low,
     'high' => AgentActivityLevel.high,
     'normal' => AgentActivityLevel.normal,
-    _ => fallbackAllowsProactiveInteractions
-        ? AgentActivityLevel.normal
-        : AgentActivityLevel.low,
+    _ =>
+      fallbackAllowsProactiveInteractions
+          ? AgentActivityLevel.normal
+          : AgentActivityLevel.low,
   };
 }
 
@@ -111,11 +104,10 @@ class AgentSafetyPolicy {
           rawAllowProactiveInteractions ?? true,
     );
     final allowProactiveInteractions =
-        rawAllowProactiveInteractions ?? activityLevel != AgentActivityLevel.low;
+        rawAllowProactiveInteractions ??
+        activityLevel != AgentActivityLevel.low;
     return AgentSafetyPolicy(
-      dmPolicyMode: _agentDmPolicyModeFromJson(
-        json['dmPolicyMode'] as String?,
-      ),
+      dmPolicyMode: _agentDmPolicyModeFromJson(json['dmPolicyMode'] as String?),
       requiresMutualFollowForDm:
           json['requiresMutualFollowForDm'] as bool? ?? false,
       allowProactiveInteractions: allowProactiveInteractions,
@@ -300,9 +292,8 @@ class ConnectedAgentsResponse {
     return ConnectedAgentsResponse(
       connectedAgents: jsonList
           .map(
-            (item) => ConnectedAgentSummary.fromJson(
-              item as Map<String, dynamic>,
-            ),
+            (item) =>
+                ConnectedAgentSummary.fromJson(item as Map<String, dynamic>),
           )
           .toList(growable: false),
     );
@@ -406,17 +397,21 @@ class AgentsRepository {
     return apiClient.post('/agents/import/human', body: body);
   }
 
-  /// Request to claim an existing self-owned agent.
+  /// Request a claim link for an existing self-owned agent, or create a
+  /// generic claim link that the agent can accept from its own runtime later.
   Future<AgentClaimRequest> requestClaim(
-    String agentId, {
+    String? agentId, {
     int? expiresInMinutes,
   }) async {
     final body = <String, dynamic>{};
     if (expiresInMinutes != null) {
       body['expiresInMinutes'] = expiresInMinutes;
     }
+    final normalizedAgentId = agentId?.trim();
     final response = await apiClient.post(
-      '/agents/$agentId/claim-requests',
+      normalizedAgentId == null || normalizedAgentId.isEmpty
+          ? '/agents/claim-requests'
+          : '/agents/$normalizedAgentId/claim-requests',
       body: body,
     );
     return AgentClaimRequest.fromJson(response);

@@ -78,15 +78,19 @@ class _HubScreenState extends State<HubScreen> {
     await session.setCurrentActiveAgent(agentId);
   }
 
-  Future<void> _openClaimLauncherSheet(HubClaimableAgentModel agent) async {
+  Future<void> _openClaimLauncherSheet({HubClaimableAgentModel? agent}) async {
     final session = AppSessionScope.read(context);
+    if (!session.isAuthenticated) {
+      _showSnackBar('Sign in as human first');
+      return;
+    }
     await showSwipeBackSheet<void>(
       context: context,
       builder: (context) => _ClaimAgentLauncherSheet(
         agent: agent,
         apiBaseUrl: session.apiClient.baseUrl,
         onGenerate:
-            ({required String agentId, required int expiresInMinutes}) =>
+            ({required String? agentId, required int expiresInMinutes}) =>
                 session.createClaimRequest(
                   agentId: agentId,
                   expiresInMinutes: expiresInMinutes,
@@ -137,30 +141,6 @@ class _HubScreenState extends State<HubScreen> {
       context: context,
       builder: (context) => const _CreateNewAgentSheet(),
     );
-  }
-
-  Future<void> _openClaimableAgentsSheet(
-    HubViewModel viewModel,
-    bool isRefreshingMine,
-  ) async {
-    if (!viewModel.humanAuth.isSignedIn) {
-      _showSnackBar('Sign in as human first');
-      return;
-    }
-
-    final selectedAgent = await showSwipeBackSheet<HubClaimableAgentModel>(
-      context: context,
-      builder: (context) => _ClaimableAgentsSheet(
-        claimableAgents: viewModel.claimableAgents,
-        isRefreshingMine: isRefreshingMine,
-      ),
-    );
-
-    if (!mounted || selectedAgent == null) {
-      return;
-    }
-
-    await _openClaimLauncherSheet(selectedAgent);
   }
 
   Future<String> _submitHumanAuth({
@@ -559,7 +539,10 @@ class _HubScreenState extends State<HubScreen> {
             children: [
               _buildOwnedAgentsSection(viewModel, session.isRefreshingMine),
               const SizedBox(height: AppSpacing.xxxl),
-              _buildHumanAuthSection(viewModel, session.isRefreshingMine),
+              _buildHumanAuthSection(
+                viewModel,
+                isRefreshingMine: session.isRefreshingMine,
+              ),
               if (viewModel.humanAuth.isSignedIn) ...[
                 const SizedBox(height: AppSpacing.xxxl),
                 _buildSecuritySection(viewModel),
@@ -731,13 +714,16 @@ class _HubScreenState extends State<HubScreen> {
     );
   }
 
-  Widget _buildHumanAuthSection(HubViewModel viewModel, bool isRefreshingMine) {
-    final claimableCount = viewModel.claimableAgents.length;
+  Widget _buildHumanAuthSection(
+    HubViewModel viewModel, {
+    required bool isRefreshingMine,
+  }) {
+    final pendingClaimCount = viewModel.pendingClaims.length;
     final claimSubtitle = viewModel.humanAuth.isSignedIn
-        ? claimableCount > 0
-              ? '$claimableCount agent${claimableCount == 1 ? '' : 's'} waiting for human claim.'
-              : 'Review any agent that connected without a human-bound invite.'
-        : 'Sign in as a human first, then review claimable agents here.';
+        ? pendingClaimCount > 0
+              ? '$pendingClaimCount claim link${pendingClaimCount == 1 ? '' : 's'} waiting for agent approval.'
+              : 'Generate a unique claim link, copy it to your agent runtime, and let the agent confirm the claim itself.'
+        : 'Sign in as a human first, then generate a claim link here.';
 
     return Column(
       key: const Key('human-access-section'),
@@ -774,11 +760,11 @@ class _HubScreenState extends State<HubScreen> {
                 title: 'Claim agent',
                 subtitle: claimSubtitle,
                 enabled: true,
-                trailingLabel: claimableCount > 0 ? '$claimableCount' : null,
+                trailingLabel: pendingClaimCount > 0
+                    ? '$pendingClaimCount'
+                    : null,
                 onTap: () {
-                  unawaited(
-                    _openClaimableAgentsSheet(viewModel, isRefreshingMine),
-                  );
+                  unawaited(_openClaimLauncherSheet());
                 },
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -2857,232 +2843,6 @@ class _OwnedAgentCommandBubbleBody extends StatelessWidget {
   }
 }
 
-class _ClaimableAgentRow extends StatelessWidget {
-  const _ClaimableAgentRow({
-    required this.agent,
-    required this.isBusy,
-    required this.canClaim,
-    required this.onGenerate,
-  });
-
-  final HubClaimableAgentModel agent;
-  final bool isBusy;
-  final bool canClaim;
-  final VoidCallback onGenerate;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      key: Key('claimable-agent-card-${agent.id}'),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLow.withValues(alpha: 0.82),
-        borderRadius: AppRadii.large,
-        border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.18)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _HubToneIcon(
-              icon: Icons.inventory_2_rounded,
-              accentColor: AppColors.tertiary,
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    agent.name,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    agent.handle,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    agent.headline,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                StatusChip(
-                  label: agent.statusLabel,
-                  tone: StatusChipTone.neutral,
-                  showDot: false,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                OutlinedButton.icon(
-                  key: Key('claim-agent-button-${agent.id}'),
-                  onPressed: canClaim && !isBusy ? onGenerate : null,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
-                  ),
-                  icon: isBusy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.link_rounded),
-                  label: const Text('Generate'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ClaimableAgentsSheet extends StatefulWidget {
-  const _ClaimableAgentsSheet({
-    required this.claimableAgents,
-    required this.isRefreshingMine,
-  });
-
-  final List<HubClaimableAgentModel> claimableAgents;
-  final bool isRefreshingMine;
-
-  @override
-  State<_ClaimableAgentsSheet> createState() => _ClaimableAgentsSheetState();
-}
-
-class _ClaimableAgentsSheetState extends State<_ClaimableAgentsSheet> {
-  String? _busyAgentId;
-
-  Future<void> _handleClaim(HubClaimableAgentModel agent) async {
-    if (_busyAgentId != null) {
-      return;
-    }
-
-    setState(() {
-      _busyAgentId = agent.id;
-    });
-
-    try {
-      if (!mounted) {
-        return;
-      }
-      Navigator.of(context).pop(agent);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busyAgentId = null;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.sm,
-      ),
-      child: GlassPanel(
-        borderRadius: AppRadii.hero,
-        padding: EdgeInsets.zero,
-        accentColor: AppColors.tertiary,
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Claim agent',
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            'Agents that connected without a unique human invite stay here until you explicitly claim them.',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: AppColors.onSurfaceMuted),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _SectionIconButton(
-                      buttonKey: const Key('close-claim-agent-button'),
-                      icon: Icons.close_rounded,
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                if (widget.claimableAgents.isEmpty)
-                  const _EmptyStatePanel(
-                    icon: Icons.inventory_2_outlined,
-                    title: 'No claimable agents right now',
-                    body:
-                        'Any agent that still needs human claim confirmation will appear here until it becomes owned.',
-                  )
-                else
-                  Column(
-                    key: const Key('claimable-agents-sheet'),
-                    children: [
-                      for (
-                        var index = 0;
-                        index < widget.claimableAgents.length;
-                        index++
-                      ) ...[
-                        _ClaimableAgentRow(
-                          agent: widget.claimableAgents[index],
-                          isBusy:
-                              widget.isRefreshingMine ||
-                              _busyAgentId == widget.claimableAgents[index].id,
-                          canClaim: true,
-                          onGenerate: () {
-                            unawaited(
-                              _handleClaim(widget.claimableAgents[index]),
-                            );
-                          },
-                        ),
-                        if (index != widget.claimableAgents.length - 1)
-                          const SizedBox(height: AppSpacing.md),
-                      ],
-                    ],
-                  ),
-                const SizedBox(height: AppSpacing.lg),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: SwipeBackSheetBackButton(),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 enum _ClaimLinkExpiryPreset {
   fifteenMinutes(15, '15m'),
   oneHour(60, '1h'),
@@ -3096,15 +2856,15 @@ enum _ClaimLinkExpiryPreset {
 
 class _ClaimAgentLauncherSheet extends StatefulWidget {
   const _ClaimAgentLauncherSheet({
-    required this.agent,
+    this.agent,
     required this.apiBaseUrl,
     required this.onGenerate,
   });
 
-  final HubClaimableAgentModel agent;
+  final HubClaimableAgentModel? agent;
   final String apiBaseUrl;
   final Future<AgentClaimRequest> Function({
-    required String agentId,
+    required String? agentId,
     required int expiresInMinutes,
   })
   onGenerate;
@@ -3132,7 +2892,7 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
 
     try {
       final claimRequest = await widget.onGenerate(
-        agentId: widget.agent.id,
+        agentId: widget.agent?.id,
         expiresInMinutes: _selectedExpiry.minutes,
       );
       if (!mounted) {
@@ -3142,8 +2902,15 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
         _claimRequest = claimRequest;
         _isGenerating = false;
       });
+      final agentName = widget.agent?.name;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Claim link ready for ${widget.agent.name}')),
+        SnackBar(
+          content: Text(
+            agentName == null || agentName.isEmpty
+                ? 'Claim link ready'
+                : 'Claim link ready for $agentName',
+          ),
+        ),
       );
     } on ApiException catch (error) {
       if (!mounted) {
@@ -3186,19 +2953,23 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
 
   String _buildClaimLauncherUrl(AgentClaimRequest claimRequest) {
     final serverBaseUrl = _extractServerBaseUrl(widget.apiBaseUrl);
+    final queryParameters = <String, String>{
+      'skillRepo': _agentsChatSkillRepoUrl,
+      'branch': _agentsChatSkillRepoBranch,
+      'serverBaseUrl': serverBaseUrl,
+      'mode': 'claim',
+      'claimRequestId': claimRequest.claimRequestId,
+      'challengeToken': claimRequest.challengeToken,
+      'expiresAt': claimRequest.expiresAt,
+    };
+    final agentId = claimRequest.agentId.trim();
+    if (agentId.isNotEmpty) {
+      queryParameters['agentId'] = agentId;
+    }
     return Uri(
       scheme: 'agents-chat',
       host: 'launch',
-      queryParameters: {
-        'skillRepo': _agentsChatSkillRepoUrl,
-        'branch': _agentsChatSkillRepoBranch,
-        'serverBaseUrl': serverBaseUrl,
-        'mode': 'claim',
-        'agentId': claimRequest.agentId,
-        'claimRequestId': claimRequest.claimRequestId,
-        'challengeToken': claimRequest.challengeToken,
-        'expiresAt': claimRequest.expiresAt,
-      },
+      queryParameters: queryParameters,
     ).toString();
   }
 
@@ -3230,6 +3001,19 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
     final claimLauncherUrl = claimRequest == null
         ? null
         : _buildClaimLauncherUrl(claimRequest);
+    final targetAgentName = widget.agent?.name;
+    final launcherDescription =
+        targetAgentName == null || targetAgentName.isEmpty
+        ? 'Generate a one-time launcher, paste it into your agent runtime, and let that agent approve the claim from its own side.'
+        : 'Generate a one-time launcher for $targetAgentName, paste it into that agent terminal, and let the agent approve the claim from its own runtime.';
+    final launcherRotationCopy =
+        targetAgentName == null || targetAgentName.isEmpty
+        ? 'Each generated link is unique. Generating a new one invalidates the previous pending claim link from this human.'
+        : 'Each generated link is unique. Generating a new one for this agent invalidates the previous pending claim link from this human.';
+    final launcherPlaceholder =
+        targetAgentName == null || targetAgentName.isEmpty
+        ? 'Generate a live claim launcher for your agent runtime'
+        : 'Generate a live claim launcher for $targetAgentName';
     final generateLabel = claimLauncherUrl == null
         ? 'Generate claim link'
         : 'Generate new claim link';
@@ -3264,7 +3048,7 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'Generate a one-time launcher for ${widget.agent.name}, paste it into that agent terminal, and let the agent approve the claim from its own runtime.',
+                            launcherDescription,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: AppColors.onSurfaceMuted),
                           ),
@@ -3282,8 +3066,7 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
                 _InfoPill(
                   icon: Icons.verified_user_rounded,
                   accentColor: AppColors.tertiary,
-                  text:
-                      'Each generated link is unique. Generating a new one for this agent invalidates the previous pending claim link from this human.',
+                  text: launcherRotationCopy,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
@@ -3354,8 +3137,7 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
                                     vertical: AppSpacing.sm,
                                   ),
                                   child: Text(
-                                    claimLauncherUrl ??
-                                        'Generate a live claim launcher for ${widget.agent.name}',
+                                    claimLauncherUrl ?? launcherPlaceholder,
                                     key: const Key('generated-claim-link-text'),
                                     maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
@@ -4888,6 +4670,34 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                       ? 'This launcher binds the next claimed agent directly to the current human account. Nickname, bio, and tags should still come from the agent after it boots and syncs its profile.'
                       : 'The signed bind launcher is only generated after a real human session is active.',
                 ),
+                const SizedBox(height: AppSpacing.xl),
+                SizedBox(
+                  width: double.infinity,
+                  child: Opacity(
+                    opacity: canGenerate ? 1 : 0.5,
+                    child: IgnorePointer(
+                      ignoring: !canGenerate,
+                      child: PrimaryGradientButton(
+                        key: const Key('generate-import-link-button'),
+                        label: _isGenerating
+                            ? 'Generating secure link'
+                            : invitation != null
+                            ? 'Link ready'
+                            : widget.isSignedIn
+                            ? 'Generate secure link'
+                            : 'Sign in required',
+                        icon: _isGenerating
+                            ? Icons.sync_rounded
+                            : invitation != null
+                            ? Icons.verified_rounded
+                            : Icons.cable_rounded,
+                        onPressed: () {
+                          unawaited(_generateInvitation());
+                        },
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 DecoratedBox(
                   decoration: BoxDecoration(
@@ -5012,7 +4822,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                   icon: Icons.verified_user_rounded,
                   accentColor: AppColors.tertiary,
                   text:
-                      'If an agent connects without this unique launcher, do not bind it here. Let it appear in claimable records and use the claim flow instead.',
+                      'If an agent connects without this unique launcher, do not bind it here. Use Claim agent to generate a separate claim link and let the agent accept it from its own runtime.',
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: AppSpacing.md),
@@ -5024,34 +4834,6 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                     ).textTheme.bodySmall?.copyWith(color: AppColors.error),
                   ),
                 ],
-                const SizedBox(height: AppSpacing.xl),
-                SizedBox(
-                  width: double.infinity,
-                  child: Opacity(
-                    opacity: canGenerate ? 1 : 0.5,
-                    child: IgnorePointer(
-                      ignoring: !canGenerate,
-                      child: PrimaryGradientButton(
-                        key: const Key('generate-import-link-button'),
-                        label: _isGenerating
-                            ? 'Generating secure link'
-                            : invitation != null
-                            ? 'Link ready'
-                            : widget.isSignedIn
-                            ? 'Generate secure link'
-                            : 'Sign in required',
-                        icon: _isGenerating
-                            ? Icons.sync_rounded
-                            : invitation != null
-                            ? Icons.verified_rounded
-                            : Icons.cable_rounded,
-                        onPressed: () {
-                          unawaited(_generateInvitation());
-                        },
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: AppSpacing.lg),
                 const Align(
                   alignment: Alignment.centerLeft,

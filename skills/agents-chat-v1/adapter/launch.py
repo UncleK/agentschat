@@ -403,48 +403,53 @@ def resolve_state_layout(
 
     if not slot:
         if mode == "claim":
-            if not agent_id:
-                raise ValueError("agentId is required for claim launchers.")
-
             state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
             slots_root = state_root / "slots"
             if slots_root.exists():
-                matching_slots: list[str] = []
                 existing_slots = sorted(
                     child.name for child in slots_root.iterdir() if child.is_dir()
                 )
-                for existing_slot in existing_slots:
-                    slot_state = load_state(slots_root / existing_slot)
-                    if slot_state.get("agentId") == agent_id:
-                        matching_slots.append(existing_slot)
+                if agent_id:
+                    matching_slots: list[str] = []
+                    for existing_slot in existing_slots:
+                        slot_state = load_state(slots_root / existing_slot)
+                        if slot_state.get("agentId") == agent_id:
+                            matching_slots.append(existing_slot)
 
-                if len(matching_slots) == 1:
-                    inferred_slot = normalize_slot_id(matching_slots[0])
-                    warn(
-                        f"claim launcher did not include --slot; reusing the "
-                        f"existing slot '{inferred_slot}' for agentId {agent_id}."
-                    )
-                    state_dir = ensure_state_dir(str(slots_root / inferred_slot))
-                    return state_root, state_dir, inferred_slot
+                    if len(matching_slots) == 1:
+                        inferred_slot = normalize_slot_id(matching_slots[0])
+                        warn(
+                            f"claim launcher did not include --slot; reusing the "
+                            f"existing slot '{inferred_slot}' for agentId {agent_id}."
+                        )
+                        state_dir = ensure_state_dir(str(slots_root / inferred_slot))
+                        return state_root, state_dir, inferred_slot
 
-                if len(matching_slots) > 1:
-                    raise ValueError(
-                        "slot is required for claim launchers when multiple "
-                        "local slots already point at the same agentId."
-                    )
+                    if len(matching_slots) > 1:
+                        raise ValueError(
+                            "slot is required for claim launchers when multiple "
+                            "local slots already point at the same agentId."
+                        )
 
                 if len(existing_slots) == 1:
                     inferred_slot = normalize_slot_id(existing_slots[0])
                     warn(
-                        f"claim launcher did not include --slot; reusing the "
+                        "claim launcher did not include --slot; reusing the "
                         f"only existing local slot '{inferred_slot}'."
                     )
                     state_dir = ensure_state_dir(str(slots_root / inferred_slot))
                     return state_root, state_dir, inferred_slot
 
+            if agent_id:
+                raise ValueError(
+                    "slot is required for claim launchers unless an existing slot "
+                    "for that agentId is already present locally."
+                )
+
             raise ValueError(
-                "slot is required for claim launchers unless an existing slot "
-                "for that agentId is already present locally."
+                "slot is required for generic claim launchers when multiple "
+                "local slots exist. Re-run the launcher inside the intended "
+                "agent slot or provide --slot explicitly."
             )
 
         if mode != "bound":
@@ -730,11 +735,43 @@ def confirm_claim_via_existing_slot(
             "Claim launcher requires an existing connected slot with an accessToken."
         )
 
-    target_agent_id = config.get("agent_id")
-    if not isinstance(target_agent_id, str) or not target_agent_id:
-        raise RuntimeError("Claim launcher requires agentId.")
+    current_server_base_url = state.get("serverBaseUrl")
+    if not isinstance(current_server_base_url, str) or not current_server_base_url:
+        raise RuntimeError(
+            "Claim launcher requires an existing connected slot with a serverBaseUrl."
+        )
+    configured_server_base_url = config.get("server_base_url")
+    if (
+        configured_server_base_url
+        and normalize_base_url(configured_server_base_url)
+        != normalize_base_url(current_server_base_url)
+    ):
+        raise RuntimeError(
+            f"slot '{slot}' is connected to {current_server_base_url}, "
+            f"but the claim launcher targets {configured_server_base_url}."
+        )
 
     current_agent_id = state.get("agentId")
+    if not isinstance(current_agent_id, str) or not current_agent_id:
+        raise RuntimeError(
+            "Claim launcher requires an existing connected slot with an agentId."
+        )
+
+    target_agent_id = config.get("agent_id")
+    if isinstance(target_agent_id, str) and target_agent_id:
+        if current_agent_id != target_agent_id:
+            raise RuntimeError(
+                f"slot '{slot}' is connected as agentId {current_agent_id}; "
+                f"claim launcher targets {target_agent_id}."
+            )
+    else:
+        target_agent_id = current_agent_id
+        config["agent_id"] = current_agent_id
+        warn(
+            f"claim launcher did not include agentId; reusing the current "
+            f"slot identity {current_agent_id}."
+        )
+
     if current_agent_id != target_agent_id:
         raise RuntimeError(
             f"slot '{slot}' is connected as agentId {current_agent_id}; "
@@ -749,7 +786,7 @@ def confirm_claim_via_existing_slot(
         )
 
     action = submit_claim_confirmation(
-        str(state["serverBaseUrl"]),
+        current_server_base_url,
         access_token,
         claim_request_id,
         challenge_token,
@@ -761,7 +798,7 @@ def confirm_claim_via_existing_slot(
     deadline = time.time() + 30
     while True:
         action_state = read_action(
-            str(state["serverBaseUrl"]),
+            current_server_base_url,
             access_token,
             action_id,
         )

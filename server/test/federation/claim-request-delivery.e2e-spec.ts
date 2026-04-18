@@ -183,4 +183,90 @@ describe('Federation claim-request delivery (e2e)', () => {
     expect(updatedAgent.ownerType).toBe(AgentOwnerType.Human);
     expect(updatedAgent.ownerUserId).toBe(human.user.id);
   });
+
+  it('lets a connected self-owned agent confirm a generic claim link without broadcasting claim.requested deliveries', async () => {
+    const bootstrapResponse = await request(app.getHttpServer())
+      .post('/api/v1/agents/bootstrap/public')
+      .send({
+        handle: 'generic-claim-agent',
+        displayName: 'Generic Claim Agent',
+      })
+      .expect(201);
+    const bootstrapBody = typedValue<PublicBootstrapResponse>(
+      bootstrapResponse.body,
+    );
+
+    const claimAgentResponse = await request(app.getHttpServer())
+      .post('/api/v1/agents/claim')
+      .send({
+        claimToken: bootstrapBody.bootstrap.claimToken,
+        pollingEnabled: true,
+      })
+      .expect(201);
+    const claimAgentBody = typedValue<ClaimAgentResponse>(
+      claimAgentResponse.body,
+    );
+
+    const human = await registerHuman(
+      app,
+      'generic-claim-owner@example.com',
+      'Generic Claim Owner',
+    );
+
+    const requestClaimResponse = await request(app.getHttpServer())
+      .post('/api/v1/agents/claim-requests')
+      .set('Authorization', `Bearer ${human.accessToken}`)
+      .expect(201);
+    const requestClaimBody = typedValue<ClaimRequestResponse>(
+      requestClaimResponse.body,
+    );
+
+    expect(requestClaimBody.claimRequest.status).toBe('pending');
+    expect(requestClaimBody.claimRequest.agentId).toBe('');
+
+    const pollResponse = await request(app.getHttpServer())
+      .get('/api/v1/deliveries/poll?wait_seconds=1')
+      .set('Authorization', `Bearer ${claimAgentBody.accessToken}`)
+      .expect(200);
+    const pollBody = typedValue<DeliveryPollResponse>(pollResponse.body);
+
+    expect(pollBody.deliveries).toEqual([]);
+
+    const confirmResponse = await request(app.getHttpServer())
+      .post('/api/v1/actions')
+      .set('Authorization', `Bearer ${claimAgentBody.accessToken}`)
+      .set('Idempotency-Key', 'generic-claim-confirm')
+      .send({
+        type: 'claim.confirm',
+        payload: {
+          claimRequestId: requestClaimBody.claimRequest.id,
+          challengeToken: requestClaimBody.challengeToken,
+        },
+      })
+      .expect(202);
+    const confirmBody = typedValue<AcceptedActionResponse>(
+      confirmResponse.body,
+    );
+    const completedConfirmation = await waitForActionStatus(
+      app,
+      claimAgentBody.accessToken,
+      confirmBody.id,
+    );
+
+    expect(completedConfirmation.status).toBe('succeeded');
+    expect(completedConfirmation.result).toMatchObject({
+      agentId: claimAgentBody.agent.id,
+      ownerType: 'human',
+      ownerUserId: human.user.id,
+      claimRequestId: requestClaimBody.claimRequest.id,
+      claimStatus: 'confirmed',
+    });
+
+    const updatedAgent = await agentRepository.findOneByOrFail({
+      id: claimAgentBody.agent.id,
+    });
+
+    expect(updatedAgent.ownerType).toBe(AgentOwnerType.Human);
+    expect(updatedAgent.ownerUserId).toBe(human.user.id);
+  });
 });

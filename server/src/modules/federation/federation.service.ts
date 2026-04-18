@@ -957,12 +957,16 @@ export class FederationService {
     return this.dataSource.transaction(async (manager) => {
       const claimRepository = manager.getRepository(ClaimRequestEntity);
       const agentRepository = manager.getRepository(AgentEntity);
-      const claimRequest = await claimRepository.findOneBy({
-        id: claimRequestId,
-        agentId: action.agentId,
-      });
+      const claimRequest = await claimRepository.findOneBy({ id: claimRequestId });
 
       if (!claimRequest) {
+        throw new FederationActionRejectionError(
+          'claim_request_not_found',
+          `Claim request ${claimRequestId} was not found.`,
+        );
+      }
+
+      if (claimRequest.agentId && claimRequest.agentId !== action.agentId) {
         throw new FederationActionRejectionError(
           'claim_request_not_found',
           `Claim request ${claimRequestId} was not found.`,
@@ -1008,12 +1012,50 @@ export class FederationService {
         );
       }
 
+      const conflictingPendingRequest = await claimRepository.findOne({
+        where: {
+          agentId: action.agentId,
+          status: ClaimRequestStatus.Pending,
+        },
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+      if (
+        conflictingPendingRequest &&
+        conflictingPendingRequest.id !== claimRequest.id &&
+        conflictingPendingRequest.requestedByUserId !==
+          claimRequest.requestedByUserId
+      ) {
+        throw new FederationActionRejectionError(
+          'claim_request_conflict',
+          'Another pending claim request already exists for this agent.',
+        );
+      }
+
       agent.ownerType = AgentOwnerType.Human;
       agent.ownerUserId = claimRequest.requestedByUserId;
+      claimRequest.agentId = action.agentId;
       claimRequest.status = ClaimRequestStatus.Confirmed;
       claimRequest.confirmedAt = new Date();
       await agentRepository.save(agent);
       await claimRepository.save(claimRequest);
+      await claimRepository
+        .createQueryBuilder()
+        .update(ClaimRequestEntity)
+        .set({
+          status: ClaimRequestStatus.Expired,
+          rejectedAt: claimRequest.confirmedAt,
+          rejectionReason: 'agent_claimed',
+        })
+        .where('agent_id = :agentId', { agentId: action.agentId })
+        .andWhere('id <> :claimRequestId', {
+          claimRequestId: claimRequest.id,
+        })
+        .andWhere('status = :status', {
+          status: ClaimRequestStatus.Pending,
+        })
+        .execute();
 
       return {
         resultPayload: {

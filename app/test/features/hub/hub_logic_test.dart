@@ -258,11 +258,7 @@ void main() {
         await pumpHub(tester);
         await scrollToAgentSecurity(tester);
 
-        await setAutonomyLevel(
-          tester,
-          agentId: 'agt-owned-1',
-          value: 0,
-        );
+        await setAutonomyLevel(tester, agentId: 'agt-owned-1', value: 0);
 
         final summaryFinder = find.byKey(
           const Key('agent-safety-autonomy-summary-agt-owned-1'),
@@ -383,11 +379,7 @@ void main() {
           findsOneWidget,
         );
 
-        await setAutonomyLevel(
-          tester,
-          agentId: 'agt-owned-1',
-          value: 2,
-        );
+        await setAutonomyLevel(tester, agentId: 'agt-owned-1', value: 2);
 
         expect(
           find.descendant(
@@ -488,7 +480,9 @@ void main() {
         await tester.ensureVisible(
           find.byKey(const Key('agent-security-apply-all-switch')),
         );
-        await tester.tap(find.byKey(const Key('agent-security-apply-all-switch')));
+        await tester.tap(
+          find.byKey(const Key('agent-security-apply-all-switch')),
+        );
         await tester.pumpAndSettle();
 
         final applyAllSwitch = tester.widget<Switch>(
@@ -496,11 +490,7 @@ void main() {
         );
         expect(applyAllSwitch.value, isTrue);
 
-        await setAutonomyLevel(
-          tester,
-          agentId: 'agt-owned-1',
-          value: 2,
-        );
+        await setAutonomyLevel(tester, agentId: 'agt-owned-1', value: 2);
 
         expect(updatedCalls, ['agt-owned-1', 'agt-owned-2']);
         expect(
@@ -822,7 +812,10 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Sign in as human first'), findsOneWidget);
-        expect(find.byKey(const Key('claimable-agents-sheet')), findsNothing);
+        expect(
+          find.byKey(const Key('generate-claim-link-button')),
+          findsNothing,
+        );
       },
     );
 
@@ -860,6 +853,12 @@ void main() {
           findsOneWidget,
         );
         expect(
+          tester
+              .getTopLeft(find.byKey(const Key('generate-import-link-button')))
+              .dy,
+          lessThan(tester.getTopLeft(find.text('BOUND LAUNCHER')).dy),
+        );
+        expect(
           find.byKey(const Key('import-display-name-field')),
           findsNothing,
         );
@@ -869,14 +868,8 @@ void main() {
         await tester.pump();
         await tester.pumpAndSettle();
 
-        expect(
-          find.textContaining('agents-chat://launch?'),
-          findsOneWidget,
-        );
-        expect(
-          find.textContaining('mode=bound'),
-          findsOneWidget,
-        );
+        expect(find.textContaining('agents-chat://launch?'), findsOneWidget);
+        expect(find.textContaining('mode=bound'), findsOneWidget);
         expect(
           find.textContaining('claimToken=claim.v1.bootstrap-token'),
           findsOneWidget,
@@ -1217,27 +1210,20 @@ void main() {
     );
 
     testWidgets(
-      'claim opens a launcher flow, generates a pending request, and does not promote the agent early',
+      'claim opens a direct launcher flow, generates a pending request, and does not promote the agent early',
       (WidgetTester tester) async {
         await authenticateWithMine(
           mineResponse(
             agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
-            claimableAgents: [
-              agentSummary(
-                id: 'agt-claimable-1',
-                displayName: 'Claimable One',
-                ownerType: 'self',
-              ),
-            ],
           ),
         );
 
         agentsRepository.enqueueRequestClaim((agentId, expiresInMinutes) async {
-          expect(agentId, 'agt-claimable-1');
+          expect(agentId, isNull);
           expect(expiresInMinutes, 60);
           return const AgentClaimRequest(
             claimRequestId: 'claim-1',
-            agentId: 'agt-claimable-1',
+            agentId: '',
             status: 'pending',
             requestedAt: '2026-04-17T10:00:00.000Z',
             expiresAt: '2026-04-17T11:00:00.000Z',
@@ -1247,15 +1233,7 @@ void main() {
         agentsRepository.enqueueReadMine(() async {
           return mineResponse(
             agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
-            claimableAgents: const [],
-            pendingClaims: [
-              pendingClaimSummary(
-                claimRequestId: 'claim-1',
-                agentId: 'agt-claimable-1',
-                handle: 'claimable-one',
-                displayName: 'Claimable One',
-              ),
-            ],
+            pendingClaims: [pendingClaimSummary(claimRequestId: 'claim-1')],
           );
         });
 
@@ -1268,18 +1246,6 @@ void main() {
         await tester.tap(
           find.byKey(const Key('human-access-claim-agent-button')),
         );
-        await tester.pumpAndSettle();
-
-        expect(find.byKey(const Key('claimable-agents-sheet')), findsOneWidget);
-        expect(
-          find.byKey(const Key('claim-agent-button-agt-claimable-1')),
-          findsOneWidget,
-        );
-
-        await tester.tap(
-          find.byKey(const Key('claim-agent-button-agt-claimable-1')),
-        );
-        await tester.pump();
         await tester.pumpAndSettle();
 
         expect(
@@ -1296,10 +1262,8 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(controller.currentActiveAgent?.id, 'agt-owned-1');
-        expect(
-          find.textContaining('agents-chat://launch?'),
-          findsOneWidget,
-        );
+        expect(find.textContaining('agents-chat://launch?'), findsOneWidget);
+        expect(find.textContaining('mode=claim'), findsOneWidget);
         expect(controller.pendingClaims, hasLength(1));
       },
     );
