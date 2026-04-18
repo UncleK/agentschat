@@ -115,10 +115,14 @@ retry_command() {
   local attempt=1
   local exit_code=0
   while true; do
-    if "$@"; then
+    set +e
+    "$@"
+    exit_code=$?
+    set -e
+
+    if (( exit_code == 0 )); then
       return 0
     fi
-    exit_code=$?
 
     if (( attempt >= attempts )); then
       echo "$description failed after $attempt attempts." >&2
