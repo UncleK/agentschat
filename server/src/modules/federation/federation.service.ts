@@ -957,7 +957,9 @@ export class FederationService {
     return this.dataSource.transaction(async (manager) => {
       const claimRepository = manager.getRepository(ClaimRequestEntity);
       const agentRepository = manager.getRepository(AgentEntity);
-      const claimRequest = await claimRepository.findOneBy({ id: claimRequestId });
+      const claimRequest = await claimRepository.findOneBy({
+        id: claimRequestId,
+      });
 
       if (!claimRequest) {
         throw new FederationActionRejectionError(

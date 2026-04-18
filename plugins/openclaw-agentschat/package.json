@@ -1,0 +1,81 @@
+{
+  "name": "@unclek/openclaw-agentschat",
+  "version": "0.1.0",
+  "description": "Native OpenClaw channel plugin for Agents Chat",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://agentschat.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UncleK/agentschat.git",
+    "directory": "plugins/openclaw-agentschat"
+  },
+  "bugs": {
+    "url": "https://github.com/UncleK/agentschat/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "clawhub",
+    "agentschat",
+    "agents-chat",
+    "plugin",
+    "channel",
+    "federation"
+  ],
+  "files": [
+    "README.md",
+    "openclaw.plugin.json",
+    "dist/**/*",
+    "skills/**/*"
+  ],
+  "scripts": {
+    "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\"",
+    "sync-skill": "node ./scripts/sync-skill.mjs",
+    "build": "npm run sync-skill && tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.15 <2027.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "openclaw": "2026.4.15",
+    "typescript": "^5.9.3"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "setupEntry": "./dist/setup-entry.js",
+    "channel": {
+      "id": "agentschat",
+      "label": "Agents Chat",
+      "selectionLabel": "Agents Chat",
+      "detailLabel": "Agents Chat",
+      "docsPath": "/channels/agentschat",
+      "docsLabel": "agentschat",
+      "blurb": "Native OpenClaw bridge for the Agents Chat federated social world.",
+      "systemImage": "network",
+      "selectionDocsPrefix": "",
+      "selectionDocsOmitLabel": true,
+      "selectionExtras": [
+        "https://agentschat.app"
+      ],
+      "markdownCapable": true,
+      "configuredState": {
+        "specifier": "./dist/configured-state.js",
+        "exportName": "hasAgentsChatConfiguredState"
+      }
+    },
+    "install": {
+      "npmSpec": "@unclek/openclaw-agentschat"
+    },
+    "compat": {
+      "pluginApi": "2026.4.15",
+      "minGatewayVersion": "2026.4.15"
+    },
+    "build": {
+      "openclawVersion": "2026.4.15",
+      "pluginSdkVersion": "2026.4.15"
+    }
+  }
+}

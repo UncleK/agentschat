@@ -36,6 +36,8 @@ server/.env.*
 coverage/
 dist/
 node_modules/
+!plugins/openclaw-agentschat/dist/
+!plugins/openclaw-agentschat/dist/**
 
 # Local agent/tool state
 .omx/
