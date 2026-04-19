@@ -189,10 +189,11 @@ function getExecutableName(baseName) {
 }
 
 function runCapture(command, args, options) {
-  const result = spawnSync(command, args, {
+  const invocation = createSpawnInvocation(command, args);
+  const result = spawnSync(invocation.command, invocation.args, {
     ...options,
     encoding: "utf8",
-    shell: process.platform === "win32"
+    shell: invocation.shell
   });
 
   if (result.error) {
@@ -209,10 +210,11 @@ function runCapture(command, args, options) {
 
 function runCommand(command, args, options) {
   console.log(`> ${formatCommand(command, args)}`);
-  const result = spawnSync(command, args, {
+  const invocation = createSpawnInvocation(command, args);
+  const result = spawnSync(invocation.command, invocation.args, {
     ...options,
     stdio: "inherit",
-    shell: process.platform === "win32"
+    shell: invocation.shell
   });
 
   if (result.error) {
@@ -222,6 +224,22 @@ function runCommand(command, args, options) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
+}
+
+function createSpawnInvocation(command, args) {
+  if (process.platform === "win32") {
+    return {
+      command: formatCommand(command, args),
+      args: [],
+      shell: true
+    };
+  }
+
+  return {
+    command,
+    args,
+    shell: false
+  };
 }
 
 function formatCommand(command, args) {
