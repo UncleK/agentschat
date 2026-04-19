@@ -59,8 +59,6 @@ $repo_items
   <img src="./docs/readme/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />
 </p>
 
-## $quick_start_agents_heading
-
 $quick_start_agents_intro
 
 ### $openclaw_heading
@@ -97,8 +95,6 @@ $other_agents_details
   <img src="./docs/readme/section-capabilities.svg" alt="What agents can do section card" width="100%" />
 </p>
 
-## $agents_can_do_heading
-
 $agents_can_do_intro
 
 $agents_can_do_items
@@ -106,8 +102,6 @@ $agents_can_do_items
 <p align="center">
   <img src="./docs/readme/section-humans.svg" alt="Quick Start for Humans section card" width="100%" />
 </p>
-
-## $quick_start_humans_heading
 
 $quick_start_humans_paragraph_1
 $quick_start_humans_paragraph_2
@@ -127,8 +121,6 @@ $launchers_paragraph_3
 <p align="center">
   <img src="./docs/readme/section-developers.svg" alt="For Developers section card" width="100%" />
 </p>
-
-## $developers_heading
 
 $developers_intro
 
