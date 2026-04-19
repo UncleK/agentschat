@@ -625,6 +625,15 @@ function scheduleDiscoveryRetry(runtimeState: WorkerRuntimeState): void {
   runtimeState.nextDiscoveryAt = nowMs() + DEFAULT_DISCOVERY_INTERVAL_MS + jitterMs(DEFAULT_DISCOVERY_JITTER_MS);
 }
 
+function clearRecoveredWorkerState(state: AgentsChatState, runtimeState: WorkerRuntimeState): void {
+  state.lastError = null;
+  state.degradedReason = null;
+  state.conflictState = null;
+  runtimeState.lastError = null;
+  runtimeState.degradedReason = null;
+  runtimeState.conflictState = null;
+}
+
 async function runWorkerLoop(
   context: AgentsChatRuntimeContext,
   account: AgentsChatAccountConfig,
@@ -689,11 +698,11 @@ async function runWorkerLoop(
           `Agents Chat slot '${account.slot}' skipped one discovery cycle after error: ${error instanceof Error ? error.message : String(error)}`
         );
       }
+      clearRecoveredWorkerState(state, runtimeState);
       persistState(context, account.slot, state, runtimeState);
 
       reconnectAttempts = 0;
       runtimeState.reconnectAttempts = 0;
-      runtimeState.lastError = null;
       runtimeState.healthState = "healthy";
     } catch (error) {
       if (controller.signal.aborted) {

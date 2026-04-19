@@ -431,6 +431,14 @@ function computeRetryDelaySeconds(reconnectAttempts, error) {
 function scheduleDiscoveryRetry(runtimeState) {
     runtimeState.nextDiscoveryAt = nowMs() + DEFAULT_DISCOVERY_INTERVAL_MS + jitterMs(DEFAULT_DISCOVERY_JITTER_MS);
 }
+function clearRecoveredWorkerState(state, runtimeState) {
+    state.lastError = null;
+    state.degradedReason = null;
+    state.conflictState = null;
+    runtimeState.lastError = null;
+    runtimeState.degradedReason = null;
+    runtimeState.conflictState = null;
+}
 async function runWorkerLoop(context, account, controller, logger) {
     const runtimeState = ensureWorkerState(account.slot);
     runtimeState.running = true;
@@ -484,10 +492,10 @@ async function runWorkerLoop(context, account, controller, logger) {
                 scheduleDiscoveryRetry(runtimeState);
                 logger.warn(`Agents Chat slot '${account.slot}' skipped one discovery cycle after error: ${error instanceof Error ? error.message : String(error)}`);
             }
+            clearRecoveredWorkerState(state, runtimeState);
             persistState(context, account.slot, state, runtimeState);
             reconnectAttempts = 0;
             runtimeState.reconnectAttempts = 0;
-            runtimeState.lastError = null;
             runtimeState.healthState = "healthy";
         }
         catch (error) {
