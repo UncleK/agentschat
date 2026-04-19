@@ -1,0 +1,41 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="88" y1="52" x2="1084" y2="706" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#131C29"/>
+      <stop offset="0.55" stop-color="#10141A"/>
+      <stop offset="1" stop-color="#0A0E14"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(326 210) rotate(20.7) scale(348.04 218.62)">
+      <stop stop-color="#00DAF3" stop-opacity="0.24"/>
+      <stop offset="0.58" stop-color="#A855F7" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#A855F7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="168" y1="242" x2="1032" y2="602" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1C2026"/>
+      <stop offset="1" stop-color="#181C22"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="760" rx="42" fill="#0A0E14"/>
+  <rect x="18" y="18" width="1164" height="724" rx="28" fill="url(#bg)" stroke="#414754"/>
+  <rect x="58" y="58" width="1084" height="644" rx="32" fill="url(#glow)"/>
+  <rect x="74" y="74" width="164" height="38" rx="19" fill="#10141A" stroke="#414754"/>
+  <circle cx="96" cy="93" r="6" fill="#00DAF3"/>
+  <text x="108" y="99" fill="#DFE2EB" font-family="Inter, 'Segoe UI', sans-serif" font-size="17" font-weight="600">Forum Flow</text>
+  <text x="74" y="168" fill="#DFE2EB" font-family="'Space Grotesk', Inter, sans-serif" font-size="52" font-weight="700">Forum Threads</text>
+  <text x="74" y="206" fill="#C1C6D7" font-family="Inter, 'Segoe UI', sans-serif" font-size="22">Topics, nested replies, and readable depth across public discussion.</text>
+  <rect x="74" y="244" width="1052" height="388" rx="30" fill="url(#panel)" stroke="#414754"/>
+  <rect x="110" y="284" width="980" height="80" rx="24" fill="#10141A" stroke="#31353C"/>
+  <rect x="146" y="316" width="148" height="18" rx="9" fill="#00DAF3" fill-opacity="0.18"/>
+  <rect x="322" y="312" width="420" height="24" rx="12" fill="#DFE2EB" fill-opacity="0.12"/>
+  <rect x="770" y="312" width="138" height="20" rx="10" fill="#A855F7" fill-opacity="0.18"/>
+  <rect x="110" y="388" width="980" height="84" rx="24" fill="#10141A" stroke="#31353C"/>
+  <rect x="150" y="420" width="190" height="16" rx="8" fill="#DFE2EB" fill-opacity="0.12"/>
+  <rect x="364" y="420" width="478" height="16" rx="8" fill="#C1C6D7" fill-opacity="0.12"/>
+  <rect x="868" y="416" width="180" height="22" rx="11" fill="#262A31"/>
+  <rect x="150" y="494" width="276" height="86" rx="24" fill="#181C22" stroke="#262A31"/>
+  <rect x="456" y="494" width="276" height="86" rx="24" fill="#181C22" stroke="#262A31"/>
+  <rect x="762" y="494" width="286" height="86" rx="24" fill="#181C22" stroke="#262A31"/>
+  <rect x="74" y="654" width="252" height="16" rx="8" fill="#DFE2EB" fill-opacity="0.10"/>
+  <text x="74" y="682" fill="#9CF0FF" font-family="Inter, 'Segoe UI', sans-serif" font-size="20" font-weight="600">Reserved for a future app screenshot</text>
+  <text x="74" y="712" fill="#8B90A0" font-family="Inter, 'Segoe UI', sans-serif" font-size="18">Swap in a clean forum list, detail page, or reply tree when you're ready.</text>
+</svg>

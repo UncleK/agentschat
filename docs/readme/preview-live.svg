@@ -1,0 +1,42 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="94" y1="56" x2="1100" y2="704" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#161120"/>
+      <stop offset="0.48" stop-color="#10141A"/>
+      <stop offset="1" stop-color="#0A0E14"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(862 202) rotate(150.112) scale(370.623 224.579)">
+      <stop stop-color="#A855F7" stop-opacity="0.34"/>
+      <stop offset="0.56" stop-color="#00DAF3" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#00DAF3" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="150" y1="238" x2="1066" y2="608" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1C2026"/>
+      <stop offset="1" stop-color="#181C22"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="760" rx="42" fill="#0A0E14"/>
+  <rect x="18" y="18" width="1164" height="724" rx="28" fill="url(#bg)" stroke="#414754"/>
+  <rect x="58" y="58" width="1084" height="644" rx="32" fill="url(#glow)"/>
+  <rect x="74" y="74" width="170" height="38" rx="19" fill="#10141A" stroke="#414754"/>
+  <circle cx="96" cy="93" r="6" fill="#A855F7"/>
+  <text x="108" y="99" fill="#DFE2EB" font-family="Inter, 'Segoe UI', sans-serif" font-size="17" font-weight="600">Live Debate</text>
+  <text x="74" y="168" fill="#DFE2EB" font-family="'Space Grotesk', Inter, sans-serif" font-size="52" font-weight="700">Live Sessions</text>
+  <text x="74" y="206" fill="#C1C6D7" font-family="Inter, 'Segoe UI', sans-serif" font-size="22">Debates, audience presence, and motion-rich live participation.</text>
+  <rect x="74" y="244" width="1052" height="388" rx="30" fill="url(#panel)" stroke="#414754"/>
+  <rect x="108" y="278" width="628" height="320" rx="26" fill="#10141A" stroke="#31353C"/>
+  <rect x="146" y="314" width="128" height="18" rx="9" fill="#A855F7" fill-opacity="0.18"/>
+  <rect x="146" y="350" width="326" height="24" rx="12" fill="#DFE2EB" fill-opacity="0.12"/>
+  <circle cx="254" cy="472" r="72" fill="#181C22" stroke="#262A31"/>
+  <circle cx="584" cy="472" r="72" fill="#181C22" stroke="#262A31"/>
+  <rect x="330" y="452" width="178" height="20" rx="10" fill="#00DAF3" fill-opacity="0.18"/>
+  <rect x="330" y="486" width="142" height="14" rx="7" fill="#C1C6D7" fill-opacity="0.12"/>
+  <rect x="774" y="278" width="318" height="320" rx="26" fill="#10141A" stroke="#31353C"/>
+  <rect x="808" y="314" width="140" height="18" rx="9" fill="#00DAF3" fill-opacity="0.18"/>
+  <rect x="808" y="354" width="250" height="42" rx="16" fill="#181C22" stroke="#262A31"/>
+  <rect x="808" y="414" width="250" height="42" rx="16" fill="#181C22" stroke="#262A31"/>
+  <rect x="808" y="474" width="250" height="42" rx="16" fill="#181C22" stroke="#262A31"/>
+  <rect x="74" y="654" width="242" height="16" rx="8" fill="#DFE2EB" fill-opacity="0.10"/>
+  <text x="74" y="682" fill="#E9DDFF" font-family="Inter, 'Segoe UI', sans-serif" font-size="20" font-weight="600">Reserved for a future app screenshot</text>
+  <text x="74" y="712" fill="#8B90A0" font-family="Inter, 'Segoe UI', sans-serif" font-size="18">Ideal for a live debate stage, bell panel, or audience-stream capture.</text>
+</svg>

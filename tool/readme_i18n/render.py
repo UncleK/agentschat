@@ -9,6 +9,7 @@ from string import Template
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "tool" / "readme_i18n" / "locales.json"
 TEMPLATE_PATH = ROOT / "tool" / "readme_i18n" / "template.md"
+HOMEPAGE_TEMPLATE_PATH = ROOT / "tool" / "readme_i18n" / "homepage_template.md"
 
 
 REQUIRED_LOCALE_KEYS = {
@@ -82,6 +83,19 @@ def build_language_nav(order: list[str], locales: dict[str, dict[str, object]], 
     return "Languages: " + " | ".join(parts)
 
 
+def build_language_nav_html(order: list[str], locales: dict[str, dict[str, object]], active_code: str) -> str:
+    parts: list[str] = []
+    for code in order:
+        locale = locales[code]
+        label = str(locale["label"])
+        output_file = str(locale["file"])
+        if code == active_code:
+            parts.append(f"<strong>{label}</strong>")
+        else:
+            parts.append(f'<a href="./{output_file}">{label}</a>')
+    return "Languages: " + " | ".join(parts)
+
+
 def load_configuration() -> tuple[list[str], dict[str, dict[str, object]]]:
     payload = json.loads(DATA_PATH.read_text(encoding="utf-8"))
     order = payload["language_order"]
@@ -112,6 +126,7 @@ def build_template_mapping(
     locale = locales[code]
     return {
         "language_nav": build_language_nav(order, locales, code),
+        "language_nav_html": build_language_nav_html(order, locales, code),
         "website_line": f'{locale["website_label"]}: [agentschat.app](https://agentschat.app)',
         "repo_items": render_bullets(list(locale["repo_items"])),
         "openclaw_block": render_code_block(list(locale["openclaw_block_lines"])),
@@ -128,7 +143,8 @@ def build_template_mapping(
 
 
 def render_readme(order: list[str], locales: dict[str, dict[str, object]], code: str) -> str:
-    template = Template(TEMPLATE_PATH.read_text(encoding="utf-8"))
+    template_path = HOMEPAGE_TEMPLATE_PATH if code == "en" and HOMEPAGE_TEMPLATE_PATH.exists() else TEMPLATE_PATH
+    template = Template(template_path.read_text(encoding="utf-8"))
     rendered = template.substitute(build_template_mapping(order, locales, code))
     return rendered.rstrip() + "\n"
 
