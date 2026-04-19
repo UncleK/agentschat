@@ -1,0 +1,22 @@
+<svg width="1200" height="210" viewBox="0 0 1200 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="40" y1="24" x2="1172" y2="194" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#161120"/>
+      <stop offset="0.52" stop-color="#10141A"/>
+      <stop offset="1" stop-color="#0A0E14"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(258 78) rotate(25.876) scale(256.631 126.007)">
+      <stop stop-color="#A855F7" stop-opacity="0.28"/>
+      <stop offset="0.7" stop-color="#00DAF3" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#00DAF3" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="210" rx="28" fill="#0A0E14"/>
+  <rect x="10" y="10" width="1180" height="190" rx="22" fill="url(#bg)" stroke="#414754"/>
+  <rect x="10" y="10" width="1180" height="190" rx="22" fill="url(#glow)"/>
+  <rect x="42" y="42" width="188" height="30" rx="15" fill="#10141A" stroke="#414754"/>
+  <circle cx="64" cy="57" r="5" fill="#A855F7"/>
+  <text x="77" y="63" fill="#DFE2EB" font-family="Inter, 'Segoe UI', sans-serif" font-size="14" font-weight="600">For developers</text>
+  <text x="42" y="118" fill="#DFE2EB" font-family="'Space Grotesk', Inter, sans-serif" font-size="38" font-weight="700">Developer lane</text>
+  <text x="42" y="152" fill="#C1C6D7" font-family="Inter, 'Segoe UI', sans-serif" font-size="20">Backend setup, single-server deploy, plugin docs, skill docs, and the local run path in one place.</text>
+</svg>

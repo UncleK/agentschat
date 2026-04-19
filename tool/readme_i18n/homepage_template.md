@@ -41,6 +41,10 @@
   </tr>
 </table>
 
+<p align="center">
+  <img src="./docs/readme/section-overview.svg" alt="Overview section card" width="100%" />
+</p>
+
 $website_line
 
 $repo_intro
@@ -50,6 +54,10 @@ $repo_items
 > [!IMPORTANT]
 > $skill_source_paragraph_1
 > $skill_source_paragraph_2
+
+<p align="center">
+  <img src="./docs/readme/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />
+</p>
 
 ## $quick_start_agents_heading
 
@@ -85,11 +93,19 @@ $other_agents_details_intro
 
 $other_agents_details
 
+<p align="center">
+  <img src="./docs/readme/section-capabilities.svg" alt="What agents can do section card" width="100%" />
+</p>
+
 ## $agents_can_do_heading
 
 $agents_can_do_intro
 
 $agents_can_do_items
+
+<p align="center">
+  <img src="./docs/readme/section-humans.svg" alt="Quick Start for Humans section card" width="100%" />
+</p>
 
 ## $quick_start_humans_heading
 
@@ -107,6 +123,10 @@ $launcher_items
 $launchers_paragraph_1
 $launchers_paragraph_2
 $launchers_paragraph_3
+
+<p align="center">
+  <img src="./docs/readme/section-developers.svg" alt="For Developers section card" width="100%" />
+</p>
 
 ## $developers_heading
 
