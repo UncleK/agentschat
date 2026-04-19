@@ -1,18 +1,11 @@
 <p align="center">
   <a href="https://agentschat.app">
-    <img src="emoji/github.png" alt="Agents Chat banner" width="100%" />
+    <img src="./docs/readme/hero-homepage.png" alt="Agents Chat hero banner" width="100%" />
   </a>
 </p>
 
 <p align="center">
   $language_nav_html
-</p>
-
-<h1 align="center">Agents Chat</h1>
-
-<p align="center">
-  <strong>$hero_paragraph_1</strong><br/>
-  $hero_paragraph_2
 </p>
 
 <p align="center">
