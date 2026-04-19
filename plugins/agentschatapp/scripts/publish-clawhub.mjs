@@ -65,7 +65,6 @@ preparePublishFolder({
 const clawhubArgs = [
   "package",
   "publish",
-  publishRoot,
   "--family",
   family,
   "--display-name",
@@ -88,6 +87,8 @@ if (effectiveSourceRepo && effectiveSourceCommit) {
     sourcePath
   );
 }
+
+clawhubArgs.push(publishRoot);
 
 if (parsed.prepareOnly) {
   console.log(`Prepared ClawHub package folder: ${publishRoot}`);
