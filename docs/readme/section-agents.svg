@@ -1,21 +1,24 @@
-<svg width="1200" height="210" viewBox="0 0 1200 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1200" height="132" viewBox="0 0 1200 132" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="40" y1="24" x2="1172" y2="194" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="26" y1="16" x2="1174" y2="116" gradientUnits="userSpaceOnUse">
       <stop stop-color="#161120"/>
       <stop offset="0.52" stop-color="#10141A"/>
       <stop offset="1" stop-color="#0A0E14"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(932 72) rotate(150.927) scale(252.224 130.765)">
-      <stop stop-color="#A855F7" stop-opacity="0.34"/>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(940 42) rotate(151.9) scale(226.17 90.28)">
+      <stop stop-color="#A855F7" stop-opacity="0.30"/>
       <stop offset="1" stop-color="#A855F7" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="1200" height="210" rx="28" fill="#0A0E14"/>
-  <rect x="10" y="10" width="1180" height="190" rx="22" fill="url(#bg)" stroke="#414754"/>
-  <rect x="10" y="10" width="1180" height="190" rx="22" fill="url(#glow)"/>
-  <rect x="42" y="42" width="176" height="30" rx="15" fill="#10141A" stroke="#414754"/>
-  <circle cx="64" cy="57" r="5" fill="#A855F7"/>
-  <text x="77" y="63" fill="#DFE2EB" font-family="Inter, 'Segoe UI', sans-serif" font-size="14" font-weight="600">For agents</text>
-  <text x="42" y="118" fill="#DFE2EB" font-family="'Space Grotesk', Inter, sans-serif" font-size="38" font-weight="700">Quick start for agents</text>
-  <text x="42" y="152" fill="#C1C6D7" font-family="Inter, 'Segoe UI', sans-serif" font-size="20">OpenClaw-native first, skill-based runtime fallback second, one launcher flow at a time.</text>
+  <rect width="1200" height="132" rx="24" fill="#0A0E14"/>
+  <rect x="8" y="8" width="1184" height="116" rx="18" fill="url(#bg)" stroke="#414754"/>
+  <rect x="8" y="8" width="1184" height="116" rx="18" fill="url(#glow)"/>
+  <rect x="34" y="34" width="144" height="28" rx="14" fill="#10141A" stroke="#414754"/>
+  <circle cx="56" cy="48" r="5" fill="#A855F7"/>
+  <text x="70" y="53" fill="#DFE2EB" font-family="Inter, 'Segoe UI', sans-serif" font-size="14" font-weight="600">Agent lane</text>
+  <text x="34" y="90" fill="#C1C6D7" font-family="Inter, 'Segoe UI', sans-serif" font-size="20">OpenClaw Native / Skill Runtime / Launcher Flow</text>
+  <rect x="916" y="34" width="84" height="12" rx="6" fill="#A855F7" fill-opacity="0.18"/>
+  <rect x="1020" y="34" width="142" height="12" rx="6" fill="#262A31"/>
+  <rect x="860" y="72" width="152" height="12" rx="6" fill="#262A31"/>
+  <rect x="1032" y="72" width="130" height="12" rx="6" fill="#A855F7" fill-opacity="0.14"/>
 </svg>

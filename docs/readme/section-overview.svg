@@ -1,21 +1,24 @@
-<svg width="1200" height="210" viewBox="0 0 1200 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1200" height="132" viewBox="0 0 1200 132" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="44" y1="28" x2="1168" y2="196" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="28" y1="18" x2="1172" y2="114" gradientUnits="userSpaceOnUse">
       <stop stop-color="#131C29"/>
-      <stop offset="0.55" stop-color="#10141A"/>
+      <stop offset="0.52" stop-color="#10141A"/>
       <stop offset="1" stop-color="#0A0E14"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(248 64) rotate(17.5) scale(236.369 119.96)">
-      <stop stop-color="#00DAF3" stop-opacity="0.30"/>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(250 42) rotate(19.4) scale(212.31 86.45)">
+      <stop stop-color="#00DAF3" stop-opacity="0.28"/>
       <stop offset="1" stop-color="#00DAF3" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="1200" height="210" rx="28" fill="#0A0E14"/>
-  <rect x="10" y="10" width="1180" height="190" rx="22" fill="url(#bg)" stroke="#414754"/>
-  <rect x="10" y="10" width="1180" height="190" rx="22" fill="url(#glow)"/>
-  <rect x="42" y="42" width="132" height="30" rx="15" fill="#10141A" stroke="#414754"/>
-  <circle cx="64" cy="57" r="5" fill="#00DAF3"/>
-  <text x="77" y="63" fill="#DFE2EB" font-family="Inter, 'Segoe UI', sans-serif" font-size="14" font-weight="600">Overview</text>
-  <text x="42" y="118" fill="#DFE2EB" font-family="'Space Grotesk', Inter, sans-serif" font-size="38" font-weight="700">Repository overview</text>
-  <text x="42" y="152" fill="#C1C6D7" font-family="Inter, 'Segoe UI', sans-serif" font-size="20">Client, backend, public skill package, and native OpenClaw plugin in one deep-dark release surface.</text>
+  <rect width="1200" height="132" rx="24" fill="#0A0E14"/>
+  <rect x="8" y="8" width="1184" height="116" rx="18" fill="url(#bg)" stroke="#414754"/>
+  <rect x="8" y="8" width="1184" height="116" rx="18" fill="url(#glow)"/>
+  <rect x="34" y="34" width="156" height="28" rx="14" fill="#10141A" stroke="#414754"/>
+  <circle cx="56" cy="48" r="5" fill="#00DAF3"/>
+  <text x="70" y="53" fill="#DFE2EB" font-family="Inter, 'Segoe UI', sans-serif" font-size="14" font-weight="600">Project scope</text>
+  <text x="34" y="90" fill="#C1C6D7" font-family="Inter, 'Segoe UI', sans-serif" font-size="20">Client / Server / Skill Package / OpenClaw Plugin</text>
+  <rect x="928" y="34" width="96" height="12" rx="6" fill="#00DAF3" fill-opacity="0.18"/>
+  <rect x="1044" y="34" width="118" height="12" rx="6" fill="#262A31"/>
+  <rect x="872" y="72" width="136" height="12" rx="6" fill="#262A31"/>
+  <rect x="1028" y="72" width="134" height="12" rx="6" fill="#00DAF3" fill-opacity="0.14"/>
 </svg>
