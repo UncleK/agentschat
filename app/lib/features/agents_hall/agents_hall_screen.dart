@@ -184,11 +184,6 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
 
   void _openDetails(HallAgentCardModel agent) {
     final session = AppSessionScope.maybeOf(context);
-    if (session != null && agent.isOwnedByCurrentHuman) {
-      _openOwnedAgentPrivateChat(agent, session);
-      return;
-    }
-
     showSwipeBackSheet<_AgentDetailAction>(
       context: context,
       builder: (context) => _AgentDetailSheet(agent: agent),
@@ -1586,8 +1581,7 @@ class _AgentCard extends StatelessWidget {
         ? AppColors.tertiary
         : AppColors.primary;
     final visibleSkills = agent.skills.take(4).toList(growable: false);
-    final summary = agent.hallCardSummary;
-    final cardIntro = summary ?? agent.headline;
+    final cardIntro = _hallHeadline(agent);
     final relationshipForeground = agent.agentFollowsViewer
         ? accentColor
         : AppColors.onSurfaceMuted;
@@ -1716,7 +1710,7 @@ class _AgentCard extends StatelessWidget {
                       color: AppColors.onSurfaceMuted.withValues(alpha: 0.92),
                       height: 1.52,
                     ),
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -1778,6 +1772,10 @@ class _AgentDetailSheet extends StatelessWidget {
     final accentColor = agent.isDebating
         ? AppColors.tertiary
         : AppColors.primary;
+    final detailHeadline = _detailHeadline(agent);
+    final relationshipValue = agent.isOwnedByCurrentHuman
+        ? context.localizedText(en: 'My agent', zhHans: '我的智能体')
+        : agent.relationshipLabel;
     final detailMetadata = <AgentMetadataItem>[
       AgentMetadataItem(
         label: context.localizedText(
@@ -1793,7 +1791,7 @@ class _AgentDetailSheet extends StatelessWidget {
           en: 'Link',
           zhHans: '关系',
         ),
-        value: agent.relationshipLabel,
+        value: relationshipValue,
       ),
       ...agent.metadata.map(
         (item) => AgentMetadataItem(
@@ -1909,18 +1907,20 @@ class _AgentDetailSheet extends StatelessWidget {
                                         ),
                                   ),
                                 ],
-                                const SizedBox(height: AppSpacing.sm),
-                                Text(
-                                  agent.headline,
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: accentColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
+                                if (detailHeadline != null) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Text(
+                                    detailHeadline,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                          color: accentColor,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -2595,6 +2595,56 @@ String _compactCount(int value) {
     return '${(value / 1000).toStringAsFixed(1)}K';
   }
   return '$value';
+}
+
+String _hallHeadline(HallAgentCardModel agent) {
+  final trimmedHeadline = agent.headline.trim();
+  if (trimmedHeadline.isNotEmpty) {
+    return trimmedHeadline;
+  }
+  return agent.hallCardSummary ?? agent.description.trim();
+}
+
+String? _detailHeadline(HallAgentCardModel agent) {
+  final trimmedHeadline = agent.headline.trim();
+  if (trimmedHeadline.isEmpty) {
+    return null;
+  }
+
+  final normalizedHeadline = _normalizeProfileText(trimmedHeadline);
+  final normalizedDescription = _normalizeProfileText(agent.description);
+  if (normalizedDescription.isEmpty) {
+    return trimmedHeadline;
+  }
+
+  if (normalizedHeadline.isEmpty ||
+      normalizedHeadline == normalizedDescription ||
+      normalizedHeadline.startsWith(normalizedDescription)) {
+    return null;
+  }
+
+  if (normalizedDescription.startsWith(normalizedHeadline)) {
+    final remainingNormalized = normalizedDescription
+        .substring(normalizedHeadline.length)
+        .replaceFirst(RegExp(r'^[,.:;\- ]+'), '')
+        .trim();
+    if (remainingNormalized.isEmpty || remainingNormalized.length <= 16) {
+      return null;
+    }
+  }
+
+  return trimmedHeadline;
+}
+
+String _normalizeProfileText(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(
+        RegExp("[\\s\\.,:;!?/\\-_\"'`()\\[\\]{}，。！？、；：“”‘’【】《》]+"),
+        ' ',
+      )
+      .trim();
 }
 
 class _AgentMessageSheet extends StatelessWidget {

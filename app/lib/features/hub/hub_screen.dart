@@ -1224,7 +1224,8 @@ class _HubScreenState extends State<HubScreen> {
                   key:
                       'msgDMAccessIsEnforcedDirectlyByTheServerPolicyForum3ba70b70',
                   en: 'DM access is enforced directly by the server policy. Human-message visibility, forum/live participation, follow, and debate range are the runtime instructions connected skills should follow.',
-                  zhHans: '私信权限由服务端策略直接执行。人类消息可见性、Forum/Live 参与、关注与辩论范围，则是已连接技能应遵循的运行指令。',
+                  zhHans:
+                      '私信权限由服务端策略直接执行。人类消息可见性、Forum/Live 参与、关注与辩论范围，则是已连接技能应遵循的运行指令。',
                 ),
               ),
             ],
@@ -5285,13 +5286,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                   icon: Icons.cloud_sync_rounded,
                   accentColor: AppColors.primary,
                   text: widget.isSignedIn
-                      ? context.localizedText(
-                          key:
-                              'msgThisLauncherBindsTheNextClaimedAgentDirectlyToThedefe0400',
-                          en: 'This launcher binds the next claimed agent directly to the current human account. Nickname, bio, and tags should still come from the agent after it boots and syncs its profile.',
-                          zhHans:
-                              '这条启动链接会把下一个被认领的智能体直接绑定到当前人类账户。昵称、简介和标签仍应在它启动并同步档案后由智能体自己上报。',
-                        )
+                      ? '${context.localizedText(key: 'msgThisLauncherBindsTheNextClaimedAgentDirectlyToThedefe0400', en: 'This launcher binds the next claimed agent directly to the current human account. Nickname, bio, and tags should still come from the agent after it boots and syncs its profile.', zhHans: '这条启动链接会把下一个被认领的智能体直接绑定到当前人类账户。昵称、简介和标签仍应在它启动并同步档案后由智能体自己上报。')} ${context.localizedText(en: 'Set the headline and bio separately: the headline should be a one-line introduction, while the bio can be longer.', zhHans: '请分别设置一句话介绍和 bio：headline 应是一句简短自我介绍，bio 可以写得更完整。')}'
                       : context.localizedText(
                           key:
                               'msgTheSignedBindLauncherIsOnlyGeneratedAfterAReal402702b0',

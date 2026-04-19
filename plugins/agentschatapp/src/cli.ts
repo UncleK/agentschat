@@ -2,6 +2,7 @@ import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
 
 import type { AgentsChatRuntimeContext } from "./context.js";
 import { DEFAULT_OPENCLAW_AGENT, DEFAULT_SERVER_BASE_URL, DEFAULT_SLOT, DEFAULT_TRANSPORT } from "./constants.js";
+import { draftInitialPublicProfile } from "./embedded.js";
 import {
   describeAgentsChatAccountConfiguredState,
   findAgentsChatAccount,
@@ -206,13 +207,39 @@ async function handleConnect(
   });
   account = mergeLauncherIntoAccount(account, opts.launcherUrl);
 
+  migrateLegacyStateIfNeeded(account.slot, runtimeContext.stateStore);
+  const priorState = loadSlotState(account.slot, runtimeContext.stateStore);
+  const isFirstPublicBootstrap = account.mode === "public"
+    && !isResumeCapableState(priorState)
+    && !priorState.agentId;
+  if (isFirstPublicBootstrap && (!account.handle || !account.displayName)) {
+    const draftedProfile = await draftInitialPublicProfile(runtimeContext, account);
+    account = {
+      ...account,
+      handle: account.handle ?? draftedProfile.handle,
+      displayName: account.displayName ?? draftedProfile.displayName
+    };
+    ctx.logger.info(
+      `Agents Chat slot '${account.slot}' drafted initial public profile as @${account.handle} (${account.displayName}).`
+    );
+  }
+
   const nextCfg = upsertAgentsChatAccount(runtimeContext.runtime.config.loadConfig(), account);
   await writeConfig(runtimeContext, nextCfg);
 
-  migrateLegacyStateIfNeeded(account.slot, runtimeContext.stateStore);
   clearWorkerConflict(account.slot);
   const nextState = await connectAccount(account, loadSlotState(account.slot, runtimeContext.stateStore), ctx.logger);
   saveSlotState(account.slot, nextState, runtimeContext.stateStore);
+  const persistedAccount = {
+    ...account,
+    handle: nextState.agentHandle ?? account.handle,
+    displayName: nextState.displayName ?? account.displayName,
+    bio: nextState.bio ?? account.bio,
+    profileTags: nextState.profileTags ?? account.profileTags,
+    avatarEmoji: nextState.avatarEmoji ?? account.avatarEmoji
+  };
+  const syncedCfg = upsertAgentsChatAccount(runtimeContext.runtime.config.loadConfig(), persistedAccount);
+  await writeConfig(runtimeContext, syncedCfg);
   if (account.autoStart !== false) {
     await reconcileManagedAccounts(runtimeContext, ctx.logger);
   }
@@ -225,6 +252,8 @@ async function handleConnect(
       agentId: nextState.agentId,
       mode: account.mode,
       serverBaseUrl: nextState.serverBaseUrl,
+      handle: nextState.agentHandle ?? persistedAccount.handle ?? null,
+      displayName: nextState.displayName ?? persistedAccount.displayName ?? null,
       autoStart: account.autoStart ?? true,
       resumeCapable: isResumeCapableState(nextState),
       pluginStateRoot: runtimeContext.pluginStateRoot
@@ -498,8 +527,8 @@ export function registerAgentsChatCli(
     .option("--slot <slot>", "Local Agents Chat slot", DEFAULT_SLOT)
     .option("--mode <mode>", "public or bound")
     .option("--server-base-url <url>", "Agents Chat server base URL", DEFAULT_SERVER_BASE_URL)
-    .option("--handle <handle>", "Preferred Agents Chat username")
-    .option("--display-name <name>", "Preferred display name")
+    .option("--handle <handle>", "Optional public Agents Chat handle override")
+    .option("--display-name <name>", "Optional public display name override")
     .option("--bio <bio>", "Preferred public bio")
     .option("--profile-tag <tag>", "Profile tag (repeatable)", collectStringOption, [])
     .option("--avatar-emoji <emoji>", "Emoji avatar to sync")

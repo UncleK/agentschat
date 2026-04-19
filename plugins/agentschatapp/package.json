@@ -1,6 +1,6 @@
 {
   "name": "agentschatapp",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Native OpenClaw channel plugin for agentschatapp",
   "license": "MIT",
   "type": "module",

@@ -13,6 +13,12 @@ const BANNED_VISIBLE_LINE_PATTERNS = [
     /^R[\d.]+[kKmM]?$/,
     /^\d+% ctx$/i
 ];
+const PROFILE_HINT_KEYS = new Set([
+    "handle",
+    "displayname",
+    "displayName"
+]);
+const HANDLE_SANITIZER = /[^a-z0-9-]+/g;
 function resolveFinalVisibleText(result) {
     const metaText = result.meta.finalAssistantVisibleText?.trim();
     if (metaText) {
@@ -62,6 +68,140 @@ function normalizeOptionalString(value) {
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : undefined;
 }
+function extractTextCandidate(payload) {
+    if (typeof payload === "string") {
+        return normalizeOptionalString(payload);
+    }
+    if (Array.isArray(payload)) {
+        for (let index = payload.length - 1; index >= 0; index -= 1) {
+            const candidate = extractTextCandidate(payload[index]);
+            if (candidate) {
+                return candidate;
+            }
+        }
+        return undefined;
+    }
+    const record = asRecord(payload);
+    for (const key of ["text", "content", "message", "reply", "output", "assistantText", "finalText"]) {
+        if (key in record) {
+            const candidate = extractTextCandidate(record[key]);
+            if (candidate) {
+                return candidate;
+            }
+        }
+    }
+    for (const key of ["result", "final", "response", "assistant", "data"]) {
+        if (key in record) {
+            const candidate = extractTextCandidate(record[key]);
+            if (candidate) {
+                return candidate;
+            }
+        }
+    }
+    return undefined;
+}
+function extractProfileCandidate(payload) {
+    if (Array.isArray(payload)) {
+        for (let index = payload.length - 1; index >= 0; index -= 1) {
+            const candidate = extractProfileCandidate(payload[index]);
+            if (candidate) {
+                return candidate;
+            }
+        }
+        return undefined;
+    }
+    const record = asRecord(payload);
+    if (Object.keys(record).some((key) => PROFILE_HINT_KEYS.has(key))) {
+        return record;
+    }
+    for (const key of ["result", "final", "response", "assistant", "data", "profile"]) {
+        if (key in record) {
+            const candidate = extractProfileCandidate(record[key]);
+            if (candidate) {
+                return candidate;
+            }
+        }
+    }
+    return undefined;
+}
+function parseJsonObjectCandidate(value) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+        return undefined;
+    }
+    try {
+        return asRecord(JSON.parse(trimmed));
+    }
+    catch {
+        const match = trimmed.match(/\{[\s\S]*\}/);
+        if (!match) {
+            return undefined;
+        }
+        try {
+            return asRecord(JSON.parse(match[0]));
+        }
+        catch {
+            return undefined;
+        }
+    }
+}
+function normalizeDraftHandle(value, slot) {
+    const normalized = String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(HANDLE_SANITIZER, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 64);
+    if (normalized.length >= 2 && /^[a-z0-9]/.test(normalized)) {
+        return normalized;
+    }
+    const slotFallback = slot
+        .trim()
+        .toLowerCase()
+        .replace(HANDLE_SANITIZER, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 64);
+    return slotFallback.length >= 2 ? slotFallback : "agent";
+}
+function normalizeDraftDisplayName(value, slot) {
+    const normalized = normalizeOptionalString(value);
+    if (normalized) {
+        return normalized.slice(0, 120);
+    }
+    const fallback = slot
+        .replace(/[-_]+/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter((part) => part.length > 0)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+    return (fallback || "New Agent").slice(0, 120);
+}
+function buildProfileBootstrapPrompt(account) {
+    const preferredHandle = account.handle ? `- preferredHandle: ${account.handle}\n` : "";
+    const preferredDisplayName = account.displayName ? `- preferredDisplayName: ${account.displayName}\n` : "";
+    return [
+        "You are joining Agents Chat for the first time.",
+        "Choose your own public username and nickname.",
+        "Return JSON only with exactly these keys:",
+        '{"handle":"lowercase-handle","displayName":"Display Name"}',
+        "",
+        "Rules:",
+        "- handle must feel distinct, agent-native, and memorable.",
+        "- handle can only use lowercase letters, numbers, and hyphens.",
+        "- displayName is the public nickname shown in the app.",
+        "- If preferredHandle is provided, keep it unchanged.",
+        "- If preferredDisplayName is provided, keep it unchanged.",
+        "- Do not add markdown, code fences, explanations, or extra keys.",
+        "",
+        "Context:",
+        `- local slot: ${account.slot}`,
+        `- OpenClaw agent id: ${account.openclawAgent}`,
+        preferredHandle + preferredDisplayName
+    ].join("\n").trim();
+}
 function resolvePrimaryModelSelection(value) {
     if (typeof value === "string") {
         return normalizeOptionalString(value);
@@ -106,6 +246,61 @@ export function buildSessionKey(account, kind, threadId) {
         return `agentschatapp:${account.openclawAgent}:${threadId}`;
     }
     return `agentschatapp:${account.openclawAgent}:${kind}:${threadId}`;
+}
+export async function draftInitialPublicProfile(context, account) {
+    const cfg = context.runtime.config.loadConfig();
+    const sessionKey = buildSessionKey(account, "planner", `${account.slot}:profile-bootstrap`);
+    const sessionId = buildStableSessionId(sessionKey);
+    const agentDir = context.runtime.agent.resolveAgentDir(cfg, account.openclawAgent);
+    const workspaceDir = context.runtime.agent.resolveAgentWorkspaceDir(cfg, account.openclawAgent);
+    const modelSelection = resolveEmbeddedModelSelection(cfg, account.openclawAgent, context.runtime.agent.defaults.provider, context.runtime.agent.defaults.model);
+    await context.runtime.agent.ensureAgentWorkspace({ dir: workspaceDir, ensureBootstrapFiles: true });
+    const sessionFile = context.runtime.agent.session.resolveSessionFilePath(sessionId, undefined, {
+        agentId: account.openclawAgent
+    });
+    const result = await context.runtime.agent.runEmbeddedPiAgent({
+        sessionId,
+        sessionKey,
+        agentId: account.openclawAgent,
+        messageChannel: "agentschatapp",
+        messageProvider: "agentschatapp",
+        agentAccountId: account.slot,
+        messageTo: `profile-bootstrap:${account.slot}`,
+        messageThreadId: `${account.slot}:profile-bootstrap`,
+        agentDir,
+        config: cfg,
+        sessionFile,
+        workspaceDir,
+        prompt: buildProfileBootstrapPrompt(account),
+        provider: modelSelection.provider,
+        model: modelSelection.model,
+        disableMessageTool: true,
+        requireExplicitMessageTarget: true,
+        allowGatewaySubagentBinding: false,
+        trigger: "user",
+        timeoutMs: context.runtime.agent.resolveAgentTimeoutMs({ cfg }),
+        runId: randomUUID(),
+        fastMode: false,
+        bootstrapContextMode: "lightweight",
+        bootstrapContextRunKind: "default",
+        extraSystemPrompt: "",
+        silentExpected: true
+    });
+    const profileCandidate = extractProfileCandidate(result)
+        ?? parseJsonObjectCandidate(sanitizeVisibleText(resolveFinalVisibleText(result)))
+        ?? parseJsonObjectCandidate(extractTextCandidate(result) ?? "");
+    const rawHandle = normalizeOptionalString(profileCandidate?.handle);
+    const rawDisplayName = normalizeOptionalString(profileCandidate?.displayName);
+    if (!account.handle && !rawHandle) {
+        throw new Error("OpenClaw embedded profile bootstrap did not return a handle.");
+    }
+    if (!account.displayName && !rawDisplayName) {
+        throw new Error("OpenClaw embedded profile bootstrap did not return a displayName.");
+    }
+    return {
+        handle: account.handle ?? normalizeDraftHandle(profileCandidate?.handle, account.slot),
+        displayName: account.displayName ?? normalizeDraftDisplayName(profileCandidate?.displayName, account.slot)
+    };
 }
 export async function runEmbeddedReply(context, params) {
     const cfg = context.runtime.config.loadConfig();
