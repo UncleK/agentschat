@@ -20,6 +20,7 @@ void main() {
     Size surfaceSize = const Size(430, 932),
     AppSessionController? controller,
     DebateRepository? debateRepository,
+    ValueChanged<VoidCallback?>? onInitiateActionChanged,
   }) async {
     await tester.binding.setSurfaceSize(surfaceSize);
     addTearDown(() async {
@@ -31,6 +32,7 @@ void main() {
       showInlineInitiateButton: false,
       initialPanel: initialPanel,
       debateRepository: debateRepository,
+      onInitiateActionChanged: onInitiateActionChanged,
     );
 
     await tester.pumpWidget(
@@ -274,6 +276,76 @@ void main() {
       expect(find.byKey(const Key('debate-end-button')), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'initiate action refreshes live data before blocking on an empty roster',
+    (tester) async {
+      final authRepository = FakeAuthRepository();
+      final agentsRepository = FakeAgentsRepository();
+      final controller = AppSessionController(
+        apiClient: FakeApiClient(),
+        authRepository: authRepository,
+        agentsRepository: agentsRepository,
+        storage: InMemoryAppSessionStorage(),
+      );
+      final repository = _SequencedDebateRepository([
+        DebateViewModel.empty(),
+        DebateViewModel.sample(),
+      ]);
+      VoidCallback? initiateAction;
+
+      addTearDown(controller.dispose);
+
+      authRepository.enqueueFetchMe((token) async {
+        return signedInState(
+          token: token,
+          userId: 'usr-debate',
+          displayName: 'Debate Host',
+          recommendedActiveAgentId: 'agt-shell',
+        );
+      });
+      agentsRepository.enqueueReadMine(
+        () async => mineResponse(
+          agents: [
+            agentSummary(
+              id: 'agt-shell',
+              handle: '@shell',
+              displayName: 'Shell Agent',
+              status: 'online',
+            ),
+          ],
+        ),
+      );
+      await controller.authenticate(
+        signedInState(
+          token: 'token-debate',
+          userId: 'usr-debate',
+          displayName: 'Debate Host',
+          recommendedActiveAgentId: 'agt-shell',
+        ),
+      );
+
+      await pumpDebateScreen(
+        tester,
+        viewModel: DebateViewModel.empty(),
+        controller: controller,
+        debateRepository: repository,
+        onInitiateActionChanged: (action) {
+          initiateAction = action;
+        },
+      );
+
+      expect(initiateAction, isNotNull);
+
+      initiateAction!.call();
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('debate-topic-input')), findsOneWidget);
+      expect(repository.readCount, greaterThanOrEqualTo(2));
+      expect(repository.lastActiveAgentId, 'agt-shell');
+    },
+  );
 }
 
 class _StaticDebateRepository extends DebateRepository {
@@ -287,6 +359,7 @@ class _StaticDebateRepository extends DebateRepository {
     required String viewerId,
     required String viewerName,
     String? preferredSessionId,
+    String? activeAgentId,
     bool usePublicDirectory = false,
   }) async {
     return preferredSessionId == null || preferredSessionId.isEmpty
@@ -332,11 +405,40 @@ class _TrackingDebateRepository extends DebateRepository {
     required String viewerId,
     required String viewerName,
     String? preferredSessionId,
+    String? activeAgentId,
     bool usePublicDirectory = false,
   }) async {
     readCount += 1;
     lastUsePublicDirectory = usePublicDirectory;
     return DebateViewModel.sample();
+  }
+}
+
+class _SequencedDebateRepository extends DebateRepository {
+  _SequencedDebateRepository(this._viewModels)
+    : super(apiClient: ApiClient(baseUrl: 'http://localhost'));
+
+  final List<DebateViewModel> _viewModels;
+  int readCount = 0;
+  String? lastActiveAgentId;
+
+  @override
+  Future<DebateViewModel> readViewModel({
+    required String viewerId,
+    required String viewerName,
+    String? preferredSessionId,
+    String? activeAgentId,
+    bool usePublicDirectory = false,
+  }) async {
+    lastActiveAgentId = activeAgentId;
+    final index = readCount < _viewModels.length
+        ? readCount
+        : _viewModels.length - 1;
+    readCount += 1;
+    final viewModel = _viewModels[index];
+    return preferredSessionId == null || preferredSessionId.isEmpty
+        ? viewModel
+        : viewModel.selectSession(preferredSessionId);
   }
 }
 

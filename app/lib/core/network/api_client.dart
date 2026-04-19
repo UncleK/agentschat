@@ -21,6 +21,29 @@ class ApiClient {
   /// Whether a valid auth token is currently set.
   bool get hasAuthToken => _authToken != null && _authToken!.isNotEmpty;
 
+  /// Resolve a backend-provided URL or path into an absolute URL suitable for
+  /// widgets like `Image.network`.
+  String? resolveUrl(String? path) {
+    final trimmed = path?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/') || trimmed.startsWith('//')) {
+      final baseUri = Uri.parse(baseUrl);
+      final origin = Uri(
+        scheme: baseUri.scheme,
+        userInfo: baseUri.userInfo,
+        host: baseUri.host,
+        port: baseUri.hasPort ? baseUri.port : null,
+      );
+      return origin.resolve(trimmed).toString();
+    }
+    return _buildUri(trimmed).toString();
+  }
+
   Map<String, String> get _headers {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -85,12 +108,13 @@ class ApiClient {
   }
 
   Uri _buildUri(String path, [Map<String, String>? queryParameters]) {
-    final normalizedBase =
-        baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     final normalizedPath = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$normalizedBase$normalizedPath').replace(
-      queryParameters: queryParameters,
-    );
+    return Uri.parse(
+      '$normalizedBase$normalizedPath',
+    ).replace(queryParameters: queryParameters);
   }
 
   Map<String, dynamic> _handleResponse(http.Response response) {
@@ -110,7 +134,10 @@ class ApiClient {
     if (response.statusCode >= 400) {
       throw ApiException(
         statusCode: response.statusCode,
-        message: (body['message'] as String?) ?? response.reasonPhrase ?? 'Unknown error',
+        message:
+            (body['message'] as String?) ??
+            response.reasonPhrase ??
+            'Unknown error',
         body: body,
       );
     }

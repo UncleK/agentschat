@@ -9,12 +9,18 @@ interface StoredObjectMetadata {
 
 @Injectable()
 export class AssetStorageService implements OnModuleInit {
+  private static readonly emptyPayloadHash =
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+  private readonly ensuredBuckets = new Set<string>();
+
   constructor(
     @Inject(APP_ENVIRONMENT)
     private readonly environment: AppEnvironment,
   ) {}
 
-  async onModuleInit(): Promise<void> {}
+  async onModuleInit(): Promise<void> {
+    await this.ensureBucketExists(this.environment.minio.bucket);
+  }
 
   createPresignedUploadUrl(input: {
     bucket: string;
@@ -82,6 +88,83 @@ export class AssetStorageService implements OnModuleInit {
     };
   }
 
+  async readObject(input: {
+    bucket: string;
+    key: string;
+  }): Promise<{
+    body: Buffer;
+    mimeType: string | null;
+    byteSize: number;
+  } | null> {
+    const response = await this.fetchSignedStorageRequest({
+      method: 'GET',
+      bucket: input.bucket,
+      key: input.key,
+    });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `Storage GET object failed with status ${response.status}.`,
+      );
+    }
+
+    const body = Buffer.from(await response.arrayBuffer());
+    return {
+      body,
+      mimeType: response.headers.get('content-type'),
+      byteSize: body.byteLength,
+    };
+  }
+
+  async ensureBucketExists(bucket: string): Promise<void> {
+    const normalizedBucket = bucket.trim();
+
+    if (!normalizedBucket || this.ensuredBuckets.has(normalizedBucket)) {
+      return;
+    }
+
+    const existingBucketResponse = await this.fetchSignedStorageRequest({
+      method: 'HEAD',
+      bucket: normalizedBucket,
+      payloadHash: AssetStorageService.emptyPayloadHash,
+    });
+
+    if (existingBucketResponse.ok || existingBucketResponse.status === 403) {
+      this.ensuredBuckets.add(normalizedBucket);
+      return;
+    }
+
+    if (existingBucketResponse.status !== 404) {
+      throw new Error(
+        `Storage bucket probe failed for ${normalizedBucket} with status ${existingBucketResponse.status}.`,
+      );
+    }
+
+    const createBucketResponse = await this.fetchSignedStorageRequest({
+      method: 'PUT',
+      bucket: normalizedBucket,
+      payloadHash: AssetStorageService.emptyPayloadHash,
+    });
+
+    if (
+      createBucketResponse.ok ||
+      createBucketResponse.status === 409 ||
+      createBucketResponse.status === 403
+    ) {
+      this.ensuredBuckets.add(normalizedBucket);
+      return;
+    }
+
+    const responseText = await createBucketResponse.text();
+    throw new Error(
+      `Storage bucket create failed for ${normalizedBucket} with status ${createBucketResponse.status}${responseText ? `: ${responseText}` : '.'}`,
+    );
+  }
+
   private createPresignedUrl(input: {
     method: 'GET' | 'HEAD' | 'PUT';
     bucket: string;
@@ -137,17 +220,22 @@ export class AssetStorageService implements OnModuleInit {
   }
 
   private async fetchSignedStorageRequest(input: {
-    method: 'GET' | 'HEAD';
+    method: 'GET' | 'HEAD' | 'PUT';
     bucket: string;
-    key: string;
+    key?: string;
+    payloadHash?: string;
   }): Promise<Response> {
     const timestamp = new Date();
     const canonicalUri = this.buildCanonicalUri(input.bucket, input.key);
     const amzDate = this.formatAmzDate(timestamp);
     const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+    const payloadHash =
+      input.payloadHash ?? (input.method === 'PUT'
+        ? AssetStorageService.emptyPayloadHash
+        : 'UNSIGNED-PAYLOAD');
     const canonicalHeaders = [
       `host:${this.host}`,
-      'x-amz-content-sha256:UNSIGNED-PAYLOAD',
+      `x-amz-content-sha256:${payloadHash}`,
       `x-amz-date:${amzDate}`,
       '',
     ].join('\n');
@@ -157,7 +245,7 @@ export class AssetStorageService implements OnModuleInit {
       canonicalQuery: '',
       canonicalHeaders,
       signedHeaders,
-      payloadHash: 'UNSIGNED-PAYLOAD',
+      payloadHash,
     });
     const signature = this.signString(
       this.buildStringToSign(timestamp, canonicalRequest),
@@ -166,13 +254,14 @@ export class AssetStorageService implements OnModuleInit {
 
     return fetch(`${this.baseUrl}${canonicalUri}`, {
       method: input.method,
+      body: input.method === 'PUT' ? '' : undefined,
       headers: {
         Authorization: this.buildAuthorizationHeader(
           signedHeaders,
           signature,
           timestamp,
         ),
-        'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+        'x-amz-content-sha256': payloadHash,
         'x-amz-date': amzDate,
       },
     });

@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_locale.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../../l10n/generated/app_localizations_en.dart';
-import '../../l10n/generated/app_localizations_zh.dart';
+import '../../l10n/generated/runtime_message_catalog.dart';
 
 extension AppLocalizationBuildContextX on BuildContext {
   AppLocalizations get l10n {
@@ -14,31 +13,42 @@ extension AppLocalizationBuildContextX on BuildContext {
     if (localization != null) {
       return localization;
     }
-    return isChineseLocale(appLocale)
-        ? AppLocalizationsZh()
-        : AppLocalizationsEn();
+    return lookupAppLocalizations(
+      resolveSupportedAppLocale(appLocale, AppLocalizations.supportedLocales),
+    );
   }
 
-  Locale get appLocale =>
-      Localizations.maybeLocaleOf(this) ?? effectiveAppLocale();
+  Locale get appLocale => resolveSupportedAppLocale(
+    Localizations.maybeLocaleOf(this) ?? effectiveAppLocale(),
+    AppLocalizations.supportedLocales,
+  );
 
-  bool get usesChineseTypography => isChineseLocale(appLocale);
+  bool get usesWideGlyphTypography => usesCjkTypographyLocale(appLocale);
 
   String localizedText({
     required String en,
     required String zhHans,
+    String? key,
+    Map<String, Object?> args = const <String, Object?>{},
   }) {
-    return usesChineseTypography ? zhHans : en;
+    if (key != null) {
+      final translated = lookupRuntimeMessage(
+        locale: appLocale,
+        key: key,
+        args: args,
+      );
+      if (translated != null) {
+        return translated;
+      }
+    }
+    return isChineseLocale(appLocale) ? zhHans : en;
   }
 
   String localeAwareCaps(String value) {
-    return usesChineseTypography ? value : value.toUpperCase();
+    return usesWideGlyphTypography ? value : value.toUpperCase();
   }
 
-  double localeAwareLetterSpacing({
-    required double latin,
-    double chinese = 0,
-  }) {
-    return usesChineseTypography ? chinese : latin;
+  double localeAwareLetterSpacing({required double latin, double chinese = 0}) {
+    return usesWideGlyphTypography ? chinese : latin;
   }
 }

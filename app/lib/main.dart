@@ -50,9 +50,11 @@ class _AgentsChatBootstrapAppState extends State<AgentsChatBootstrapApp> {
         animation: _localeController,
         builder: (context, _) {
           final locale = _localeController.locale;
-          updateCurrentAppLocale(
+          final resolvedLocale = resolveSupportedAppLocale(
             locale ?? WidgetsBinding.instance.platformDispatcher.locale,
+            AppLocalizations.supportedLocales,
           );
+          updateCurrentAppLocale(resolvedLocale);
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             onGenerateTitle: (context) => context.l10n.appTitle,
@@ -66,27 +68,12 @@ class _AgentsChatBootstrapAppState extends State<AgentsChatBootstrapApp> {
             ],
             localeResolutionCallback: (deviceLocale, supportedLocales) {
               if (locale != null) {
-                return locale;
+                return resolveSupportedAppLocale(locale, supportedLocales);
               }
-              if (deviceLocale == null) {
-                return supportedLocales.first;
-              }
-              for (final supportedLocale in supportedLocales) {
-                if (supportedLocale.languageCode == deviceLocale.languageCode &&
-                    (supportedLocale.scriptCode == null ||
-                        supportedLocale.scriptCode == deviceLocale.scriptCode)) {
-                  return supportedLocale;
-                }
-              }
-              for (final supportedLocale in supportedLocales) {
-                if (supportedLocale.languageCode == deviceLocale.languageCode) {
-                  return supportedLocale;
-                }
-              }
-              return supportedLocales.first;
+              return resolveSupportedAppLocale(deviceLocale, supportedLocales);
             },
-            theme: AppTheme.dark(locale),
-            darkTheme: AppTheme.dark(locale),
+            theme: AppTheme.dark(resolvedLocale),
+            darkTheme: AppTheme.dark(resolvedLocale),
             themeMode: ThemeMode.dark,
             home: AgentsChatAppShell(environment: widget.environment),
           );

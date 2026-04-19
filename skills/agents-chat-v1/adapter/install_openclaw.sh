@@ -9,6 +9,8 @@ SLOT=""
 HANDLE=""
 DISPLAY_NAME=""
 BIO=""
+AVATAR_EMOJI=""
+AVATAR_FILE=""
 PROFILE_TAGS_JSON=""
 OPENCLAW_AGENT=""
 OPENCLAW_BIN="openclaw"
@@ -57,6 +59,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --bio)
       BIO="$2"
+      shift 2
+      ;;
+    --avatar-emoji)
+      AVATAR_EMOJI="$2"
+      shift 2
+      ;;
+    --avatar-file)
+      AVATAR_FILE="$2"
       shift 2
       ;;
     --profile-tags-json)
@@ -239,7 +249,7 @@ if [ ! -f "$PROFILE_BOOTSTRAP_SCRIPT" ]; then
   exit 1
 fi
 
-if [ -z "$HANDLE" ] || [ -z "$DISPLAY_NAME" ] || [ -z "$BIO" ] || [ -z "$PROFILE_TAGS_JSON" ]; then
+if [ -z "$HANDLE" ] || [ -z "$DISPLAY_NAME" ] || [ -z "$BIO" ] || [ -z "$AVATAR_EMOJI" ] || [ -z "$PROFILE_TAGS_JSON" ]; then
   profile_json="$("$PYTHON_BIN" "$PROFILE_BOOTSTRAP_SCRIPT" --slot "$SLOT" --openclaw-agent "$OPENCLAW_AGENT" --openclaw-bin "$OPENCLAW_BIN")"
   if [ -z "$HANDLE" ]; then
     HANDLE="$("$PYTHON_BIN" - "$profile_json" <<'PY'
@@ -268,6 +278,15 @@ print(payload.get("bio", ""))
 PY
 )"
   fi
+  if [ -z "$AVATAR_EMOJI" ]; then
+    AVATAR_EMOJI="$("$PYTHON_BIN" - "$profile_json" <<'PY'
+import json
+import sys
+payload = json.loads(sys.argv[1])
+print(payload.get("avatarEmoji", ""))
+PY
+)"
+  fi
   if [ -z "$PROFILE_TAGS_JSON" ]; then
     PROFILE_TAGS_JSON="$("$PYTHON_BIN" - "$profile_json" <<'PY'
 import json
@@ -288,6 +307,12 @@ if [ -n "$DISPLAY_NAME" ]; then
 fi
 if [ -n "$BIO" ]; then
   set -- "$@" --bio "$BIO"
+fi
+if [ -n "$AVATAR_EMOJI" ]; then
+  set -- "$@" --avatar-emoji "$AVATAR_EMOJI"
+fi
+if [ -n "$AVATAR_FILE" ]; then
+  set -- "$@" --avatar-file "$AVATAR_FILE"
 fi
 if [ -n "$PROFILE_TAGS_JSON" ]; then
   set -- "$@" --profile-tags-json "$PROFILE_TAGS_JSON"

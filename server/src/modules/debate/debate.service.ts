@@ -63,7 +63,9 @@ interface PreparedTurnSubmission {
 
 @Injectable()
 export class DebateService {
-  private readonly defaultTurnDeadlineMs = 60_000;
+  private readonly defaultTurnDeadlineMs = 200_000;
+  private readonly defaultDebateDurationMs = 24 * 60 * 60 * 1000;
+  private readonly defaultTurnsPerSideLimit = 200;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -305,6 +307,7 @@ export class DebateService {
         {
           status: DebateSessionStatus.Live,
           currentTurnNumber: debateTurn.turnNumber,
+          startedAt: debateSession.startedAt ?? new Date(),
         },
       );
 
@@ -501,7 +504,6 @@ export class DebateService {
     const result = await this.dataSource.transaction(async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
-      const debateTurnRepository = manager.getRepository(DebateTurnEntity);
       const debateSession = await debateSessionRepository.findOneBy({
         id: debateSessionId,
       });
@@ -523,55 +525,14 @@ export class DebateService {
         );
       }
 
-      const currentTurn = await debateTurnRepository.findOneBy({
-        debateSessionId: debateSession.id,
-        turnNumber: debateSession.currentTurnNumber,
-      });
-
-      if (currentTurn && currentTurn.status === DebateTurnStatus.Pending) {
-        await debateTurnRepository.update(
-          { id: currentTurn.id },
-          {
-            status: DebateTurnStatus.Skipped,
-            deadlineAt: null,
-            metadata: {
-              ...currentTurn.metadata,
-              endedAt: new Date().toISOString(),
-            },
-          },
-        );
-      }
-
-      await debateSessionRepository.update(
-        { id: debateSession.id },
-        {
-          status: DebateSessionStatus.Ended,
-        },
-      );
-
-      const endedEvent = await this.createDebateEvent(
+      return this.finalizeDebateSession(
         manager,
         debateSession,
-        'debate.ended',
-        this.bindActor(actor),
         {
+          actor,
           finalTurnNumber: debateSession.currentTurnNumber,
         },
       );
-      const touchedAgentIds = await this.collectSessionAgentIds(
-        manager,
-        debateSession.id,
-      );
-
-      return {
-        debateSessionId: debateSession.id,
-        threadId: debateSession.threadId,
-        status: DebateSessionStatus.Ended,
-        currentTurnNumber: debateSession.currentTurnNumber,
-        eventId: endedEvent.id,
-        followUpEventIds: [] as string[],
-        touchedAgentIds,
-      };
     });
 
     await this.processEventIds([result.eventId]);
@@ -719,7 +680,19 @@ export class DebateService {
       });
 
       if (!debateSession || debateSession.status !== DebateSessionStatus.Live) {
-        return null;
+        if (!debateSession) {
+          return null;
+        }
+
+        return this.maybeAutoEndDebateSession(manager, debateSession);
+      }
+
+      const autoEnded = await this.maybeAutoEndDebateSession(
+        manager,
+        debateSession,
+      );
+      if (autoEnded) {
+        return autoEnded;
       }
 
       const currentTurn = await debateTurnRepository.findOneBy({
@@ -820,7 +793,11 @@ export class DebateService {
       return;
     }
 
-    await this.processEventIds(result.eventIds);
+    await this.processEventIds(
+      'eventIds' in result
+        ? result.eventIds
+        : [result.eventId, ...result.followUpEventIds],
+    );
     await this.syncAgentStatuses(result.touchedAgentIds);
   }
 
@@ -948,6 +925,9 @@ export class DebateService {
     const debateTurnRepository = manager.getRepository(DebateTurnEntity);
     const debateSessionRepository = manager.getRepository(DebateSessionEntity);
     const seats = await this.loadSeats(manager, input.debateSession.id);
+    const touchedAgentIds = seats
+      .map((seat) => seat.agentId)
+      .filter((agentId): agentId is string => Boolean(agentId));
 
     await debateTurnRepository.update(
       { id: input.debateTurn.id },
@@ -964,6 +944,17 @@ export class DebateService {
     );
 
     const nextTurnNumber = input.debateTurn.turnNumber + 1;
+    if (input.debateTurn.turnNumber >= this.maxTotalTurnCount()) {
+      return this.finalizeDebateSession(
+        manager,
+        input.debateSession,
+        {
+          reason: 'turn_limit_reached',
+          finalTurnNumber: input.debateTurn.turnNumber,
+          currentTurnNumber: input.debateTurn.turnNumber,
+        },
+      );
+    }
 
     if (seats.length < 2) {
       await debateSessionRepository.update(
@@ -975,6 +966,7 @@ export class DebateService {
 
       return {
         followUpEventIds: [] as string[],
+        touchedAgentIds,
       };
     }
 
@@ -1014,6 +1006,7 @@ export class DebateService {
 
       return {
         followUpEventIds: [replacementNeededEvent.id, pausedEvent.id],
+        touchedAgentIds,
       };
     }
 
@@ -1040,7 +1033,12 @@ export class DebateService {
 
     return {
       followUpEventIds: [assignedEvent.id],
+      touchedAgentIds,
     };
+  }
+
+  async syncSessionAgentStatuses(agentIds: string[]): Promise<void> {
+    await this.syncAgentStatuses(agentIds);
   }
 
   async assertSpectatorCommentAllowed(
@@ -1707,6 +1705,123 @@ export class DebateService {
 
   private buildTurnDeadline() {
     return new Date(Date.now() + this.defaultTurnDeadlineMs);
+  }
+
+  private maxTotalTurnCount(): number {
+    return this.defaultTurnsPerSideLimit * 2;
+  }
+
+  private getDebateStartTime(debateSession: DebateSessionEntity): Date {
+    return debateSession.startedAt ?? debateSession.createdAt;
+  }
+
+  private isDebateDurationExceeded(
+    debateSession: DebateSessionEntity,
+    referenceTime = Date.now(),
+  ): boolean {
+    return (
+      referenceTime - this.getDebateStartTime(debateSession).getTime() >=
+      this.defaultDebateDurationMs
+    );
+  }
+
+  private async maybeAutoEndDebateSession(
+    manager: EntityManager,
+    debateSession: DebateSessionEntity,
+  ) {
+    if (
+      debateSession.status !== DebateSessionStatus.Live &&
+      debateSession.status !== DebateSessionStatus.Paused
+    ) {
+      return null;
+    }
+
+    if (this.isDebateDurationExceeded(debateSession)) {
+      return this.finalizeDebateSession(manager, debateSession, {
+        reason: 'duration_limit_reached',
+      });
+    }
+
+    if (debateSession.currentTurnNumber > this.maxTotalTurnCount()) {
+      return this.finalizeDebateSession(manager, debateSession, {
+        reason: 'turn_limit_reached',
+        finalTurnNumber: this.maxTotalTurnCount(),
+        currentTurnNumber: this.maxTotalTurnCount(),
+      });
+    }
+
+    return null;
+  }
+
+  private async finalizeDebateSession(
+    manager: EntityManager,
+    debateSession: DebateSessionEntity,
+    options: {
+      actor?: DebateActor;
+      reason?: string;
+      finalTurnNumber?: number;
+      currentTurnNumber?: number;
+    } = {},
+  ) {
+    const debateSessionRepository = manager.getRepository(DebateSessionEntity);
+    const debateTurnRepository = manager.getRepository(DebateTurnEntity);
+    const currentTurn = await debateTurnRepository.findOneBy({
+      debateSessionId: debateSession.id,
+      turnNumber: debateSession.currentTurnNumber,
+    });
+
+    if (currentTurn && currentTurn.status === DebateTurnStatus.Pending) {
+      await debateTurnRepository.update(
+        { id: currentTurn.id },
+        {
+          status: DebateTurnStatus.Skipped,
+          deadlineAt: null,
+          metadata: {
+            ...currentTurn.metadata,
+            endedAt: new Date().toISOString(),
+            ...(options.reason ? { endedReason: options.reason } : {}),
+          },
+        },
+      );
+    }
+
+    const finalTurnNumber =
+      options.finalTurnNumber ?? debateSession.currentTurnNumber;
+    const currentTurnNumber =
+      options.currentTurnNumber ?? debateSession.currentTurnNumber;
+
+    await debateSessionRepository.update(
+      { id: debateSession.id },
+      {
+        status: DebateSessionStatus.Ended,
+        currentTurnNumber,
+      },
+    );
+
+    const endedEvent = await this.createDebateEvent(
+      manager,
+      debateSession,
+      'debate.ended',
+      options.actor ? this.bindActor(options.actor) : this.bindSystemActor(),
+      {
+        finalTurnNumber,
+        ...(options.reason ? { reason: options.reason } : {}),
+      },
+    );
+    const touchedAgentIds = await this.collectSessionAgentIds(
+      manager,
+      debateSession.id,
+    );
+
+    return {
+      debateSessionId: debateSession.id,
+      threadId: debateSession.threadId,
+      status: DebateSessionStatus.Ended,
+      currentTurnNumber,
+      eventId: endedEvent.id,
+      followUpEventIds: [] as string[],
+      touchedAgentIds,
+    };
   }
 
   private normalizeTurnNumber(value: unknown, fallback: number): number {

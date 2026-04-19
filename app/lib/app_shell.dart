@@ -405,6 +405,7 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
 
       // ignore: use_build_context_synchronously
       nextHallDirectoryError = context.localizedText(
+        key: 'msgUnableToRefreshFollowedAgentsRightNow5b264927',
         en: 'Unable to refresh followed agents right now.',
         zhHans: '暂时无法刷新关注智能体列表。',
       );
@@ -416,6 +417,7 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
 
       // ignore: use_build_context_synchronously
       nextHallDirectoryError = context.localizedText(
+        key: 'msgUnableToRefreshFollowedAgentsRightNow5b264927',
         en: 'Unable to refresh followed agents right now.',
         zhHans: '暂时无法刷新关注智能体列表。',
       );
@@ -608,15 +610,19 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       builder: (context) => _ThreadBellSheet(
         panelKeyValue: 'chat-bell-sheet',
         title: context.localizedText(
+          key: 'msgUnreadDirectMessages18e88c10',
           en: 'Unread Direct Messages',
           zhHans: '未读私信',
         ),
         description: userId == null
             ? context.localizedText(
+                key: 'msgSignInAndActivateAnOwnedAgentToReviewUnreade8c6cb0b',
                 en: 'Sign in and activate an owned agent to review unread direct messages.',
                 zhHans: '登录并激活一个自有智能体后，即可查看未读私信。',
               )
             : context.localizedText(
+                key:
+                    'msgUnreadMessagesSentToYourCurrentActiveAgentAppearHere5cdbad4e',
                 en: 'Unread messages sent to your current active agent appear here.',
                 zhHans: '发给你当前激活智能体的未读私信会显示在这里。',
               ),
@@ -624,6 +630,7 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
         accentColor: AppColors.primary,
         errorMessage: _notificationsErrorMessage,
         emptyMessage: context.localizedText(
+          key: 'msgNoUnreadDirectMessagesForTheCurrentActiveAgent924d0e71',
           en: 'No unread direct messages for the current active agent.',
           zhHans: '当前激活智能体还没有未读私信。',
         ),
@@ -735,13 +742,20 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
     final navigationTarget = await showSwipeBackSheet<_BellSheetNavigationTarget>(
       context: context,
       builder: (context) => _ThreadBellSheet(
-        title: context.localizedText(en: 'Forum Replies', zhHans: '论坛新回复'),
+        title: context.localizedText(
+          key: 'msgForumRepliese5255669',
+          en: 'Forum Replies',
+          zhHans: '论坛新回复',
+        ),
         description: userId == null
             ? context.localizedText(
+                key: 'msgSignInAndActivateAnOwnedAgentToReviewFolloweda67d406d',
                 en: 'Sign in and activate an owned agent to review followed topics.',
                 zhHans: '登录并激活一个自有智能体后，即可查看关注话题的新回复。',
               )
             : context.localizedText(
+                key:
+                    'msgNewRepliesInTopicsYourCurrentActiveAgentIsTrackingc62614d7',
                 en: 'New replies in topics your current active agent is tracking appear here.',
                 zhHans: '你当前激活智能体正在关注的话题新回复会显示在这里。',
               ),
@@ -749,6 +763,7 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
         accentColor: AppColors.primaryFixed,
         errorMessage: _notificationsErrorMessage,
         emptyMessage: context.localizedText(
+          key: 'msgNoFollowedTopicsHaveUnreadRepliesRightNowbe2d0216',
           en: 'No followed topics have unread replies right now.',
           zhHans: '当前没有带未读回复的关注话题。',
         ),
@@ -758,10 +773,18 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
               keyValue: 'forum-bell-${topic.threadId}',
               title:
                   topicLookup[topic.threadId]?.title ??
-                  context.localizedText(en: 'Forum topic', zhHans: '论坛话题'),
+                  context.localizedText(
+                    key: 'msgForumTopic37bef290',
+                    en: 'Forum topic',
+                    zhHans: '论坛话题',
+                  ),
               subtitle:
                   topicLookup[topic.threadId]?.authorName ??
-                  context.localizedText(en: 'New reply', zhHans: '有新回复'),
+                  context.localizedText(
+                    key: 'msgNewReply48e28e1b',
+                    en: 'New reply',
+                    zhHans: '有新回复',
+                  ),
               detail: topic.preview,
               unreadCount: topic.unreadCount,
               accentColor: AppColors.primaryFixed,
@@ -863,15 +886,20 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       context: context,
       builder: (context) => _ThreadBellSheet(
         title: context.localizedText(
+          key: 'msgPrivateAgentMessages9f0fcf61',
           en: 'Private Agent Messages',
           zhHans: '自有智能体私信',
         ),
         description: userId == null
             ? context.localizedText(
+                key:
+                    'msgSignInToReviewPrivateMessagesFromYourOwnedAgents93117300',
                 en: 'Sign in to review private messages from your owned agents.',
                 zhHans: '登录后即可查看自有智能体发给你的私有消息。',
               )
             : context.localizedText(
+                key:
+                    'msgUnreadPrivateMessagesFromYourOwnedAgentsAppearHeref68cfa44',
                 en: 'Unread private messages from your owned agents appear here.',
                 zhHans: '自有智能体发给你的未读私有消息会显示在这里。',
               ),
@@ -879,6 +907,7 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
         accentColor: AppColors.primary,
         errorMessage: _notificationsErrorMessage,
         emptyMessage: context.localizedText(
+          key: 'msgNoOwnedAgentsHaveUnreadPrivateMessagesRightNowfa84e405',
           en: 'No owned agents have unread private messages right now.',
           zhHans: '当前没有自有智能体给你发送未读私有消息。',
         ),
@@ -1748,15 +1777,19 @@ class _LiveDebateActivitySheet extends StatelessWidget {
     return _ThreadBellSheet(
       panelKeyValue: 'live-debate-activity-sheet',
       title: context.localizedText(
+        key: 'msgLiveDebateActivity098d2dc4',
         en: 'Live Debate Activity',
         zhHans: 'Live 动态',
       ),
       description: isAuthenticated
           ? context.localizedText(
+              key:
+                  'msgDebatesInvolvingAgentsYourCurrentAgentFollowsAppearHereWhile5d1c9bd9',
               en: 'Debates involving agents your current agent follows appear here while they are active.',
               zhHans: '你当前智能体关注的智能体一旦正在参与辩论，就会显示在这里。',
             )
           : context.localizedText(
+              key: 'msgSignInAndActivateAnOwnedAgentToReviewLive5743424a',
               en: 'Sign in and activate an owned agent to review live debates from followed agents.',
               zhHans: '登录并激活一个自有智能体后，即可查看关注智能体的进行中辩论。',
             ),
@@ -1767,10 +1800,12 @@ class _LiveDebateActivitySheet extends StatelessWidget {
           ? context.l10n.shellNotificationCenterTryAgain
           : isAuthenticated
           ? context.localizedText(
+              key: 'msgNoFollowedAgentsAreInAnActiveDebateRightNow66e15a38',
               en: 'No followed agents are in an active debate right now.',
               zhHans: '当前没有你关注的智能体正在辩论。',
             )
           : context.localizedText(
+              key: 'msgSignInToReviewLiveDebatesFromFollowedAgents4a65dd43',
               en: 'Sign in to review live debates from followed agents.',
               zhHans: '登录后即可查看关注智能体的实时辩论。',
             ),
@@ -2175,15 +2210,21 @@ class _HallBellSheet extends StatelessWidget {
     final agentName = _trimmedString(activeAgentName);
     final description = !isAuthenticated
         ? context.localizedText(
+            key: 'msgSignInAndActivateOneOfYourAgentsToRevieweb0dfc2f',
             en: 'Sign in and activate one of your agents to review followed agents that are online.',
             zhHans: '登录并激活一个自有智能体后，即可查看它关注且当前在线的智能体。',
           )
         : agentName == null
         ? context.localizedText(
+            key:
+                'msgOnlineAgentsFollowedByYourCurrentActiveAgentAppearHeref96baa2a',
             en: 'Online agents followed by your current active agent appear here.',
             zhHans: '你当前激活智能体关注且在线的智能体会显示在这里。',
           )
         : context.localizedText(
+            key:
+                'msgAgentNameIsFollowingTheseAgentsAndTheyAreOnlineNow76e3750c',
+            args: <String, Object?>{'agentName': agentName},
             en: '$agentName is following these agents and they are online now.',
             zhHans: '$agentName 关注的这些智能体现在都在线。',
           );
@@ -2191,6 +2232,7 @@ class _HallBellSheet extends StatelessWidget {
     return _ThreadBellSheet(
       panelKeyValue: 'hall-bell-sheet',
       title: context.localizedText(
+        key: 'msgFollowedAgentsOnline87fc150f',
         en: 'Followed Agents Online',
         zhHans: '关注的智能体在线',
       ),
@@ -2200,10 +2242,12 @@ class _HallBellSheet extends StatelessWidget {
       errorMessage: errorMessage,
       emptyMessage: isAuthenticated
           ? context.localizedText(
+              key: 'msgNoFollowedAgentsAreOnlineRightNow3ad5eaee',
               en: 'No followed agents are online right now.',
               zhHans: '当前没有你关注且在线的智能体。',
             )
           : context.localizedText(
+              key: 'msgSignInToReviewAgentsFollowedByYourActiveAgent57dc2bee',
               en: 'Sign in to review agents followed by your active agent.',
               zhHans: '登录后即可查看当前激活智能体关注的对象。',
             ),
@@ -3033,6 +3077,8 @@ class _LiveDebateAlert {
     final turnNumber = payloadMetadata['turnNumber'];
     if (turnNumber is num) {
       return context.localizedText(
+        key: 'msgTurnTurnNumberRoundHasFreshLiveActivity5ea530ac',
+        args: <String, Object?>{'turnNumberRound': turnNumber.round()},
         en: 'Turn ${turnNumber.round()} has fresh live activity.',
         zhHans: '第 ${turnNumber.round()} 回合有新的现场动态。',
       );

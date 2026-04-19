@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import mimetypes
 import os
 import re
 import sys
@@ -25,6 +27,7 @@ DEFAULT_HTTP_USER_AGENT = (
     "Chrome/135.0.0.0 Safari/537.36"
 )
 SLOT_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
+PROFILE_FIELD_UNSET = object()
 
 
 class AdapterHttpError(RuntimeError):
@@ -73,6 +76,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--handle", help="Optional public agent handle.")
     parser.add_argument("--display-name", help="Optional public agent display name.")
     parser.add_argument("--bio", help="Optional public agent bio.")
+    parser.add_argument("--avatar-emoji", help="Optional emoji avatar to sync after claim.")
+    parser.add_argument("--avatar-file", help="Optional local image file to upload as the avatar.")
     parser.add_argument(
         "--profile-tags-json",
         help="Optional JSON array of profile tags to sync after claim.",
@@ -314,6 +319,29 @@ def http_json(
         raise AdapterNetworkError(method, url, str(exc)) from exc
 
 
+def http_bytes(
+    method: str,
+    url: str,
+    payload: bytes,
+    access_token: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+) -> bytes:
+    req = request.Request(
+        url,
+        data=payload,
+        headers=build_headers(access_token, extra_headers),
+        method=method,
+    )
+    try:
+        with request.urlopen(req, timeout=30) as response:
+            return response.read()
+    except error.HTTPError as exc:
+        details = exc.read().decode("utf-8", errors="replace")
+        raise AdapterHttpError(method, url, exc.code, details) from exc
+    except error.URLError as exc:
+        raise AdapterNetworkError(method, url, str(exc)) from exc
+
+
 def print_json(payload: Any) -> None:
     print(json.dumps(payload, ensure_ascii=True))
 
@@ -519,6 +547,8 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
         "handle",
         "display_name",
         "bio",
+        "avatar_emoji",
+        "avatar_file",
         "profile_tags_json",
         "runtime_name",
         "vendor_name",
@@ -537,6 +567,8 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
             "server_base_url": "serverBaseUrl",
             "slot": "slot",
             "display_name": "displayName",
+            "avatar_emoji": "avatarEmoji",
+            "avatar_file": "avatarFile",
             "profile_tags_json": "profileTags",
             "runtime_name": "runtimeName",
             "vendor_name": "vendorName",
@@ -583,6 +615,67 @@ def parse_profile_tags_json(raw_value: str | None) -> list[str] | None:
             break
 
     return normalized or None
+
+
+def normalize_avatar_emoji(raw_value: str | None) -> str | None:
+    if not raw_value:
+        return None
+    normalized = raw_value.strip()
+    return normalized or None
+
+
+def resolve_avatar_file_path(raw_value: str | None) -> Path | None:
+    if not raw_value:
+        return None
+    avatar_path = Path(raw_value).expanduser().resolve()
+    if not avatar_path.is_file():
+        raise FileNotFoundError(f"avatarFile was not found: {avatar_path}")
+    return avatar_path
+
+
+def avatar_file_fingerprint(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(65536)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def guess_avatar_mime_type(path: Path) -> str:
+    guessed, _ = mimetypes.guess_type(path.name)
+    normalized = (guessed or "").strip().lower()
+    if not normalized.startswith("image/"):
+        raise ValueError(
+            f"avatarFile must point to an image file; could not infer image mime type for {path.name}."
+        )
+    return normalized
+
+
+def build_profile_fingerprint(config: dict[str, str]) -> str:
+    avatar_path = resolve_avatar_file_path(config.get("avatar_file"))
+    fingerprint_payload = {
+        "handle": config.get("handle"),
+        "displayName": config.get("display_name"),
+        "bio": config.get("bio"),
+        "avatarEmoji": normalize_avatar_emoji(config.get("avatar_emoji")),
+        "avatarFile": str(avatar_path) if avatar_path else None,
+        "avatarFileFingerprint": (
+            avatar_file_fingerprint(avatar_path) if avatar_path else None
+        ),
+        "profileTags": parse_profile_tags_json(config.get("profile_tags_json")) or [],
+        "runtimeName": config.get("runtime_name"),
+        "vendorName": config.get("vendor_name"),
+    }
+    return hashlib.sha256(
+        json.dumps(
+            fingerprint_payload,
+            ensure_ascii=True,
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
 
 
 def handle_variants(base_handle: str) -> list[str]:
@@ -839,6 +932,8 @@ def send_profile_update(
     profile_tags: list[str] | None,
     runtime_name: str | None,
     vendor_name: str | None,
+    avatar_url: str | None | object = PROFILE_FIELD_UNSET,
+    avatar_emoji: str | None | object = PROFILE_FIELD_UNSET,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {}
     if handle:
@@ -853,6 +948,10 @@ def send_profile_update(
         payload["runtimeName"] = runtime_name
     if vendor_name:
         payload["vendorName"] = vendor_name
+    if avatar_url is not PROFILE_FIELD_UNSET:
+        payload["avatarUrl"] = avatar_url
+    if avatar_emoji is not PROFILE_FIELD_UNSET:
+        payload["avatarEmoji"] = avatar_emoji
 
     if not payload:
         return {}
@@ -886,6 +985,51 @@ def send_profile_update(
             f"{json.dumps(action_state.get('error', {}), ensure_ascii=True)}"
         )
     return action_state
+
+
+def upload_agent_avatar(
+    server_base_url: str,
+    access_token: str,
+    avatar_path: Path,
+) -> tuple[str, str]:
+    mime_type = guess_avatar_mime_type(avatar_path)
+    create_response = http_json(
+        "POST",
+        f"{normalize_base_url(server_base_url)}/api/v1/agents/self/avatar-upload",
+        {
+            "fileName": avatar_path.name,
+            "mimeType": mime_type,
+        },
+        access_token=access_token,
+    )
+    upload = create_response.get("upload", {})
+    upload_url = upload.get("url") if isinstance(upload, dict) else None
+    upload_headers = upload.get("headers") if isinstance(upload, dict) else None
+    if not isinstance(upload_url, str) or not upload_url:
+        raise RuntimeError("Avatar upload did not return a valid upload URL.")
+
+    resolved_headers = {
+        str(key): str(value)
+        for key, value in (upload_headers or {}).items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+    http_bytes(
+        str(upload.get("method") or "PUT"),
+        upload_url,
+        avatar_path.read_bytes(),
+        extra_headers=resolved_headers,
+    )
+
+    complete_response = http_json(
+        "POST",
+        f"{normalize_base_url(server_base_url)}/api/v1/agents/self/avatar-upload/complete",
+        {},
+        access_token=access_token,
+    )
+    avatar_url = complete_response.get("avatarUrl")
+    if not isinstance(avatar_url, str) or not avatar_url:
+        raise RuntimeError("Avatar upload did not return avatarUrl after completion.")
+    return avatar_url, avatar_file_fingerprint(avatar_path)
 
 
 def read_directory(server_base_url: str, access_token: str) -> dict[str, Any]:
@@ -1292,6 +1436,20 @@ def connect_if_needed(
 def sync_profile(state: dict[str, Any], config: dict[str, str]) -> None:
     handle = config.get("handle")
     handle_candidates = handle_variants(handle) if handle else [None]
+    avatar_emoji = normalize_avatar_emoji(config.get("avatar_emoji"))
+    avatar_path = resolve_avatar_file_path(config.get("avatar_file"))
+    uploaded_avatar_url: str | None | object = PROFILE_FIELD_UNSET
+    avatar_file_fingerprint_value: str | None = None
+
+    if avatar_path is not None:
+        uploaded_avatar_url, avatar_file_fingerprint_value = upload_agent_avatar(
+            str(state["serverBaseUrl"]),
+            str(state["accessToken"]),
+            avatar_path,
+        )
+    elif avatar_emoji is not None:
+        uploaded_avatar_url = None
+
     action_state: dict[str, Any] | None = None
     for candidate in handle_candidates:
         try:
@@ -1304,6 +1462,12 @@ def sync_profile(state: dict[str, Any], config: dict[str, str]) -> None:
                 parse_profile_tags_json(config.get("profile_tags_json")),
                 config.get("runtime_name"),
                 config.get("vendor_name"),
+                avatar_url=uploaded_avatar_url,
+                avatar_emoji=(
+                    avatar_emoji
+                    if avatar_emoji is not None
+                    else None if avatar_path is not None else PROFILE_FIELD_UNSET
+                ),
             )
             if candidate:
                 config["handle"] = candidate
@@ -1333,8 +1497,19 @@ def sync_profile(state: dict[str, Any], config: dict[str, str]) -> None:
         state["displayName"] = agent.get("displayName")
         state["bio"] = agent.get("bio")
         state["profileTags"] = agent.get("tags")
+        state["avatarUrl"] = agent.get("avatarUrl")
+        state["avatarEmoji"] = agent.get("avatarEmoji")
         state["runtimeName"] = agent.get("runtimeName")
         state["vendorName"] = agent.get("vendorName")
+    elif uploaded_avatar_url is not PROFILE_FIELD_UNSET:
+        state["avatarUrl"] = uploaded_avatar_url
+
+    if avatar_file_fingerprint_value is not None:
+        state["avatarFileFingerprint"] = avatar_file_fingerprint_value
+    elif avatar_path is None:
+        state.pop("avatarFileFingerprint", None)
+
+    state["lastProfileSyncFingerprint"] = build_profile_fingerprint(config)
 
 
 def should_sync_profile(
@@ -1346,28 +1521,8 @@ def should_sync_profile(
         return True
     if previous_state.get("accessToken") != next_state.get("accessToken"):
         return True
-    for config_key, state_key in (
-        ("handle", "agentHandle"),
-        ("display_name", "displayName"),
-        ("bio", "bio"),
-        ("runtime_name", "runtimeName"),
-        ("vendor_name", "vendorName"),
-    ):
-        config_value = config.get(config_key)
-        if config_value is None:
-            continue
-        state_value = previous_state.get(state_key)
-        normalized_state_value = (
-            None if state_value is None else str(state_value)
-        )
-        if config_value != normalized_state_value:
-            return True
-    configured_tags = parse_profile_tags_json(config.get("profile_tags_json"))
-    if configured_tags is not None:
-        state_tags = previous_state.get("profileTags")
-        if state_tags != configured_tags:
-            return True
-    return False
+    desired_fingerprint = build_profile_fingerprint(config)
+    return previous_state.get("lastProfileSyncFingerprint") != desired_fingerprint
 
 
 def run_poll_loop(

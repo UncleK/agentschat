@@ -30,7 +30,10 @@ class AgentsHallRepository {
       queryParameters['activeAgentId'] = activeAgentId;
     }
 
-    final response = await apiClient.get(path, queryParameters: queryParameters);
+    final response = await apiClient.get(
+      path,
+      queryParameters: queryParameters,
+    );
     final rawAgents = response['agents'] as List<dynamic>? ?? const [];
 
     return AgentsHallViewModel(
@@ -64,34 +67,49 @@ class AgentsHallRepository {
         .whereType<String>()
         .toList(growable: false);
     final status = json['status'] as String? ?? 'offline';
-    final displayName = _readString(json['displayName']) ??
-        localizedAppText(en: 'Unnamed agent', zhHans: '未命名智能体');
+    final displayName =
+        _readString(json['displayName']) ??
+        localizedAppText(
+          key: 'msgUnnamedAgent7ca5e2bd',
+          en: 'Unnamed agent',
+          zhHans: '未命名智能体',
+        );
     final handle = _readString(json['handle']);
     final sourceType =
         _readString(json['sourceType']) ??
-        localizedAppText(en: 'Public', zhHans: '公开');
+        localizedAppText(key: 'msgPublicdc5eb704', en: 'Public', zhHans: '公开');
     final vendorName = _readString(json['vendorName']) ?? 'Agents Chat';
     final runtimeName =
         _readString(json['runtimeName']) ??
         _readString(metadata['runtime']) ??
         _readString(metadata['model']) ??
-        localizedAppText(en: 'runtime pending', zhHans: '运行时待接入');
+        localizedAppText(
+          key: 'msgRuntimePendingce979916',
+          en: 'runtime pending',
+          zhHans: '运行时待接入',
+        );
 
     return HallAgentCardModel(
       id: json['id'] as String? ?? '',
       name: displayName,
       handle: handle,
-      avatarUrl: _readString(json['avatarUrl']),
+      avatarUrl: apiClient.resolveUrl(_readString(json['avatarUrl'])),
+      avatarEmoji: _readString(json['avatarEmoji']),
       headline:
           _readString(metadata['headline']) ??
           _readString(json['bio']) ??
           (handle == null
-              ? localizedAppText(en: 'Public agent', zhHans: '公开智能体')
+              ? localizedAppText(
+                  key: 'msgPublicAgenta223f69f',
+                  en: 'Public agent',
+                  zhHans: '公开智能体',
+                )
               : '@$handle'),
       description:
           _readString(json['bio']) ??
           _readString(metadata['description']) ??
           localizedAppText(
+            key: 'msgPublicAgentProfileSyncedFromTheBackendDirectory1ad5f9fd',
             en: 'Public agent profile synced from the backend directory.',
             zhHans: '已从后端目录同步公开智能体资料。',
           ),
@@ -109,8 +127,16 @@ class AgentsHallRepository {
       bellState: _bellFromStatus(status),
       skills: tags.isEmpty
           ? <String>[
-              localizedAppText(en: 'Public', zhHans: '公开'),
-              localizedAppText(en: 'Agent', zhHans: '智能体'),
+              localizedAppText(
+                key: 'msgPublicdc5eb704',
+                en: 'Public',
+                zhHans: '公开',
+              ),
+              localizedAppText(
+                key: 'msgAgent5ce2e6f4',
+                en: 'Agent',
+                zhHans: '智能体',
+              ),
             ]
           : tags,
       icon: _iconForAgent(
@@ -122,15 +148,27 @@ class AgentsHallRepository {
       directoryOrder: directoryOrder,
       metadata: [
         AgentMetadataItem(
-          label: localizedAppText(en: 'Source', zhHans: '来源'),
+          label: localizedAppText(
+            key: 'msgSource6da13add',
+            en: 'Source',
+            zhHans: '来源',
+          ),
           value: _titleCase(sourceType),
         ),
         AgentMetadataItem(
-          label: localizedAppText(en: 'Vendor', zhHans: '提供方'),
+          label: localizedAppText(
+            key: 'msgVendord96159ff',
+            en: 'Vendor',
+            zhHans: '提供方',
+          ),
           value: vendorName,
         ),
         AgentMetadataItem(
-          label: localizedAppText(en: 'Runtime', zhHans: '运行时'),
+          label: localizedAppText(
+            key: 'msgRuntimec4740e4c',
+            en: 'Runtime',
+            zhHans: '运行时',
+          ),
           value: runtimeName,
         ),
       ],

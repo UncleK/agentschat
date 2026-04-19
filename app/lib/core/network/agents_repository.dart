@@ -138,6 +138,8 @@ class AgentSummary {
     required this.bio,
     required this.ownerType,
     required this.status,
+    this.avatarEmoji,
+    this.profileTags = const <String>[],
     this.safetyPolicy,
   });
 
@@ -145,19 +147,26 @@ class AgentSummary {
   final String handle;
   final String displayName;
   final String? avatarUrl;
+  final String? avatarEmoji;
   final String? bio;
+  final List<String> profileTags;
   final String ownerType;
   final String status;
   final AgentSafetyPolicy? safetyPolicy;
 
-  factory AgentSummary.fromJson(Map<String, dynamic> json) {
+  factory AgentSummary.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     final safetyPolicyJson = json['safetyPolicy'];
     return AgentSummary(
       id: json['id'] as String? ?? '',
       handle: json['handle'] as String? ?? '',
       displayName: json['displayName'] as String? ?? '',
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: _resolveUrl(json['avatarUrl'], resolveUrl),
+      avatarEmoji: _readOptionalString(json['avatarEmoji']),
       bio: json['bio'] as String?,
+      profileTags: _readStringList(json['profileTags']),
       ownerType: json['ownerType'] as String? ?? '',
       status: json['status'] as String? ?? '',
       safetyPolicy: safetyPolicyJson is Map<String, dynamic>
@@ -213,13 +222,17 @@ class ConnectedAgentSummary {
     required this.pollingEnabled,
     required this.lastSeenAt,
     required this.lastHeartbeatAt,
+    this.avatarEmoji,
+    this.profileTags = const <String>[],
   });
 
   final String id;
   final String handle;
   final String displayName;
   final String? avatarUrl;
+  final String? avatarEmoji;
   final String? bio;
+  final List<String> profileTags;
   final String ownerType;
   final String status;
   final String protocolVersion;
@@ -228,13 +241,18 @@ class ConnectedAgentSummary {
   final String? lastSeenAt;
   final String? lastHeartbeatAt;
 
-  factory ConnectedAgentSummary.fromJson(Map<String, dynamic> json) {
+  factory ConnectedAgentSummary.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     return ConnectedAgentSummary(
       id: json['id'] as String? ?? '',
       handle: json['handle'] as String? ?? '',
       displayName: json['displayName'] as String? ?? '',
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: _resolveUrl(json['avatarUrl'], resolveUrl),
+      avatarEmoji: _readOptionalString(json['avatarEmoji']),
       bio: json['bio'] as String?,
+      profileTags: _readStringList(json['profileTags']),
       ownerType: json['ownerType'] as String? ?? '',
       status: json['status'] as String? ?? '',
       protocolVersion: json['protocolVersion'] as String? ?? '',
@@ -257,18 +275,32 @@ class AgentsMineResponse {
   final List<AgentSummary> claimableAgents;
   final List<PendingClaimSummary> pendingClaims;
 
-  factory AgentsMineResponse.fromJson(Map<String, dynamic> json) {
+  factory AgentsMineResponse.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     return AgentsMineResponse(
-      agents: _parseAgentList(json['agents']),
-      claimableAgents: _parseAgentList(json['claimableAgents']),
+      agents: _parseAgentList(json['agents'], resolveUrl: resolveUrl),
+      claimableAgents: _parseAgentList(
+        json['claimableAgents'],
+        resolveUrl: resolveUrl,
+      ),
       pendingClaims: _parsePendingClaimList(json['pendingClaims']),
     );
   }
 
-  static List<AgentSummary> _parseAgentList(Object? rawList) {
+  static List<AgentSummary> _parseAgentList(
+    Object? rawList, {
+    String? Function(String?)? resolveUrl,
+  }) {
     final jsonList = rawList as List<dynamic>? ?? const [];
     return jsonList
-        .map((item) => AgentSummary.fromJson(item as Map<String, dynamic>))
+        .map(
+          (item) => AgentSummary.fromJson(
+            item as Map<String, dynamic>,
+            resolveUrl: resolveUrl,
+          ),
+        )
         .toList(growable: false);
   }
 
@@ -287,13 +319,18 @@ class ConnectedAgentsResponse {
 
   final List<ConnectedAgentSummary> connectedAgents;
 
-  factory ConnectedAgentsResponse.fromJson(Map<String, dynamic> json) {
+  factory ConnectedAgentsResponse.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     final jsonList = json['connectedAgents'] as List<dynamic>? ?? const [];
     return ConnectedAgentsResponse(
       connectedAgents: jsonList
           .map(
-            (item) =>
-                ConnectedAgentSummary.fromJson(item as Map<String, dynamic>),
+            (item) => ConnectedAgentSummary.fromJson(
+              item as Map<String, dynamic>,
+              resolveUrl: resolveUrl,
+            ),
           )
           .toList(growable: false),
     );
@@ -366,13 +403,19 @@ class AgentsRepository {
   /// Read the authenticated human's owned-agent partitions.
   Future<AgentsMineResponse> readMine() async {
     final response = await apiClient.get('/agents/mine');
-    return AgentsMineResponse.fromJson(response);
+    return AgentsMineResponse.fromJson(
+      response,
+      resolveUrl: apiClient.resolveUrl,
+    );
   }
 
   /// Read connected agents owned by the authenticated human.
   Future<ConnectedAgentsResponse> readConnectedAgents() async {
     final response = await apiClient.get('/agents/connections/mine');
-    return ConnectedAgentsResponse.fromJson(response);
+    return ConnectedAgentsResponse.fromJson(
+      response,
+      resolveUrl: apiClient.resolveUrl,
+    );
   }
 
   /// Create a signed bootstrap link for a human-owned agent invitation.
@@ -451,4 +494,26 @@ class AgentsRepository {
     );
     return AgentSafetyPolicy.fromJson(response);
   }
+}
+
+String? _readOptionalString(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
+}
+
+String? _resolveUrl(Object? value, String? Function(String?)? resolveUrl) {
+  final raw = value as String?;
+  return resolveUrl?.call(raw) ?? raw;
+}
+
+List<String> _readStringList(Object? value) {
+  final rawList = value as List<dynamic>? ?? const [];
+  return rawList
+      .whereType<String>()
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
 }

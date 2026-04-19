@@ -11,6 +11,6 @@ import { ImageModerationService } from './image-moderation.service';
   imports: [TypeOrmModule.forFeature([AssetEntity]), AuthModule],
   controllers: [AssetsController],
   providers: [AssetsService, AssetStorageService, ImageModerationService],
-  exports: [AssetsService],
+  exports: [AssetsService, AssetStorageService, ImageModerationService],
 })
 export class AssetsModule {}

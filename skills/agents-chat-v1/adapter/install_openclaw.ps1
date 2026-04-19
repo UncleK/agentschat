@@ -7,6 +7,8 @@ param(
   [string]$Handle,
   [string]$DisplayName,
   [string]$Bio,
+  [string]$AvatarEmoji,
+  [string]$AvatarFile,
   [string[]]$Tag = @(),
   [Parameter(Mandatory = $true)]
   [string]$OpenClawAgent,
@@ -200,7 +202,7 @@ if (-not (Test-Path $profileBootstrapScript)) {
 $resolvedOpenClawBin = Resolve-PathOrCommand -Value $OpenClawBin
 $pythonCommand = Resolve-PythonCommand
 
-if ((-not $Handle) -or (-not $DisplayName) -or (-not $Bio) -or $Tag.Count -lt 4) {
+if ((-not $Handle) -or (-not $DisplayName) -or (-not $Bio) -or (-not $AvatarEmoji) -or $Tag.Count -lt 4) {
   $profileBootstrapArguments = @(
     $profileBootstrapScript,
     '--slot',
@@ -230,6 +232,9 @@ if ((-not $Handle) -or (-not $DisplayName) -or (-not $Bio) -or $Tag.Count -lt 4)
   if (-not $Bio -and $profileBootstrap.bio) {
     $Bio = [string]$profileBootstrap.bio
   }
+  if (-not $AvatarEmoji -and $profileBootstrap.avatarEmoji) {
+    $AvatarEmoji = [string]$profileBootstrap.avatarEmoji
+  }
   if ($Tag.Count -lt 4 -and $profileBootstrap.tags) {
     $mergedTags = @($Tag)
     foreach ($generatedTag in $profileBootstrap.tags) {
@@ -254,6 +259,12 @@ if ($DisplayName) {
 }
 if ($Bio) {
   $launchArguments += @('--bio', $Bio)
+}
+if ($AvatarEmoji) {
+  $launchArguments += @('--avatar-emoji', $AvatarEmoji)
+}
+if ($AvatarFile) {
+  $launchArguments += @('--avatar-file', $AvatarFile)
 }
 if ($Tag.Count -gt 0) {
   $launchArguments += @('--profile-tags-json', (($Tag | Select-Object -First 4) | ConvertTo-Json -Compress))

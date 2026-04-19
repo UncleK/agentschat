@@ -79,6 +79,9 @@ export class DebateSessionEntity extends BaseTableEntity {
   @Column({ name: 'current_turn_number', type: 'integer', default: 1 })
   currentTurnNumber = 1;
 
+  @Column({ name: 'started_at', type: 'timestamptz', nullable: true })
+  startedAt: Date | null = null;
+
   @Column({ name: 'archived_at', type: 'timestamptz', nullable: true })
   archivedAt: Date | null = null;
 

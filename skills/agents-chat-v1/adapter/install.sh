@@ -8,6 +8,8 @@ SLOT=""
 HANDLE=""
 DISPLAY_NAME=""
 BIO=""
+AVATAR_EMOJI=""
+AVATAR_FILE=""
 WORK_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/agents-chat-skill"
 
 while [ "$#" -gt 0 ]; do
@@ -38,6 +40,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --bio)
       BIO="$2"
+      shift 2
+      ;;
+    --avatar-emoji)
+      AVATAR_EMOJI="$2"
+      shift 2
+      ;;
+    --avatar-file)
+      AVATAR_FILE="$2"
       shift 2
       ;;
     --work-dir)
@@ -160,6 +170,12 @@ quoted_adapter_dir="$(shell_quote "$(dirname "$ADAPTER_SCRIPT")")"
   printf 'exec sh %s --launcher-url %s' "$quoted_adapter_script" "$quoted_launcher"
   if [ -n "$BIO" ]; then
     printf ' --bio %s' "$(shell_quote "$BIO")"
+  fi
+  if [ -n "$AVATAR_EMOJI" ]; then
+    printf ' --avatar-emoji %s' "$(shell_quote "$AVATAR_EMOJI")"
+  fi
+  if [ -n "$AVATAR_FILE" ]; then
+    printf ' --avatar-file %s' "$(shell_quote "$AVATAR_FILE")"
   fi
   printf '\n'
 } >"$runner_script"

@@ -86,7 +86,11 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
     if (email.isNotEmpty) {
       return email;
     }
-    return context.localizedText(en: 'Human admin', zhHans: '人类管理员');
+    return context.localizedText(
+      key: 'msgHumanAdminaabce010',
+      en: 'Human admin',
+      zhHans: '人类管理员',
+    );
   }
 
   @override
@@ -123,6 +127,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         _messages = const <_OwnedAgentCommandMessage>[];
         _isLoadingThread = false;
         _loadError = context.localizedText(
+          key: 'msgSignInAsTheOwnerBeforeOpeningThisPrivateThread4aa1888a',
           en: 'Sign in as the owner before opening this private thread.',
           zhHans: '请先以所有者身份登录，再打开这条私密线程。',
         );
@@ -185,6 +190,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         _isLoadingThread = false;
         _loadError = error.message.trim().isEmpty
             ? context.localizedText(
+                key: 'msgUnableToLoadThisPrivateThreadRightNow1422805d',
                 en: 'Unable to load this private thread right now.',
                 zhHans: '暂时无法加载这条私密线程。',
               )
@@ -199,6 +205,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         _messages = const <_OwnedAgentCommandMessage>[];
         _isLoadingThread = false;
         _loadError = context.localizedText(
+          key: 'msgUnableToLoadThisPrivateThreadRightNow1422805d',
           en: 'Unable to load this private thread right now.',
           zhHans: '暂时无法加载这条私密线程。',
         );
@@ -299,9 +306,15 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
 
   Future<void> _sendMessage() async {
     final draft = _composerController.text.trim();
+    final commandThreadIdMissingMessage = context.localizedText(
+      key: 'msgCommandThreadIdWasNotReturnedca984c02',
+      en: 'Command thread id was not returned.',
+      zhHans: '未返回命令线程 ID。',
+    );
     if (!_hasAuthenticatedHuman) {
       setState(() {
         _sendError = context.localizedText(
+          key: 'msgSignInAsTheOwnerBeforeSendingMessagesd9acc950',
           en: 'Sign in as the owner before sending messages.',
           zhHans: '请先以所有者身份登录，再发送消息。',
         );
@@ -344,12 +357,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         );
         final createdThreadId = (response['threadId'] as String? ?? '').trim();
         if (createdThreadId.isEmpty) {
-          throw StateError(
-            context.localizedText(
-              en: 'Command thread id was not returned.',
-              zhHans: '未返回命令线程 ID。',
-            ),
-          );
+          throw StateError(commandThreadIdMissingMessage);
         }
         final messagesResponse = await _chatRepository.getMessages(
           threadId: createdThreadId,
@@ -384,6 +392,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
         _isSendingMessage = false;
         _sendError = error.message.trim().isEmpty
             ? context.localizedText(
+                key: 'msgUnableToSendThisMessageRightNow010931ab',
                 en: 'Unable to send this message right now.',
                 zhHans: '暂时无法发送这条消息。',
               )
@@ -396,6 +405,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
       setState(() {
         _isSendingMessage = false;
         _sendError = context.localizedText(
+          key: 'msgUnableToSendThisMessageRightNow010931ab',
           en: 'Unable to send this message right now.',
           zhHans: '暂时无法发送这条消息。',
         );
@@ -462,8 +472,13 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
       body: body != null && body.isNotEmpty
           ? body
           : message.contentType.toLowerCase() == 'image'
-          ? context.localizedText(en: 'Image', zhHans: '图片')
+          ? context.localizedText(
+              key: 'msgImage50e19fda',
+              en: 'Image',
+              zhHans: '图片',
+            )
           : context.localizedText(
+              key: 'msgOwnedAgentCommandUnsupportedMessage',
               en: 'Unsupported message',
               zhHans: '暂不支持的消息',
             ),
@@ -533,6 +548,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
                         children: [
                           Text(
                             context.localizedText(
+                              key: 'msgPrivateOwnerChat3a3d94c3',
                               en: 'Private Owner Chat',
                               zhHans: '私密所有者聊天',
                             ),
@@ -569,8 +585,9 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
                   icon: Icons.chat_bubble_rounded,
                   accentColor: AppColors.primaryFixed,
                   text: context.localizedText(
-                    en:
-                        'This is the real private human-to-agent command thread. First send creates it if it does not exist yet.',
+                    key:
+                        'msgThisIsTheRealPrivateHumanToAgentCommandThread357cc1f3',
+                    en: 'This is the real private human-to-agent command thread. First send creates it if it does not exist yet.',
                     zhHans: '这是人类与该智能体之间真实的私密命令线程。如果尚未创建，首次发送消息时会自动建立。',
                   ),
                 ),
@@ -666,6 +683,10 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
                       onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
                         hintText: context.localizedText(
+                          key: 'msgSendAMessageToActiveAgentNameef7c820d',
+                          args: <String, Object?>{
+                            'activeAgentName': activeAgentName,
+                          },
                           en: 'Send a message to $activeAgentName...',
                           zhHans: '给 $activeAgentName 发送一条消息...',
                         ),
@@ -762,6 +783,7 @@ class _OwnedAgentCommandEmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             Text(
               context.localizedText(
+                key: 'msgNoPrivateThreadYet2461de57',
                 en: 'No private thread yet',
                 zhHans: '还没有私密线程',
               ),
@@ -774,8 +796,9 @@ class _OwnedAgentCommandEmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               context.localizedText(
-                en:
-                    'Your first message opens a private human-to-agent line with $agentName.',
+                key: 'msgOwnedAgentCommandFirstMessageOpensPrivateLine',
+                args: <String, Object?>{'agentName': agentName},
+                en: 'Your first message opens a private human-to-agent line with $agentName.',
                 zhHans: '你的第一条消息会为你和 $agentName 打开一条私密命令通道。',
               ),
               textAlign: TextAlign.center,

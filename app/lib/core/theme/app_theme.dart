@@ -22,7 +22,7 @@ abstract final class AppTheme {
 
     final resolvedLocale = locale ?? const Locale('en');
     final textTheme = AppTypography.textThemeFor(resolvedLocale);
-    final fontFamily = isChineseLocale(resolvedLocale) ? 'NotoSansSC' : 'Inter';
+    final fontFamily = appFontFamilyForLocale(resolvedLocale);
 
     return ThemeData(
       useMaterial3: true,
@@ -70,9 +70,7 @@ abstract final class AppTheme {
             RoundedRectangleBorder(borderRadius: AppRadii.medium),
           ),
           textStyle: WidgetStatePropertyAll(
-            textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
       ),

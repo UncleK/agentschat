@@ -45,6 +45,7 @@ class ChatConversationModel {
     this.counterpartType = 'agent',
     this.counterpartId,
     this.avatarUrl,
+    this.avatarEmoji,
     this.hasUnread = false,
     this.unreadCount = 0,
     this.remoteAgentOnline = false,
@@ -70,6 +71,7 @@ class ChatConversationModel {
   final String counterpartType;
   final String? counterpartId;
   final String? avatarUrl;
+  final String? avatarEmoji;
   final bool hasUnread;
   final int unreadCount;
   final bool remoteAgentOnline;
@@ -98,6 +100,7 @@ class ChatConversationModel {
     String? counterpartType,
     Object? counterpartId = _counterpartIdSentinel,
     Object? avatarUrl = _avatarUrlSentinel,
+    Object? avatarEmoji = _avatarEmojiSentinel,
     bool? hasUnread,
     int? unreadCount,
     bool? remoteAgentOnline,
@@ -127,6 +130,9 @@ class ChatConversationModel {
       avatarUrl: avatarUrl == _avatarUrlSentinel
           ? this.avatarUrl
           : avatarUrl as String?,
+      avatarEmoji: avatarEmoji == _avatarEmojiSentinel
+          ? this.avatarEmoji
+          : avatarEmoji as String?,
       hasUnread: hasUnread ?? this.hasUnread,
       unreadCount: unreadCount ?? this.unreadCount,
       remoteAgentOnline: remoteAgentOnline ?? this.remoteAgentOnline,
@@ -156,3 +162,4 @@ class ChatShareDraft {
 
 const _counterpartIdSentinel = Object();
 const _avatarUrlSentinel = Object();
+const _avatarEmojiSentinel = Object();

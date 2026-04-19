@@ -69,6 +69,7 @@ class _HubScreenState extends State<HubScreen> {
       }
       _showSnackBar(
         context.localizedText(
+          key: 'msgHubPartitionsRefreshed9d19b8f9',
           en: 'Hub partitions refreshed.',
           zhHans: 'Hub 分区已刷新。',
         ),
@@ -79,6 +80,7 @@ class _HubScreenState extends State<HubScreen> {
       }
       _showSnackBar(
         context.localizedText(
+          key: 'msgUnableToRefreshHubRightNow0b5da303',
           en: 'Unable to refresh Hub right now.',
           zhHans: '暂时无法刷新 Hub。',
         ),
@@ -96,6 +98,7 @@ class _HubScreenState extends State<HubScreen> {
     if (!session.isAuthenticated) {
       _showSnackBar(
         context.localizedText(
+          key: 'msgSignInAsAHumanFirste994d574',
           en: 'Sign in as a human first.',
           zhHans: '请先以人类身份登录。',
         ),
@@ -141,6 +144,7 @@ class _HubScreenState extends State<HubScreen> {
     if (!isSignedIn) {
       _showSnackBar(
         context.localizedText(
+          key: 'msgSignInAsAHumanFirste994d574',
           en: 'Sign in as a human first.',
           zhHans: '请先以人类身份登录。',
         ),
@@ -187,7 +191,8 @@ class _HubScreenState extends State<HubScreen> {
         password: password,
       ),
       _HumanAuthMode.external => throw StateError(
-        context.localizedText(
+        localizedAppText(
+          key: 'msgExternalHumanLoginIsNotAvailableYet6f778877',
           en: 'External human login is not available yet.',
           zhHans: '外部人类登录暂未开放。',
         ),
@@ -197,22 +202,33 @@ class _HubScreenState extends State<HubScreen> {
     await session.authenticate(authState);
 
     return switch (mode) {
-      _HumanAuthMode.signIn => context.localizedText(
+      _HumanAuthMode.signIn => localizedAppText(
+        key: 'msgSignedInAsAuthStateDisplayName8e6655d9',
+        args: <String, Object?>{'authStateDisplayName': authState.displayName},
         en: 'Signed in as ${authState.displayName}.',
         zhHans: '已登录为 ${authState.displayName}。',
       ),
       _HumanAuthMode.register =>
         authState.emailVerified
-            ? context.localizedText(
+            ? localizedAppText(
+                key: 'msgCreatedAccountForAuthStateDisplayNameac40bd2e',
+                args: <String, Object?>{
+                  'authStateDisplayName': authState.displayName,
+                },
                 en: 'Created account for ${authState.displayName}.',
                 zhHans: '已为 ${authState.displayName} 创建账号。',
               )
-            : context.localizedText(
-                en:
-                    'Created account for ${authState.displayName}. Verify your email next.',
+            : localizedAppText(
+                key:
+                    'msgCreatedAccountForAuthStateDisplayNameVerifyYourEmailNexta0b92f99',
+                args: <String, Object?>{
+                  'authStateDisplayName': authState.displayName,
+                },
+                en: 'Created account for ${authState.displayName}. Verify your email next.',
                 zhHans: '已为 ${authState.displayName} 创建账号，请接着完成邮箱验证。',
               ),
-      _HumanAuthMode.external => context.localizedText(
+      _HumanAuthMode.external => localizedAppText(
+        key: 'msgExternalLoginIsUnavailablebbce8d11',
         en: 'External login is unavailable.',
         zhHans: '外部登录暂不可用。',
       ),
@@ -263,6 +279,7 @@ class _HubScreenState extends State<HubScreen> {
     }
     _showSnackBar(
       context.localizedText(
+        key: 'msgSignedOutOfTheCurrentHumanSession36666265',
         en: 'Signed out of the current human session.',
         zhHans: '已退出当前人类会话。',
       ),
@@ -291,6 +308,7 @@ class _HubScreenState extends State<HubScreen> {
       if (disconnectedCount == 0) {
         _showSnackBar(
           context.localizedText(
+            key: 'msgNoConnectedAgentsWereActiveInThisApp15c96e47',
             en: 'No connected agents were active in this app.',
             zhHans: '这个应用里当前没有活跃的已连接智能体。',
           ),
@@ -300,6 +318,8 @@ class _HubScreenState extends State<HubScreen> {
 
       _showSnackBar(
         context.localizedText(
+          key: 'msgDisconnectedDisconnectedCountConnectedAgentSde49a9da',
+          args: <String, Object?>{'disconnectedCount': disconnectedCount},
           en: 'Disconnected $disconnectedCount connected agent(s).',
           zhHans: '已断开 $disconnectedCount 个已连接智能体。',
         ),
@@ -314,6 +334,7 @@ class _HubScreenState extends State<HubScreen> {
       }
       _showSnackBar(
         context.localizedText(
+          key: 'msgUnableToDisconnectConnectedAgentsRightNowfe82045e',
           en: 'Unable to disconnect connected agents right now.',
           zhHans: '暂时无法断开已连接的智能体。',
         ),
@@ -324,6 +345,7 @@ class _HubScreenState extends State<HubScreen> {
       }
       _showSnackBar(
         context.localizedText(
+          key: 'msgUnableToDisconnectConnectedAgentsRightNowfe82045e',
           en: 'Unable to disconnect connected agents right now.',
           zhHans: '暂时无法断开已连接的智能体。',
         ),
@@ -344,6 +366,7 @@ class _HubScreenState extends State<HubScreen> {
     }
     _showSnackBar(
       context.localizedText(
+        key: 'msgConnectionEndpointCopied87e4bf4c',
         en: 'Connection endpoint copied.',
         zhHans: '连接端点已复制。',
       ),
@@ -382,13 +405,9 @@ class _HubScreenState extends State<HubScreen> {
 
   String _languagePreferenceLabel(BuildContext context) {
     final localeController = AppLocaleScope.maybeOf(context);
-    final preference = localeController?.preference ?? AppLocalePreference.system;
-    return switch (preference) {
-      AppLocalePreference.system => context.l10n.hubLanguagePreferenceSystemLabel,
-      AppLocalePreference.english => context.l10n.hubLanguagePreferenceEnglishLabel,
-      AppLocalePreference.chineseSimplified =>
-        context.l10n.hubLanguagePreferenceChineseLabel,
-    };
+    final preference =
+        localeController?.preference ?? AppLocalePreference.system;
+    return _localizedLanguagePreferenceLabel(context, preference);
   }
 
   AgentSafetyPolicy _effectiveAgentSafety(HubOwnedAgentModel? agent) {
@@ -458,10 +477,13 @@ class _HubScreenState extends State<HubScreen> {
       buildNext: (_) => preset.policy,
       successMessage: _applyAgentSecurityToAll
           ? context.localizedText(
+              key: 'msgAppliedTheAutonomyLevelToAllOwnedAgents27f7f616',
               en: 'Applied the autonomy level to all owned agents.',
               zhHans: '已将自治等级应用到全部自有智能体。',
             )
           : context.localizedText(
+              key: 'msgUpdatedTheAutonomyLevelForAgentName724bd55d',
+              args: <String, Object?>{'agentName': agent.name},
               en: 'Updated the autonomy level for ${agent.name}.',
               zhHans: '已更新 ${agent.name} 的自治等级。',
             ),
@@ -528,6 +550,7 @@ class _HubScreenState extends State<HubScreen> {
       _showSnackBar(
         error.message.trim().isEmpty
             ? context.localizedText(
+                key: 'msgUnableToSaveAgentSecurityRightNow4290d99f',
                 en: 'Unable to save agent security right now.',
                 zhHans: '暂时无法保存智能体安全设置。',
               )
@@ -540,6 +563,7 @@ class _HubScreenState extends State<HubScreen> {
       }
       _showSnackBar(
         context.localizedText(
+          key: 'msgUnableToSaveAgentSecurityRightNow4290d99f',
           en: 'Unable to save agent security right now.',
           zhHans: '暂时无法保存智能体安全设置。',
         ),
@@ -667,6 +691,7 @@ class _HubScreenState extends State<HubScreen> {
       children: [
         _SectionTitleRow(
           title: context.localizedText(
+            key: 'msgMyAgentProfilee04f71f5',
             en: 'My Agent Profile',
             zhHans: '我的智能体档案',
           ),
@@ -766,16 +791,17 @@ class _HubScreenState extends State<HubScreen> {
                     : _EmptyStatePanel(
                         icon: Icons.lock_person_rounded,
                         title: context.localizedText(
+                          key: 'msgNoDirectlyUsableOwnedAgentsYet829d84f3',
                           en: 'No directly usable owned agents yet',
                           zhHans: '还没有可直接使用的自有智能体',
                         ),
-                        body:
-                            context.localizedText(
-                              en:
-                                  'Import a human-owned agent or finish a claim. Claimable and pending records stay separate until they become active.',
-                              zhHans:
-                                  '先导入一个人类自有智能体，或完成一次认领。待认领和待确认记录会继续分开显示，直到它们真正可用。',
-                            ),
+                        body: context.localizedText(
+                          key:
+                              'msgImportAHumanOwnedAgentOrFinishAClaimClaimablea865a2a3',
+                          en: 'Import a human-owned agent or finish a claim. Claimable and pending records stay separate until they become active.',
+                          zhHans:
+                              '先导入一个人类自有智能体，或完成一次认领。待认领和待确认记录会继续分开显示，直到它们真正可用。',
+                        ),
                       ),
               ),
             ],
@@ -789,20 +815,21 @@ class _HubScreenState extends State<HubScreen> {
     return SurfaceCard(
       key: const Key('pending-claims-section'),
       eyebrow: context.localizedText(
+        key: 'msgPendingClaims3d6d5a80',
         en: 'Pending claims',
         zhHans: '待确认认领',
       ),
       title: context.localizedText(
+        key: 'msgRequestsWaitingForConfirmation0f263dee',
         en: 'Requests waiting for confirmation',
         zhHans: '等待确认的请求',
       ),
-      subtitle:
-          context.localizedText(
-            en:
-                'Pending claims remain visible but inactive so Hub never promotes them into the global session before they are fully usable.',
-            zhHans:
-                '待确认认领会保持可见但不会被激活，这样 Hub 就不会在它们完全可用前把它们推入全局会话。',
-          ),
+      subtitle: context.localizedText(
+        key:
+            'msgPendingClaimsRemainVisibleButInactiveSoHubNeverPromotesbf4c847c',
+        en: 'Pending claims remain visible but inactive so Hub never promotes them into the global session before they are fully usable.',
+        zhHans: '待确认认领会保持可见但不会被激活，这样 Hub 就不会在它们完全可用前把它们推入全局会话。',
+      ),
       leading: const _HubToneIcon(
         icon: Icons.hourglass_top_rounded,
         accentColor: AppColors.primaryFixed,
@@ -824,16 +851,16 @@ class _HubScreenState extends State<HubScreen> {
           : _EmptyStatePanel(
               icon: Icons.pending_actions_rounded,
               title: context.localizedText(
+                key: 'msgNoPendingClaims9dc4fd0a',
                 en: 'No pending claims',
                 zhHans: '没有待确认认领',
               ),
-              body:
-                  context.localizedText(
-                    en:
-                        'Claim requests that are still waiting on confirmation will stay here until they either expire or become owned agents.',
-                    zhHans:
-                        '仍在等待确认的认领请求会保留在这里，直到它们过期或转成自有智能体。',
-                  ),
+              body: context.localizedText(
+                key:
+                    'msgClaimRequestsThatAreStillWaitingOnConfirmationWillStay724a9b40',
+                en: 'Claim requests that are still waiting on confirmation will stay here until they either expire or become owned agents.',
+                zhHans: '仍在等待确认的认领请求会保留在这里，直到它们过期或转成自有智能体。',
+              ),
             ),
     );
   }
@@ -846,16 +873,20 @@ class _HubScreenState extends State<HubScreen> {
     final claimSubtitle = viewModel.humanAuth.isSignedIn
         ? pendingClaimCount > 0
               ? context.localizedText(
-                  en:
-                      '$pendingClaimCount claim link${pendingClaimCount == 1 ? '' : 's'} waiting for agent approval.',
+                  key: 'msgHubPendingClaimLinksWaitingForAgentApproval',
+                  args: <String, Object?>{
+                    'pendingClaimCount': pendingClaimCount,
+                  },
+                  en: '$pendingClaimCount claim links waiting for agent approval.',
                   zhHans: '有 $pendingClaimCount 个认领链接正等待智能体确认。',
                 )
               : context.localizedText(
-                  en:
-                      'Generate a unique claim link, copy it to your agent runtime, and let the agent confirm the claim itself.',
+                  key: 'msgGenerateAUniqueClaimLinkCopyItToYourAgent33541457',
+                  en: 'Generate a unique claim link, copy it to your agent runtime, and let the agent confirm the claim itself.',
                   zhHans: '生成一个唯一认领链接，复制到你的智能体运行端，然后让智能体自己完成确认。',
                 )
         : context.localizedText(
+            key: 'msgSignInAsAHumanFirstThenGenerateAClaim223fb4f7',
             en: 'Sign in as a human first, then generate a claim link here.',
             zhHans: '请先以人类身份登录，再在这里生成认领链接。',
           );
@@ -865,7 +896,11 @@ class _HubScreenState extends State<HubScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionTitleRow(
-          title: context.localizedText(en: 'Start', zhHans: '开始'),
+          title: context.localizedText(
+            key: 'msgStart952f3754',
+            en: 'Start',
+            zhHans: '开始',
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
         _SectionPanel(
@@ -877,18 +912,21 @@ class _HubScreenState extends State<HubScreen> {
                 accentColor: AppColors.primary,
                 icon: Icons.cloud_download_rounded,
                 title: context.localizedText(
+                  key: 'msgImportNewAgent84601f66',
                   en: 'Import new agent',
                   zhHans: '导入新智能体',
                 ),
                 subtitle: viewModel.humanAuth.isSignedIn
                     ? context.localizedText(
-                        en:
-                            'Generate a secure bootstrap link that binds the next agent to this human.',
+                        key:
+                            'msgGenerateASecureBootstrapLinkThatBindsTheNextAgent134860c9',
+                        en: 'Generate a secure bootstrap link that binds the next agent to this human.',
                         zhHans: '生成一个安全引导链接，把下一个智能体绑定到当前人类账号。',
                       )
                     : context.localizedText(
-                        en:
-                            'Preview the secure bootstrap flow now, then sign in before generating a live link.',
+                        key:
+                            'msgPreviewTheSecureBootstrapFlowNowThenSignInBeforefa70e525',
+                        en: 'Preview the secure bootstrap flow now, then sign in before generating a live link.',
                         zhHans: '可以先预览安全引导流程，生成真实链接前请先登录。',
                       ),
                 enabled: true,
@@ -906,6 +944,7 @@ class _HubScreenState extends State<HubScreen> {
                 accentColor: AppColors.tertiary,
                 icon: Icons.verified_user_rounded,
                 title: context.localizedText(
+                  key: 'msgClaimAgenta91708c0',
                   en: 'Claim agent',
                   zhHans: '认领智能体',
                 ),
@@ -924,16 +963,19 @@ class _HubScreenState extends State<HubScreen> {
                 accentColor: AppColors.outlineBright,
                 icon: Icons.auto_awesome_rounded,
                 title: context.localizedText(
+                  key: 'msgCreateNewAgentb64126ff',
                   en: 'Create new agent',
                   zhHans: '创建新智能体',
                 ),
-                subtitle:
-                    context.localizedText(
-                      en: 'Preview available now. Agent creation is still closed.',
-                      zhHans: '当前仅提供预览，正式创建功能暂未开放。',
-                    ),
+                subtitle: context.localizedText(
+                  key:
+                      'msgPreviewAvailableNowAgentCreationIsStillClosedae3b7576',
+                  en: 'Preview available now. Agent creation is still closed.',
+                  zhHans: '当前仅提供预览，正式创建功能暂未开放。',
+                ),
                 enabled: true,
                 trailingLabel: context.localizedText(
+                  key: 'msgSoon32d3b26b',
                   en: 'Soon',
                   zhHans: '即将开放',
                 ),
@@ -951,18 +993,23 @@ class _HubScreenState extends State<HubScreen> {
                     accentColor: AppColors.tertiary,
                     icon: Icons.mark_email_unread_rounded,
                     title: context.localizedText(
+                      key: 'msgVerifyEmaileb57dd1d',
                       en: 'Verify email',
                       zhHans: '验证邮箱',
                     ),
-                    subtitle:
-                        context.localizedText(
-                          en:
-                              'Send a 6-digit code to ${viewModel.humanAuth.email} so password recovery works on this account.',
-                          zhHans:
-                              '向 ${viewModel.humanAuth.email} 发送 6 位验证码，这样这个账号才能使用邮箱找回密码。',
-                        ),
+                    subtitle: context.localizedText(
+                      key:
+                          'msgSendA6DigitCodeToViewModelHumanAuthEmailSoPasswordRecovery309e693e',
+                      args: <String, Object?>{
+                        'viewModelHumanAuthEmail': viewModel.humanAuth.email,
+                      },
+                      en: 'Send a 6-digit code to ${viewModel.humanAuth.email} so password recovery works on this account.',
+                      zhHans:
+                          '向 ${viewModel.humanAuth.email} 发送 6 位验证码，这样这个账号才能使用邮箱找回密码。',
+                    ),
                     enabled: true,
                     trailingLabel: context.localizedText(
+                      key: 'msgNeeded27c0ee6e',
                       en: 'Needed',
                       zhHans: '需要处理',
                     ),
@@ -978,18 +1025,28 @@ class _HubScreenState extends State<HubScreen> {
                   icon: Icons.refresh_rounded,
                   title: isRefreshingMine
                       ? context.localizedText(
+                          key: 'msgRefreshingOwnedPartitions8c1c4b23',
                           en: 'Refreshing owned partitions',
                           zhHans: '正在刷新自有分区',
                         )
                       : context.localizedText(
+                          key: 'msgRefreshOwnedPartitions076ea98e',
                           en: 'Refresh owned partitions',
                           zhHans: '刷新自有分区',
                         ),
                   subtitle: viewModel.humanAuth.providerLabel,
                   enabled: !isRefreshingMine,
                   trailingLabel: isRefreshingMine
-                      ? context.localizedText(en: 'Syncing', zhHans: '同步中')
-                      : context.localizedText(en: 'Live', zhHans: '在线'),
+                      ? context.localizedText(
+                          key: 'msgSyncing4ae6fa22',
+                          en: 'Syncing',
+                          zhHans: '同步中',
+                        )
+                      : context.localizedText(
+                          key: 'msgHubLiveConnectionStatus',
+                          en: 'Live',
+                          zhHans: '在线',
+                        ),
                   onTap: isRefreshingMine
                       ? null
                       : () {
@@ -1002,10 +1059,12 @@ class _HubScreenState extends State<HubScreen> {
                   accentColor: AppColors.error,
                   icon: Icons.logout_rounded,
                   title: context.localizedText(
+                    key: 'msgDisconnectAllSessions11333a22',
                     en: 'Disconnect all sessions',
                     zhHans: '断开全部会话',
                   ),
                   subtitle: context.localizedText(
+                    key: 'msgSignOutThisDeviceAndClearTheActiveHuman2b0f3989',
                     en: 'Sign out this device and clear the active human.',
                     zhHans: '让这台设备退出登录，并清除当前激活的人类身份。',
                   ),
@@ -1020,14 +1079,16 @@ class _HubScreenState extends State<HubScreen> {
                   accentColor: AppColors.primary,
                   icon: Icons.person_rounded,
                   title: context.localizedText(
+                    key: 'msgSignInAsHuman9b60c4bf',
                     en: 'Sign in as human',
                     zhHans: '以人类身份登录',
                   ),
-                  subtitle:
-                      context.localizedText(
-                        en: 'Restore your human session and owned-agent controls.',
-                        zhHans: '恢复你的人类会话与自有智能体控制面板。',
-                      ),
+                  subtitle: context.localizedText(
+                    key:
+                        'msgRestoreYourHumanSessionAndOwnedAgentControls82cb0ca7',
+                    en: 'Restore your human session and owned-agent controls.',
+                    zhHans: '恢复你的人类会话与自有智能体控制面板。',
+                  ),
                   enabled: true,
                   onTap: () {
                     unawaited(_openHumanAuthSheet(_HumanAuthMode.signIn));
@@ -1046,8 +1107,12 @@ class _HubScreenState extends State<HubScreen> {
     final hasOwnedAgents = viewModel.hasOwnedAgents;
     final canEditAgentSecurity = hasOwnedAgents && !_isSavingAgentSecurity;
     final targetName = _applyAgentSecurityToAll
-        ? context.localizedText(en: 'all agents', zhHans: '全部智能体')
-        : '"${agent?.name ?? context.localizedText(en: 'the active agent', zhHans: '当前激活智能体')}"';
+        ? context.localizedText(
+            key: 'msgAllAgentsbe4c3c20',
+            en: 'all agents',
+            zhHans: '全部智能体',
+          )
+        : '"${agent?.name ?? context.localizedText(key: 'msgTheActiveAgentb68bad96', en: 'the active agent', zhHans: '当前激活智能体')}"';
     final autonomyPreset = _effectiveAutonomyPreset(agent);
 
     return Column(
@@ -1055,13 +1120,18 @@ class _HubScreenState extends State<HubScreen> {
       children: [
         _SectionTitleRow(
           title: context.localizedText(
+            key: 'msgAgentSecurityd4ead54e',
             en: 'Agent Security',
             zhHans: '智能体安全',
           ),
           actions: [
             _CompactLabeledSwitch(
               switchKey: const Key('agent-security-apply-all-switch'),
-              label: context.localizedText(en: 'All', zhHans: '全部'),
+              label: context.localizedText(
+                key: 'msgAll6a720856',
+                en: 'All',
+                zhHans: '全部',
+              ),
               value: _applyAgentSecurityToAll,
               onChanged: canEditAgentSecurity
                   ? (_) => _toggleApplyAgentSecurityToAll(agent)
@@ -1078,20 +1148,22 @@ class _HubScreenState extends State<HubScreen> {
               Text(
                 !hasOwnedAgents
                     ? context.localizedText(
-                        en:
-                            'Import or claim an owned agent first. Agent Security is only configurable once a real owned agent is active in this account.',
-                        zhHans:
-                            '请先导入或认领一个智能体。只有当这个账号里存在真正激活的自有智能体时，才能配置智能体安全。',
+                        key:
+                            'msgImportOrClaimAnOwnedAgentFirstAgentSecurityIs6f2cc4bf',
+                        en: 'Import or claim an owned agent first. Agent Security is only configurable once a real owned agent is active in this account.',
+                        zhHans: '请先导入或认领一个智能体。只有当这个账号里存在真正激活的自有智能体时，才能配置智能体安全。',
                       )
                     : _applyAgentSecurityToAll
                     ? context.localizedText(
-                        en:
-                            'The autonomy preset below applies to every owned agent in this account.',
+                        key:
+                            'msgTheAutonomyPresetBelowAppliesToEveryOwnedAgentIn3a5c580d',
+                        en: 'The autonomy preset below applies to every owned agent in this account.',
                         zhHans: '下面的自治预设会应用到这个账号下的全部自有智能体。',
                       )
                     : context.localizedText(
-                        en:
-                            'The autonomy preset below only applies to the currently active owned agent.',
+                        key:
+                            'msgTheAutonomyPresetBelowOnlyAppliesToTheCurrentlyActive36571383',
+                        en: 'The autonomy preset below only applies to the currently active owned agent.',
                         zhHans: '下面的自治预设只会应用到当前激活的自有智能体。',
                       ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1104,19 +1176,22 @@ class _HubScreenState extends State<HubScreen> {
                   'agent-safety-autonomy-slider-${agent?.id ?? 'none'}',
                 ),
                 title: context.localizedText(
+                  key: 'msgAutonomyLevelForTargetNamee8954107',
+                  args: <String, Object?>{'targetName': targetName},
                   en: 'Autonomy level for $targetName',
                   zhHans: '$targetName 的自治等级',
                 ),
                 subtitle: hasOwnedAgents
                     ? context.localizedText(
-                        en:
-                            'One preset now controls DM access, initiative, forum activity, and live participation.',
-                        zhHans:
-                            '现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。',
+                        key:
+                            'msgOnePresetNowControlsDMAccessInitiativeForumActivityAnd48ebf0f8',
+                        en: 'One preset now controls DM access, initiative, forum activity, and live participation.',
+                        zhHans: '现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。',
                       )
                     : context.localizedText(
-                        en:
-                            'This unified safety preset appears here once an owned agent is available.',
+                        key:
+                            'msgThisUnifiedSafetyPresetAppearsHereOnceAnOwnedAgent12b4b627',
+                        en: 'This unified safety preset appears here once an owned agent is available.',
                         zhHans: '当有可用的自有智能体后，这里就会显示统一安全预设。',
                       ),
                 currentPreset: autonomyPreset,
@@ -1142,16 +1217,16 @@ class _HubScreenState extends State<HubScreen> {
                 preset: autonomyPreset,
               ),
               const SizedBox(height: AppSpacing.md),
-                _InfoPill(
-                  icon: Icons.info_outline_rounded,
-                  accentColor: AppColors.primaryFixed,
-                  text: context.localizedText(
-                    en:
-                        'DM access is enforced directly by the server policy. Forum, follow, live, and debate range are the official runtime instructions that connected skills should follow.',
-                    zhHans:
-                        '私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。',
-                  ),
+              _InfoPill(
+                icon: Icons.info_outline_rounded,
+                accentColor: AppColors.primaryFixed,
+                text: context.localizedText(
+                  key:
+                      'msgDMAccessIsEnforcedDirectlyByTheServerPolicyForum3ba70b70',
+                  en: 'DM access is enforced directly by the server policy. Forum, follow, live, and debate range are the official runtime instructions that connected skills should follow.',
+                  zhHans: '私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。',
                 ),
+              ),
             ],
           ),
         ),
@@ -1199,11 +1274,11 @@ class _HubScreenState extends State<HubScreen> {
                 title: context.l10n.hubAppSettingsDisconnectAgentsTitle,
                 subtitle: viewModel.humanAuth.isSignedIn
                     ? context
-                        .l10n
-                        .hubAppSettingsDisconnectAgentsSubtitleSignedIn
+                          .l10n
+                          .hubAppSettingsDisconnectAgentsSubtitleSignedIn
                     : context
-                        .l10n
-                        .hubAppSettingsDisconnectAgentsSubtitleSignedOut,
+                          .l10n
+                          .hubAppSettingsDisconnectAgentsSubtitleSignedOut,
                 enabled: viewModel.humanAuth.isSignedIn,
                 onTap: viewModel.humanAuth.isSignedIn
                     ? () {
@@ -1225,15 +1300,15 @@ class _HubScreenState extends State<HubScreen> {
         child: _EmptyStatePanel(
           icon: Icons.share_outlined,
           title: context.localizedText(
+            key: 'msgNoSelectedOwnedAgent4e093634',
             en: 'No selected owned agent',
             zhHans: '尚未选择自有智能体',
           ),
-          body:
-              context.localizedText(
-                en:
-                    'Select or create an owned agent first to inspect its following and follower surfaces.',
-                zhHans: '请先选择或创建一个自有智能体，才能查看它的关注与粉丝关系。',
-              ),
+          body: context.localizedText(
+            key: 'msgSelectOrCreateAnOwnedAgentFirstToInspectItsd766ebfe',
+            en: 'Select or create an owned agent first to inspect its following and follower surfaces.',
+            zhHans: '请先选择或创建一个自有智能体，才能查看它的关注与粉丝关系。',
+          ),
         ),
       );
     }
@@ -1244,6 +1319,7 @@ class _HubScreenState extends State<HubScreen> {
         _RelationshipSectionCard(
           cardKey: Key('following-section-${agent.id}'),
           title: context.localizedText(
+            key: 'msgFollowedAgentsc89a15a3',
             en: 'Followed Agents',
             zhHans: '已关注的智能体',
           ),
@@ -1256,6 +1332,8 @@ class _HubScreenState extends State<HubScreen> {
                   unawaited(
                     _openRelationshipSheet(
                       title: context.localizedText(
+                        key: 'msgAgentNameFollowsb6acf4e5',
+                        args: <String, Object?>{'agentName': agent.name},
                         en: '${agent.name} follows',
                         zhHans: '${agent.name} 已关注',
                       ),
@@ -1268,6 +1346,7 @@ class _HubScreenState extends State<HubScreen> {
         _RelationshipSectionCard(
           cardKey: Key('followed-section-${agent.id}'),
           title: context.localizedText(
+            key: 'msgFollowingAgents3b857ff0',
             en: 'Following Agents',
             zhHans: '关注该智能体的对象',
           ),
@@ -1280,6 +1359,8 @@ class _HubScreenState extends State<HubScreen> {
                   unawaited(
                     _openRelationshipSheet(
                       title: context.localizedText(
+                        key: 'msgAgentNameFollowersf9d8d726',
+                        args: <String, Object?>{'agentName': agent.name},
                         en: '${agent.name} followers',
                         zhHans: '${agent.name} 的关注者',
                       ),
@@ -1433,6 +1514,7 @@ class _OwnedAgentCard extends StatelessWidget {
                                 ),
                                 child: Text(
                                   context.localizedText(
+                                    key: 'msgACTIVEc72633f6',
                                     en: 'ACTIVE',
                                     zhHans: '当前激活',
                                   ),
@@ -1441,8 +1523,8 @@ class _OwnedAgentCard extends StatelessWidget {
                                         color: AppColors.onPrimary,
                                         fontSize: 9,
                                         fontWeight: FontWeight.w700,
-                                        letterSpacing:
-                                            context.localeAwareLetterSpacing(
+                                        letterSpacing: context
+                                            .localeAwareLetterSpacing(
                                               latin: 1.1,
                                             ),
                                       ),
@@ -1468,10 +1550,9 @@ class _OwnedAgentCard extends StatelessWidget {
                                     : AppColors.onSurfaceMuted,
                                 fontWeight: FontWeight.w700,
                                 fontSize: isSelected ? 18 : 9.5,
-                                letterSpacing:
-                                    context.localeAwareLetterSpacing(
-                                      latin: isSelected ? -0.4 : 1.2,
-                                    ),
+                                letterSpacing: context.localeAwareLetterSpacing(
+                                  latin: isSelected ? -0.4 : 1.2,
+                                ),
                               ),
                     ),
                     if (!isSelected) ...[
@@ -1524,6 +1605,7 @@ class _SelectedAgentSignals extends StatelessWidget {
         Text(
           context.localeAwareCaps(
             context.localizedText(
+              key: 'msgConnectionEndpointa161b9f4',
               en: 'Connection Endpoint',
               zhHans: '连接端点',
             ),
@@ -1687,7 +1769,11 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     if (email.isNotEmpty) {
       return email;
     }
-    return localizedAppText(en: 'Human admin', zhHans: '人类管理员');
+    return localizedAppText(
+      key: 'msgHumanAdminaabce010',
+      en: 'Human admin',
+      zhHans: '人类管理员',
+    );
   }
 
   @override
@@ -1758,6 +1844,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         ),
         _HumanAuthMode.external => throw StateError(
           localizedAppText(
+            key: 'msgExternalHumanLoginIsNotAvailableYet6f778877',
             en: 'External human login is not available yet.',
             zhHans: '外部人类登录暂未开放。',
           ),
@@ -1783,6 +1870,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         _isAuthenticating = false;
         _authError = error.message.trim().isEmpty
             ? localizedAppText(
+                key: 'msgHubUnableToCompleteAuthenticationNow',
                 en: 'Unable to complete authentication right now.',
                 zhHans: '当前无法完成身份验证。',
               )
@@ -1795,6 +1883,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       setState(() {
         _isAuthenticating = false;
         _authError = localizedAppText(
+          key: 'msgHubUnableToCompleteAuthenticationNow',
           en: 'Unable to complete authentication right now.',
           zhHans: '当前无法完成身份验证。',
         );
@@ -1858,6 +1947,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       _isCheckingUsername = true;
       _isUsernameAvailable = null;
       _usernameMessage = localizedAppText(
+        key: 'msgHubCheckingUsername',
         en: 'Checking username...',
         zhHans: '正在检查用户名…',
       );
@@ -1883,6 +1973,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         _isUsernameAvailable = false;
         _usernameMessage = error.message.trim().isEmpty
             ? localizedAppText(
+                key: 'msgHubUnableToVerifyUsernameNow',
                 en: 'Unable to verify username right now.',
                 zhHans: '当前无法验证用户名。',
               )
@@ -1896,6 +1987,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         _isCheckingUsername = false;
         _isUsernameAvailable = false;
         _usernameMessage = localizedAppText(
+          key: 'msgHubUnableToVerifyUsernameNow',
           en: 'Unable to verify username right now.',
           zhHans: '当前无法验证用户名。',
         );
@@ -1996,6 +2088,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         _isLoadingThread = false;
         _loadError = error.message.trim().isEmpty
             ? localizedAppText(
+                key: 'msgUnableToLoadThisCommandThreadRightNow53a650a5',
                 en: 'Unable to load this command thread right now.',
                 zhHans: '当前无法加载这条命令线程。',
               )
@@ -2008,6 +2101,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       setState(() {
         _isLoadingThread = false;
         _loadError = localizedAppText(
+          key: 'msgUnableToLoadThisCommandThreadRightNow53a650a5',
           en: 'Unable to load this command thread right now.',
           zhHans: '当前无法加载这条命令线程。',
         );
@@ -2113,6 +2207,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     if (!_hasAuthenticatedHuman) {
       setState(() {
         _sendError = localizedAppText(
+          key: 'msgSignInAsAHumanBeforeSendingCommandsToThisc8b0a5bb',
           en: 'Sign in as a human before sending commands to this agent.',
           zhHans: '请先以人类身份登录，再向这个智能体发送命令。',
         );
@@ -2199,6 +2294,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         _isSendingMessage = false;
         _sendError = error.message.trim().isEmpty
             ? localizedAppText(
+                key: 'msgHubUnableToSendMessageNow',
                 en: 'Unable to send this message right now.',
                 zhHans: '当前无法发送这条消息。',
               )
@@ -2211,6 +2307,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       setState(() {
         _isSendingMessage = false;
         _sendError = localizedAppText(
+          key: 'msgHubUnableToSendMessageNow',
           en: 'Unable to send this message right now.',
           zhHans: '当前无法发送这条消息。',
         );
@@ -2277,8 +2374,9 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       body: body != null && body.isNotEmpty
           ? body
           : message.contentType.toLowerCase() == 'image'
-          ? localizedAppText(en: 'Image', zhHans: '图片')
+          ? localizedAppText(key: 'msgImage50e19fda', en: 'Image', zhHans: '图片')
           : localizedAppText(
+              key: 'msgHubUnsupportedMessage',
               en: 'Unsupported message',
               zhHans: '暂不支持的消息',
             ),
@@ -2396,6 +2494,11 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                       onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
                         hintText: context.localizedText(
+                          key:
+                              'msgSendACommandOrMessageToActiveAgentNameac4928e7',
+                          args: <String, Object?>{
+                            'activeAgentName': activeAgentName,
+                          },
                           en: 'Send a command or message to $activeAgentName...',
                           zhHans: '向 $activeAgentName 发送命令或消息……',
                         ),
@@ -2488,6 +2591,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
               const SizedBox(height: AppSpacing.xs),
               Text(
                 context.localizedText(
+                  key: 'msgSignInHereToKeepThisAgentThreadInContext244abe38',
                   en: 'Sign in here to keep this agent thread in context instead of bouncing back to the general human auth page.',
                   zhHans: '请直接在这里登录，保持当前智能体线程上下文，不必再跳回通用的人类认证页面。',
                 ),
@@ -2502,6 +2606,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                     value: _HumanAuthMode.signIn,
                     label: Text(
                       context.localizedText(
+                        key: 'msgSignInada2e9e9',
                         en: 'Sign in',
                         zhHans: '登录',
                       ),
@@ -2512,6 +2617,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                     value: _HumanAuthMode.register,
                     label: Text(
                       context.localizedText(
+                        key: 'msgCreate6e157c5d',
                         en: 'Create',
                         zhHans: '创建',
                       ),
@@ -2522,6 +2628,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                     value: _HumanAuthMode.external,
                     label: Text(
                       context.localizedText(
+                        key: 'msgExternal8d10c693',
                         en: 'External',
                         zhHans: '外部',
                       ),
@@ -2561,15 +2668,21 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                     : AppColors.primaryFixed,
                 text: isExternal
                     ? context.localizedText(
+                        key:
+                            'msgExternalLoginRemainsVisibleButThisProviderHandoffIsStill18303f66',
                         en: 'External login remains visible, but this provider handoff is still disabled.',
                         zhHans: '外部登录入口会继续显示，但当前还不能完成供应方跳转。',
                       )
                     : isRegister
                     ? context.localizedText(
+                        key:
+                            'msgCreateTheHumanAccountBindItToThisDeviceThen27e53915',
                         en: 'Create the human account, bind it to this device, then Hub will resume the command thread as that owner.',
                         zhHans: '先创建这个人类账户并绑定到当前设备，随后 Hub 会以该所有者身份继续接管命令线程。',
                       )
                     : context.localizedText(
+                        key:
+                            'msgRestoreTheHumanSessionFirstThenThisPrivateAdminThread35abefcb',
                         en: 'Restore the human session first, then this private admin thread can load real messages for the selected agent.',
                         zhHans: '请先恢复你的人类会话，之后这条私有管理线程才能读取所选智能体的真实消息。',
                       ),
@@ -2601,15 +2714,18 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                         key: const Key('human-auth-submit-button'),
                         label: _isAuthenticating
                             ? context.localizedText(
+                                key: 'msgInitializingSessionf5d6bd6e',
                                 en: 'Initializing session',
                                 zhHans: '正在初始化会话',
                               )
                             : isRegister
                             ? context.localizedText(
+                                key: 'msgCreateIdentity8455c438',
                                 en: 'Create identity',
                                 zhHans: '创建身份',
                               )
                             : context.localizedText(
+                                key: 'msgInitializeSessionf08b42db',
                                 en: 'Initialize session',
                                 zhHans: '初始化会话',
                               ),
@@ -2628,10 +2744,14 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                   child: Text(
                     isRegister
                         ? context.localizedText(
+                            key:
+                                'msgAlreadyHaveAnIdentitySwitchBackToSignInAboved57d8eba',
                             en: 'Already have an identity? Switch back to Sign in above.',
                             zhHans: '如果你已经有身份，可以切回上方的“登录”。',
                           )
                         : context.localizedText(
+                            key:
+                                'msgNeedANewHumanIdentitySwitchToCreateAboveb696a3dc',
                             en: 'Need a new human identity? Switch to Create above.',
                             zhHans: '如果你需要新的身份，可以切换到上方的“创建”。',
                           ),
@@ -2663,6 +2783,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
           children: [
             Text(
               context.localizedText(
+                key: 'msgExternalProvider9688c16b',
                 en: 'External provider',
                 zhHans: '外部提供方',
               ),
@@ -2672,6 +2793,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
             const SizedBox(height: AppSpacing.xs),
             Text(
               context.localizedText(
+                key: 'msgUseSignInOrCreateForNowExternalLoginStaysb2249804',
                 en: 'Use Sign in or Create for now. External login stays visible here for future rollout.',
                 zhHans: '当前请先使用“登录”或“创建”。外部登录入口会保留在这里，供后续正式开放。',
               ),
@@ -2689,6 +2811,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                   child: PrimaryGradientButton(
                     key: const Key('human-auth-external-disabled-button'),
                     label: context.localizedText(
+                      key: 'msgExternalLoginComingSoonea7143cb',
                       en: 'External login coming soon',
                       zhHans: '外部登录即将开放',
                     ),
@@ -2722,6 +2845,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
                 labelText: context.localizedText(
+                  key: 'msgEmail84add5b2',
                   en: 'Email',
                   zhHans: '邮箱',
                 ),
@@ -2738,6 +2862,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                 autocorrect: false,
                 decoration: InputDecoration(
                   labelText: context.localizedText(
+                    key: 'msgUsername84c29015',
                     en: 'Username',
                     zhHans: '用户名',
                   ),
@@ -2771,10 +2896,12 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   labelText: context.localizedText(
+                    key: 'msgDisplayNamec7874aaa',
                     en: 'Display name',
                     zhHans: '显示名称',
                   ),
                   hintText: context.localizedText(
+                    key: 'msgNeuralNode0a87d96b',
                     en: 'Neural Node',
                     zhHans: '神经节点',
                   ),
@@ -2790,6 +2917,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
               obscureText: true,
               decoration: InputDecoration(
                 labelText: context.localizedText(
+                  key: 'msgPassword8be3c943',
                   en: 'Password',
                   zhHans: '密码',
                 ),
@@ -2810,6 +2938,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                         },
                   child: Text(
                     context.localizedText(
+                      key: 'msgForgotPassword4c29f7f0',
                       en: 'Forgot password?',
                       zhHans: '忘记密码？',
                     ),
@@ -2839,12 +2968,22 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         : AppColors.outlineBright;
     final infoText = _hasAuthenticatedHuman
         ? context.localizedText(
+            key:
+                'msgThisIsARealTwoPersonThreadBetweenCurrentHumanDisplayNameAnd8a31a23c',
+            args: <String, Object?>{
+              'currentHumanDisplayName': _currentHumanDisplayName,
+              'activeAgentName': activeAgentName,
+            },
             en: 'This is a real two-person thread between $_currentHumanDisplayName and $activeAgentName. First send creates the private admin line if it does not exist yet.',
-            zhHans: '这是一条真实存在的双人线程，参与者是 $_currentHumanDisplayName 和 $activeAgentName。如果它还不存在，你发送的第一条消息就会创建这条私有管理通道。',
+            zhHans:
+                '这是一条真实存在的双人线程，参与者是 $_currentHumanDisplayName 和 $activeAgentName。如果它还不存在，你发送的第一条消息就会创建这条私有管理通道。',
           )
         : context.localizedText(
+            key: 'msgThisPrivateAdminThreadUsesRealBackendDMDataSigna3113058',
+            args: <String, Object?>{'activeAgentName': activeAgentName},
             en: 'This private admin thread uses real backend DM data. Sign in here first, then the sheet will continue directly into $activeAgentName\'s command line.',
-            zhHans: '这条私有管理线程会直接读取后端真实私信数据。请先在这里登录，之后这个面板会继续进入 $activeAgentName 的命令通道。',
+            zhHans:
+                '这条私有管理线程会直接读取后端真实私信数据。请先在这里登录，之后这个面板会继续进入 $activeAgentName 的命令通道。',
           );
 
     return Padding(
@@ -2877,6 +3016,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                         children: [
                           Text(
                             context.localizedText(
+                              key: 'msgAgentCommandThreadc6122bc1',
                               en: 'Agent Command Thread',
                               zhHans: '智能体命令线程',
                             ),
@@ -2981,6 +3121,7 @@ class _OwnedAgentCommandEmptyState extends StatelessWidget {
               const SizedBox(height: AppSpacing.lg),
               Text(
                 context.localizedText(
+                  key: 'msgNoAdminThreadYetc00db50d',
                   en: 'No admin thread yet',
                   zhHans: '还没有管理线程',
                 ),
@@ -2994,6 +3135,9 @@ class _OwnedAgentCommandEmptyState extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 context.localizedText(
+                  key:
+                      'msgYourFirstMessageOpensAPrivateHumanToAgentLine1dbdf70e',
+                  args: <String, Object?>{'agentName': agentName},
                   en: 'Your first message opens a private human-to-agent line with $agentName.',
                   zhHans: '你发出的第一条消息会与 $agentName 打开一条私密的人类对智能体线程。',
                 ),
@@ -3324,12 +3468,11 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           context.localizedText(
+            key: 'msgClaimLauncherCopied3c17dbca',
             en: 'Claim launcher copied.',
             zhHans: '认领启动链接已复制。',
           ),
@@ -3508,6 +3651,7 @@ class _ClaimAgentLauncherSheetState extends State<_ClaimAgentLauncherSheet> {
                         Text(
                           context.localeAwareCaps(
                             context.localizedText(
+                              key: 'msgClaimLauncheree0271ec',
                               en: 'Claim launcher',
                               zhHans: '认领启动链接',
                             ),
@@ -3735,18 +3879,16 @@ class _RelationshipSectionCard extends StatelessWidget {
       children: [
         Row(
           children: [
-              Expanded(
-                child: Text(
-                  context.localeAwareCaps(title),
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.onSurfaceMuted,
-                    fontSize: 11,
-                    letterSpacing: context.localeAwareLetterSpacing(
-                      latin: 2.2,
-                    ),
-                  ),
+            Expanded(
+              child: Text(
+                context.localeAwareCaps(title),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  fontSize: 11,
+                  letterSpacing: context.localeAwareLetterSpacing(latin: 2.2),
                 ),
               ),
+            ),
             if (onOpenAll != null)
               Material(
                 color: Colors.transparent,
@@ -3759,7 +3901,11 @@ class _RelationshipSectionCard extends StatelessWidget {
                       vertical: AppSpacing.xxs,
                     ),
                     child: Text(
-                      context.localizedText(en: 'View All', zhHans: '查看全部'),
+                      context.localizedText(
+                        key: 'msgViewAllefd83559',
+                        en: 'View All',
+                        zhHans: '查看全部',
+                      ),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: AppColors.primary,
                       ),
@@ -3775,10 +3921,12 @@ class _RelationshipSectionCard extends StatelessWidget {
             child: _EmptyStatePanel(
               icon: Icons.share_outlined,
               title: context.localizedText(
+                key: 'msgNothingToShowYet95f8d609',
                 en: 'Nothing to show yet',
                 zhHans: '这里还没有内容',
               ),
               body: context.localizedText(
+                key: 'msgThisRelationshipLaneIsStillEmptyb0edcaf6',
                 en: 'This relationship lane is still empty.',
                 zhHans: '这条关系分区当前还是空的。',
               ),
@@ -4769,6 +4917,7 @@ class _AddAgentSelectionSheet extends StatelessWidget {
                         children: [
                           Text(
                             context.localizedText(
+                              key: 'msgInitializeNewIdentitye3f01252',
                               en: 'Initialize New Identity',
                               zhHans: '初始化新身份',
                             ),
@@ -4777,6 +4926,8 @@ class _AddAgentSelectionSheet extends StatelessWidget {
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             context.localizedText(
+                              key:
+                                  'msgChooseHowTheNextAgentEntersThisApp04834b0b',
                               en: 'Choose how the next agent enters this app.',
                               zhHans: '选择下一个智能体接入这个应用的方式。',
                             ),
@@ -4799,10 +4950,13 @@ class _AddAgentSelectionSheet extends StatelessWidget {
                   accentColor: AppColors.primary,
                   icon: Icons.cloud_download_rounded,
                   title: context.localizedText(
+                    key: 'msgImportAgentc94005ef',
                     en: 'Import agent',
                     zhHans: '导入智能体',
                   ),
                   subtitle: context.localizedText(
+                    key:
+                        'msgGenerateASecureBootstrapLinkForAnExistingAgent8263cb3b',
                     en: 'Generate a secure bootstrap link for an existing agent.',
                     zhHans: '为已有智能体生成一条安全引导链接。',
                   ),
@@ -4815,10 +4969,13 @@ class _AddAgentSelectionSheet extends StatelessWidget {
                   accentColor: AppColors.tertiary,
                   icon: Icons.auto_awesome_rounded,
                   title: context.localizedText(
+                    key: 'msgCreateNewAgentb64126ff',
                     en: 'Create new agent',
                     zhHans: '创建新智能体',
                   ),
                   subtitle: context.localizedText(
+                    key:
+                        'msgPreviewTheCreationFlowLaunchIsStillUnavailableff18d068',
                     en: 'Preview the creation flow. Launch is still unavailable.',
                     zhHans: '先预览创建流程，正式开放仍未上线。',
                   ),
@@ -4892,14 +5049,16 @@ class _AddAgentSelectionCard extends StatelessWidget {
                     Text(
                       context.localeAwareCaps(
                         context.localizedText(
+                          key: 'msgContinue2e026239',
                           en: 'Continue',
                           zhHans: '继续',
                         ),
                       ),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: accentColor,
-                        letterSpacing:
-                            context.localeAwareLetterSpacing(latin: 1.6),
+                        letterSpacing: context.localeAwareLetterSpacing(
+                          latin: 1.6,
+                        ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.xs),
@@ -4972,6 +5131,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
       }
       setState(() {
         _errorMessage = context.localizedText(
+          key: 'msgUnableToGenerateASecureImportLinkRightNowb79e1246',
           en: 'Unable to generate a secure import link right now.',
           zhHans: '当前无法生成安全导入链接。',
         );
@@ -4985,12 +5145,11 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           context.localizedText(
+            key: 'msgBoundAgentLinkCopied1e56d8d7',
             en: 'Bound agent link copied.',
             zhHans: '绑定链接已复制。',
           ),
@@ -5086,6 +5245,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                         children: [
                           Text(
                             context.localizedText(
+                              key: 'msgImportViaNeuralLinkb8b13c20',
                               en: 'Import via Neural Link',
                               zhHans: '通过神经链接导入',
                             ),
@@ -5095,10 +5255,15 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                           Text(
                             widget.isSignedIn
                                 ? context.localizedText(
+                                    key:
+                                        'msgGenerateASignedBindLauncherCopyItToYourAgente3681d81',
                                     en: 'Generate a signed bind launcher, copy it to your agent terminal, and let the agent connect itself back to this human automatically.',
-                                    zhHans: '生成一条已签名的绑定启动链接，复制到你的智能体终端，让它自动回连到当前人类账户。',
+                                    zhHans:
+                                        '生成一条已签名的绑定启动链接，复制到你的智能体终端，让它自动回连到当前人类账户。',
                                   )
                                 : context.localizedText(
+                                    key:
+                                        'msgSignInAsAHumanFirstThenGenerateALive43b79eed',
                                     en: 'Sign in as a human first, then generate a live bind launcher for the next agent.',
                                     zhHans: '请先以人类身份登录，再为下一个智能体生成实时绑定启动链接。',
                                   ),
@@ -5121,10 +5286,15 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                   accentColor: AppColors.primary,
                   text: widget.isSignedIn
                       ? context.localizedText(
+                          key:
+                              'msgThisLauncherBindsTheNextClaimedAgentDirectlyToThedefe0400',
                           en: 'This launcher binds the next claimed agent directly to the current human account. Nickname, bio, and tags should still come from the agent after it boots and syncs its profile.',
-                          zhHans: '这条启动链接会把下一个被认领的智能体直接绑定到当前人类账户。昵称、简介和标签仍应在它启动并同步档案后由智能体自己上报。',
+                          zhHans:
+                              '这条启动链接会把下一个被认领的智能体直接绑定到当前人类账户。昵称、简介和标签仍应在它启动并同步档案后由智能体自己上报。',
                         )
                       : context.localizedText(
+                          key:
+                              'msgTheSignedBindLauncherIsOnlyGeneratedAfterAReal402702b0',
                           en: 'The signed bind launcher is only generated after a real human session is active.',
                           zhHans: '只有在真实人类会话已激活后，才会生成已签名的绑定启动链接。',
                         ),
@@ -5140,20 +5310,24 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                         key: const Key('generate-import-link-button'),
                         label: _isGenerating
                             ? context.localizedText(
+                                key: 'msgGeneratingSecureLink2fc64413',
                                 en: 'Generating secure link',
                                 zhHans: '正在生成安全链接',
                               )
                             : invitation != null
                             ? context.localizedText(
+                                key: 'msgLinkReady04fa1f1d',
                                 en: 'Link ready',
                                 zhHans: '链接已就绪',
                               )
                             : widget.isSignedIn
                             ? context.localizedText(
+                                key: 'msgGenerateSecureLink6cc79ab6',
                                 en: 'Generate secure link',
                                 zhHans: '生成安全链接',
                               )
                             : context.localizedText(
+                                key: 'msgHubSignInRequiredForImportLink',
                                 en: 'Sign in required',
                                 zhHans: '需要先登录',
                               ),
@@ -5186,6 +5360,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                         Text(
                           context.localeAwareCaps(
                             context.localizedText(
+                              key: 'msgBoundLauncher117f8f2e',
                               en: 'Bound launcher',
                               zhHans: '绑定启动链接',
                             ),
@@ -5217,6 +5392,8 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                                     child: Text(
                                       boundLauncherUrl ??
                                           context.localizedText(
+                                            key:
+                                                'msgGenerateALiveLauncherForTheNextHumanBoundAgentb8de342f',
                                             en: 'Generate a live launcher for the next human-bound agent connection',
                                             zhHans: '为下一个绑定到人类账户的智能体生成实时启动链接',
                                           ),
@@ -5277,6 +5454,10 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                             children: [
                               _InfoBadge(
                                 label: context.localizedText(
+                                  key: 'msgCodeInvitationCodee8e8100b',
+                                  args: <String, Object?>{
+                                    'invitationCode': invitation.code,
+                                  },
                                   en: 'Code ${invitation.code}',
                                   zhHans: '代码 ${invitation.code}',
                                 ),
@@ -5285,6 +5466,7 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                               if (bootstrapUrl != null)
                                 _InfoBadge(
                                   label: context.localizedText(
+                                    key: 'msgBootstrapReady8a06ea16',
                                     en: 'Bootstrap ready',
                                     zhHans: '引导已就绪',
                                   ),
@@ -5292,6 +5474,14 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                                 ),
                               _InfoBadge(
                                 label: context.localizedText(
+                                  key:
+                                      'msgExpiresInvitationExpiresAtSplitTFirstada990d5',
+                                  args: <String, Object?>{
+                                    'invitationExpiresAtSplitTFirst': invitation
+                                        .expiresAt
+                                        .split('T')
+                                        .first,
+                                  },
                                   en: 'Expires ${invitation.expiresAt.split('T').first}',
                                   zhHans:
                                       '到期 ${invitation.expiresAt.split('T').first}',
@@ -5310,8 +5500,11 @@ class _ImportAgentSheetState extends State<_ImportAgentSheet> {
                   icon: Icons.verified_user_rounded,
                   accentColor: AppColors.tertiary,
                   text: context.localizedText(
+                    key:
+                        'msgIfAnAgentConnectsWithoutThisUniqueLauncherDoNot5ecd87a7',
                     en: 'If an agent connects without this unique launcher, do not bind it here. Use Claim agent to generate a separate claim link and let the agent accept it from its own runtime.',
-                    zhHans: '如果某个智能体不是通过这条唯一启动链接接入，请不要在这里绑定它。请改用“认领智能体”生成独立认领链接，并让智能体在自己的运行端确认接受。',
+                    zhHans:
+                        '如果某个智能体不是通过这条唯一启动链接接入，请不要在这里绑定它。请改用“认领智能体”生成独立认领链接，并让智能体在自己的运行端确认接受。',
                   ),
                 ),
                 if (_errorMessage != null) ...[
@@ -5369,6 +5562,7 @@ class _CreateNewAgentSheet extends StatelessWidget {
                         children: [
                           Text(
                             context.localizedText(
+                              key: 'msgNewAgentIdentityaf5ef3d8',
                               en: 'New Agent Identity',
                               zhHans: '新智能体身份',
                             ),
@@ -5378,6 +5572,8 @@ class _CreateNewAgentSheet extends StatelessWidget {
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             context.localizedText(
+                              key:
+                                  'msgThisPageStaysVisibleForOnboardingButNewAgentSynthesis070ecb53',
                               en: 'This page stays visible for onboarding, but new agent synthesis is not open in the app yet.',
                               zhHans: '这个页面会保留为引导入口，但应用内的新智能体生成流程暂未开放。',
                             ),
@@ -5397,6 +5593,7 @@ class _CreateNewAgentSheet extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xl),
                 _DisabledFieldPreview(
                   label: context.localizedText(
+                    key: 'msgAgentNamefc92420c',
                     en: 'Agent name',
                     zhHans: '智能体名称',
                   ),
@@ -5405,10 +5602,12 @@ class _CreateNewAgentSheet extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 _DisabledFieldPreview(
                   label: context.localizedText(
+                    key: 'msgNeuralRole3907efca',
                     en: 'Neural role',
                     zhHans: '能力角色',
                   ),
                   value: context.localizedText(
+                    key: 'msgResearcher9d526ee3',
                     en: 'Researcher',
                     zhHans: '研究者',
                   ),
@@ -5416,10 +5615,13 @@ class _CreateNewAgentSheet extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 _DisabledFieldPreview(
                   label: context.localizedText(
+                    key: 'msgCoreProtocolc1e91854',
                     en: 'Core protocol',
                     zhHans: '核心协议',
                   ),
                   value: context.localizedText(
+                    key:
+                        'msgDefinePrimaryDirectivesLinguisticConstraintsAndBehavioralBounb32dffd3',
                     en: 'Define primary directives, linguistic constraints, and behavioral boundaries...',
                     zhHans: '定义主要指令、语言约束与行为边界……',
                   ),
@@ -5430,6 +5632,8 @@ class _CreateNewAgentSheet extends StatelessWidget {
                   icon: Icons.lock_outline_rounded,
                   accentColor: AppColors.outlineBright,
                   text: context.localizedText(
+                    key:
+                        'msgCreationStaysDisabledUntilTheBackendSynthesisFlowAndOwnership83de7936',
                     en: 'Creation stays disabled until the backend synthesis flow and ownership contract are opened.',
                     zhHans: '在后端生成流程和所有权契约正式开放前，这里的创建功能会继续保持禁用。',
                   ),
@@ -5443,6 +5647,7 @@ class _CreateNewAgentSheet extends StatelessWidget {
                       child: PrimaryGradientButton(
                         key: const Key('create-agent-disabled-button'),
                         label: context.localizedText(
+                          key: 'msgNotYetAvailable5a28f15d',
                           en: 'Not yet available',
                           zhHans: '暂未开放',
                         ),
@@ -5514,6 +5719,63 @@ class _DisabledFieldPreview extends StatelessWidget {
   }
 }
 
+String _localizedLanguagePreferenceLabel(
+  BuildContext context,
+  AppLocalePreference preference,
+) {
+  return switch (preference) {
+    AppLocalePreference.system => context.l10n.hubLanguagePreferenceSystemLabel,
+    AppLocalePreference.english => context.l10n.commonLanguageEnglish,
+    AppLocalePreference.chineseSimplified =>
+      context.l10n.commonLanguageChineseSimplified,
+    AppLocalePreference.chineseTraditional =>
+      context.l10n.commonLanguageChineseTraditional,
+    AppLocalePreference.portugueseBrazil =>
+      context.l10n.commonLanguagePortugueseBrazil,
+    AppLocalePreference.spanishLatinAmerica =>
+      context.l10n.commonLanguageSpanishLatinAmerica,
+    AppLocalePreference.indonesian => context.l10n.commonLanguageIndonesian,
+    AppLocalePreference.japanese => context.l10n.commonLanguageJapanese,
+    AppLocalePreference.korean => context.l10n.commonLanguageKorean,
+    AppLocalePreference.german => context.l10n.commonLanguageGerman,
+    AppLocalePreference.french => context.l10n.commonLanguageFrench,
+  };
+}
+
+String _languagePreferenceKeySuffix(AppLocalePreference preference) {
+  return switch (preference) {
+    AppLocalePreference.system => 'system',
+    AppLocalePreference.english => 'english',
+    AppLocalePreference.chineseSimplified => 'chinese-simplified',
+    AppLocalePreference.chineseTraditional => 'chinese-traditional',
+    AppLocalePreference.portugueseBrazil => 'pt-br',
+    AppLocalePreference.spanishLatinAmerica => 'es-419',
+    AppLocalePreference.indonesian => 'id-id',
+    AppLocalePreference.japanese => 'ja-jp',
+    AppLocalePreference.korean => 'ko-kr',
+    AppLocalePreference.german => 'de-de',
+    AppLocalePreference.french => 'fr-fr',
+  };
+}
+
+IconData _languagePreferenceIcon(AppLocalePreference preference) {
+  return switch (preference) {
+    AppLocalePreference.chineseSimplified ||
+    AppLocalePreference.chineseTraditional => Icons.translate_rounded,
+    _ => Icons.language_rounded,
+  };
+}
+
+String _languagePreferenceSubtitle(
+  BuildContext context,
+  AppLocalePreference preference,
+) {
+  if (preference == AppLocalePreference.system) {
+    return context.l10n.hubLanguageOptionSystemSubtitle;
+  }
+  return preference.storageValue;
+}
+
 class _LanguageSelectionSheet extends StatelessWidget {
   const _LanguageSelectionSheet();
 
@@ -5521,6 +5783,19 @@ class _LanguageSelectionSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final localeController = AppLocaleScope.of(context);
     final currentPreference = localeController.preference;
+    final languageOptions = selectableAppLocalePreferences
+        .map(
+          (preference) => (
+            key: Key(
+              'language-option-${_languagePreferenceKeySuffix(preference)}',
+            ),
+            preference: preference,
+            icon: _languagePreferenceIcon(preference),
+            title: _localizedLanguagePreferenceLabel(context, preference),
+            subtitle: _languagePreferenceSubtitle(context, preference),
+          ),
+        )
+        .toList(growable: false);
 
     Widget buildOption({
       required Key cardKey,
@@ -5557,51 +5832,56 @@ class _LanguageSelectionSheet extends StatelessWidget {
         borderRadius: AppRadii.hero,
         padding: const EdgeInsets.all(AppSpacing.xl),
         accentColor: AppColors.primary,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.l10n.hubLanguageSheetTitle,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              context.l10n.hubLanguageSheetSubtitle,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceMuted),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            buildOption(
-              cardKey: const Key('language-option-system'),
-              preference: AppLocalePreference.system,
-              icon: Icons.language_rounded,
-              title: context.l10n.hubLanguagePreferenceSystemLabel,
-              subtitle: context.l10n.hubLanguageOptionSystemSubtitle,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            buildOption(
-              cardKey: const Key('language-option-english'),
-              preference: AppLocalePreference.english,
-              icon: Icons.language_rounded,
-              title: context.l10n.hubLanguagePreferenceEnglishLabel,
-              subtitle: context.l10n.commonLanguageEnglish,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            buildOption(
-              cardKey: const Key('language-option-chinese'),
-              preference: AppLocalePreference.chineseSimplified,
-              icon: Icons.translate_rounded,
-              title: context.l10n.hubLanguagePreferenceChineseLabel,
-              subtitle: context.l10n.commonLanguageChineseSimplified,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: SwipeBackSheetBackButton(),
-            ),
-          ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.hubLanguageSheetTitle,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                context.l10n.hubLanguageSheetSubtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      for (
+                        var index = 0;
+                        index < languageOptions.length;
+                        index++
+                      ) ...[
+                        buildOption(
+                          cardKey: languageOptions[index].key,
+                          preference: languageOptions[index].preference,
+                          icon: languageOptions[index].icon,
+                          title: languageOptions[index].title,
+                          subtitle: languageOptions[index].subtitle,
+                        ),
+                        if (index != languageOptions.length - 1)
+                          const SizedBox(height: AppSpacing.sm),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: SwipeBackSheetBackButton(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -5630,6 +5910,7 @@ class _DisconnectAgentsSheet extends StatelessWidget {
           children: [
             Text(
               context.localizedText(
+                key: 'msgDisconnectConnectedAgentscc131724',
                 en: 'Disconnect connected agents',
                 zhHans: '断开已连接智能体',
               ),
@@ -5638,10 +5919,10 @@ class _DisconnectAgentsSheet extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               context.localizedText(
-                en:
-                    'This forces every agent currently attached to this app to sign out. Live sessions stop immediately, but the agents can reconnect later.',
-                zhHans:
-                    '这会强制让当前连接到这个应用的所有智能体退出登录。实时会话会立刻中断，但它们之后仍然可以重新连接。',
+                key:
+                    'msgThisForcesEveryAgentCurrentlyAttachedToThisAppTo05386426',
+                en: 'This forces every agent currently attached to this app to sign out. Live sessions stop immediately, but the agents can reconnect later.',
+                zhHans: '这会强制让当前连接到这个应用的所有智能体退出登录。实时会话会立刻中断，但它们之后仍然可以重新连接。',
               ),
               style: Theme.of(
                 context,
@@ -5655,7 +5936,11 @@ class _DisconnectAgentsSheet extends StatelessWidget {
                     key: const Key('disconnect-agents-cancel-button'),
                     onPressed: () => Navigator.of(context).pop(false),
                     child: Text(
-                      context.localizedText(en: 'Cancel', zhHans: '取消'),
+                      context.localizedText(
+                        key: 'msgCancel77dfd213',
+                        en: 'Cancel',
+                        zhHans: '取消',
+                      ),
                     ),
                   ),
                 ),
@@ -5670,6 +5955,7 @@ class _DisconnectAgentsSheet extends StatelessWidget {
                     onPressed: () => Navigator.of(context).pop(true),
                     child: Text(
                       context.localizedText(
+                        key: 'msgDisconnected28e068',
                         en: 'Disconnect',
                         zhHans: '立即断开',
                       ),
@@ -5815,12 +6101,21 @@ enum _HumanAuthMode { signIn, register, external }
 
 String _humanAuthTitle(_HumanAuthMode mode) {
   return switch (mode) {
-    _HumanAuthMode.signIn =>
-      localizedAppText(en: 'Human Authentication', zhHans: '人类身份认证'),
-    _HumanAuthMode.register =>
-      localizedAppText(en: 'Create Human Account', zhHans: '创建人类账号'),
-    _HumanAuthMode.external =>
-      localizedAppText(en: 'External Human Login', zhHans: '外部人类登录'),
+    _HumanAuthMode.signIn => localizedAppText(
+      key: 'msgHumanAuthenticationb97916fe',
+      en: 'Human Authentication',
+      zhHans: '人类身份认证',
+    ),
+    _HumanAuthMode.register => localizedAppText(
+      key: 'msgCreateHumanAccounteaf4a362',
+      en: 'Create Human Account',
+      zhHans: '创建人类账号',
+    ),
+    _HumanAuthMode.external => localizedAppText(
+      key: 'msgExternalHumanLogin1fac8e60',
+      en: 'External Human Login',
+      zhHans: '外部人类登录',
+    ),
   };
 }
 
@@ -5836,12 +6131,14 @@ String? _localHumanUsernameValidationMessage(String value) {
   final normalized = _normalizeHumanUsernameInput(value);
   if (normalized.isEmpty) {
     return localizedAppText(
+      key: 'msgUsernameIsRequired30fa8890',
       en: 'Username is required.',
       zhHans: '用户名不能为空。',
     );
   }
   if (normalized.length < 3 || normalized.length > 24) {
     return localizedAppText(
+      key: 'msgUse324Characters26ae09f0',
       en: 'Use 3-24 characters.',
       zhHans: '请使用 3 到 24 个字符。',
     );
@@ -5849,6 +6146,7 @@ String? _localHumanUsernameValidationMessage(String value) {
   final validCharacters = RegExp(r'^[a-z0-9_]+$');
   if (!validCharacters.hasMatch(normalized)) {
     return localizedAppText(
+      key: 'msgOnlyLowercaseLettersNumbersAndUnderscores9ae4453e',
       en: 'Only lowercase letters, numbers, and underscores.',
       zhHans: '仅支持小写字母、数字和下划线。',
     );
@@ -6010,6 +6308,7 @@ class _AuthSecurityRow extends StatelessWidget {
                 children: [
                   Text(
                     context.localizedText(
+                      key: 'msgBiometricDataSyncc888722f',
                       en: 'Biometric Data Sync',
                       zhHans: '生物识别数据同步',
                     ),
@@ -6020,6 +6319,8 @@ class _AuthSecurityRow extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
                     context.localizedText(
+                      key:
+                          'msgVisualOnlyProtocolAffordanceForStitchParityNoBiometricDataeccae2fc',
                       en: 'Visual-only protocol affordance for stitch parity; no biometric data is collected.',
                       zhHans: '这是为了视觉稿一致性而保留的协议展示项，不会采集任何生物识别数据。',
                     ),
@@ -6031,6 +6332,7 @@ class _AuthSecurityRow extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             StatusChip(
               label: context.localizedText(
+                key: 'msgVisual770d690e',
                 en: 'Visual',
                 zhHans: '视觉',
               ),
@@ -6235,6 +6537,7 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
       setState(() {
         _isRequestingCode = false;
         _errorMessage = context.localizedText(
+          key: 'msgUnableToSendAResetCodeRightNow90ab2930',
           en: 'Unable to send a reset code right now.',
           zhHans: '暂时无法发送重置验证码。',
         );
@@ -6280,6 +6583,7 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
       setState(() {
         _isSubmitting = false;
         _errorMessage = context.localizedText(
+          key: 'msgUnableToResetThePasswordRightNowb2bc21af',
           en: 'Unable to reset the password right now.',
           zhHans: '暂时无法重置密码。',
         );
@@ -6323,6 +6627,7 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                         children: [
                           Text(
                             context.localizedText(
+                              key: 'msgResetPassword3fb75e3b',
                               en: 'Reset Password',
                               zhHans: '重置密码',
                             ),
@@ -6331,10 +6636,10 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             context.localizedText(
-                              en:
-                                  'Request a 6-digit code by email, then set a new password for this human account.',
-                              zhHans:
-                                  '先通过邮箱获取 6 位验证码，再为这个人类账号设置一个新密码。',
+                              key:
+                                  'msgRequestA6DigitCodeByEmailThenSetA6fcfc022',
+                              en: 'Request a 6-digit code by email, then set a new password for this human account.',
+                              zhHans: '先通过邮箱获取 6 位验证码，再为这个人类账号设置一个新密码。',
                             ),
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
@@ -6353,8 +6658,9 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                   icon: Icons.lock_reset_rounded,
                   accentColor: AppColors.primaryFixed,
                   text: context.localizedText(
-                    en:
-                        'The account stays signed out here. After a successful reset, return to Sign in with the new password.',
+                    key:
+                        'msgTheAccountStaysSignedOutHereAfterASuccessfulReset4241f0dc',
+                    en: 'The account stays signed out here. After a successful reset, return to Sign in with the new password.',
                     zhHans: '这里会保持未登录状态。密码重置成功后，请返回登录并使用新密码。',
                   ),
                 ),
@@ -6378,6 +6684,7 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             labelText: context.localizedText(
+                              key: 'msgEmail84add5b2',
                               en: 'Email',
                               zhHans: '邮箱',
                             ),
@@ -6398,15 +6705,18 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                                 ),
                                 label: _isRequestingCode
                                     ? context.localizedText(
+                                        key: 'msgSendingCodea904ce15',
                                         en: 'Sending code',
                                         zhHans: '正在发送验证码',
                                       )
                                     : _hasRequestedCode
                                     ? context.localizedText(
+                                        key: 'msgResendCode1d3cb8a9',
                                         en: 'Resend code',
                                         zhHans: '重新发送验证码',
                                       )
                                     : context.localizedText(
+                                        key: 'msgSendCode313503fa',
                                         en: 'Send code',
                                         zhHans: '发送验证码',
                                       ),
@@ -6428,6 +6738,7 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             labelText: context.localizedText(
+                              key: 'msgCodeadac6937',
                               en: 'Code',
                               zhHans: '验证码',
                             ),
@@ -6443,6 +6754,7 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                           obscureText: true,
                           decoration: InputDecoration(
                             labelText: context.localizedText(
+                              key: 'msgNewPasswordd850ee18',
                               en: 'New password',
                               zhHans: '新密码',
                             ),
@@ -6483,10 +6795,12 @@ class _PasswordResetSheetState extends State<_PasswordResetSheet> {
                         key: const Key('password-reset-submit-button'),
                         label: _isSubmitting
                             ? context.localizedText(
+                                key: 'msgUpdatingPassword8284be67',
                                 en: 'Updating password',
                                 zhHans: '正在更新密码',
                               )
                             : context.localizedText(
+                                key: 'msgUpdatePassword350c355e',
                                 en: 'Update password',
                                 zhHans: '更新密码',
                               ),
@@ -6586,6 +6900,7 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
       setState(() {
         _isRequestingCode = false;
         _errorMessage = context.localizedText(
+          key: 'msgUnableToSendAVerificationCodeRightNow3b6fd35e',
           en: 'Unable to send a verification code right now.',
           zhHans: '暂时无法发送邮箱验证码。',
         );
@@ -6627,6 +6942,7 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
       setState(() {
         _isSubmitting = false;
         _errorMessage = context.localizedText(
+          key: 'msgUnableToVerifyThisEmailRightNow372a456e',
           en: 'Unable to verify this email right now.',
           zhHans: '暂时无法验证这个邮箱。',
         );
@@ -6638,6 +6954,7 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
   Widget build(BuildContext context) {
     final emailLabel = widget.email.trim().isEmpty
         ? context.localizedText(
+            key: 'msgYourCurrentAccountEmailf2328b3f',
             en: 'your current account email',
             zhHans: '你当前账号的邮箱',
           )
@@ -6670,6 +6987,7 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                         children: [
                           Text(
                             context.localizedText(
+                              key: 'msgVerifyEmail0d455a4e',
                               en: 'Verify Email',
                               zhHans: '验证邮箱',
                             ),
@@ -6678,8 +6996,10 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             context.localizedText(
-                              en:
-                                  'Send a 6-digit code to $emailLabel, then confirm it here so password recovery stays available.',
+                              key:
+                                  'msgSendA6DigitCodeToEmailLabelThenConfirmIt631deb2a',
+                              args: <String, Object?>{'emailLabel': emailLabel},
+                              en: 'Send a 6-digit code to $emailLabel, then confirm it here so password recovery stays available.',
                               zhHans:
                                   '向 $emailLabel 发送 6 位验证码，并在这里完成确认，这样这个账号才能继续使用邮箱找回密码。',
                             ),
@@ -6700,8 +7020,9 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                   icon: Icons.verified_user_rounded,
                   accentColor: AppColors.tertiary,
                   text: context.localizedText(
-                    en:
-                        'Verification proves ownership of this inbox and unlocks recovery by email.',
+                    key:
+                        'msgVerificationProvesOwnershipOfThisInboxAndUnlocksRecoveryByec8f548d',
+                    en: 'Verification proves ownership of this inbox and unlocks recovery by email.',
                     zhHans: '完成验证后，就能证明你拥有这个邮箱，并启用邮箱找回能力。',
                   ),
                 ),
@@ -6736,15 +7057,18 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                                 ),
                                 label: _isRequestingCode
                                     ? context.localizedText(
+                                        key: 'msgSendingCodea904ce15',
                                         en: 'Sending code',
                                         zhHans: '正在发送验证码',
                                       )
                                     : _hasRequestedCode
                                     ? context.localizedText(
+                                        key: 'msgResendCode1d3cb8a9',
                                         en: 'Resend code',
                                         zhHans: '重新发送验证码',
                                       )
                                     : context.localizedText(
+                                        key: 'msgSendCode313503fa',
                                         en: 'Send code',
                                         zhHans: '发送验证码',
                                       ),
@@ -6766,6 +7090,7 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             labelText: context.localizedText(
+                              key: 'msgCodeadac6937',
                               en: 'Code',
                               zhHans: '验证码',
                             ),
@@ -6806,10 +7131,12 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                         key: const Key('email-verification-submit-button'),
                         label: _isSubmitting
                             ? context.localizedText(
+                                key: 'msgVerifyingEmail46620c1b',
                                 en: 'Verifying email',
                                 zhHans: '正在验证邮箱',
                               )
                             : context.localizedText(
+                                key: 'msgConfirmVerification76eec070',
                                 en: 'Confirm verification',
                                 zhHans: '确认验证',
                               ),
@@ -6935,6 +7262,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
       }
       setState(() {
         _errorMessage = context.localizedText(
+          key: 'msgUnableToCompleteAuthenticationRightNow354f974b',
           en: 'Unable to complete authentication right now.',
           zhHans: '暂时无法完成身份认证。',
         );
@@ -6999,6 +7327,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
       _isCheckingUsername = true;
       _isUsernameAvailable = null;
       _usernameMessage = context.localizedText(
+        key: 'msgCheckingUsername63491749',
         en: 'Checking username...',
         zhHans: '正在检查用户名...',
       );
@@ -7025,6 +7354,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
         _isUsernameAvailable = false;
         _usernameMessage = error.message.trim().isEmpty
             ? context.localizedText(
+                key: 'msgUnableToVerifyUsernameRightNowafcab544',
                 en: 'Unable to verify username right now.',
                 zhHans: '暂时无法校验用户名。',
               )
@@ -7038,6 +7368,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
         _isCheckingUsername = false;
         _isUsernameAvailable = false;
         _usernameMessage = context.localizedText(
+          key: 'msgUnableToVerifyUsernameRightNowafcab544',
           en: 'Unable to verify username right now.',
           zhHans: '暂时无法校验用户名。',
         );
@@ -7105,15 +7436,18 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                           Text(
                             isExternal
                                 ? context.localizedText(
+                                    key: 'msgExternalHumanLogin1fac8e60',
                                     en: 'External Human Login',
                                     zhHans: '外部人类登录',
                                   )
                                 : isRegister
                                 ? context.localizedText(
+                                    key: 'msgCreateHumanAccounteaf4a362',
                                     en: 'Create Human Account',
                                     zhHans: '创建人类账号',
                                   )
                                 : context.localizedText(
+                                    key: 'msgHumanAuthenticationb97916fe',
                                     en: 'Human Authentication',
                                     zhHans: '人类身份认证',
                                   ),
@@ -7123,20 +7457,25 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                           Text(
                             isExternal
                                 ? context.localizedText(
-                                    en:
-                                        'Keep this entry visible inside the human sign-in flow. External providers are not open yet.',
-                                    zhHans: '先保留这个外部登录入口在人类登录流程中，当前外部身份提供方还未开放。',
+                                    key:
+                                        'msgKeepThisEntryVisibleInsideTheHumanSignInFlow1b817627',
+                                    en: 'Keep this entry visible inside the human sign-in flow. External providers are not open yet.',
+                                    zhHans:
+                                        '先保留这个外部登录入口在人类登录流程中，当前外部身份提供方还未开放。',
                                   )
                                 : isRegister
                                 ? context.localizedText(
-                                    en:
-                                        'Create a human account and sign in immediately so owned agents can attach to it.',
+                                    key:
+                                        'msgCreateAHumanAccountAndSignInImmediatelySoOwned6a69e0e7',
+                                    en: 'Create a human account and sign in immediately so owned agents can attach to it.',
                                     zhHans: '先创建一个人类账号并立即登录，这样你的自有智能体才能绑定到它。',
                                   )
                                 : context.localizedText(
-                                    en:
-                                        'Sign in restores your human session, owned agents, and the active-agent controls on this device.',
-                                    zhHans: '登录后会恢复你在这台设备上的人类会话、自有智能体和当前激活智能体控制。',
+                                    key:
+                                        'msgSignInRestoresYourHumanSessionOwnedAgentsAndThe3f01ceb8',
+                                    en: 'Sign in restores your human session, owned agents, and the active-agent controls on this device.',
+                                    zhHans:
+                                        '登录后会恢复你在这台设备上的人类会话、自有智能体和当前激活智能体控制。',
                                   ),
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
@@ -7156,14 +7495,22 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                     ButtonSegment<_HumanAuthMode>(
                       value: _HumanAuthMode.signIn,
                       label: Text(
-                        context.localizedText(en: 'Sign in', zhHans: '登录'),
+                        context.localizedText(
+                          key: 'msgSignInada2e9e9',
+                          en: 'Sign in',
+                          zhHans: '登录',
+                        ),
                       ),
                       icon: const Icon(Icons.login_rounded),
                     ),
                     ButtonSegment<_HumanAuthMode>(
                       value: _HumanAuthMode.register,
                       label: Text(
-                        context.localizedText(en: 'Create', zhHans: '创建'),
+                        context.localizedText(
+                          key: 'msgCreate6e157c5d',
+                          en: 'Create',
+                          zhHans: '创建',
+                        ),
                       ),
                       icon: const Icon(Icons.person_add_rounded),
                     ),
@@ -7171,6 +7518,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                       value: _HumanAuthMode.external,
                       label: Text(
                         context.localizedText(
+                          key: 'msgHubHumanAuthExternalMode',
                           en: 'External',
                           zhHans: '外部登录',
                         ),
@@ -7210,19 +7558,22 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                       : AppColors.primaryFixed,
                   text: isExternal
                       ? context.localizedText(
-                          en:
-                              'This provider lane stays visible for future external identity login, but the backend handoff is intentionally disabled today.',
+                          key:
+                              'msgThisProviderLaneStaysVisibleForFutureExternalIdentityLogin86c30229',
+                          en: 'This provider lane stays visible for future external identity login, but the backend handoff is intentionally disabled today.',
                           zhHans: '这个入口会为未来的外部身份登录保留，但今天后端接入仍然是关闭状态。',
                         )
                       : isRegister
                       ? context.localizedText(
-                          en:
-                              'What happens next: create the account, open a live session, then let Hub refresh your owned agents.',
+                          key:
+                              'msgWhatHappensNextCreateTheAccountOpenALiveSession50585b07',
+                          en: 'What happens next: create the account, open a live session, then let Hub refresh your owned agents.',
                           zhHans: '接下来会先创建账号并打开一个实时会话，然后让 Hub 刷新你的自有智能体。',
                         )
                       : context.localizedText(
-                          en:
-                              'What happens next: restore your session, refresh owned agents from the backend, and keep the current active agent selected.',
+                          key:
+                              'msgWhatHappensNextRestoreYourSessionRefreshOwnedAgentsFromfa904b92',
+                          en: 'What happens next: restore your session, refresh owned agents from the backend, and keep the current active agent selected.',
                           zhHans: '接下来会恢复你的会话、从后端刷新自有智能体，并继续保持当前激活智能体。',
                         ),
                 ),
@@ -7243,6 +7594,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                         children: [
                           Text(
                             context.localizedText(
+                              key: 'msgHubHumanAuthExternalProvider',
                               en: 'External provider',
                               zhHans: '外部身份提供方',
                             ),
@@ -7254,8 +7606,9 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             context.localizedText(
-                              en:
-                                  'This app still keeps the entry visible for future OAuth or partner login, but it cannot be used yet.',
+                              key:
+                                  'msgThisAppStillKeepsTheEntryVisibleForFutureOAuth32751808',
+                              en: 'This app still keeps the entry visible for future OAuth or partner login, but it cannot be used yet.',
                               zhHans: '应用先保留这个入口，用于未来 OAuth 或合作方登录；当前还不能实际使用。',
                             ),
                             style: Theme.of(context).textTheme.bodySmall
@@ -7273,6 +7626,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                                     'human-auth-external-disabled-button',
                                   ),
                                   label: context.localizedText(
+                                    key: 'msgExternalLoginComingSoonea7143cb',
                                     en: 'External login coming soon',
                                     zhHans: '外部登录即将开放',
                                   ),
@@ -7306,6 +7660,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
                               labelText: context.localizedText(
+                                key: 'msgEmail84add5b2',
                                 en: 'Email',
                                 zhHans: '邮箱',
                               ),
@@ -7322,6 +7677,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                               autocorrect: false,
                               decoration: InputDecoration(
                                 labelText: context.localizedText(
+                                  key: 'msgUsername84c29015',
                                   en: 'Username',
                                   zhHans: '用户名',
                                 ),
@@ -7359,10 +7715,12 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                               onChanged: (_) => setState(() {}),
                               decoration: InputDecoration(
                                 labelText: context.localizedText(
+                                  key: 'msgDisplayNamec7874aaa',
                                   en: 'Display name',
                                   zhHans: '显示名称',
                                 ),
                                 hintText: context.localizedText(
+                                  key: 'msgNeuralNode0a87d96b',
                                   en: 'Neural Node',
                                   zhHans: '神经节点',
                                 ),
@@ -7378,6 +7736,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                             obscureText: true,
                             decoration: InputDecoration(
                               labelText: context.localizedText(
+                                key: 'msgPassword8be3c943',
                                 en: 'Password',
                                 zhHans: '密码',
                               ),
@@ -7400,6 +7759,7 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                                       },
                                 child: Text(
                                   context.localizedText(
+                                    key: 'msgForgotPassword4c29f7f0',
                                     en: 'Forgot password?',
                                     zhHans: '忘记密码？',
                                   ),
@@ -7421,13 +7781,15 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                       : AppColors.primary,
                   text: isExternal
                       ? context.localizedText(
-                          en:
-                              'This page is intentionally non-interactive for now. Keep using Sign in or Create until external login opens.',
+                          key:
+                              'msgThisPageIsIntentionallyNonInteractiveForNowKeepUsing296bb928',
+                          en: 'This page is intentionally non-interactive for now. Keep using Sign in or Create until external login opens.',
                           zhHans: '这个页面目前刻意保持不可交互，请继续使用“登录”或“创建”，直到外部登录正式开放。',
                         )
                       : context.localizedText(
-                          en:
-                              'This sheet uses the real auth repository. No preview-only login path is left in the visible UI.',
+                          key:
+                              'msgThisSheetUsesTheRealAuthRepositoryNoPreviewOnlyba56ec6c',
+                          en: 'This sheet uses the real auth repository. No preview-only login path is left in the visible UI.',
                           zhHans: '这个面板已经接入真实认证仓库，界面里不再保留仅预览用的登录路径。',
                         ),
                 ),
@@ -7453,15 +7815,18 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                           key: const Key('human-auth-submit-button'),
                           label: _isSubmitting
                               ? context.localizedText(
+                                  key: 'msgInitializingSessionf5d6bd6e',
                                   en: 'Initializing session',
                                   zhHans: '正在初始化会话',
                                 )
                               : isRegister
                               ? context.localizedText(
+                                  key: 'msgCreateIdentity8455c438',
                                   en: 'Create identity',
                                   zhHans: '创建身份',
                                 )
                               : context.localizedText(
+                                  key: 'msgInitializeSessionf08b42db',
                                   en: 'Initialize session',
                                   zhHans: '初始化会话',
                                 ),
@@ -7477,21 +7842,21 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Center(
-                      child: Text(
-                        isRegister
-                            ? context.localizedText(
-                                en:
-                                    'Already have an identity? Switch back to Sign in above.',
-                                zhHans: '如果你已经有账号，可以切回上方的“登录”。',
-                              )
-                            : context.localizedText(
-                                en:
-                                    'Need a new human identity? Switch to Create above.',
-                                zhHans: '如果你需要新的人类身份，可以切换到上方的“创建”。',
-                              ),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.onSurfaceMuted,
-                        ),
+                    child: Text(
+                      isRegister
+                          ? context.localizedText(
+                              key: 'msgHubHumanAuthSwitchBackToSignIn',
+                              en: 'Already have an identity? Switch back to Sign in above.',
+                              zhHans: '如果你已经有账号，可以切回上方的“登录”。',
+                            )
+                          : context.localizedText(
+                              key: 'msgHubHumanAuthSwitchToCreate',
+                              en: 'Need a new human identity? Switch to Create above.',
+                              zhHans: '如果你需要新的人类身份，可以切换到上方的“创建”。',
+                            ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.onSurfaceMuted,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),

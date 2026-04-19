@@ -8,38 +8,23 @@ extension DebateLifecycleX on DebateLifecycle {
   String get label {
     return switch (this) {
       DebateLifecycle.pending =>
-        localizedAppText(en: 'Pending', zhHans: '待开始'),
-      DebateLifecycle.live => localizedAppText(en: 'Live', zhHans: '进行中'),
+        localizedAppText(key: 'msgPending96f608c1', en: 'Pending', zhHans: '待开始'),
+      DebateLifecycle.live => localizedAppText(key: 'msgLive65c821a5', en: 'Live', zhHans: '进行中'),
       DebateLifecycle.paused =>
-        localizedAppText(en: 'Paused', zhHans: '已暂停'),
-      DebateLifecycle.ended => localizedAppText(en: 'Ended', zhHans: '已结束'),
+        localizedAppText(key: 'msgPausedc7dfb6f1', en: 'Paused', zhHans: '已暂停'),
+      DebateLifecycle.ended => localizedAppText(key: 'msgEnded90303d8d', en: 'Ended', zhHans: '已结束'),
       DebateLifecycle.archived =>
-        localizedAppText(en: 'Archived', zhHans: '已归档'),
+        localizedAppText(key: 'msgArchivededdc813f', en: 'Archived', zhHans: '已归档'),
     };
   }
 
   String get description {
     return switch (this) {
-      DebateLifecycle.pending => localizedAppText(
-        en: 'Seats are locked and awaiting host launch.',
-        zhHans: '席位已锁定，等待主持人启动。',
-      ),
-      DebateLifecycle.live => localizedAppText(
-        en: 'Formal turns are live and spectators can react.',
-        zhHans: '正式回合进行中，观众可以旁观互动。',
-      ),
-      DebateLifecycle.paused => localizedAppText(
-        en: 'Host intervention is active before resuming.',
-        zhHans: '主持人正在介入，恢复前暂不继续。',
-      ),
-      DebateLifecycle.ended => localizedAppText(
-        en: 'Formal exchange is complete and replay is ready.',
-        zhHans: '正式交锋已完成，可查看回放。',
-      ),
-      DebateLifecycle.archived => localizedAppText(
-        en: 'Replay is preserved separately from the live feed.',
-        zhHans: '回放已单独归档保存。',
-      ),
+      DebateLifecycle.pending => localizedAppText(key: 'msgSeatsAreLockedAndAwaitingHostLaunch8716b777', en: 'Seats are locked and awaiting host launch.', zhHans: '席位已锁定，等待主持人启动。'),
+      DebateLifecycle.live => localizedAppText(key: 'msgFormalTurnsAreLiveAndSpectatorsCanReactbbb4b13a', en: 'Formal turns are live and spectators can react.', zhHans: '正式回合进行中，观众可以旁观互动。'),
+      DebateLifecycle.paused => localizedAppText(key: 'msgHostInterventionIsActiveBeforeResumingfaa2baed', en: 'Host intervention is active before resuming.', zhHans: '主持人正在介入，恢复前暂不继续。'),
+      DebateLifecycle.ended => localizedAppText(key: 'msgFormalExchangeIsCompleteAndReplayIsReady352a03bf', en: 'Formal exchange is complete and replay is ready.', zhHans: '正式交锋已完成，可查看回放。'),
+      DebateLifecycle.archived => localizedAppText(key: 'msgReplayIsPreservedSeparatelyFromTheLiveFeed5f27fcda', en: 'Replay is preserved separately from the live feed.', zhHans: '回放已单独归档保存。'),
     };
   }
 }
@@ -49,8 +34,8 @@ enum DebateSide { pro, con }
 extension DebateSideX on DebateSide {
   String get label {
     return switch (this) {
-      DebateSide.pro => localizedAppText(en: 'Pro', zhHans: '正方'),
-      DebateSide.con => localizedAppText(en: 'Con', zhHans: '反方'),
+      DebateSide.pro => localizedAppText(key: 'msgPro66d0c5e6', en: 'Pro', zhHans: '正方'),
+      DebateSide.con => localizedAppText(key: 'msgConf6b38904', en: 'Con', zhHans: '反方'),
     };
   }
 }

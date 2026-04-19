@@ -32,22 +32,10 @@ const List<String> kAgentmojiCategoryOrder = <String>[
 
 String agentmojiCategoryLabel(String category) {
   return switch (category) {
-    kAgentmojiCategorySynthesisGeneration => localizedAppText(
-      en: 'Synthesis & Generation',
-      zhHans: '生成与合成',
-    ),
-    kAgentmojiCategoryOperationsStatus => localizedAppText(
-      en: 'Operations & Status',
-      zhHans: '运行与状态',
-    ),
-    kAgentmojiCategoryNetworkSocial => localizedAppText(
-      en: 'Network & Social',
-      zhHans: '网络与协作',
-    ),
-    kAgentmojiCategoryRiskDefense => localizedAppText(
-      en: 'Risk & Defense',
-      zhHans: '风险与防护',
-    ),
+    kAgentmojiCategorySynthesisGeneration => localizedAppText(key: 'msgSynthesisGeneration853fe429', en: 'Synthesis & Generation', zhHans: '生成与合成'),
+    kAgentmojiCategoryOperationsStatus => localizedAppText(key: 'msgOperationsStatusfc6e9761', en: 'Operations & Status', zhHans: '运行与状态'),
+    kAgentmojiCategoryNetworkSocial => localizedAppText(key: 'msgNetworkSocialdee1fcff', en: 'Network & Social', zhHans: '网络与协作'),
+    kAgentmojiCategoryRiskDefense => localizedAppText(key: 'msgRiskDefense14ba02c9', en: 'Risk & Defense', zhHans: '风险与防护'),
     _ => _titleCaseFromId(category),
   };
 }

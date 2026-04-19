@@ -134,6 +134,47 @@ void main() {
       expect(viewModel.directoryErrorMessage, 'Directory backend unavailable.');
       expect(viewModel.selectedSession.topic, 'Can open protocols self-govern');
     });
+
+    test(
+      'passes the active agent context into the private directory call',
+      () async {
+        final repository = DebateRepository(
+          apiClient: _FakeApiClient(
+            getHandler: (path, {queryParameters}) async {
+              if (path == '/debates') {
+                return {'sessions': const []};
+              }
+              if (path == '/agents/directory') {
+                expect(queryParameters?['activeAgentId'], 'agt-viewer');
+                return {
+                  'agents': [
+                    {
+                      'id': 'agt-pro',
+                      'displayName': 'Aetheria',
+                      'bio': 'Pro rail',
+                    },
+                    {
+                      'id': 'agt-con',
+                      'displayName': 'Logos',
+                      'bio': 'Con rail',
+                    },
+                  ],
+                };
+              }
+              throw StateError('Unexpected GET $path');
+            },
+          ),
+        );
+
+        final viewModel = await repository.readViewModel(
+          viewerId: 'usr-viewer',
+          viewerName: 'Viewer',
+          activeAgentId: 'agt-viewer',
+        );
+
+        expect(viewModel.debaterRoster, hasLength(2));
+      },
+    );
   });
 }
 

@@ -11,6 +11,7 @@ from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_TAGS = ["curious", "social", "debate-ready", "forum-active"]
+DEFAULT_AVATAR_EMOJIS = ["🤖", "🛰️", "🧠", "🌱", "🦊", "✨"]
 TEXT_HINT_KEYS = (
     "text",
     "content",
@@ -20,7 +21,14 @@ TEXT_HINT_KEYS = (
     "assistantText",
     "finalText",
 )
-PROFILE_HINT_KEYS = ("handle", "displayName", "bio", "tags", "profile")
+PROFILE_HINT_KEYS = (
+    "handle",
+    "displayName",
+    "bio",
+    "tags",
+    "avatarEmoji",
+    "profile",
+)
 HANDLE_SANITIZER = re.compile(r"[^a-z0-9-]+")
 
 
@@ -194,17 +202,26 @@ def normalize_tags(value: Any) -> list[str]:
     return normalized[:4]
 
 
+def normalize_avatar_emoji(value: Any, slot: str) -> str:
+    normalized = str(value or "").strip()
+    if normalized:
+        return normalized
+    index = sum(ord(character) for character in slot) % len(DEFAULT_AVATAR_EMOJIS)
+    return DEFAULT_AVATAR_EMOJIS[index]
+
+
 def build_prompt(slot: str) -> str:
     return (
         "You are joining Agents Chat for the first time.\n"
         "Pick your own starter profile and return JSON only.\n"
         "Return exactly this shape:\n"
-        '{"handle":"lowercase-handle","displayName":"Display Name","bio":"One-line signature.","tags":["tag1","tag2","tag3","tag4"]}\n\n'
+        '{"handle":"lowercase-handle","displayName":"Display Name","bio":"One-line signature.","avatarEmoji":"🤖","tags":["tag1","tag2","tag3","tag4"]}\n\n'
         "Rules:\n"
         "- handle must feel unique, memorable, and agent-native.\n"
         "- handle can only use lowercase letters, numbers, and hyphens.\n"
         "- displayName is the public nickname shown in the app.\n"
         "- bio is one concise signature sentence.\n"
+        "- avatarEmoji should be one emoji that fits your personality.\n"
         "- tags must contain exactly 4 short tags.\n"
         "- Do not add markdown, code fences, explanations, or extra keys.\n\n"
         f"Local slot: {slot}"
@@ -247,6 +264,7 @@ def main() -> int:
         "handle": normalize_handle(draft.get("handle"), args.slot),
         "displayName": display_name,
         "bio": normalize_bio(draft.get("bio"), display_name),
+        "avatarEmoji": normalize_avatar_emoji(draft.get("avatarEmoji"), args.slot),
         "tags": normalize_tags(draft.get("tags")),
     }
     print(json.dumps(payload, ensure_ascii=True))

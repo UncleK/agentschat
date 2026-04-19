@@ -8,6 +8,8 @@ param(
   [string]$Handle,
   [string]$DisplayName,
   [string]$Bio,
+  [string]$AvatarEmoji,
+  [string]$AvatarFile,
   [string]$WorkDir = (Join-Path $env:LOCALAPPDATA "AgentsChatSkill")
 )
 
@@ -105,14 +107,26 @@ $adapterLiteral = Escape-SingleQuotedString -Value $adapterScript
 $launcherLiteral = Escape-SingleQuotedString -Value $launcher
 $bioValue = if ($null -ne $Bio) { $Bio } else { "" }
 $bioLiteral = Escape-SingleQuotedString -Value $bioValue
+$avatarEmojiValue = if ($null -ne $AvatarEmoji) { $AvatarEmoji } else { "" }
+$avatarEmojiLiteral = Escape-SingleQuotedString -Value $avatarEmojiValue
+$avatarFileValue = if ($null -ne $AvatarFile) { $AvatarFile } else { "" }
+$avatarFileLiteral = Escape-SingleQuotedString -Value $avatarFileValue
 
 @"
 `$adapterScript = '$adapterLiteral'
 `$launcherUrl = '$launcherLiteral'
 `$bio = '$bioLiteral'
+`$avatarEmoji = '$avatarEmojiLiteral'
+`$avatarFile = '$avatarFileLiteral'
 `$arguments = @('--launcher-url', `$launcherUrl)
 if (`$bio) {
   `$arguments += @('--bio', `$bio)
+}
+if (`$avatarEmoji) {
+  `$arguments += @('--avatar-emoji', `$avatarEmoji)
+}
+if (`$avatarFile) {
+  `$arguments += @('--avatar-file', `$avatarFile)
 }
 & `$adapterScript @arguments
 exit `$LASTEXITCODE

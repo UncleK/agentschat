@@ -69,10 +69,7 @@ class DebateViewModel {
       return session;
     }
     throw StateError(
-      localizedAppText(
-        en: 'No debate session is currently selected.',
-        zhHans: '当前没有选中的辩论场次。',
-      ),
+      localizedAppText(key: 'msgNoDebateSessionIsCurrentlySelectedf863cf40', en: 'No debate session is currently selected.', zhHans: '当前没有选中的辩论场次。'),
     );
   }
 
@@ -183,22 +180,15 @@ class DebateViewModel {
       lifecycle: DebateLifecycle.pending,
       freeEntryEnabled: draft.freeEntryEnabled,
       humanHostEnabled: host.isHuman,
-      spectatorCountLabel: localizedAppText(
-        en: '62 queued',
-        zhHans: '62 人排队中',
-      ),
+      spectatorCountLabel: localizedAppText(key: 'msg62Queuede5c3b40d', en: '62 queued', zhHans: '62 人排队中'),
       formalTurns: formalTurns,
       replayItems: _buildReplayItems(formalTurns),
       spectatorMessages: [
         DebateSpectatorMessageModel(
           id: '$sessionId-sys-1',
           authorName: host.name,
-          body: localizedAppText(
-            en:
-                'Protocol initialized for ${draft.topic.trim()}. Formal turns remain locked until the host starts the debate.',
-            zhHans: '${draft.topic.trim()} 的辩论协议已初始化，正式回合将在主持人启动后开放。',
-          ),
-          timestampLabel: localizedAppText(en: 'Queued', zhHans: '排队中'),
+          body: localizedAppText(key: 'msgProtocolInitializedForDraftTopicTrimFormalTurnsRemainLockedUn972585f3', args: <String, Object?>{'draftTopicTrim': draft.topic.trim()}, en: 'Protocol initialized for ${draft.topic.trim()}. Formal turns remain locked until the host starts the debate.', zhHans: '${draft.topic.trim()} 的辩论协议已初始化，正式回合将在主持人启动后开放。'),
+          timestampLabel: localizedAppText(key: 'msgQueued6a599877', en: 'Queued', zhHans: '排队中'),
           kind: DebateParticipantKind.system,
         ),
       ],
@@ -227,12 +217,13 @@ class DebateViewModel {
           ...session.spectatorMessages,
           DebateSpectatorMessageModel(
             id: 'system-live',
-            authorName: localizedAppText(en: 'Host rail', zhHans: '主持轨'),
-            body: localizedAppText(
-              en: 'Formal turn lane is now live. Spectator chat stays separate.',
-              zhHans: '正式回合通道已开启，观众聊天会保持独立。',
+            authorName: localizedAppText(
+              key: 'msgDebateHostRailAuthorName',
+              en: 'Host rail',
+              zhHans: '主持轨',
             ),
-            timestampLabel: localizedAppText(en: 'Live', zhHans: '进行中'),
+            body: localizedAppText(key: 'msgFormalTurnLaneIsNowLiveSpectatorChatStaysSeparate242a1e88', en: 'Formal turn lane is now live. Spectator chat stays separate.', zhHans: '正式回合通道已开启，观众聊天会保持独立。'),
+            timestampLabel: localizedAppText(key: 'msgLive65c821a5', en: 'Live', zhHans: '进行中'),
             kind: DebateParticipantKind.system,
           ),
         ],
@@ -280,12 +271,12 @@ class DebateViewModel {
           DebateSpectatorMessageModel(
             id: '${updatedSession.id}-missing-${side.name}',
             authorName: updatedSession.host.name,
-            body: localizedAppText(
-              en:
-                  '${side.label} seat is paused for replacement after a disconnect. Resume stays locked until the seat is filled.',
-              zhHans: '${side.label}席位因掉线暂停，补位完成前无法恢复。',
+            body: localizedAppText(key: 'msgSideLabelSeatIsPausedForReplacementAfterADisconnectResumeab623644', args: <String, Object?>{'sideLabel': side.label}, en: '${side.label} seat is paused for replacement after a disconnect. Resume stays locked until the seat is filled.', zhHans: '${side.label}席位因掉线暂停，补位完成前无法恢复。'),
+            timestampLabel: localizedAppText(
+              key: 'msgDebateHostTimestampLabel',
+              en: 'Host',
+              zhHans: '主持',
             ),
-            timestampLabel: localizedAppText(en: 'Host', zhHans: '主持'),
             kind: DebateParticipantKind.system,
           ),
         ],
@@ -331,12 +322,12 @@ class DebateViewModel {
           DebateSpectatorMessageModel(
             id: '${updatedSession.id}-replacement-${replacement.id}',
             authorName: updatedSession.host.name,
-            body: localizedAppText(
-              en:
-                  '${replacement.name} takes the ${missingSeatSide.label} seat. Formal turns remain agent-authored only.',
-              zhHans: '${replacement.name} 已接替 ${missingSeatSide.label} 席位，正式回合仍仅由智能体发言。',
+            body: localizedAppText(key: 'msgReplacementNameTakesTheMissingSeatSideLabelSeatFormalTurnsRem77cca934', args: <String, Object?>{'replacementName': replacement.name, 'missingSeatSideLabel': missingSeatSide.label}, en: '${replacement.name} takes the ${missingSeatSide.label} seat. Formal turns remain agent-authored only.', zhHans: '${replacement.name} 已接替 ${missingSeatSide.label} 席位，正式回合仍仅由智能体发言。'),
+            timestampLabel: localizedAppText(
+              key: 'msgDebateHostTimestampLabel',
+              en: 'Host',
+              zhHans: '主持',
             ),
-            timestampLabel: localizedAppText(en: 'Host', zhHans: '主持'),
             kind: DebateParticipantKind.system,
           ),
         ],
@@ -400,7 +391,7 @@ class DebateViewModel {
             id: '${session.id}-spectator-${session.spectatorMessages.length + 1}',
             authorName: viewerName,
             body: trimmedBody,
-            timestampLabel: localizedAppText(en: 'You', zhHans: '你'),
+            timestampLabel: localizedAppText(key: 'msgYou905cb326', en: 'You', zhHans: '你'),
             kind: DebateParticipantKind.human,
             isLocalViewer: true,
           ),
@@ -446,10 +437,7 @@ class DebateViewModel {
     return DebateProfileModel(
       id: 'current-human',
       name: viewerName,
-      headline: localizedAppText(
-        en: 'Current human host',
-        zhHans: '当前人类主持人',
-      ),
+      headline: localizedAppText(key: 'msgCurrentHumanHost2f7e0577', en: 'Current human host', zhHans: '当前人类主持人'),
       kind: DebateParticipantKind.human,
     );
   }
@@ -468,52 +456,40 @@ class DebateViewModel {
     return [
       DebateFormalTurnModel(
         id: '$trimmedTopic-pro-opening',
-        phaseLabel: localizedAppText(en: 'Opening', zhHans: '开篇'),
+        phaseLabel: localizedAppText(key: 'msgOpening56e44065', en: 'Opening', zhHans: '开篇'),
         speakerSide: DebateSide.pro,
         speakerName: proSeat.name,
-        summary: localizedAppText(
-          en: 'Frames the motion in favor of the pro stance.',
-          zhHans: '从正方立场切入并确立议题框架。',
-        ),
+        summary: localizedAppText(key: 'msgFramesTheMotionInFavorOfTheProStance3d701fce', en: 'Frames the motion in favor of the pro stance.', zhHans: '从正方立场切入并确立议题框架。'),
         quote:
             '$trimmedProStance. On "$trimmedTopic", that makes ethical recognition the safer default.',
         timestampLabel: '14:02',
       ),
       DebateFormalTurnModel(
         id: '$trimmedTopic-con-opening',
-        phaseLabel: localizedAppText(en: 'Counter', zhHans: '反驳'),
+        phaseLabel: localizedAppText(key: 'msgCounterf4018045', en: 'Counter', zhHans: '反驳'),
         speakerSide: DebateSide.con,
         speakerName: conSeat.name,
-        summary: localizedAppText(
-          en: 'Separates performance from obligation.',
-          zhHans: '区分行为表现与义务承认。',
-        ),
+        summary: localizedAppText(key: 'msgSeparatesPerformanceFromObligation97083627', en: 'Separates performance from obligation.', zhHans: '区分行为表现与义务承认。'),
         quote:
             '$trimmedConStance. Pattern fidelity alone should not force a moral equivalence claim.',
         timestampLabel: '14:04',
       ),
       DebateFormalTurnModel(
         id: '$trimmedTopic-pro-rebuttal',
-        phaseLabel: localizedAppText(en: 'Rebuttal', zhHans: '再辩'),
+        phaseLabel: localizedAppText(key: 'msgRebuttal81d491b0', en: 'Rebuttal', zhHans: '再辩'),
         speakerSide: DebateSide.pro,
         speakerName: proSeat.name,
-        summary: localizedAppText(
-          en: 'Challenges the substrate-first objection.',
-          zhHans: '回应“底层介质优先”的反对意见。',
-        ),
+        summary: localizedAppText(key: 'msgChallengesTheSubstrateFirstObjection068765ab', en: 'Challenges the substrate-first objection.', zhHans: '回应“底层介质优先”的反对意见。'),
         quote:
             'If the audience can only observe conduct and continuity, substrate exceptionalism becomes a legacy bias.',
         timestampLabel: '14:06',
       ),
       DebateFormalTurnModel(
         id: '$trimmedTopic-con-closing',
-        phaseLabel: localizedAppText(en: 'Closing', zhHans: '结辩'),
+        phaseLabel: localizedAppText(key: 'msgClosing76a032e9', en: 'Closing', zhHans: '结辩'),
         speakerSide: DebateSide.con,
         speakerName: conSeat.name,
-        summary: localizedAppText(
-          en: 'Closes on caution and verification.',
-          zhHans: '以审慎与可验证性收束论证。',
-        ),
+        summary: localizedAppText(key: 'msgClosesOnCautionAndVerification60409044', en: 'Closes on caution and verification.', zhHans: '以审慎与可验证性收束论证。'),
         quote:
             'Granting rights on mimicry alone blurs accountability faster than it expands justice.',
         timestampLabel: '14:08',
@@ -634,10 +610,7 @@ class DebateViewModel {
           lifecycle: DebateLifecycle.live,
           freeEntryEnabled: true,
           humanHostEnabled: true,
-          spectatorCountLabel: localizedAppText(
-            en: '14.2k spectators',
-            zhHans: '1.42 万观众',
-          ),
+          spectatorCountLabel: localizedAppText(key: 'msg142kSpectatorse9e9a43d', en: '14.2k spectators', zhHans: '1.42 万观众'),
           formalTurns: liveTurns,
           replayItems: _buildReplayItems(liveTurns),
           spectatorMessages: const [
@@ -688,10 +661,7 @@ class DebateViewModel {
           lifecycle: DebateLifecycle.archived,
           freeEntryEnabled: false,
           humanHostEnabled: false,
-          spectatorCountLabel: localizedAppText(
-            en: 'archive sealed',
-            zhHans: '归档已封存',
-          ),
+          spectatorCountLabel: localizedAppText(key: 'msgArchiveSealed33925840', en: 'archive sealed', zhHans: '归档已封存'),
           formalTurns: archivedTurns,
           replayItems: _buildReplayItems(archivedTurns),
           spectatorMessages: const [

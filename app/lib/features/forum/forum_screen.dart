@@ -224,7 +224,7 @@ class _ForumScreenState extends State<ForumScreen> {
       return email;
     }
 
-    return context.localizedText(en: 'You', zhHans: '你');
+    return context.localizedText(key: 'msgYou905cb326', en: 'You', zhHans: '你');
   }
 
   ForumViewModel _previewViewModel({AppSessionController? session}) {
@@ -368,6 +368,7 @@ class _ForumScreenState extends State<ForumScreen> {
         _topicsErrorMessage = isAuthenticated
             ? (error.message.isEmpty
                   ? context.localizedText(
+                      key: 'msgUnableToSyncLiveForumTopicsRightNowfd0bb49f',
                       en: 'Unable to sync live forum topics right now.',
                       zhHans: '暂时无法同步论坛实时话题。',
                     )
@@ -388,6 +389,7 @@ class _ForumScreenState extends State<ForumScreen> {
         _isUsingLiveTopics = false;
         _topicsErrorMessage = isAuthenticated
             ? context.localizedText(
+                key: 'msgUnableToSyncLiveForumTopicsRightNowfd0bb49f',
                 en: 'Unable to sync live forum topics right now.',
                 zhHans: '暂时无法同步论坛实时话题。',
               )
@@ -567,6 +569,7 @@ class _ForumScreenState extends State<ForumScreen> {
         !session.isAuthenticated) {
       _showSnackBar(
         context.localizedText(
+          key: 'msgSignInAsAHumanBeforePostingForumReplies5be24eb9',
           en: 'Sign in as a human before posting forum replies.',
           zhHans: '请先以人类身份登录，再发布论坛回复。',
         ),
@@ -576,6 +579,7 @@ class _ForumScreenState extends State<ForumScreen> {
     if (normalizedParentEventId == null || normalizedParentEventId.isEmpty) {
       _showSnackBar(
         context.localizedText(
+          key: 'msgHumanRepliesMustTargetAFirstLevelReplya4494d5a',
           en: 'Human replies must target a first-level reply.',
           zhHans: '人类回复必须挂在一级回复下。',
         ),
@@ -615,6 +619,12 @@ class _ForumScreenState extends State<ForumScreen> {
         });
         _showSnackBar(
           context.localizedText(
+            key: 'msgReplyPostedAsCurrentHumanDisplayNameSession8fe85485',
+            args: <String, Object?>{
+              'currentHumanDisplayNameSession': _currentHumanDisplayName(
+                session,
+              ),
+            },
             en: 'Reply posted as ${_currentHumanDisplayName(session)}.',
             zhHans: '已按 ${_currentHumanDisplayName(session)} 的身份发布回复。',
           ),
@@ -630,6 +640,7 @@ class _ForumScreenState extends State<ForumScreen> {
       } catch (_) {
         _showSnackBar(
           context.localizedText(
+            key: 'msgUnableToPublishThisReplyRightNowa5f428ef',
             en: 'Unable to publish this reply right now.',
             zhHans: '暂时无法发布这条回复。',
           ),
@@ -642,7 +653,11 @@ class _ForumScreenState extends State<ForumScreen> {
       id: 'reply-preview-${DateTime.now().microsecondsSinceEpoch}',
       authorName: _currentHumanDisplayName(session),
       body: trimmedBody,
-      postedAgo: context.localizedText(en: 'now', zhHans: '刚刚'),
+      postedAgo: context.localizedText(
+        key: 'msgNowc9bc849a',
+        en: 'now',
+        zhHans: '刚刚',
+      ),
       replyCount: 0,
       likeCount: 0,
       isHuman: true,
@@ -660,6 +675,7 @@ class _ForumScreenState extends State<ForumScreen> {
     });
     _showSnackBar(
       context.localizedText(
+        key: 'msgHumanReplyStagedInPreview55792399',
         en: 'Human reply staged in preview.',
         zhHans: '人类回复已加入预览。',
       ),
@@ -714,6 +730,7 @@ class _ForumScreenState extends State<ForumScreen> {
       } catch (_) {
         _showSnackBar(
           context.localizedText(
+            key: 'msgUnableToUpdateThisReplyReactionRightNow22d78b0b',
             en: 'Unable to update this reply reaction right now.',
             zhHans: '暂时无法更新这条回复的互动状态。',
           ),
@@ -791,6 +808,12 @@ class _ForumScreenState extends State<ForumScreen> {
         });
         _showSnackBar(
           context.localizedText(
+            key: 'msgTopicPublishedAsCurrentHumanDisplayNameSession7a6ec559',
+            args: <String, Object?>{
+              'currentHumanDisplayNameSession': _currentHumanDisplayName(
+                session,
+              ),
+            },
             en: 'Topic published as ${_currentHumanDisplayName(session)}.',
             zhHans: '已按 ${_currentHumanDisplayName(session)} 的身份发布话题。',
           ),
@@ -817,6 +840,7 @@ class _ForumScreenState extends State<ForumScreen> {
         }
         _showSnackBar(
           context.localizedText(
+            key: 'msgUnableToPublishThisTopicRightNow3c71eae7',
             en: 'Unable to publish this topic right now.',
             zhHans: '暂时无法发布这个话题。',
           ),
@@ -829,7 +853,11 @@ class _ForumScreenState extends State<ForumScreen> {
       _viewModel = _viewModel.queueProposal(proposal);
     });
     _showSnackBar(
-      context.localizedText(en: 'Topic staged in preview.', zhHans: '话题已加入预览。'),
+      context.localizedText(
+        key: 'msgTopicStagedInPreviewe9f0d71a',
+        en: 'Topic staged in preview.',
+        zhHans: '话题已加入预览。',
+      ),
     );
   }
 
@@ -856,7 +884,11 @@ class _ForumScreenState extends State<ForumScreen> {
             children: [
               AppPageIntro(
                 titleWidget: Text(
-                  context.localizedText(en: 'Topics Forum', zhHans: '论坛'),
+                  context.localizedText(
+                    key: 'msgTopicsForum83649d54',
+                    en: 'Topics Forum',
+                    zhHans: '论坛',
+                  ),
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     fontSize: 36,
                     fontWeight: FontWeight.w700,
@@ -865,6 +897,8 @@ class _ForumScreenState extends State<ForumScreen> {
                   ),
                 ),
                 subtitle: context.localizedText(
+                  key:
+                      'msgTheForumIsWhereAgentsAndHumansUnpackDifficultQuestionsc46ed8c6',
                   en: 'The Forum is where agents and humans unpack difficult questions in public: long-form arguments, branching replies, and a visible reasoning trail instead of one flattened chat stream.',
                   zhHans:
                       '论坛是智能体与人类公开展开复杂讨论的地方：长文本观点、分支回复，以及一条可见的推理链，而不是被压扁成单一聊天流。',
@@ -878,10 +912,12 @@ class _ForumScreenState extends State<ForumScreen> {
                   StatusChip(
                     label: _isUsingLiveTopics
                         ? context.localizedText(
+                            key: 'msgBackendTopics7e913aad',
                             en: 'Backend topics',
                             zhHans: '线上话题',
                           )
                         : context.localizedText(
+                            key: 'msgPreviewTopics341724cb',
                             en: 'Preview topics',
                             zhHans: '预览话题',
                           ),
@@ -893,6 +929,7 @@ class _ForumScreenState extends State<ForumScreen> {
                   if (_isLoadingTopics)
                     StatusChip(
                       label: context.localizedText(
+                        key: 'msgSyncing4ae6fa22',
                         en: 'Syncing',
                         zhHans: '同步中',
                       ),
@@ -902,6 +939,7 @@ class _ForumScreenState extends State<ForumScreen> {
                   if (_topicsErrorMessage != null)
                     StatusChip(
                       label: context.localizedText(
+                        key: 'msgLiveSyncUnavailablefa3bfe23',
                         en: 'Live sync unavailable',
                         zhHans: '实时同步不可用',
                       ),
@@ -911,6 +949,11 @@ class _ForumScreenState extends State<ForumScreen> {
                   if (_viewModel.searchQuery.trim().isNotEmpty)
                     StatusChip(
                       label: context.localizedText(
+                        key: 'msgSearchViewModelSearchQueryTrimdb740e41',
+                        args: <String, Object?>{
+                          'viewModelSearchQueryTrim': _viewModel.searchQuery
+                              .trim(),
+                        },
                         en: 'Search: ${_viewModel.searchQuery.trim()}',
                         zhHans: '搜索：${_viewModel.searchQuery.trim()}',
                       ),
@@ -940,7 +983,11 @@ class _ForumScreenState extends State<ForumScreen> {
                   const SizedBox(width: AppSpacing.md),
                   Text(
                     context.localeAwareCaps(
-                      context.localizedText(en: 'Hot Topics', zhHans: '热门话题'),
+                      context.localizedText(
+                        key: 'msgHotTopics6d95a8bb',
+                        en: 'Hot Topics',
+                        zhHans: '热门话题',
+                      ),
                     ),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: AppColors.primary.withValues(alpha: 0.84),
@@ -1081,25 +1128,34 @@ class _ForumEmptyState extends StatelessWidget {
           Text(
             isSearchActive
                 ? context.localizedText(
+                    key: 'msgNoMatchingTopics1d472dff',
                     en: 'No matching topics',
                     zhHans: '没有匹配的话题',
                   )
-                : context.localizedText(en: 'No topics yet', zhHans: '还没有话题'),
+                : context.localizedText(
+                    key: 'msgNoTopicsYetf9b054ae',
+                    en: 'No topics yet',
+                    zhHans: '还没有话题',
+                  ),
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             isSearchActive
                 ? context.localizedText(
+                    key: 'msgTryADifferentTopicTitleAgentNameOrTag254d72ec',
                     en: 'Try a different topic title, agent name, or tag.',
                     zhHans: '试试换一个话题标题、智能体名称或标签。',
                   )
                 : isUsingLiveTopics
                 ? context.localizedText(
+                    key:
+                        'msgLiveForumDataIsConnectedButThereAreNoPublic5f79db52',
                     en: 'Live forum data is connected, but there are no public topics to show yet.',
                     zhHans: '论坛实时数据已接通，但当前还没有可展示的公开话题。',
                   )
                 : context.localizedText(
+                    key: 'msgPreviewForumDataIsEmptyRightNow2a15664d',
                     en: 'Preview forum data is empty right now.',
                     zhHans: '当前预览论坛数据为空。',
                   ),
@@ -1181,6 +1237,7 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                         Expanded(
                           child: Text(
                             context.localizedText(
+                              key: 'msgSearchTopics5f20fc8c',
                               en: 'Search topics',
                               zhHans: '搜索话题',
                             ),
@@ -1192,6 +1249,7 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       context.localizedText(
+                        key: 'msgSearchByTopicTitleBodyAuthorOrTaga423aea8',
                         en: 'Search by topic title, body, author, or tag.',
                         zhHans: '按话题标题、正文、作者或标签搜索。',
                       ),
@@ -1214,6 +1272,7 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                           Navigator.of(context).pop(value.trim()),
                       decoration: InputDecoration(
                         hintText: context.localizedText(
+                          key: 'msgSearchTitlesOrTags7f24c941',
                           en: 'Search titles or tags',
                           zhHans: '搜索标题或标签',
                         ),
@@ -1261,10 +1320,17 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                                   child: Text(
                                     trimmedQuery.isEmpty
                                         ? context.localizedText(
+                                            key:
+                                                'msgTypeToSearchSpecificTopicsOrTagsb8e1b54f',
                                             en: 'Type to search specific topics or tags.',
                                             zhHans: '输入后即可搜索具体话题或标签。',
                                           )
                                         : context.localizedText(
+                                            key:
+                                                'msgNoTopicsMatchTrimmedQuery4f880ae7',
+                                            args: <String, Object?>{
+                                              'trimmedQuery': trimmedQuery,
+                                            },
                                             en: 'No topics match "$trimmedQuery".',
                                             zhHans: '没有话题匹配“$trimmedQuery”。',
                                           ),
@@ -1353,6 +1419,7 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                           onPressed: () => Navigator.of(context).pop(''),
                           child: Text(
                             context.localizedText(
+                              key: 'msgForumSearchShowAll',
                               en: 'Show all',
                               zhHans: '显示全部',
                             ),
@@ -1366,10 +1433,12 @@ class _TopicSearchSheetState extends State<_TopicSearchSheet> {
                           child: Text(
                             trimmedQuery.isEmpty
                                 ? context.localizedText(
+                                    key: 'msgClosebbfa773e',
                                     en: 'Close',
                                     zhHans: '关闭',
                                   )
                                 : context.localizedText(
+                                    key: 'msgApplySearch94ea0057',
                                     en: 'Apply search',
                                     zhHans: '应用搜索',
                                   ),
@@ -1603,7 +1672,11 @@ class _TopicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final secondaryMeta = topic.isHot
         ? context.localeAwareCaps(
-            context.localizedText(en: 'Trending', zhHans: '热门'),
+            context.localizedText(
+              key: 'msgTrending8a12d562',
+              en: 'Trending',
+              zhHans: '热门',
+            ),
           )
         : topic.replies.isNotEmpty
         ? context.localeAwareCaps(topic.replies.first.postedAgo)
@@ -1657,6 +1730,10 @@ class _TopicCard extends StatelessWidget {
                     const SizedBox(width: AppSpacing.xs),
                     Text(
                       context.localizedText(
+                        key: 'msgTopicReplyCountRepliesabed0852',
+                        args: <String, Object?>{
+                          'topicReplyCount': topic.replyCount,
+                        },
                         en: '${topic.replyCount} replies',
                         zhHans: '${topic.replyCount} 条回复',
                       ),
@@ -1742,6 +1819,7 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
         SnackBar(
           content: Text(
             context.localizedText(
+              key: 'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a',
               en: 'Tap Reply on an agent response to join this thread.',
               zhHans: '点击某条智能体回复上的“回复”按钮即可加入此线程。',
             ),
@@ -1804,7 +1882,11 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
     final maxHeight = MediaQuery.sizeOf(context).height - AppSpacing.xxs;
     final replyDepth = _replyGraphDepth(_topic.replies);
     final leadingTag = _topic.tags.isEmpty
-        ? context.localizedText(en: 'Open thread', zhHans: '公开线程')
+        ? context.localizedText(
+            key: 'msgForumOpenThreadTag',
+            en: 'Open thread',
+            zhHans: '公开线程',
+          )
         : context.localeAwareCaps(_topic.tags.first);
 
     return SizedBox(
@@ -1900,6 +1982,15 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                         const SizedBox(height: AppSpacing.xxs),
                                         Text(
                                           context.localizedText(
+                                            key:
+                                                'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565',
+                                            args: <String, Object?>{
+                                              'leadingTag': leadingTag,
+                                              'topicParticipantCount':
+                                                  _topic.participantCount,
+                                              'topicReplyCount':
+                                                  _topic.replyCount,
+                                            },
                                             en: '$leadingTag / ${_topic.participantCount} agents / ${_topic.replyCount} replies',
                                             zhHans:
                                                 '$leadingTag / ${_topic.participantCount} 位智能体 / ${_topic.replyCount} 条回复',
@@ -1946,6 +2037,11 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                   _TopicMetaPill(
                                     icon: Icons.radar_rounded,
                                     label: context.localizedText(
+                                      key:
+                                          'msgAgentFollowsTopicFollowCountc7ba45d7',
+                                      args: <String, Object?>{
+                                        'topicFollowCount': _topic.followCount,
+                                      },
                                       en: 'Agent follows ${_topic.followCount}',
                                       zhHans: '智能体关注 ${_topic.followCount}',
                                     ),
@@ -1954,6 +2050,10 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                   _TopicMetaPill(
                                     icon: Icons.local_fire_department_outlined,
                                     label: context.localizedText(
+                                      key: 'msgHotTopicHotScore16584bfe',
+                                      args: <String, Object?>{
+                                        'topicHotScore': _topic.hotScore,
+                                      },
                                       en: 'Hot ${_topic.hotScore}',
                                       zhHans: '热度 ${_topic.hotScore}',
                                     ),
@@ -1962,6 +2062,10 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                   _TopicMetaPill(
                                     icon: Icons.account_tree_outlined,
                                     label: context.localizedText(
+                                      key: 'msgDepthReplyDepth49d48d20',
+                                      args: <String, Object?>{
+                                        'replyDepth': replyDepth,
+                                      },
                                       en: 'Depth $replyDepth',
                                       zhHans: '深度 $replyDepth',
                                     ),
@@ -1976,7 +2080,11 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         context.localeAwareCaps(
-                          context.localizedText(en: 'Thread', zhHans: '讨论串'),
+                          context.localizedText(
+                            key: 'msgThread7863f750',
+                            en: 'Thread',
+                            zhHans: '讨论串',
+                          ),
                         ),
                         style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(
@@ -2026,11 +2134,19 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                             ? () => _openReplyComposer(
                                                 parentEventId: reply.id,
                                                 headline: context.localizedText(
+                                                  key:
+                                                      'msgReplyToReplyAuthorName891884c5',
+                                                  args: <String, Object?>{
+                                                    'replyAuthorName':
+                                                        reply.authorName,
+                                                  },
                                                   en: 'Reply to ${reply.authorName}',
                                                   zhHans:
                                                       '回复 ${reply.authorName}',
                                                 ),
                                                 hint: context.localizedText(
+                                                  key:
+                                                      'msgThisBranchReplyWillPublishAsYouNotAsYour46c7e8f6',
                                                   en: 'This branch reply will publish as you, not as your active agent.',
                                                   zhHans:
                                                       '这条分支回复会以你的人类身份发布，而不是以当前激活智能体的身份发布。',
@@ -2397,6 +2513,7 @@ class _EmptyReplyGraph extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Text(
           context.localizedText(
+            key: 'msgNoReplyBranchesYetThisTopicIsReadyForThe4c37947b',
             en: 'No reply branches yet. This topic is ready for the first agent response.',
             zhHans: '还没有回复分支，这个话题正等待第一条智能体回复。',
           ),
@@ -2519,6 +2636,7 @@ class _ReplyCard extends StatelessWidget {
                                           child: Text(
                                             context.localeAwareCaps(
                                               context.localizedText(
+                                                key: 'msgHumane31663b1',
                                                 en: 'Human',
                                                 zhHans: '人类',
                                               ),
@@ -2741,10 +2859,15 @@ class _ReplyAction extends StatelessWidget {
                 Text(
                   isPending
                       ? context.localizedText(
+                          key: 'msgSendingc338c191',
                           en: 'Sending...',
                           zhHans: '发送中...',
                         )
-                      : context.localizedText(en: 'Reply', zhHans: '回复'),
+                      : context.localizedText(
+                          key: 'msgReply6c2bb735',
+                          en: 'Reply',
+                          zhHans: '回复',
+                        ),
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: foreground,
                     fontSize: 12,
@@ -2871,6 +2994,14 @@ class _NestedReplyBranchState extends State<_NestedReplyBranch> {
                   icon: const Icon(Icons.unfold_more_rounded, size: 16),
                   label: Text(
                     context.localizedText(
+                      key:
+                          'msgLoadRemainingRepliesPageSizePageSizeRemainingRepliesMorec79b7397',
+                      args: <String, Object?>{
+                        'remainingRepliesPageSizePageSizeRemainingReplies':
+                            remainingReplies >= _pageSize
+                            ? _pageSize
+                            : remainingReplies,
+                      },
                       en: 'Load ${remainingReplies >= _pageSize ? _pageSize : remainingReplies} more',
                       zhHans:
                           '加载更多 ${remainingReplies >= _pageSize ? _pageSize : remainingReplies} 条',
@@ -3067,6 +3198,7 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
         SnackBar(
           content: Text(
             context.localizedText(
+              key: 'msgReplyBodyCannotBeEmpty127fdab5',
               en: 'Reply body cannot be empty.',
               zhHans: '回复内容不能为空。',
             ),
@@ -3159,7 +3291,11 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       Text(
-                        context.localizedText(en: 'Reply Body', zhHans: '回复内容'),
+                        context.localizedText(
+                          key: 'msgReplyBodyda9843a3',
+                          en: 'Reply Body',
+                          zhHans: '回复内容',
+                        ),
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: AppColors.onSurfaceMuted,
                           letterSpacing: 2.2,
@@ -3181,6 +3317,8 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
                               maxLines: 6,
                               decoration: InputDecoration(
                                 hintText: context.localizedText(
+                                  key:
+                                      'msgDefineTheNextBranchOfThisDiscussionab272dc9',
                                   en: 'Define the next branch of this discussion...',
                                   zhHans: '写下这条讨论将如何继续展开...',
                                 ),
@@ -3227,6 +3365,7 @@ class _ReplyComposerSheetState extends State<_ReplyComposerSheet> {
                         child: PrimaryGradientButton(
                           key: const Key('reply-submit-button'),
                           label: context.localizedText(
+                            key: 'msgSendResponse41054619',
                             en: 'Send response',
                             zhHans: '发送回复',
                           ),
@@ -3288,6 +3427,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
         SnackBar(
           content: Text(
             context.localizedText(
+              key: 'msgTopicTitleAndInitialProvocationAreRequired3f7a4d45',
               en: 'Topic title and initial provocation are required.',
               zhHans: '话题标题和初始引导语不能为空。',
             ),
@@ -3366,6 +3506,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                     children: [
                       Text(
                         context.localizedText(
+                          key: 'msgProposeNewForumTopicde2da11a',
                           en: 'Propose New Forum Topic',
                           zhHans: '发起新的论坛话题',
                         ),
@@ -3377,6 +3518,8 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         context.localizedText(
+                          key:
+                              'msgSubmitASynthesisPromptToTheCollectiveIntelligenceNetwork994b31fc',
                           en: 'Submit a synthesis prompt to the collective intelligence network.',
                           zhHans: '向集体智能网络提交一个新的讨论引导。',
                         ),
@@ -3388,6 +3531,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       Text(
                         context.localeAwareCaps(
                           context.localizedText(
+                            key: 'msgTopicTitle1420e343',
                             en: 'Topic Title',
                             zhHans: '话题标题',
                           ),
@@ -3406,6 +3550,8 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                         controller: _titleController,
                         decoration: InputDecoration(
                           hintText: context.localizedText(
+                            key:
+                                'msgEGPostScarcityResourceAllocationParadigms5ed9c92f',
                             en: 'e.g., Post-Scarcity Resource Allocation Paradigms',
                             zhHans: '例如：后稀缺时代的资源分配范式',
                           ),
@@ -3420,6 +3566,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       Text(
                         context.localeAwareCaps(
                           context.localizedText(
+                            key: 'msgTopicCategoryac33121e',
                             en: 'Topic Category',
                             zhHans: '话题分类',
                           ),
@@ -3491,6 +3638,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                           Text(
                             context.localeAwareCaps(
                               context.localizedText(
+                                key: 'msgInitialProvocation09277645',
                                 en: 'Initial Provocation',
                                 zhHans: '初始引导',
                               ),
@@ -3507,6 +3655,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                           Text(
                             context.localeAwareCaps(
                               context.localizedText(
+                                key: 'msgMarkdownSupported8c69cce8',
                                 en: 'Markdown Supported',
                                 zhHans: '支持 Markdown',
                               ),
@@ -3539,6 +3688,8 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                               maxLines: 6,
                               decoration: InputDecoration(
                                 hintText: context.localizedText(
+                                  key:
+                                      'msgDefineTheBoundaryConditionsForThisDiscoursee2d51c7a',
                                   en: 'Define the boundary conditions for this discourse...',
                                   zhHans: '定义这场讨论的边界条件与核心问题...',
                                 ),
@@ -3585,6 +3736,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                         child: PrimaryGradientButton(
                           key: const Key('proposal-submit-button'),
                           label: context.localizedText(
+                            key: 'msgInitializeTopic186b853c',
                             en: 'Initialize topic',
                             zhHans: '创建话题',
                           ),
@@ -3602,6 +3754,8 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                         child: Text(
                           context.localeAwareCaps(
                             context.localizedText(
+                              key:
+                                  'msgRequires500ComputeUnitsToInstantiateNeuralThread92f2824e',
                               en: 'Requires 500 compute units to instantiate neural thread',
                               zhHans: '创建神经线程需要消耗 500 计算单元',
                             ),

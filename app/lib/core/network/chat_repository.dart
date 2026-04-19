@@ -10,6 +10,7 @@ class ChatThreadCounterpart {
     required this.isOnline,
     required this.viewerFollowsAgent,
     required this.agentFollowsViewer,
+    this.avatarEmoji,
   });
 
   final String type;
@@ -17,17 +18,22 @@ class ChatThreadCounterpart {
   final String displayName;
   final String? handle;
   final String? avatarUrl;
+  final String? avatarEmoji;
   final bool isOnline;
   final bool viewerFollowsAgent;
   final bool agentFollowsViewer;
 
-  factory ChatThreadCounterpart.fromJson(Map<String, dynamic> json) {
+  factory ChatThreadCounterpart.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     return ChatThreadCounterpart(
       type: json['type'] as String? ?? '',
       id: json['id'] as String? ?? '',
       displayName: json['displayName'] as String? ?? '',
       handle: json['handle'] as String?,
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: _resolveUrl(json['avatarUrl'], resolveUrl),
+      avatarEmoji: _readOptionalString(json['avatarEmoji']),
       isOnline: json['isOnline'] as bool? ?? false,
       viewerFollowsAgent: json['viewerFollowsAgent'] as bool? ?? false,
       agentFollowsViewer: json['agentFollowsViewer'] as bool? ?? false,
@@ -75,11 +81,15 @@ class ChatThreadSummary {
 
   bool get isOwnedAgentCommandThread => threadUsage == 'owned_agent_command';
 
-  factory ChatThreadSummary.fromJson(Map<String, dynamic> json) {
+  factory ChatThreadSummary.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     return ChatThreadSummary(
       threadId: json['threadId'] as String? ?? '',
       counterpart: ChatThreadCounterpart.fromJson(
         json['counterpart'] as Map<String, dynamic>? ?? const {},
+        resolveUrl: resolveUrl,
       ),
       lastMessage: ChatThreadLastMessage.fromJson(
         json['lastMessage'] as Map<String, dynamic>? ?? const {},
@@ -101,13 +111,19 @@ class ChatThreadsResponse {
   final List<ChatThreadSummary> threads;
   final String? nextCursor;
 
-  factory ChatThreadsResponse.fromJson(Map<String, dynamic> json) {
+  factory ChatThreadsResponse.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     final rawThreads = json['threads'] as List<dynamic>? ?? const [];
     return ChatThreadsResponse(
       activeAgentId: json['activeAgentId'] as String? ?? '',
       threads: rawThreads
           .map(
-            (item) => ChatThreadSummary.fromJson(item as Map<String, dynamic>),
+            (item) => ChatThreadSummary.fromJson(
+              item as Map<String, dynamic>,
+              resolveUrl: resolveUrl,
+            ),
           )
           .toList(growable: false),
       nextCursor: json['nextCursor'] as String?,
@@ -250,7 +266,10 @@ class ChatRepository {
       '/content/dm/threads',
       queryParameters: queryParameters,
     );
-    return ChatThreadsResponse.fromJson(response);
+    return ChatThreadsResponse.fromJson(
+      response,
+      resolveUrl: apiClient.resolveUrl,
+    );
   }
 
   Future<ChatMessagesResponse> getMessages({
@@ -335,4 +354,17 @@ class ChatRepository {
 
     return apiClient.post('/content/dm', body: body);
   }
+}
+
+String? _readOptionalString(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
+}
+
+String? _resolveUrl(Object? value, String? Function(String?)? resolveUrl) {
+  final raw = value as String?;
+  return resolveUrl?.call(raw) ?? raw;
 }

@@ -9,10 +9,11 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
+  AssetModerationStatus,
   AgentActivityLevel,
   AgentDmAcceptanceMode,
   EventActorType,
@@ -34,6 +35,8 @@ import { EventEntity } from '../../database/entities/event.entity';
 import { FollowEntity } from '../../database/entities/follow.entity';
 import { ThreadEntity } from '../../database/entities/thread.entity';
 import { AuthenticatedHuman } from '../auth/auth.types';
+import { AssetStorageService } from '../assets/asset-storage.service';
+import { ImageModerationService } from '../assets/image-moderation.service';
 import { FederationCredentialsService } from '../federation/federation-credentials.service';
 import { FederationDeliveryService } from '../federation/federation-delivery.service';
 import type { AuthenticatedFederatedAgent } from '../federation/federation.types';
@@ -43,6 +46,11 @@ interface ImportAgentInput {
   displayName: string;
   avatarUrl?: string | null;
   bio?: string | null;
+}
+
+interface CreateAgentAvatarUploadInput {
+  fileName?: string;
+  mimeType?: string;
 }
 
 export type AgentDmPolicyMode =
@@ -70,7 +78,9 @@ export interface AgentSummary {
   handle: string;
   displayName: string;
   avatarUrl: string | null;
+  avatarEmoji: string | null;
   bio: string | null;
+  profileTags: string[];
   ownerType: AgentOwnerType;
   status: AgentStatus;
   safetyPolicy?: AgentSafetyPolicySummary;
@@ -197,6 +207,14 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private static readonly invitationIssuedAtKey = 'invitationIssuedAt';
   private static readonly allowInitialHandleClaimKey =
     'allowInitialHandleClaim';
+  private static readonly avatarEmojiMetadataKey = 'avatarEmoji';
+  private static readonly avatarStorageBucketMetadataKey =
+    'avatarStorageBucket';
+  private static readonly avatarStorageKeyMetadataKey = 'avatarStorageKey';
+  private static readonly avatarMimeTypeMetadataKey = 'avatarMimeType';
+  private static readonly avatarUpdatedAtMetadataKey = 'avatarUpdatedAt';
+  private static readonly pendingAvatarUploadMetadataKey =
+    'pendingAvatarUpload';
   private static readonly defaultClaimRequestTtlMinutes = 60;
   private static readonly minClaimRequestTtlMinutes = 15;
   private static readonly maxClaimRequestTtlMinutes = 24 * 60;
@@ -217,6 +235,8 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     private readonly agentPolicyRepository: Repository<AgentPolicyEntity>,
     @InjectRepository(FollowEntity)
     private readonly followRepository: Repository<FollowEntity>,
+    private readonly assetStorageService: AssetStorageService,
+    private readonly imageModerationService: ImageModerationService,
     private readonly federationCredentialsService: FederationCredentialsService,
     private readonly federationDeliveryService: FederationDeliveryService,
   ) {
@@ -539,6 +559,160 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       connectedAgents: agents
         .filter((agent) => agent.connection != null)
         .map((agent) => this.serializeConnectedAgent(agent)),
+    };
+  }
+
+  async createFederatedAgentAvatarUpload(
+    agent: AuthenticatedFederatedAgent,
+    input: CreateAgentAvatarUploadInput,
+  ) {
+    const persistedAgent = await this.agentRepository.findOneBy({ id: agent.id });
+
+    if (!persistedAgent) {
+      throw new NotFoundException(`Agent ${agent.id} was not found.`);
+    }
+
+    const fileName = this.normalizeAvatarFileName(input.fileName);
+    const mimeType = this.normalizeAvatarMimeType(input.mimeType);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const storageBucket = this.environment.minio.bucket;
+    const storageKey = this.buildAgentAvatarObjectKey(
+      persistedAgent.id,
+      fileName,
+    );
+
+    persistedAgent.profileMetadata = {
+      ...persistedAgent.profileMetadata,
+      [AgentsService.pendingAvatarUploadMetadataKey]: {
+        bucket: storageBucket,
+        key: storageKey,
+        mimeType,
+        expiresAt: expiresAt.toISOString(),
+      },
+    };
+    await this.agentRepository.save(persistedAgent);
+
+    return {
+      upload: {
+        method: 'PUT',
+        url: this.assetStorageService.createPresignedUploadUrl({
+          bucket: storageBucket,
+          key: storageKey,
+          mimeType,
+          expiresInSeconds: 15 * 60,
+        }),
+        headers: {
+          'Content-Type': mimeType,
+        },
+        expiresAt: expiresAt.toISOString(),
+        bucket: storageBucket,
+        objectKey: storageKey,
+      },
+      avatarUrl: this.buildAgentAvatarPath(persistedAgent.id, Date.now()),
+    };
+  }
+
+  async completeFederatedAgentAvatarUpload(
+    agent: AuthenticatedFederatedAgent,
+  ): Promise<{
+    avatarUrl: string;
+    mimeType: string;
+    updatedAt: string;
+  }> {
+    const persistedAgent = await this.agentRepository.findOneBy({ id: agent.id });
+
+    if (!persistedAgent) {
+      throw new NotFoundException(`Agent ${agent.id} was not found.`);
+    }
+
+    const pendingUpload = this.readPendingAvatarUpload(
+      persistedAgent.profileMetadata,
+    );
+    if (!pendingUpload) {
+      throw new ConflictException(
+        'No pending agent avatar upload exists for this slot.',
+      );
+    }
+
+    const storedObject = await this.assetStorageService.headObject({
+      bucket: pendingUpload.bucket,
+      key: pendingUpload.key,
+    });
+    if (!storedObject) {
+      throw new ConflictException('Uploaded avatar object was not found.');
+    }
+
+    const mimeType = storedObject.mimeType?.trim() || pendingUpload.mimeType;
+    const moderation = this.imageModerationService.moderate({
+      byteSize: storedObject.byteSize,
+      mimeType,
+      originalFileName: pendingUpload.key.split('/').pop() ?? 'agent-avatar',
+    });
+
+    if (moderation.status === AssetModerationStatus.Rejected) {
+      persistedAgent.profileMetadata = this.clearPendingAvatarUpload(
+        persistedAgent.profileMetadata,
+      );
+      await this.agentRepository.save(persistedAgent);
+      throw new ForbiddenException(
+        moderation.reason
+          ? `Avatar upload rejected: ${moderation.reason}.`
+          : 'Avatar upload rejected.',
+      );
+    }
+
+    const updatedAt = new Date();
+    persistedAgent.profileMetadata = this.withStoredAvatarMetadata(
+      this.clearPendingAvatarUpload(persistedAgent.profileMetadata),
+      {
+        bucket: pendingUpload.bucket,
+        key: pendingUpload.key,
+        mimeType,
+        updatedAt: updatedAt.toISOString(),
+      },
+    );
+    persistedAgent.avatarUrl = this.buildAgentAvatarPath(
+      persistedAgent.id,
+      updatedAt.getTime(),
+    );
+    await this.agentRepository.save(persistedAgent);
+
+    return {
+      avatarUrl: persistedAgent.avatarUrl,
+      mimeType,
+      updatedAt: updatedAt.toISOString(),
+    };
+  }
+
+  async readPublicAgentAvatar(agentId: string): Promise<{
+    body: Buffer;
+    mimeType: string;
+    byteSize: number;
+  }> {
+    const agent = await this.agentRepository.findOneBy({ id: agentId });
+
+    if (!agent) {
+      throw new NotFoundException(`Agent ${agentId} was not found.`);
+    }
+
+    const storedAvatar = this.readStoredAvatarMetadata(agent.profileMetadata);
+    if (!storedAvatar) {
+      throw new NotFoundException(`Agent ${agentId} does not have an uploaded avatar.`);
+    }
+
+    const object = await this.assetStorageService.readObject({
+      bucket: storedAvatar.bucket,
+      key: storedAvatar.key,
+    });
+
+    if (!object) {
+      throw new NotFoundException(`Avatar object for agent ${agentId} was not found.`);
+    }
+
+    return {
+      body: object.body,
+      mimeType: storedAvatar.mimeType || object.mimeType || 'application/octet-stream',
+      byteSize: object.byteSize,
     };
   }
 
@@ -1029,7 +1203,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       handle: agent.handle,
       displayName: agent.displayName,
       avatarUrl: agent.avatarUrl,
+      avatarEmoji: this.readAvatarEmoji(agent.profileMetadata),
       bio: agent.bio,
+      profileTags: agent.profileTags,
       ownerType: agent.ownerType,
       status: agent.status,
     };
@@ -1552,6 +1728,137 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private readAvatarEmoji(metadata: Record<string, unknown>): string | null {
+    const value = metadata[AgentsService.avatarEmojiMetadataKey];
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const normalized = value.trim();
+    return normalized ? normalized : null;
+  }
+
+  private readPendingAvatarUpload(metadata: Record<string, unknown>): {
+    bucket: string;
+    key: string;
+    mimeType: string;
+  } | null {
+    const raw = metadata[AgentsService.pendingAvatarUploadMetadataKey];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return null;
+    }
+    const record = raw as Record<string, unknown>;
+    const bucket =
+      typeof record.bucket === 'string' ? record.bucket.trim() : '';
+    const key = typeof record.key === 'string' ? record.key.trim() : '';
+    const mimeType =
+      typeof record.mimeType === 'string' ? record.mimeType.trim() : '';
+    if (!bucket || !key || !mimeType) {
+      return null;
+    }
+    return {
+      bucket,
+      key,
+      mimeType,
+    };
+  }
+
+  private readStoredAvatarMetadata(metadata: Record<string, unknown>): {
+    bucket: string;
+    key: string;
+    mimeType: string | null;
+  } | null {
+    const bucketValue = metadata[AgentsService.avatarStorageBucketMetadataKey];
+    const keyValue = metadata[AgentsService.avatarStorageKeyMetadataKey];
+    const mimeTypeValue = metadata[AgentsService.avatarMimeTypeMetadataKey];
+    const bucket =
+      typeof bucketValue === 'string' ? bucketValue.trim() : '';
+    const key = typeof keyValue === 'string' ? keyValue.trim() : '';
+    const mimeType =
+      typeof mimeTypeValue === 'string' && mimeTypeValue.trim()
+        ? mimeTypeValue.trim()
+        : null;
+    if (!bucket || !key) {
+      return null;
+    }
+    return {
+      bucket,
+      key,
+      mimeType,
+    };
+  }
+
+  private clearPendingAvatarUpload(
+    metadata: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const nextMetadata = { ...metadata };
+    delete nextMetadata[AgentsService.pendingAvatarUploadMetadataKey];
+    return nextMetadata;
+  }
+
+  private withStoredAvatarMetadata(
+    metadata: Record<string, unknown>,
+    value: {
+      bucket: string;
+      key: string;
+      mimeType: string;
+      updatedAt: string;
+    },
+  ): Record<string, unknown> {
+    return {
+      ...metadata,
+      [AgentsService.avatarStorageBucketMetadataKey]: value.bucket,
+      [AgentsService.avatarStorageKeyMetadataKey]: value.key,
+      [AgentsService.avatarMimeTypeMetadataKey]: value.mimeType,
+      [AgentsService.avatarUpdatedAtMetadataKey]: value.updatedAt,
+    };
+  }
+
+  private clearStoredAvatarMetadata(
+    metadata: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const nextMetadata = { ...metadata };
+    delete nextMetadata[AgentsService.avatarStorageBucketMetadataKey];
+    delete nextMetadata[AgentsService.avatarStorageKeyMetadataKey];
+    delete nextMetadata[AgentsService.avatarMimeTypeMetadataKey];
+    delete nextMetadata[AgentsService.avatarUpdatedAtMetadataKey];
+    delete nextMetadata[AgentsService.pendingAvatarUploadMetadataKey];
+    return nextMetadata;
+  }
+
+  private buildAgentAvatarObjectKey(
+    agentId: string,
+    fileName: string,
+  ): string {
+    return `agent-avatars/${agentId}/${randomUUID()}-${this.sanitizePathSegment(fileName)}`;
+  }
+
+  private buildAgentAvatarPath(agentId: string, version: number): string {
+    return `/${this.environment.apiPrefix}/agents/${encodeURIComponent(agentId)}/avatar?v=${version}`;
+  }
+
+  private normalizeAvatarFileName(value: string | undefined): string {
+    const normalized = value?.trim();
+    if (!normalized) {
+      throw new BadRequestException('fileName is required.');
+    }
+    return normalized;
+  }
+
+  private normalizeAvatarMimeType(value: string | undefined): string {
+    const normalized = value?.trim().toLowerCase();
+    if (!normalized) {
+      throw new BadRequestException('mimeType is required.');
+    }
+    if (!normalized.startsWith('image/')) {
+      throw new BadRequestException('mimeType must be an image media type.');
+    }
+    return normalized;
+  }
+
+  private sanitizePathSegment(value: string): string {
+    return value.replace(/[^a-zA-Z0-9._-]/g, '-');
   }
 
   private normalizeHandle(handle: string): string {

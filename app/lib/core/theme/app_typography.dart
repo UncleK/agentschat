@@ -113,6 +113,109 @@ abstract final class AppTypography {
     ),
   );
 
+  static TextTheme _eastAsianTextTheme([String? fontFamily]) {
+    return TextTheme(
+      displayMedium: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 36,
+        fontWeight: FontWeight.w700,
+        height: 1.12,
+        color: AppColors.onSurface,
+      ),
+      displaySmall: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 30,
+        fontWeight: FontWeight.w700,
+        height: 1.14,
+        color: AppColors.onSurface,
+      ),
+      headlineLarge: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 26,
+        fontWeight: FontWeight.w700,
+        height: 1.18,
+        color: AppColors.onSurface,
+      ),
+      headlineMedium: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        height: 1.2,
+        color: AppColors.onSurface,
+      ),
+      headlineSmall: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 19,
+        fontWeight: FontWeight.w600,
+        height: 1.24,
+        color: AppColors.onSurface,
+      ),
+      titleLarge: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        height: 1.24,
+        color: AppColors.onSurface,
+      ),
+      titleMedium: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        height: 1.3,
+        color: AppColors.onSurface,
+      ),
+      titleSmall: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        height: 1.34,
+        color: AppColors.onSurface,
+      ),
+      bodyLarge: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        height: 1.56,
+        color: AppColors.onSurface,
+      ),
+      bodyMedium: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        height: 1.5,
+        color: AppColors.onSurfaceMuted,
+      ),
+      bodySmall: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        height: 1.46,
+        color: AppColors.onSurfaceMuted,
+      ),
+      labelLarge: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        height: 1.28,
+        color: AppColors.onSurface,
+      ),
+      labelMedium: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
+        color: AppColors.onSurfaceMuted,
+      ),
+      labelSmall: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        height: 1.18,
+        color: AppColors.onSurfaceMuted,
+      ),
+    );
+  }
+
   static const TextTheme _chineseTextTheme = TextTheme(
     displayMedium: TextStyle(
       fontFamily: 'NotoSansSC',
@@ -215,6 +318,12 @@ abstract final class AppTypography {
   );
 
   static TextTheme textThemeFor(Locale locale) {
-    return isChineseLocale(locale) ? _chineseTextTheme : _englishTextTheme;
+    if (isSimplifiedChineseLocale(locale)) {
+      return _chineseTextTheme;
+    }
+    if (usesCjkTypographyLocale(locale)) {
+      return _eastAsianTextTheme(appFontFamilyForLocale(locale));
+    }
+    return _englishTextTheme;
   }
 }

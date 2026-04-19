@@ -20,6 +20,7 @@ class DebateRepository {
     required String viewerId,
     required String viewerName,
     String? preferredSessionId,
+    String? activeAgentId,
     bool usePublicDirectory = false,
   }) async {
     final debatesResponse = await apiClient.get('/debates');
@@ -30,7 +31,7 @@ class DebateRepository {
         .toList(growable: false);
     final directoryRosterResult = usePublicDirectory
         ? await _readPublicDirectoryRoster()
-        : await _readDirectoryRoster();
+        : await _readDirectoryRoster(activeAgentId: activeAgentId);
     final debaterRoster = _mergeDebaterRoster(
       directoryRosterResult.roster,
       sessions,
@@ -39,9 +40,13 @@ class DebateRepository {
       DebateProfileModel(
         id: viewerId.isEmpty ? 'current-human' : viewerId,
         name: viewerName.trim().isEmpty
-            ? localizedAppText(en: 'You', zhHans: '你')
+            ? localizedAppText(key: 'msgYou905cb326', en: 'You', zhHans: '你')
             : viewerName.trim(),
-        headline: localizedAppText(en: 'Current human host', zhHans: '当前人类主持人'),
+        headline: localizedAppText(
+          key: 'msgCurrentHumanHost2f7e0577',
+          en: 'Current human host',
+          zhHans: '当前人类主持人',
+        ),
         kind: DebateParticipantKind.human,
       ),
     ];
@@ -54,7 +59,7 @@ class DebateRepository {
           _resolvePreferredSessionId(sessions, preferredSessionId) ??
           (sessions.isEmpty ? '' : sessions.first.id),
       viewerName: viewerName.trim().isEmpty
-          ? localizedAppText(en: 'You', zhHans: '你')
+          ? localizedAppText(key: 'msgYou905cb326', en: 'You', zhHans: '你')
           : viewerName.trim(),
       directoryErrorMessage: directoryRosterResult.errorMessage,
     );
@@ -128,8 +133,18 @@ class DebateRepository {
     );
   }
 
-  Future<_DirectoryRosterResult> _readDirectoryRoster() async {
-    return _readDirectoryRosterFromPath('/agents/directory');
+  Future<_DirectoryRosterResult> _readDirectoryRoster({
+    String? activeAgentId,
+  }) async {
+    final queryParameters = <String, String>{};
+    final normalizedActiveAgentId = activeAgentId?.trim();
+    if (normalizedActiveAgentId != null && normalizedActiveAgentId.isNotEmpty) {
+      queryParameters['activeAgentId'] = normalizedActiveAgentId;
+    }
+    return _readDirectoryRosterFromPath(
+      '/agents/directory',
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    );
   }
 
   Future<_DirectoryRosterResult> _readPublicDirectoryRoster() async {
@@ -137,10 +152,14 @@ class DebateRepository {
   }
 
   Future<_DirectoryRosterResult> _readDirectoryRosterFromPath(
-    String path,
-  ) async {
+    String path, {
+    Map<String, String>? queryParameters,
+  }) async {
     try {
-      final response = await apiClient.get(path);
+      final response = await apiClient.get(
+        path,
+        queryParameters: queryParameters,
+      );
       final rawAgents = response['agents'] as List<dynamic>? ?? const [];
       return _DirectoryRosterResult(roster: _mapDirectoryRoster(rawAgents));
     } on ApiException catch (error) {
@@ -149,6 +168,7 @@ class DebateRepository {
         roster: const [],
         errorMessage: message.isEmpty
             ? localizedAppText(
+                key: 'msgAgentDirectoryIsTemporarilyUnavailablece494c59',
                 en: 'Agent directory is temporarily unavailable.',
                 zhHans: '智能体目录暂时不可用。',
               )
@@ -158,6 +178,7 @@ class DebateRepository {
       return _DirectoryRosterResult(
         roster: const [],
         errorMessage: localizedAppText(
+          key: 'msgAgentDirectoryIsTemporarilyUnavailablece494c59',
           en: 'Agent directory is temporarily unavailable.',
           zhHans: '智能体目录暂时不可用。',
         ),
@@ -175,13 +196,21 @@ class DebateRepository {
               json['displayName'] as String?,
               fallback:
                   json['handle'] as String? ??
-                  localizedAppText(en: 'Agent', zhHans: '智能体'),
+                  localizedAppText(
+                    key: 'msgAgent5ce2e6f4',
+                    en: 'Agent',
+                    zhHans: '智能体',
+                  ),
             ),
             headline: _displayName(
               json['bio'] as String?,
               fallback:
                   json['handle'] as String? ??
-                  localizedAppText(en: 'Available debater', zhHans: '可参辩智能体'),
+                  localizedAppText(
+                    key: 'msgAvailableDebater1ba72777',
+                    en: 'Available debater',
+                    zhHans: '可参辩智能体',
+                  ),
             ),
             kind: DebateParticipantKind.agent,
           );
@@ -237,24 +266,48 @@ class DebateRepository {
     final proSeat = _mapSeat(
       seatJson: seatsByStance['pro'],
       side: DebateSide.pro,
-      fallbackName: localizedAppText(en: 'Pro seat', zhHans: '正方席位'),
+      fallbackName: localizedAppText(
+        key: 'msgProSeat02c83784',
+        en: 'Pro seat',
+        zhHans: '正方席位',
+      ),
       fallbackHeadline:
           json['proStance'] as String? ??
-          localizedAppText(en: 'Pro stance', zhHans: '正方立场'),
+          localizedAppText(
+            key: 'msgProStancedd303a7e',
+            en: 'Pro stance',
+            zhHans: '正方立场',
+          ),
       stanceText:
           json['proStance'] as String? ??
-          localizedAppText(en: 'Pro stance', zhHans: '正方立场'),
+          localizedAppText(
+            key: 'msgProStancedd303a7e',
+            en: 'Pro stance',
+            zhHans: '正方立场',
+          ),
     );
     final conSeat = _mapSeat(
       seatJson: seatsByStance['con'],
       side: DebateSide.con,
-      fallbackName: localizedAppText(en: 'Con seat', zhHans: '反方席位'),
+      fallbackName: localizedAppText(
+        key: 'msgConSeated16d201',
+        en: 'Con seat',
+        zhHans: '反方席位',
+      ),
       fallbackHeadline:
           json['conStance'] as String? ??
-          localizedAppText(en: 'Con stance', zhHans: '反方立场'),
+          localizedAppText(
+            key: 'msgConStance7741bc34',
+            en: 'Con stance',
+            zhHans: '反方立场',
+          ),
       stanceText:
           json['conStance'] as String? ??
-          localizedAppText(en: 'Con stance', zhHans: '反方立场'),
+          localizedAppText(
+            key: 'msgConStance7741bc34',
+            en: 'Con stance',
+            zhHans: '反方立场',
+          ),
     );
     final lifecycle = _mapLifecycle(json['status'] as String?);
     final rawTurns = json['formalTurns'] as List<dynamic>? ?? const [];
@@ -287,7 +340,11 @@ class DebateRepository {
       id: json['debateSessionId'] as String? ?? '',
       topic: _displayName(
         json['topic'] as String?,
-        fallback: localizedAppText(en: 'Untitled debate', zhHans: '未命名辩论'),
+        fallback: localizedAppText(
+          key: 'msgUntitledDebate6394fefc',
+          en: 'Untitled debate',
+          zhHans: '未命名辩论',
+        ),
       ),
       proSeat: proSeat,
       conSeat: conSeat,
@@ -321,14 +378,30 @@ class DebateRepository {
       name: _displayName(
         json['displayName'] as String?,
         fallback: type == 'human'
-            ? localizedAppText(en: 'Human host', zhHans: '人类主持人')
-            : localizedAppText(en: 'Host', zhHans: '主持人'),
+            ? localizedAppText(
+                key: 'msgHumanHostead5bcea',
+                en: 'Human host',
+                zhHans: '人类主持人',
+              )
+            : localizedAppText(
+                key: 'msgHost3960ec4c',
+                en: 'Host',
+                zhHans: '主持',
+              ),
       ),
       headline: _displayName(
         json['headline'] as String?,
         fallback: type == 'human'
-            ? localizedAppText(en: 'Human host', zhHans: '人类主持人')
-            : localizedAppText(en: 'Debate host', zhHans: '辩论主持'),
+            ? localizedAppText(
+                key: 'msgHumanHostead5bcea',
+                en: 'Human host',
+                zhHans: '人类主持人',
+              )
+            : localizedAppText(
+                key: 'msgDebateHostb2456ce8',
+                en: 'Debate host',
+                zhHans: '辩论主持',
+              ),
       ),
       kind: type == 'human'
           ? DebateParticipantKind.human
@@ -387,8 +460,16 @@ class DebateRepository {
     final speakerName = _displayName(
       (seatJson?['agent'] as Map<String, dynamic>?)?['displayName'] as String?,
       fallback: side == DebateSide.pro
-          ? localizedAppText(en: 'Pro seat', zhHans: '正方席位')
-          : localizedAppText(en: 'Con seat', zhHans: '反方席位'),
+          ? localizedAppText(
+              key: 'msgProSeat02c83784',
+              en: 'Pro seat',
+              zhHans: '正方席位',
+            )
+          : localizedAppText(
+              key: 'msgConSeated16d201',
+              en: 'Con seat',
+              zhHans: '反方席位',
+            ),
     );
 
     return DebateFormalTurnModel(
@@ -398,6 +479,8 @@ class DebateRepository {
       speakerName: speakerName,
       summary: rawEvent == null
           ? localizedAppText(
+              key: 'msgAwaitingAFormalSubmissionFromSpeakerName74a595d6',
+              args: <String, Object?>{'speakerName': speakerName},
               en: 'Awaiting a formal submission from $speakerName.',
               zhHans: '正在等待 $speakerName 提交正式回合。',
             )
@@ -422,8 +505,16 @@ class DebateRepository {
     final authorName = _displayName(
       json['actorDisplayName'] as String?,
       fallback: actorType == 'human'
-          ? localizedAppText(en: 'Human spectator', zhHans: '人类观众')
-          : localizedAppText(en: 'Agent spectator', zhHans: '智能体观众'),
+          ? localizedAppText(
+              key: 'msgHumanSpectator47350bbb',
+              en: 'Human spectator',
+              zhHans: '人类观众',
+            )
+          : localizedAppText(
+              key: 'msgAgentSpectator0f79b0cf',
+              en: 'Agent spectator',
+              zhHans: '智能体观众',
+            ),
     );
 
     return DebateSpectatorMessageModel(
@@ -431,7 +522,11 @@ class DebateRepository {
       authorName: authorName,
       body: _displayName(
         json['content'] as String?,
-        fallback: localizedAppText(en: 'Spectator update', zhHans: '观众动态'),
+        fallback: localizedAppText(
+          key: 'msgSpectatorUpdate1ca5cb93',
+          en: 'Spectator update',
+          zhHans: '观众动态',
+        ),
       ),
       timestampLabel: _timeLabel(json['occurredAt'] as String?),
       kind: actorType == 'human'
@@ -539,16 +634,43 @@ class DebateRepository {
 
   String _phaseLabel(int turnNumber) {
     return switch (turnNumber) {
-      1 => localizedAppText(en: 'Opening', zhHans: '开篇'),
-      2 => localizedAppText(en: 'Counter', zhHans: '反驳'),
-      3 => localizedAppText(en: 'Rebuttal', zhHans: '再辩'),
-      4 => localizedAppText(en: 'Closing', zhHans: '结辩'),
-      _ => localizedAppText(en: 'Turn $turnNumber', zhHans: '第 $turnNumber 回合'),
+      1 => localizedAppText(
+        key: 'msgOpening56e44065',
+        en: 'Opening',
+        zhHans: '开篇',
+      ),
+      2 => localizedAppText(
+        key: 'msgCounterf4018045',
+        en: 'Counter',
+        zhHans: '反驳',
+      ),
+      3 => localizedAppText(
+        key: 'msgRebuttal81d491b0',
+        en: 'Rebuttal',
+        zhHans: '再辩',
+      ),
+      4 => localizedAppText(
+        key: 'msgClosing76a032e9',
+        en: 'Closing',
+        zhHans: '结辩',
+      ),
+      _ => localizedAppText(
+        key: 'msgTurnTurnNumber850e6ce0',
+        args: <String, Object?>{'turnNumber': turnNumber},
+        en: 'Turn $turnNumber',
+        zhHans: '第 $turnNumber 回合',
+      ),
     };
   }
 
   String _pendingTurnText({required DebateSide side, required int turnNumber}) {
     return localizedAppText(
+      key:
+          'msgAwaitingSideDebateSideProProConSubmissionForTurnTurnNumberb3e713b4',
+      args: <String, Object?>{
+        'sideDebateSideProProCon': side == DebateSide.pro ? 'pro' : 'con',
+        'turnNumber': turnNumber,
+      },
       en: 'Awaiting ${side == DebateSide.pro ? 'pro' : 'con'} submission for turn $turnNumber.',
       zhHans: '正在等待${side.label}提交第 $turnNumber 回合内容。',
     );
@@ -557,11 +679,11 @@ class DebateRepository {
   String _timeLabel(String? rawValue) {
     final value = rawValue?.trim();
     if (value == null || value.isEmpty) {
-      return localizedAppText(en: 'now', zhHans: '刚刚');
+      return localizedAppText(key: 'msgNowc9bc849a', en: 'now', zhHans: '刚刚');
     }
     final parsed = DateTime.tryParse(value)?.toLocal();
     if (parsed == null) {
-      return localizedAppText(en: 'now', zhHans: '刚刚');
+      return localizedAppText(key: 'msgNowc9bc849a', en: 'now', zhHans: '刚刚');
     }
     final hour = parsed.hour.toString().padLeft(2, '0');
     final minute = parsed.minute.toString().padLeft(2, '0');
@@ -570,7 +692,9 @@ class DebateRepository {
 
   String _spectatorCountLabel(int count) {
     return localizedAppText(
-      en: '$count ${count == 1 ? 'spectator' : 'spectators'}',
+      key: 'msgDebateSpectatorCountLabel',
+      args: <String, Object?>{'count': count},
+      en: '$count spectators',
       zhHans: '$count 位观众',
     );
   }

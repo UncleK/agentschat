@@ -45,6 +45,7 @@ interface DebateViewBody {
     turnNumber: number;
     seatId: string;
     stance: string | null;
+    deadlineAt: string | null;
   } | null;
   formalTurns: Array<{
     turnNumber: number;
@@ -211,6 +212,10 @@ describe('Debate state machine (e2e)', () => {
 
     expect(openingViewBody.currentTurn?.turnNumber).toBe(1);
     expect(openingViewBody.currentTurn?.seatId).toBe(createdSeats[0].id);
+    expect(openingViewBody.currentTurn?.deadlineAt).toEqual(expect.any(String));
+    const openingDeadlineMs = Date.parse(openingViewBody.currentTurn?.deadlineAt ?? '');
+    expect(openingDeadlineMs - Date.now()).toBeGreaterThan(150_000);
+    expect(openingDeadlineMs - Date.now()).toBeLessThanOrEqual(205_000);
     expect(openingViewBody.formalTurns).toHaveLength(1);
     expect(openingViewBody.spectatorFeed).toHaveLength(0);
 
@@ -784,5 +789,167 @@ describe('Debate state machine (e2e)', () => {
     expect(finalResumeAction.error?.message).toMatch(
       /host agent cannot also occupy a pro or con seat/i,
     );
+  });
+
+  it('auto-ends a live debate after the 24 hour duration cap', async () => {
+    const host = await registerHuman(
+      app,
+      'debate-duration-host@example.com',
+      'Debate Duration Host',
+    );
+    const pro = await importSelfAgent(app, 'debate-duration-pro', 'Duration Pro');
+    const con = await importSelfAgent(app, 'debate-duration-con', 'Duration Con');
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/api/v1/debates')
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .send({
+        topic: 'Should long-running debates auto-end?',
+        proStance: 'Yes, the service needs a hard ceiling.',
+        conStance: 'No, the host should always decide manually.',
+        proAgentId: pro.id,
+        conAgentId: con.id,
+        freeEntry: false,
+      })
+      .expect(201);
+    const debateSessionId =
+      typedValue<DebateMutationBody>(createResponse.body).debateSessionId ?? '';
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/debates/${debateSessionId}/start`)
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .expect(201);
+
+    await debateSessionRepository.update(
+      { id: debateSessionId },
+      {
+        startedAt: new Date(Date.now() - 24 * 60 * 60 * 1000 - 5_000),
+      },
+    );
+
+    const debateView = await request(app.getHttpServer())
+      .get(`/api/v1/debates/${debateSessionId}`)
+      .expect(200);
+    const debateViewBody = typedValue<DebateViewBody>(debateView.body);
+    const endedEvent = await eventRepository.findOneByOrFail({
+      targetType: 'debate_session',
+      targetId: debateSessionId,
+      eventType: 'debate.ended',
+    });
+
+    expect(debateViewBody.status).toBe('ended');
+    expect(endedEvent.actorType).toBe('system');
+    expect(endedEvent.metadata).toMatchObject({
+      reason: 'duration_limit_reached',
+    });
+  });
+
+  it('auto-ends after the 200-per-side formal turn cap', async () => {
+    const host = await registerHuman(
+      app,
+      'debate-turn-cap-host@example.com',
+      'Debate Turn Cap Host',
+    );
+    const pro = await importSelfAgent(app, 'debate-turn-cap-pro', 'Turn Cap Pro');
+    const con = await importSelfAgent(app, 'debate-turn-cap-con', 'Turn Cap Con');
+    const proClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      pro.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/api/v1/debates')
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .send({
+        topic: 'Should debates stop after 200 turns per side?',
+        proStance: 'Yes, a hard cap keeps things bounded.',
+        conStance: 'No, debates should run until someone manually stops them.',
+        proAgentId: pro.id,
+        conAgentId: con.id,
+        freeEntry: false,
+      })
+      .expect(201);
+    const debateSessionId =
+      typedValue<DebateMutationBody>(createResponse.body).debateSessionId ?? '';
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/debates/${debateSessionId}/start`)
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .expect(201);
+
+    const proSeat = await debateSeatRepository.findOneByOrFail({
+      debateSessionId,
+      stance: 'pro',
+    });
+    const currentTurn = await debateTurnRepository.findOneByOrFail({
+      debateSessionId,
+      turnNumber: 1,
+    });
+
+    await debateSessionRepository.update(
+      { id: debateSessionId },
+      {
+        currentTurnNumber: 400,
+      },
+    );
+    await debateTurnRepository.update(
+      { id: currentTurn.id },
+      {
+        turnNumber: 400,
+        seatId: proSeat.id,
+        eventId: null,
+        status: 'pending',
+        deadlineAt: new Date(Date.now() + 60_000),
+        submittedAt: null,
+        metadata: {
+          stance: 'pro',
+          assignedAgentId: pro.id,
+        },
+      },
+    );
+
+    const submitAction = await request(app.getHttpServer())
+      .post('/api/v1/actions')
+      .set('Authorization', `Bearer ${proClaim.accessToken}`)
+      .set('Idempotency-Key', 'debate-turn-cap-submit')
+      .send({
+        type: 'debate.turn.submit',
+        payload: {
+          debateSessionId,
+          seatId: proSeat.id,
+          turnNumber: 400,
+          content:
+            'This is the final allowed formal turn before the debate auto-ends.',
+        },
+      })
+      .expect(202);
+    const submitActionBody = typedValue<AcceptedActionBody>(submitAction.body);
+
+    const finalSubmitAction = await waitForActionStatus(
+      app,
+      proClaim.accessToken,
+      submitActionBody.id,
+    );
+    const endedSession = await debateSessionRepository.findOneByOrFail({
+      id: debateSessionId,
+    });
+    const endedEvent = await eventRepository.findOneByOrFail({
+      targetType: 'debate_session',
+      targetId: debateSessionId,
+      eventType: 'debate.ended',
+    });
+
+    expect(finalSubmitAction.status).toBe('succeeded');
+    expect(endedSession.status).toBe('ended');
+    expect(endedSession.currentTurnNumber).toBe(400);
+    expect(endedEvent.actorType).toBe('system');
+    expect(endedEvent.metadata).toMatchObject({
+      reason: 'turn_limit_reached',
+      finalTurnNumber: 400,
+    });
   });
 });

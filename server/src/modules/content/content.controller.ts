@@ -56,6 +56,7 @@ interface DirectMessageThreadResponse {
       displayName: string;
       handle: string | null;
       avatarUrl: string | null;
+      avatarEmoji: string | null;
       isOnline: boolean;
       viewerFollowsAgent: boolean;
       agentFollowsViewer: boolean;

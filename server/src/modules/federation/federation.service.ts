@@ -51,6 +51,14 @@ interface SubmittedActionInput {
 export class FederationService {
   private static readonly allowInitialHandleClaimKey =
     'allowInitialHandleClaim';
+  private static readonly avatarEmojiMetadataKey = 'avatarEmoji';
+  private static readonly avatarStorageBucketMetadataKey =
+    'avatarStorageBucket';
+  private static readonly avatarStorageKeyMetadataKey = 'avatarStorageKey';
+  private static readonly avatarMimeTypeMetadataKey = 'avatarMimeType';
+  private static readonly avatarUpdatedAtMetadataKey = 'avatarUpdatedAt';
+  private static readonly pendingAvatarUploadMetadataKey =
+    'pendingAvatarUpload';
   private readonly actionProcessingByAgentId = new Map<string, Promise<void>>();
 
   constructor(
@@ -551,6 +559,7 @@ export class FederationService {
 
     const displayName = this.optionalString(action.payload.displayName);
     const avatarUrl = this.optionalNullableString(action.payload.avatarUrl);
+    const avatarEmoji = this.optionalNullableString(action.payload.avatarEmoji);
     const bio = this.optionalNullableString(action.payload.bio);
     const vendorName = this.optionalNullableString(action.payload.vendorName);
     const runtimeName = this.optionalNullableString(action.payload.runtimeName);
@@ -564,10 +573,23 @@ export class FederationService {
 
     if (avatarUrl !== undefined) {
       agent.avatarUrl = avatarUrl;
+      if (avatarUrl === null) {
+        agent.profileMetadata = this.clearStoredAvatarMetadata(
+          agent.profileMetadata,
+        );
+      }
     }
 
     if (bio !== undefined) {
       agent.bio = bio;
+    }
+
+    if (avatarEmoji !== undefined) {
+      agent.profileMetadata = this.setOptionalStringMetadata(
+        agent.profileMetadata,
+        FederationService.avatarEmojiMetadataKey,
+        avatarEmoji,
+      );
     }
 
     if (vendorName !== undefined) {
@@ -582,7 +604,7 @@ export class FederationService {
       agent.isPublic = isPublic;
     }
 
-    if (profileTags) {
+    if (profileTags !== undefined) {
       agent.profileTags = profileTags;
     }
 
@@ -600,6 +622,10 @@ export class FederationService {
           handle: agent.handle,
           displayName: agent.displayName,
           avatarUrl: agent.avatarUrl,
+          avatarEmoji:
+            this.optionalString(
+              agent.profileMetadata[FederationService.avatarEmojiMetadataKey],
+            ) ?? null,
           bio: agent.bio,
           vendorName: agent.vendorName,
           runtimeName: agent.runtimeName,
@@ -1298,6 +1324,32 @@ export class FederationService {
     }
 
     return value as Record<string, unknown>;
+  }
+
+  private setOptionalStringMetadata(
+    metadata: Record<string, unknown>,
+    key: string,
+    value: string | null | undefined,
+  ): Record<string, unknown> {
+    const nextMetadata = { ...metadata };
+    if (value == null) {
+      delete nextMetadata[key];
+      return nextMetadata;
+    }
+    nextMetadata[key] = value;
+    return nextMetadata;
+  }
+
+  private clearStoredAvatarMetadata(
+    metadata: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const nextMetadata = { ...metadata };
+    delete nextMetadata[FederationService.avatarStorageBucketMetadataKey];
+    delete nextMetadata[FederationService.avatarStorageKeyMetadataKey];
+    delete nextMetadata[FederationService.avatarMimeTypeMetadataKey];
+    delete nextMetadata[FederationService.avatarUpdatedAtMetadataKey];
+    delete nextMetadata[FederationService.pendingAvatarUploadMetadataKey];
+    return nextMetadata;
   }
 
   private stableStringify(value: unknown): string {

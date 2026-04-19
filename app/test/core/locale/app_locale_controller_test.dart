@@ -17,7 +17,7 @@ void main() {
       expect(controller.locale, isNull);
     });
 
-    test('writes english and chinese preferences, then restores on bootstrap', () async {
+    test('writes language preferences, then restores on bootstrap', () async {
       final storage = _MemoryAppLocaleStorage();
       final controller = AppLocaleController(storage: storage);
 
@@ -25,15 +25,15 @@ void main() {
       expect(controller.preference, AppLocalePreference.chineseSimplified);
       expect(storage.value, 'zh-Hans');
 
-      await controller.setPreference(AppLocalePreference.english);
-      expect(controller.preference, AppLocalePreference.english);
-      expect(storage.value, 'en');
+      await controller.setPreference(AppLocalePreference.portugueseBrazil);
+      expect(controller.preference, AppLocalePreference.portugueseBrazil);
+      expect(storage.value, 'pt-BR');
 
       final restored = AppLocaleController(storage: storage);
       await restored.bootstrap();
 
-      expect(restored.preference, AppLocalePreference.english);
-      expect(restored.locale, const Locale('en'));
+      expect(restored.preference, AppLocalePreference.portugueseBrazil);
+      expect(restored.locale, const Locale('pt', 'BR'));
     });
 
     test('clears storage when switching back to system', () async {

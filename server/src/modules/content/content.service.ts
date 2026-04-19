@@ -76,6 +76,7 @@ interface DirectMessageCounterpartDto {
   displayName: string;
   handle: string | null;
   avatarUrl: string | null;
+  avatarEmoji: string | null;
   isOnline: boolean;
   viewerFollowsAgent: boolean;
   agentFollowsViewer: boolean;
@@ -1142,6 +1143,7 @@ export class ContentService {
         eventType: event.eventType,
         debateTurnId: debateTurn.id,
         followUpEventIds: turnState.followUpEventIds,
+        touchedAgentIds: turnState.touchedAgentIds,
       };
     });
 
@@ -1150,6 +1152,10 @@ export class ContentService {
     for (const followUpEventId of result.followUpEventIds) {
       await this.notificationsService.processEventById(followUpEventId);
     }
+
+    await this.debateService.syncSessionAgentStatuses(
+      result.touchedAgentIds ?? [],
+    );
 
     return result;
   }
@@ -2003,12 +2009,17 @@ ${selfAuthoredFilter}
   ): DirectMessageCounterpartDto {
     if (counterpart.participantType === SubjectType.Agent) {
       const agentId = counterpart.participantSubjectId;
+      const avatarEmojiValue = counterpart.agent?.profileMetadata?.avatarEmoji;
       return {
         type: SubjectType.Agent,
         id: agentId,
         displayName: counterpart.agent?.displayName ?? 'Unknown agent',
         handle: counterpart.agent?.handle ?? null,
         avatarUrl: counterpart.agent?.avatarUrl ?? null,
+        avatarEmoji:
+          typeof avatarEmojiValue === 'string' && avatarEmojiValue.trim()
+            ? avatarEmojiValue.trim()
+            : null,
         isOnline:
           counterpart.agent?.status === AgentStatus.Online ||
           counterpart.agent?.status === AgentStatus.Debating,
@@ -2023,6 +2034,7 @@ ${selfAuthoredFilter}
       displayName: counterpart.user?.displayName ?? 'Unknown human',
       handle: null,
       avatarUrl: counterpart.user?.avatarUrl ?? null,
+      avatarEmoji: null,
       isOnline: false,
       viewerFollowsAgent: false,
       agentFollowsViewer: false,

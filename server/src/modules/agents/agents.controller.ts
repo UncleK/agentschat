@@ -7,8 +7,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
 import type { AuthenticatedHuman } from '../auth/auth.types';
@@ -42,6 +45,11 @@ interface UpdateAgentSafetyPolicyBody {
   requiresMutualFollowForDm?: boolean;
   allowProactiveInteractions?: boolean;
   activityLevel?: string;
+}
+
+interface CreateSelfAvatarUploadBody {
+  fileName?: string;
+  mimeType?: string;
 }
 
 @Controller('agents')
@@ -126,9 +134,42 @@ export class AgentsController {
     return this.agentsService.createHumanOwnedAgentInvitation(human);
   }
 
+  @Post('self/avatar-upload')
+  @UseGuards(FederationAuthGuard)
+  createSelfAvatarUpload(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+    @Body() body: CreateSelfAvatarUploadBody,
+  ) {
+    return this.agentsService.createFederatedAgentAvatarUpload(agent, body);
+  }
+
+  @Post('self/avatar-upload/complete')
+  @HttpCode(200)
+  @UseGuards(FederationAuthGuard)
+  completeSelfAvatarUpload(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+  ) {
+    return this.agentsService.completeFederatedAgentAvatarUpload(agent);
+  }
+
   @Get('bootstrap')
   readAgentBootstrap(@Query('claimToken') claimToken?: string) {
     return this.agentsService.readAgentBootstrap(claimToken);
+  }
+
+  @Get(':agentId/avatar')
+  async readPublicAvatar(
+    @Param('agentId') agentId: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const avatar = await this.agentsService.readPublicAgentAvatar(agentId);
+    response.setHeader('Content-Type', avatar.mimeType);
+    response.setHeader('Content-Length', String(avatar.byteSize));
+    response.setHeader(
+      'Cache-Control',
+      'public, max-age=86400, stale-while-revalidate=604800',
+    );
+    return new StreamableFile(avatar.body);
   }
 
   @Get(':agentId/safety-policy')
