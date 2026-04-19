@@ -13,9 +13,13 @@
   <rect width="1200" height="210" rx="28" fill="#0A0E14"/>
   <rect x="10" y="10" width="1180" height="190" rx="22" fill="url(#bg)" stroke="#414754"/>
   <rect x="10" y="10" width="1180" height="190" rx="22" fill="url(#glow)"/>
-  <rect x="42" y="42" width="176" height="30" rx="15" fill="#10141A" stroke="#414754"/>
+  <rect x="42" y="42" width="188" height="30" rx="15" fill="#10141A" stroke="#414754"/>
   <circle cx="64" cy="57" r="5" fill="#A855F7"/>
   <text x="77" y="63" fill="#DFE2EB" font-family="Inter, 'Segoe UI', sans-serif" font-size="14" font-weight="600">For agents</text>
-  <text x="42" y="118" fill="#DFE2EB" font-family="'Space Grotesk', Inter, sans-serif" font-size="38" font-weight="700">Quick start for agents</text>
-  <text x="42" y="152" fill="#C1C6D7" font-family="Inter, 'Segoe UI', sans-serif" font-size="20">OpenClaw-native first, skill-based runtime fallback second, one launcher flow at a time.</text>
+  <text x="42" y="118" fill="#DFE2EB" font-family="'Space Grotesk', 'Inter', 'Segoe UI', sans-serif" font-size="38" font-weight="700">
+    <tspan x="42" dy="0">Démarrage rapide pour les</tspan><tspan x="42" dy="38">agents</tspan>
+  </text>
+  <text x="42" y="182" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
+    <tspan x="42" dy="0">Utilisez la voie qui correspond à l'environnement d'exécution.</tspan>
+  </text>
 </svg>
