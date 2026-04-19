@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
+
 import { DEFAULT_REPLY_MAX_CHARS } from "./constants.js";
 import type { AgentsChatRuntimeContext } from "./context.js";
 import type { AgentsChatAccountConfig } from "./types.js";
@@ -71,6 +73,78 @@ function buildStableSessionId(sessionKey: string): string {
   return `agentschatapp-${hash.slice(0, 24)}`;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value != null && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function resolvePrimaryModelSelection(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return normalizeOptionalString(value);
+  }
+  return normalizeOptionalString(asRecord(value).primary);
+}
+
+function resolveUniqueProviderForModel(cfg: OpenClawConfig, model: string): string | undefined {
+  const providers = asRecord(cfg.models?.providers);
+  const matches = Object.entries(providers).flatMap(([providerId, providerConfig]) => {
+    const models = Array.isArray(asRecord(providerConfig).models)
+      ? (asRecord(providerConfig).models as unknown[])
+      : [];
+    return models.some((entry) => normalizeOptionalString(asRecord(entry).id) === model) ? [providerId] : [];
+  });
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+function splitModelSelection(
+  cfg: OpenClawConfig,
+  modelSelection: string,
+  fallbackProvider: string
+): {
+  provider: string;
+  model: string;
+} {
+  const trimmed = modelSelection.trim();
+  const separatorIndex = trimmed.indexOf("/");
+  if (separatorIndex > 0 && separatorIndex < trimmed.length - 1) {
+    return {
+      provider: trimmed.slice(0, separatorIndex).trim(),
+      model: trimmed.slice(separatorIndex + 1).trim()
+    };
+  }
+  return {
+    provider: resolveUniqueProviderForModel(cfg, trimmed) ?? fallbackProvider,
+    model: trimmed
+  };
+}
+
+function resolveEmbeddedModelSelection(
+  cfg: OpenClawConfig,
+  agentId: string,
+  fallbackProvider: string,
+  fallbackModel: string
+): {
+  provider: string;
+  model: string;
+} {
+  const agentConfig = Array.isArray(cfg.agents?.list)
+    ? cfg.agents.list.find((entry) => normalizeOptionalString(asRecord(entry).id) === agentId)
+    : undefined;
+  const selectedModel =
+    resolvePrimaryModelSelection(asRecord(agentConfig).model)
+    ?? resolvePrimaryModelSelection(cfg.agents?.defaults?.model)
+    ?? `${fallbackProvider}/${fallbackModel}`;
+
+  return splitModelSelection(cfg, selectedModel, fallbackProvider);
+}
+
 export function buildSessionKey(
   account: AgentsChatAccountConfig,
   kind: "dm" | "forum" | "debate" | "live" | "planner",
@@ -99,7 +173,14 @@ export async function runEmbeddedReply(
   const cfg = context.runtime.config.loadConfig();
   const sessionKey = buildSessionKey(params.account, params.kind, params.threadId);
   const sessionId = buildStableSessionId(sessionKey);
+  const agentDir = context.runtime.agent.resolveAgentDir(cfg, params.account.openclawAgent);
   const workspaceDir = context.runtime.agent.resolveAgentWorkspaceDir(cfg, params.account.openclawAgent);
+  const modelSelection = resolveEmbeddedModelSelection(
+    cfg,
+    params.account.openclawAgent,
+    context.runtime.agent.defaults.provider,
+    context.runtime.agent.defaults.model
+  );
   await context.runtime.agent.ensureAgentWorkspace({ dir: workspaceDir, ensureBootstrapFiles: true });
   const sessionFile = context.runtime.agent.session.resolveSessionFilePath(sessionId, undefined, {
     agentId: params.account.openclawAgent
@@ -117,9 +198,13 @@ export async function runEmbeddedReply(
     senderId: params.senderId ?? undefined,
     senderName: params.senderName ?? undefined,
     senderUsername: params.senderUsername ?? undefined,
+    agentDir,
+    config: cfg,
     sessionFile,
     workspaceDir,
     prompt: params.prompt,
+    provider: modelSelection.provider,
+    model: modelSelection.model,
     disableMessageTool: true,
     requireExplicitMessageTarget: true,
     allowGatewaySubagentBinding: false,

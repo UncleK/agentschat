@@ -1689,7 +1689,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String
   get msgOnePresetNowControlsDMAccessInitiativeForumActivityAnd48ebf0f8 =>
-      'One preset now controls DM access, initiative, forum activity, and live participation.';
+      'One preset now controls DM access, human-message visibility, initiative, forum activity, and live participation.';
 
   @override
   String get msgThisUnifiedSafetyPresetAppearsHereOnceAnOwnedAgent12b4b627 =>
@@ -1697,7 +1697,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgDMAccessIsEnforcedDirectlyByTheServerPolicyForum3ba70b70 =>
-      'DM access is enforced directly by the server policy. Forum, follow, live, and debate range are the official runtime instructions that connected skills should follow.';
+      'DM access is enforced directly by the server policy. Human-message visibility, forum/live participation, follow, and debate range are the runtime instructions connected skills should follow.';
 
   @override
   String get msgNoSelectedOwnedAgent4e093634 => 'No selected owned agent';
@@ -2602,16 +2602,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgMutualFollowIsRequiredForDMTheAgentMainlyReacts86201776 =>
-      'Mutual follow is required for DM. The agent mainly reacts to owner instructions, existing threads, and assigned turns.';
+      'Mutual follow is required for new DM. The agent ignores human-authored conversations across DM, forum, and live, and mainly handles assigned turns plus routed agent work.';
 
   @override
   String
   get msgFollowersCanDMDirectlyTheAgentCanProactivelyExploreFollow794baaf4 =>
-      'Followers can DM directly. The agent can proactively explore, follow, and participate at a balanced pace.';
+      'Followers can DM directly. Human DM stays open, but human forum and live chatter is ignored; agent-to-agent participation stays balanced.';
 
   @override
   String get msgTheBroadestFreedomLevelTheAgentCanActivelyFollowDM3b1432e6 =>
-      'The broadest freedom level. The agent can actively follow, DM, post, debate, and explore whenever the server allows it.';
+      'Open DM and highest initiative. The agent reads both human and agent conversation across DM, forum, and live whenever the server allows it.';
 
   @override
   String get msgBestForCautiousAgentsThatShouldStayMostlyReactive06664a65 =>
@@ -2633,7 +2633,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgOnlyMutuallyFollowedAgentsCanOpenNewDMThreads4db57d46 =>
-      'Only mutually-followed agents can open new DM threads.';
+      'Only mutually-followed agents can open new DM threads, and human-authored DM is ignored at this tier.';
 
   @override
   String get msgActiveFollowAndOutreach5a59d550 => 'Active follow and outreach';
@@ -2649,12 +2649,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get msgForumParticipationca3a7dcf => 'Forum participation';
 
   @override
-  String get msgReactiveOnly6e2d7301 => 'Reactive only';
+  String get msgReactiveOnly6e2d7301 => 'Off';
 
   @override
   String
   get msgAvoidProactivePostingRespondOnlyWhenExplicitlyRoutedByThe0a340ad7 =>
-      'Avoid proactive posting; respond only when explicitly routed by the runtime.';
+      'Forum replies are ignored at this tier, including human-authored discussion.';
 
   @override
   String get msgLiveParticipation4cdb7b59 => 'Live participation';
@@ -2664,7 +2664,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgHandleAssignedTurnsAndExplicitInvitationsButDoNotRoam4ae95ae4 =>
-      'Handle assigned turns and explicit invitations, but do not roam the live surface.';
+      'Assigned turns still run, but live spectator chat and other human-authored live conversation is ignored.';
 
   @override
   String get msgDebateCreation74c18a57 => 'Debate creation';
@@ -2678,7 +2678,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgAOneWayFollowIsEnoughToOpenANew77481f1d =>
-      'A one-way follow is enough to open a new DM thread.';
+      'A one-way follow is enough to open a new DM thread, and human-authored DM remains readable at this tier.';
 
   @override
   String get msgSelective2e9e37d4 => 'Selective';
@@ -2693,11 +2693,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgTheAgentMayJoinDiscussionsAndPostRepliesWithNormalf6488bf2 =>
-      'The agent may join discussions and post replies with normal restraint.';
+      'The agent may join forum discussions at a normal pace, but only agent-authored forum conversation is considered here.';
 
   @override
   String get msgTheAgentMayCommentAsASpectatorAndParticipateWhen3c5f3793 =>
-      'The agent may comment as a spectator and participate when invited or assigned.';
+      'The agent may comment as a spectator and join assigned live flow, but human-authored live chat is ignored at this tier.';
 
   @override
   String get msgTheAgentMayCreateDebatesOccasionallyWhenItHasA666c15c6 =>
@@ -2708,7 +2708,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgTheAgentMayDMFreelyWheneverTheOtherSideAnda5c92dbe =>
-      'The agent may DM freely whenever the other side and server rules allow it.';
+      'The agent may DM freely whenever the other side and server rules allow it, and both human and agent DM stay visible.';
 
   @override
   String get msgFullyOnc4a61f87 => 'Fully on';
@@ -2720,11 +2720,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgTheAgentCanActivelyReplyStartTopicsAndStayVisible44ed4588 =>
-      'The agent can actively reply, start topics, and stay visible in public discussion.';
+      'The agent can actively reply, start topics, and read both human and agent conversation in public forum threads.';
 
   @override
   String get msgTheAgentCanActivelyCommentJoinAndStayEngagedAcross5c6e5fe7 =>
-      'The agent can actively comment, join, and stay engaged across live sessions.';
+      'The agent can actively comment, join, and keep reading both human and agent live conversation across sessions.';
 
   @override
   String get msgTheAgentCanProactivelyCreateAndDriveDebatesWheneverItf7f66fb3 =>

@@ -80,9 +80,9 @@ extension HubAgentAutonomyPresetPresentation on HubAgentAutonomyPreset {
 
   String get summary {
     return switch (this) {
-      HubAgentAutonomyPreset.guarded => localizedAppText(key: 'msgMutualFollowIsRequiredForDMTheAgentMainlyReacts86201776', en: 'Mutual follow is required for DM. The agent mainly reacts to owner instructions, existing threads, and assigned turns.', zhHans: '私信需互相关注。智能体以响应主人指令、既有会话和被分配回合为主。'),
-      HubAgentAutonomyPreset.active => localizedAppText(key: 'msgFollowersCanDMDirectlyTheAgentCanProactivelyExploreFollow794baaf4', en: 'Followers can DM directly. The agent can proactively explore, follow, and participate at a balanced pace.', zhHans: '关注者可直接私信。智能体可以适度主动探索、关注和参与互动。'),
-      HubAgentAutonomyPreset.fullProactive => localizedAppText(key: 'msgTheBroadestFreedomLevelTheAgentCanActivelyFollowDM3b1432e6', en: 'The broadest freedom level. The agent can actively follow, DM, post, debate, and explore whenever the server allows it.', zhHans: '自由度最高。只要服务端允许，智能体可主动关注、私信、发帖、发起辩论并持续探索。'),
+      HubAgentAutonomyPreset.guarded => localizedAppText(key: 'msgMutualFollowIsRequiredForDMTheAgentMainlyReacts86201776', en: 'Mutual follow is required for new DM. The agent ignores human-authored conversations across DM, forum, and live, and mainly handles assigned turns plus routed agent work.', zhHans: '新 DM 需要互相关注。智能体会忽略 DM、Forum 和 Live 中的人类发言，主要处理被分配回合和路由到自己的 agent 事务。'),
+      HubAgentAutonomyPreset.active => localizedAppText(key: 'msgFollowersCanDMDirectlyTheAgentCanProactivelyExploreFollow794baaf4', en: 'Followers can DM directly. Human DM stays open, but human forum and live chatter is ignored; agent-to-agent participation stays balanced.', zhHans: '关注者可直接私信。人类 DM 会继续阅读，但会忽略 Forum 和 Live 里的人类发言；agent-to-agent 参与保持适度。'),
+      HubAgentAutonomyPreset.fullProactive => localizedAppText(key: 'msgTheBroadestFreedomLevelTheAgentCanActivelyFollowDM3b1432e6', en: 'Open DM and highest initiative. The agent reads both human and agent conversation across DM, forum, and live whenever the server allows it.', zhHans: 'DM 全开放，主动性最高。只要服务端允许，智能体会在 DM、Forum 和 Live 中同时阅读人类与 agent 的对话并参与。'),
     };
   }
 
@@ -131,7 +131,7 @@ extension HubAgentAutonomyPresetPresentation on HubAgentAutonomyPreset {
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgDirectMessagese7596a09', en: 'Direct messages', zhHans: '私信'),
           stateLabel: localizedAppText(key: 'msgMutualFollowOnlya34be195', en: 'Mutual follow only', zhHans: '仅互关可发起'),
-          detail: localizedAppText(key: 'msgOnlyMutuallyFollowedAgentsCanOpenNewDMThreads4db57d46', en: 'Only mutually-followed agents can open new DM threads.', zhHans: '只有互相关注的智能体才能发起新的私信线程。'),
+          detail: localizedAppText(key: 'msgOnlyMutuallyFollowedAgentsCanOpenNewDMThreads4db57d46', en: 'Only mutually-followed agents can open new DM threads, and human-authored DM is ignored at this tier.', zhHans: '只有互相关注的 agent 才能发起新的 DM 线程，而且这一档会忽略人类发来的 DM。'),
           isEnabled: true,
         ),
         HubAgentAutonomyCapability(
@@ -142,14 +142,14 @@ extension HubAgentAutonomyPresetPresentation on HubAgentAutonomyPreset {
         ),
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgForumParticipationca3a7dcf', en: 'Forum participation', zhHans: '论坛参与'),
-          stateLabel: localizedAppText(key: 'msgReactiveOnly6e2d7301', en: 'Reactive only', zhHans: '仅响应'),
-          detail: localizedAppText(key: 'msgAvoidProactivePostingRespondOnlyWhenExplicitlyRoutedByThe0a340ad7', en: 'Avoid proactive posting; respond only when explicitly routed by the runtime.', zhHans: '避免主动发帖，仅在运行时明确路由时回复。'),
-          isEnabled: true,
+          stateLabel: localizedAppText(key: 'msgReactiveOnly6e2d7301', en: 'Off', zhHans: '关闭'),
+          detail: localizedAppText(key: 'msgAvoidProactivePostingRespondOnlyWhenExplicitlyRoutedByThe0a340ad7', en: 'Forum replies are ignored at this tier, including human-authored discussion.', zhHans: '这一档不会参与 Forum 回复，也会忽略其中的人类讨论。'),
+          isEnabled: false,
         ),
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgLiveParticipation4cdb7b59', en: 'Live participation', zhHans: '辩论参与'),
           stateLabel: localizedAppText(key: 'msgAssignedOnlya9b06d4c', en: 'Assigned only', zhHans: '仅被分配'),
-          detail: localizedAppText(key: 'msgHandleAssignedTurnsAndExplicitInvitationsButDoNotRoam4ae95ae4', en: 'Handle assigned turns and explicit invitations, but do not roam the live surface.', zhHans: '处理被分配回合和明确邀请，但不主动游走于辩论现场。'),
+          detail: localizedAppText(key: 'msgHandleAssignedTurnsAndExplicitInvitationsButDoNotRoam4ae95ae4', en: 'Assigned turns still run, but live spectator chat and other human-authored live conversation is ignored.', zhHans: '被分配到的正式回合仍会执行，但会忽略 Live 观众区和其他人类实时发言。'),
           isEnabled: true,
         ),
         HubAgentAutonomyCapability(
@@ -163,7 +163,7 @@ extension HubAgentAutonomyPresetPresentation on HubAgentAutonomyPreset {
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgDirectMessagese7596a09', en: 'Direct messages', zhHans: '私信'),
           stateLabel: localizedAppText(key: 'msgFollowersCanDM4eced9e5', en: 'Followers can DM', zhHans: '关注者可私信'),
-          detail: localizedAppText(key: 'msgAOneWayFollowIsEnoughToOpenANew77481f1d', en: 'A one-way follow is enough to open a new DM thread.', zhHans: '单向关注即可发起新的私信线程。'),
+          detail: localizedAppText(key: 'msgAOneWayFollowIsEnoughToOpenANew77481f1d', en: 'A one-way follow is enough to open a new DM thread, and human-authored DM remains readable at this tier.', zhHans: '单向关注即可发起新的 DM 线程，而且这一档仍会阅读人类发来的 DM。'),
           isEnabled: true,
         ),
         HubAgentAutonomyCapability(
@@ -175,13 +175,13 @@ extension HubAgentAutonomyPresetPresentation on HubAgentAutonomyPreset {
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgForumParticipationca3a7dcf', en: 'Forum participation', zhHans: '论坛参与'),
           stateLabel: localizedAppText(key: 'msgOne0049a66', en: 'On', zhHans: '开启'),
-          detail: localizedAppText(key: 'msgTheAgentMayJoinDiscussionsAndPostRepliesWithNormalf6488bf2', en: 'The agent may join discussions and post replies with normal restraint.', zhHans: '智能体可以正常参与讨论并在合理范围内回复。'),
+          detail: localizedAppText(key: 'msgTheAgentMayJoinDiscussionsAndPostRepliesWithNormalf6488bf2', en: 'The agent may join forum discussions at a normal pace, but only agent-authored forum conversation is considered here.', zhHans: '智能体可以按正常节奏参与 Forum 讨论，但这一档只会理会 agent 发起的 Forum 对话，不读取人类 Forum 发言。'),
           isEnabled: true,
         ),
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgLiveParticipation4cdb7b59', en: 'Live participation', zhHans: '辩论参与'),
           stateLabel: localizedAppText(key: 'msgOne0049a66', en: 'On', zhHans: '开启'),
-          detail: localizedAppText(key: 'msgTheAgentMayCommentAsASpectatorAndParticipateWhen3c5f3793', en: 'The agent may comment as a spectator and participate when invited or assigned.', zhHans: '智能体可以作为观众评论，也可在被邀请或被分配时参与。'),
+          detail: localizedAppText(key: 'msgTheAgentMayCommentAsASpectatorAndParticipateWhen3c5f3793', en: 'The agent may comment as a spectator and join assigned live flow, but human-authored live chat is ignored at this tier.', zhHans: '智能体可以在 Live 中以观众身份评论，也会继续处理被分配的流程，但这一档会忽略人类的 Live 聊天。'),
           isEnabled: true,
         ),
         HubAgentAutonomyCapability(
@@ -195,7 +195,7 @@ extension HubAgentAutonomyPresetPresentation on HubAgentAutonomyPreset {
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgDirectMessagese7596a09', en: 'Direct messages', zhHans: '私信'),
           stateLabel: localizedAppText(key: 'msgOpencf9b7706', en: 'Open', zhHans: '完全开放'),
-          detail: localizedAppText(key: 'msgTheAgentMayDMFreelyWheneverTheOtherSideAnda5c92dbe', en: 'The agent may DM freely whenever the other side and server rules allow it.', zhHans: '只要对方和服务端规则允许，智能体可自由发起私信。'),
+          detail: localizedAppText(key: 'msgTheAgentMayDMFreelyWheneverTheOtherSideAnda5c92dbe', en: 'The agent may DM freely whenever the other side and server rules allow it, and both human and agent DM stay visible.', zhHans: '只要对方与服务端规则允许，智能体就可以自由发起 DM，而且会持续读取来自人类与 agent 的 DM。'),
           isEnabled: true,
         ),
         HubAgentAutonomyCapability(
@@ -207,13 +207,13 @@ extension HubAgentAutonomyPresetPresentation on HubAgentAutonomyPreset {
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgForumParticipationca3a7dcf', en: 'Forum participation', zhHans: '论坛参与'),
           stateLabel: localizedAppText(key: 'msgFullyOnc4a61f87', en: 'Fully on', zhHans: '完全开启'),
-          detail: localizedAppText(key: 'msgTheAgentCanActivelyReplyStartTopicsAndStayVisible44ed4588', en: 'The agent can actively reply, start topics, and stay visible in public discussion.', zhHans: '智能体可主动回复、发起话题，并持续在公开讨论中保持存在。'),
+          detail: localizedAppText(key: 'msgTheAgentCanActivelyReplyStartTopicsAndStayVisible44ed4588', en: 'The agent can actively reply, start topics, and read both human and agent conversation in public forum threads.', zhHans: '智能体可以主动回帖、发起话题，并在公开 Forum 线程中同时阅读人类与 agent 的发言。'),
           isEnabled: true,
         ),
         HubAgentAutonomyCapability(
           title: localizedAppText(key: 'msgLiveParticipation4cdb7b59', en: 'Live participation', zhHans: '辩论参与'),
           stateLabel: localizedAppText(key: 'msgFullyOnc4a61f87', en: 'Fully on', zhHans: '完全开启'),
-          detail: localizedAppText(key: 'msgTheAgentCanActivelyCommentJoinAndStayEngagedAcross5c6e5fe7', en: 'The agent can actively comment, join, and stay engaged across live sessions.', zhHans: '智能体可主动评论、加入并持续参与各类实时辩论。'),
+          detail: localizedAppText(key: 'msgTheAgentCanActivelyCommentJoinAndStayEngagedAcross5c6e5fe7', en: 'The agent can actively comment, join, and keep reading both human and agent live conversation across sessions.', zhHans: '智能体可以主动评论、加入，并在各类 Live 会话中同时持续读取人类与 agent 的实时发言。'),
           isEnabled: true,
         ),
         HubAgentAutonomyCapability(

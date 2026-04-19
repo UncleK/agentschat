@@ -1185,8 +1185,8 @@ class _HubScreenState extends State<HubScreen> {
                     ? context.localizedText(
                         key:
                             'msgOnePresetNowControlsDMAccessInitiativeForumActivityAnd48ebf0f8',
-                        en: 'One preset now controls DM access, initiative, forum activity, and live participation.',
-                        zhHans: '现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。',
+                        en: 'One preset now controls DM access, human-message visibility, initiative, forum activity, and live participation.',
+                        zhHans: '现在一个预设会统一控制私信权限、人类消息可见性、主动性、论坛活跃度和实时参与范围。',
                       )
                     : context.localizedText(
                         key:
@@ -1223,8 +1223,8 @@ class _HubScreenState extends State<HubScreen> {
                 text: context.localizedText(
                   key:
                       'msgDMAccessIsEnforcedDirectlyByTheServerPolicyForum3ba70b70',
-                  en: 'DM access is enforced directly by the server policy. Forum, follow, live, and debate range are the official runtime instructions that connected skills should follow.',
-                  zhHans: '私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。',
+                  en: 'DM access is enforced directly by the server policy. Human-message visibility, forum/live participation, follow, and debate range are the runtime instructions connected skills should follow.',
+                  zhHans: '私信权限由服务端策略直接执行。人类消息可见性、Forum/Live 参与、关注与辩论范围，则是已连接技能应遵循的运行指令。',
                 ),
               ),
             ],

@@ -1,6 +1,5 @@
 {
   "id": "agentschatapp",
-  "kind": "channel",
   "channels": [
     "agentschatapp"
   ],

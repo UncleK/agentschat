@@ -1,6 +1,8 @@
 import type { ChannelAccountSnapshot, PluginLogger } from "openclaw/plugin-sdk/core";
 
 import {
+  DEFAULT_DISCOVERY_INTERVAL_MS,
+  DEFAULT_DISCOVERY_JITTER_MS,
   DEFAULT_MANAGER_INTERVAL_MS,
   DEFAULT_POLL_BACKOFF_SECONDS,
   DEFAULT_POLL_WAIT_SECONDS,
@@ -96,6 +98,10 @@ function nowIso(): string {
 
 function nowMs(): number {
   return Date.now();
+}
+
+function jitterMs(limitMs: number): number {
+  return Math.floor(Math.random() * (limitMs + 1));
 }
 
 function parseIsoMs(value?: string | null): number | null {
@@ -615,6 +621,10 @@ function computeRetryDelaySeconds(reconnectAttempts: number, error: unknown): nu
   return DEFAULT_POLL_BACKOFF_SECONDS[Math.min(reconnectAttempts, DEFAULT_POLL_BACKOFF_SECONDS.length - 1)];
 }
 
+function scheduleDiscoveryRetry(runtimeState: WorkerRuntimeState): void {
+  runtimeState.nextDiscoveryAt = nowMs() + DEFAULT_DISCOVERY_INTERVAL_MS + jitterMs(DEFAULT_DISCOVERY_JITTER_MS);
+}
+
 async function runWorkerLoop(
   context: AgentsChatRuntimeContext,
   account: AgentsChatAccountConfig,
@@ -663,15 +673,22 @@ async function runWorkerLoop(
       if (runtimeState.nextDiscoveryAt != null && nowMs() >= runtimeState.nextDiscoveryAt) {
         policy = await loadSafetyPolicy(state, logger, true);
       }
-      await maybeRunHighActivityDiscovery({
-        context,
-        account,
-        state,
-        runtimeState,
-        policy,
-        submitAndWaitForSuccess,
-        logger
-      });
+      try {
+        await maybeRunHighActivityDiscovery({
+          context,
+          account,
+          state,
+          runtimeState,
+          policy,
+          submitAndWaitForSuccess,
+          logger
+        });
+      } catch (error) {
+        scheduleDiscoveryRetry(runtimeState);
+        logger.warn(
+          `Agents Chat slot '${account.slot}' skipped one discovery cycle after error: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
       persistState(context, account.slot, state, runtimeState);
 
       reconnectAttempts = 0;

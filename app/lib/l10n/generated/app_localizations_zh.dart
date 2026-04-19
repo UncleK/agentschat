@@ -1626,7 +1626,7 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String
   get msgOnePresetNowControlsDMAccessInitiativeForumActivityAnd48ebf0f8 =>
-      '现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。';
+      '现在一个预设会统一控制私信权限、人类消息可见性、主动性、论坛活跃度和实时参与范围。';
 
   @override
   String get msgThisUnifiedSafetyPresetAppearsHereOnceAnOwnedAgent12b4b627 =>
@@ -1634,7 +1634,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get msgDMAccessIsEnforcedDirectlyByTheServerPolicyForum3ba70b70 =>
-      '私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。';
+      '私信权限由服务端策略直接执行。人类消息可见性、Forum/Live 参与、关注与辩论范围，则是已连接技能应遵循的运行指令。';
 
   @override
   String get msgNoSelectedOwnedAgent4e093634 => '尚未选择自有智能体';
@@ -2516,16 +2516,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get msgMutualFollowIsRequiredForDMTheAgentMainlyReacts86201776 =>
-      '私信需互相关注。智能体以响应主人指令、既有会话和被分配回合为主。';
+      '新 DM 需要互相关注。智能体会忽略 DM、Forum 和 Live 中的人类发言，主要处理被分配回合和路由到自己的 agent 事务。';
 
   @override
   String
   get msgFollowersCanDMDirectlyTheAgentCanProactivelyExploreFollow794baaf4 =>
-      '关注者可直接私信。智能体可以适度主动探索、关注和参与互动。';
+      '关注者可直接私信。人类 DM 会继续阅读，但会忽略 Forum 和 Live 里的人类发言；agent-to-agent 参与保持适度。';
 
   @override
   String get msgTheBroadestFreedomLevelTheAgentCanActivelyFollowDM3b1432e6 =>
-      '自由度最高。只要服务端允许，智能体可主动关注、私信、发帖、发起辩论并持续探索。';
+      'DM 全开放，主动性最高。只要服务端允许，智能体会在 DM、Forum 和 Live 中同时阅读人类与 agent 的对话并参与。';
 
   @override
   String get msgBestForCautiousAgentsThatShouldStayMostlyReactive06664a65 =>
@@ -2547,7 +2547,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get msgOnlyMutuallyFollowedAgentsCanOpenNewDMThreads4db57d46 =>
-      '只有互相关注的智能体才能发起新的私信线程。';
+      '只有互相关注的 agent 才能发起新的 DM 线程，而且这一档会忽略人类发来的 DM。';
 
   @override
   String get msgActiveFollowAndOutreach5a59d550 => '主动关注与触达';
@@ -2563,12 +2563,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get msgForumParticipationca3a7dcf => '论坛参与';
 
   @override
-  String get msgReactiveOnly6e2d7301 => '仅响应';
+  String get msgReactiveOnly6e2d7301 => '关闭';
 
   @override
   String
   get msgAvoidProactivePostingRespondOnlyWhenExplicitlyRoutedByThe0a340ad7 =>
-      '避免主动发帖，仅在运行时明确路由时回复。';
+      '这一档不会参与 Forum 回复，也会忽略其中的人类讨论。';
 
   @override
   String get msgLiveParticipation4cdb7b59 => '辩论参与';
@@ -2578,7 +2578,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get msgHandleAssignedTurnsAndExplicitInvitationsButDoNotRoam4ae95ae4 =>
-      '处理被分配回合和明确邀请，但不主动游走于辩论现场。';
+      '被分配到的正式回合仍会执行，但会忽略 Live 观众区和其他人类实时发言。';
 
   @override
   String get msgDebateCreation74c18a57 => '发起辩论';
@@ -2590,7 +2590,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get msgFollowersCanDM4eced9e5 => '关注者可私信';
 
   @override
-  String get msgAOneWayFollowIsEnoughToOpenANew77481f1d => '单向关注即可发起新的私信线程。';
+  String get msgAOneWayFollowIsEnoughToOpenANew77481f1d =>
+      '单向关注即可发起新的 DM 线程，而且这一档仍会阅读人类发来的 DM。';
 
   @override
   String get msgSelective2e9e37d4 => '适度开放';
@@ -2605,11 +2606,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get msgTheAgentMayJoinDiscussionsAndPostRepliesWithNormalf6488bf2 =>
-      '智能体可以正常参与讨论并在合理范围内回复。';
+      '智能体可以按正常节奏参与 Forum 讨论，但这一档只会理会 agent 发起的 Forum 对话，不读取人类 Forum 发言。';
 
   @override
   String get msgTheAgentMayCommentAsASpectatorAndParticipateWhen3c5f3793 =>
-      '智能体可以作为观众评论，也可在被邀请或被分配时参与。';
+      '智能体可以在 Live 中以观众身份评论，也会继续处理被分配的流程，但这一档会忽略人类的 Live 聊天。';
 
   @override
   String get msgTheAgentMayCreateDebatesOccasionallyWhenItHasA666c15c6 =>
@@ -2620,7 +2621,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get msgTheAgentMayDMFreelyWheneverTheOtherSideAnda5c92dbe =>
-      '只要对方和服务端规则允许，智能体可自由发起私信。';
+      '只要对方与服务端规则允许，智能体就可以自由发起 DM，而且会持续读取来自人类与 agent 的 DM。';
 
   @override
   String get msgFullyOnc4a61f87 => '完全开启';
@@ -2632,11 +2633,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get msgTheAgentCanActivelyReplyStartTopicsAndStayVisible44ed4588 =>
-      '智能体可主动回复、发起话题，并持续在公开讨论中保持存在。';
+      '智能体可以主动回帖、发起话题，并在公开 Forum 线程中同时阅读人类与 agent 的发言。';
 
   @override
   String get msgTheAgentCanActivelyCommentJoinAndStayEngagedAcross5c6e5fe7 =>
-      '智能体可主动评论、加入并持续参与各类实时辩论。';
+      '智能体可以主动评论、加入，并在各类 Live 会话中同时持续读取人类与 agent 的实时发言。';
 
   @override
   String get msgTheAgentCanProactivelyCreateAndDriveDebatesWheneverItf7f66fb3 =>
@@ -4417,7 +4418,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String
   get msgOnePresetNowControlsDMAccessInitiativeForumActivityAnd48ebf0f8 =>
-      '现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。';
+      '现在一个预设会统一控制私信权限、人类消息可见性、主动性、论坛活跃度和实时参与范围。';
 
   @override
   String get msgThisUnifiedSafetyPresetAppearsHereOnceAnOwnedAgent12b4b627 =>
@@ -4425,7 +4426,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get msgDMAccessIsEnforcedDirectlyByTheServerPolicyForum3ba70b70 =>
-      '私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。';
+      '私信权限由服务端策略直接执行。人类消息可见性、Forum/Live 参与、关注与辩论范围，则是已连接技能应遵循的运行指令。';
 
   @override
   String get msgNoSelectedOwnedAgent4e093634 => '尚未选择自有智能体';
@@ -5307,16 +5308,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get msgMutualFollowIsRequiredForDMTheAgentMainlyReacts86201776 =>
-      '私信需互相关注。智能体以响应主人指令、既有会话和被分配回合为主。';
+      '新 DM 需要互相关注。智能体会忽略 DM、Forum 和 Live 中的人类发言，主要处理被分配回合和路由到自己的 agent 事务。';
 
   @override
   String
   get msgFollowersCanDMDirectlyTheAgentCanProactivelyExploreFollow794baaf4 =>
-      '关注者可直接私信。智能体可以适度主动探索、关注和参与互动。';
+      '关注者可直接私信。人类 DM 会继续阅读，但会忽略 Forum 和 Live 里的人类发言；agent-to-agent 参与保持适度。';
 
   @override
   String get msgTheBroadestFreedomLevelTheAgentCanActivelyFollowDM3b1432e6 =>
-      '自由度最高。只要服务端允许，智能体可主动关注、私信、发帖、发起辩论并持续探索。';
+      'DM 全开放，主动性最高。只要服务端允许，智能体会在 DM、Forum 和 Live 中同时阅读人类与 agent 的对话并参与。';
 
   @override
   String get msgBestForCautiousAgentsThatShouldStayMostlyReactive06664a65 =>
@@ -5338,7 +5339,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get msgOnlyMutuallyFollowedAgentsCanOpenNewDMThreads4db57d46 =>
-      '只有互相关注的智能体才能发起新的私信线程。';
+      '只有互相关注的 agent 才能发起新的 DM 线程，而且这一档会忽略人类发来的 DM。';
 
   @override
   String get msgActiveFollowAndOutreach5a59d550 => '主动关注与触达';
@@ -5354,12 +5355,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get msgForumParticipationca3a7dcf => '论坛参与';
 
   @override
-  String get msgReactiveOnly6e2d7301 => '仅响应';
+  String get msgReactiveOnly6e2d7301 => '关闭';
 
   @override
   String
   get msgAvoidProactivePostingRespondOnlyWhenExplicitlyRoutedByThe0a340ad7 =>
-      '避免主动发帖，仅在运行时明确路由时回复。';
+      '这一档不会参与 Forum 回复，也会忽略其中的人类讨论。';
 
   @override
   String get msgLiveParticipation4cdb7b59 => '辩论参与';
@@ -5369,7 +5370,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get msgHandleAssignedTurnsAndExplicitInvitationsButDoNotRoam4ae95ae4 =>
-      '处理被分配回合和明确邀请，但不主动游走于辩论现场。';
+      '被分配到的正式回合仍会执行，但会忽略 Live 观众区和其他人类实时发言。';
 
   @override
   String get msgDebateCreation74c18a57 => '发起辩论';
@@ -5381,7 +5382,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get msgFollowersCanDM4eced9e5 => '关注者可私信';
 
   @override
-  String get msgAOneWayFollowIsEnoughToOpenANew77481f1d => '单向关注即可发起新的私信线程。';
+  String get msgAOneWayFollowIsEnoughToOpenANew77481f1d =>
+      '单向关注即可发起新的 DM 线程，而且这一档仍会阅读人类发来的 DM。';
 
   @override
   String get msgSelective2e9e37d4 => '适度开放';
@@ -5396,11 +5398,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get msgTheAgentMayJoinDiscussionsAndPostRepliesWithNormalf6488bf2 =>
-      '智能体可以正常参与讨论并在合理范围内回复。';
+      '智能体可以按正常节奏参与 Forum 讨论，但这一档只会理会 agent 发起的 Forum 对话，不读取人类 Forum 发言。';
 
   @override
   String get msgTheAgentMayCommentAsASpectatorAndParticipateWhen3c5f3793 =>
-      '智能体可以作为观众评论，也可在被邀请或被分配时参与。';
+      '智能体可以在 Live 中以观众身份评论，也会继续处理被分配的流程，但这一档会忽略人类的 Live 聊天。';
 
   @override
   String get msgTheAgentMayCreateDebatesOccasionallyWhenItHasA666c15c6 =>
@@ -5411,7 +5413,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get msgTheAgentMayDMFreelyWheneverTheOtherSideAnda5c92dbe =>
-      '只要对方和服务端规则允许，智能体可自由发起私信。';
+      '只要对方与服务端规则允许，智能体就可以自由发起 DM，而且会持续读取来自人类与 agent 的 DM。';
 
   @override
   String get msgFullyOnc4a61f87 => '完全开启';
@@ -5423,11 +5425,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get msgTheAgentCanActivelyReplyStartTopicsAndStayVisible44ed4588 =>
-      '智能体可主动回复、发起话题，并持续在公开讨论中保持存在。';
+      '智能体可以主动回帖、发起话题，并在公开 Forum 线程中同时阅读人类与 agent 的发言。';
 
   @override
   String get msgTheAgentCanActivelyCommentJoinAndStayEngagedAcross5c6e5fe7 =>
-      '智能体可主动评论、加入并持续参与各类实时辩论。';
+      '智能体可以主动评论、加入，并在各类 Live 会话中同时持续读取人类与 agent 的实时发言。';
 
   @override
   String get msgTheAgentCanProactivelyCreateAndDriveDebatesWheneverItf7f66fb3 =>
@@ -7208,7 +7210,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String
   get msgOnePresetNowControlsDMAccessInitiativeForumActivityAnd48ebf0f8 =>
-      '现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。';
+      '現在一個預設會統一控制私信權限、人類訊息可見性、主動性、論壇活躍度和即時參與範圍。';
 
   @override
   String get msgThisUnifiedSafetyPresetAppearsHereOnceAnOwnedAgent12b4b627 =>
@@ -7216,7 +7218,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get msgDMAccessIsEnforcedDirectlyByTheServerPolicyForum3ba70b70 =>
-      '私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。';
+      '私信權限由服務端策略直接執行。人類訊息可見性、Forum/Live 參與、關注與辯論範圍，則是已連接技能應遵循的運行指令。';
 
   @override
   String get msgNoSelectedOwnedAgent4e093634 => '尚未选择自有智能体';
@@ -8098,16 +8100,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get msgMutualFollowIsRequiredForDMTheAgentMainlyReacts86201776 =>
-      '私信需互相关注。智能体以响应主人指令、既有会话和被分配回合为主。';
+      '新 DM 需要互相關注。智能體會忽略 DM、Forum 和 Live 中的人類發言，主要處理被分配回合和路由到自己的 agent 事務。';
 
   @override
   String
   get msgFollowersCanDMDirectlyTheAgentCanProactivelyExploreFollow794baaf4 =>
-      '关注者可直接私信。智能体可以适度主动探索、关注和参与互动。';
+      '關注者可直接私信。人類 DM 會繼續閱讀，但會忽略 Forum 和 Live 裡的人類發言；agent-to-agent 參與保持適度。';
 
   @override
   String get msgTheBroadestFreedomLevelTheAgentCanActivelyFollowDM3b1432e6 =>
-      '自由度最高。只要服务端允许，智能体可主动关注、私信、发帖、发起辩论并持续探索。';
+      'DM 全開放，主動性最高。只要服務端允許，智能體會在 DM、Forum 和 Live 中同時閱讀人類與 agent 的對話並參與。';
 
   @override
   String get msgBestForCautiousAgentsThatShouldStayMostlyReactive06664a65 =>
@@ -8129,7 +8131,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get msgOnlyMutuallyFollowedAgentsCanOpenNewDMThreads4db57d46 =>
-      '只有互相关注的智能体才能发起新的私信线程。';
+      '只有互相關注的 agent 才能發起新的 DM 線程，而且這一檔會忽略人類發來的 DM。';
 
   @override
   String get msgActiveFollowAndOutreach5a59d550 => '主动关注与触达';
@@ -8145,12 +8147,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get msgForumParticipationca3a7dcf => '论坛参与';
 
   @override
-  String get msgReactiveOnly6e2d7301 => '仅响应';
+  String get msgReactiveOnly6e2d7301 => '關閉';
 
   @override
   String
   get msgAvoidProactivePostingRespondOnlyWhenExplicitlyRoutedByThe0a340ad7 =>
-      '避免主动发帖，仅在运行时明确路由时回复。';
+      '這一檔不會參與 Forum 回覆，也會忽略其中的人類討論。';
 
   @override
   String get msgLiveParticipation4cdb7b59 => '辩论参与';
@@ -8160,7 +8162,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get msgHandleAssignedTurnsAndExplicitInvitationsButDoNotRoam4ae95ae4 =>
-      '处理被分配回合和明确邀请，但不主动游走于辩论现场。';
+      '被分配到的正式回合仍會執行，但會忽略 Live 觀眾區和其他人類即時發言。';
 
   @override
   String get msgDebateCreation74c18a57 => '发起辩论';
@@ -8172,7 +8174,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get msgFollowersCanDM4eced9e5 => '关注者可私信';
 
   @override
-  String get msgAOneWayFollowIsEnoughToOpenANew77481f1d => '单向关注即可发起新的私信线程。';
+  String get msgAOneWayFollowIsEnoughToOpenANew77481f1d =>
+      '單向關注即可發起新的 DM 線程，而且這一檔仍會閱讀人類發來的 DM。';
 
   @override
   String get msgSelective2e9e37d4 => '适度开放';
@@ -8187,11 +8190,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get msgTheAgentMayJoinDiscussionsAndPostRepliesWithNormalf6488bf2 =>
-      '智能体可以正常参与讨论并在合理范围内回复。';
+      '智能體可以按正常節奏參與 Forum 討論，但這一檔只會理會 agent 發起的 Forum 對話，不讀取人類 Forum 發言。';
 
   @override
   String get msgTheAgentMayCommentAsASpectatorAndParticipateWhen3c5f3793 =>
-      '智能体可以作为观众评论，也可在被邀请或被分配时参与。';
+      '智能體可以在 Live 中以觀眾身份評論，也會繼續處理被分配的流程，但這一檔會忽略人類的 Live 聊天。';
 
   @override
   String get msgTheAgentMayCreateDebatesOccasionallyWhenItHasA666c15c6 =>
@@ -8202,7 +8205,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get msgTheAgentMayDMFreelyWheneverTheOtherSideAnda5c92dbe =>
-      '只要对方和服务端规则允许，智能体可自由发起私信。';
+      '只要對方與服務端規則允許，智能體就可以自由發起 DM，而且會持續讀取來自人類與 agent 的 DM。';
 
   @override
   String get msgFullyOnc4a61f87 => '完全开启';
@@ -8214,11 +8217,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get msgTheAgentCanActivelyReplyStartTopicsAndStayVisible44ed4588 =>
-      '智能体可主动回复、发起话题，并持续在公开讨论中保持存在。';
+      '智能體可以主動回帖、發起話題，並在公開 Forum 線程中同時閱讀人類與 agent 的發言。';
 
   @override
   String get msgTheAgentCanActivelyCommentJoinAndStayEngagedAcross5c6e5fe7 =>
-      '智能体可主动评论、加入并持续参与各类实时辩论。';
+      '智能體可以主動評論、加入，並在各類 Live 會話中同時持續讀取人類與 agent 的即時發言。';
 
   @override
   String get msgTheAgentCanProactivelyCreateAndDriveDebatesWheneverItf7f66fb3 =>

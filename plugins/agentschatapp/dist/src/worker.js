@@ -1,4 +1,4 @@
-import { DEFAULT_MANAGER_INTERVAL_MS, DEFAULT_POLL_BACKOFF_SECONDS, DEFAULT_POLL_WAIT_SECONDS, DEFAULT_SAFETY_POLICY_REFRESH_MS } from "./constants.js";
+import { DEFAULT_DISCOVERY_INTERVAL_MS, DEFAULT_DISCOVERY_JITTER_MS, DEFAULT_MANAGER_INTERVAL_MS, DEFAULT_POLL_BACKOFF_SECONDS, DEFAULT_POLL_WAIT_SECONDS, DEFAULT_SAFETY_POLICY_REFRESH_MS } from "./constants.js";
 import { buildSessionKey, runEmbeddedReply } from "./embedded.js";
 import { buildDebatePrompt, buildDebateSpectatorPrompt, buildDmPrompt, buildForumPrompt, isNoReply } from "./prompts.js";
 import { maybeRunHighActivityDiscovery } from "./worker-discovery.js";
@@ -27,6 +27,9 @@ function nowIso() {
 }
 function nowMs() {
     return Date.now();
+}
+function jitterMs(limitMs) {
+    return Math.floor(Math.random() * (limitMs + 1));
 }
 function parseIsoMs(value) {
     if (!value) {
@@ -425,6 +428,9 @@ function computeRetryDelaySeconds(reconnectAttempts, error) {
     }
     return DEFAULT_POLL_BACKOFF_SECONDS[Math.min(reconnectAttempts, DEFAULT_POLL_BACKOFF_SECONDS.length - 1)];
 }
+function scheduleDiscoveryRetry(runtimeState) {
+    runtimeState.nextDiscoveryAt = nowMs() + DEFAULT_DISCOVERY_INTERVAL_MS + jitterMs(DEFAULT_DISCOVERY_JITTER_MS);
+}
 async function runWorkerLoop(context, account, controller, logger) {
     const runtimeState = ensureWorkerState(account.slot);
     runtimeState.running = true;
@@ -463,15 +469,21 @@ async function runWorkerLoop(context, account, controller, logger) {
             if (runtimeState.nextDiscoveryAt != null && nowMs() >= runtimeState.nextDiscoveryAt) {
                 policy = await loadSafetyPolicy(state, logger, true);
             }
-            await maybeRunHighActivityDiscovery({
-                context,
-                account,
-                state,
-                runtimeState,
-                policy,
-                submitAndWaitForSuccess,
-                logger
-            });
+            try {
+                await maybeRunHighActivityDiscovery({
+                    context,
+                    account,
+                    state,
+                    runtimeState,
+                    policy,
+                    submitAndWaitForSuccess,
+                    logger
+                });
+            }
+            catch (error) {
+                scheduleDiscoveryRetry(runtimeState);
+                logger.warn(`Agents Chat slot '${account.slot}' skipped one discovery cycle after error: ${error instanceof Error ? error.message : String(error)}`);
+            }
             persistState(context, account.slot, state, runtimeState);
             reconnectAttempts = 0;
             runtimeState.reconnectAttempts = 0;

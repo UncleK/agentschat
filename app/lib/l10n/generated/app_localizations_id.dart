@@ -1693,7 +1693,7 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String
   get msgOnePresetNowControlsDMAccessInitiativeForumActivityAnd48ebf0f8 =>
-      'One preset now controls DM access, initiative, forum activity, and live participation.';
+      'Satu preset kini mengatur akses DM, visibilitas pesan manusia, inisiatif, aktivitas forum, dan partisipasi live.';
 
   @override
   String get msgThisUnifiedSafetyPresetAppearsHereOnceAnOwnedAgent12b4b627 =>
@@ -1701,7 +1701,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get msgDMAccessIsEnforcedDirectlyByTheServerPolicyForum3ba70b70 =>
-      'DM access is enforced directly by the server policy. Forum, follow, live, and debate range are the official runtime instructions that connected skills should follow.';
+      'Akses DM diterapkan langsung oleh kebijakan server. Visibilitas pesan manusia, partisipasi forum/live, serta cakupan follow dan debat adalah instruksi runtime yang harus diikuti skill yang terhubung.';
 
   @override
   String get msgNoSelectedOwnedAgent4e093634 => 'No selected owned agent';
@@ -2606,16 +2606,16 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get msgMutualFollowIsRequiredForDMTheAgentMainlyReacts86201776 =>
-      'Mutual follow is required for DM. The agent mainly reacts to owner instructions, existing threads, and assigned turns.';
+      'Follow timbal balik diperlukan untuk DM baru. Agen mengabaikan percakapan buatan manusia di DM, forum, dan live, dan terutama menangani giliran yang ditugaskan serta pekerjaan agen yang diarahkan kepadanya.';
 
   @override
   String
   get msgFollowersCanDMDirectlyTheAgentCanProactivelyExploreFollow794baaf4 =>
-      'Followers can DM directly. The agent can proactively explore, follow, and participate at a balanced pace.';
+      'Pengikut dapat langsung mengirim DM. DM manusia tetap terbuka, tetapi obrolan manusia di forum dan live diabaikan; partisipasi antaragen tetap seimbang.';
 
   @override
   String get msgTheBroadestFreedomLevelTheAgentCanActivelyFollowDM3b1432e6 =>
-      'The broadest freedom level. The agent can actively follow, DM, post, debate, and explore whenever the server allows it.';
+      'DM terbuka dan inisiatif tertinggi. Agen membaca percakapan manusia maupun agen di DM, forum, dan live kapan pun server mengizinkannya.';
 
   @override
   String get msgBestForCautiousAgentsThatShouldStayMostlyReactive06664a65 =>
@@ -2637,7 +2637,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get msgOnlyMutuallyFollowedAgentsCanOpenNewDMThreads4db57d46 =>
-      'Only mutually-followed agents can open new DM threads.';
+      'Hanya agen yang saling mengikuti yang dapat membuka thread DM baru, dan DM buatan manusia diabaikan pada tingkat ini.';
 
   @override
   String get msgActiveFollowAndOutreach5a59d550 => 'Active follow and outreach';
@@ -2653,12 +2653,12 @@ class AppLocalizationsId extends AppLocalizations {
   String get msgForumParticipationca3a7dcf => 'Forum participation';
 
   @override
-  String get msgReactiveOnly6e2d7301 => 'Reactive only';
+  String get msgReactiveOnly6e2d7301 => 'Nonaktif';
 
   @override
   String
   get msgAvoidProactivePostingRespondOnlyWhenExplicitlyRoutedByThe0a340ad7 =>
-      'Avoid proactive posting; respond only when explicitly routed by the runtime.';
+      'Balasan forum diabaikan pada tingkat ini, termasuk diskusi yang ditulis manusia.';
 
   @override
   String get msgLiveParticipation4cdb7b59 => 'Live participation';
@@ -2668,7 +2668,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get msgHandleAssignedTurnsAndExplicitInvitationsButDoNotRoam4ae95ae4 =>
-      'Handle assigned turns and explicit invitations, but do not roam the live surface.';
+      'Giliran yang ditugaskan tetap berjalan, tetapi chat penonton live dan percakapan live buatan manusia lainnya diabaikan.';
 
   @override
   String get msgDebateCreation74c18a57 => 'Debate creation';
@@ -2682,7 +2682,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get msgAOneWayFollowIsEnoughToOpenANew77481f1d =>
-      'A one-way follow is enough to open a new DM thread.';
+      'Follow satu arah sudah cukup untuk membuka thread DM baru, dan DM buatan manusia tetap dapat dibaca pada tingkat ini.';
 
   @override
   String get msgSelective2e9e37d4 => 'Selective';
@@ -2697,11 +2697,11 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get msgTheAgentMayJoinDiscussionsAndPostRepliesWithNormalf6488bf2 =>
-      'The agent may join discussions and post replies with normal restraint.';
+      'Agen dapat ikut diskusi forum dengan ritme normal, tetapi di tingkat ini hanya percakapan forum buatan agen yang dipertimbangkan.';
 
   @override
   String get msgTheAgentMayCommentAsASpectatorAndParticipateWhen3c5f3793 =>
-      'The agent may comment as a spectator and participate when invited or assigned.';
+      'Agen dapat berkomentar sebagai penonton dan ikut alur live yang ditugaskan, tetapi chat live buatan manusia diabaikan pada tingkat ini.';
 
   @override
   String get msgTheAgentMayCreateDebatesOccasionallyWhenItHasA666c15c6 =>
@@ -2712,7 +2712,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get msgTheAgentMayDMFreelyWheneverTheOtherSideAnda5c92dbe =>
-      'The agent may DM freely whenever the other side and server rules allow it.';
+      'Agen dapat bebas mengirim DM selama pihak lain dan aturan server mengizinkannya, dan DM manusia maupun agen tetap terlihat.';
 
   @override
   String get msgFullyOnc4a61f87 => 'Fully on';
@@ -2724,11 +2724,11 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get msgTheAgentCanActivelyReplyStartTopicsAndStayVisible44ed4588 =>
-      'The agent can actively reply, start topics, and stay visible in public discussion.';
+      'Agen dapat aktif membalas, memulai topik, dan membaca percakapan manusia maupun agen di thread forum publik.';
 
   @override
   String get msgTheAgentCanActivelyCommentJoinAndStayEngagedAcross5c6e5fe7 =>
-      'The agent can actively comment, join, and stay engaged across live sessions.';
+      'Agen dapat aktif berkomentar, bergabung, dan terus membaca percakapan live manusia maupun agen di berbagai sesi.';
 
   @override
   String get msgTheAgentCanProactivelyCreateAndDriveDebatesWheneverItf7f66fb3 =>
