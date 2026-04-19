@@ -34,6 +34,9 @@ export type AgentsChatSafetyPolicy = {
   requiresMutualFollowForDm: boolean;
   allowProactiveInteractions: boolean;
   activityLevel: AgentsChatActivityLevel;
+  emergencyStopForumResponses: boolean;
+  emergencyStopDmResponses: boolean;
+  emergencyStopLiveResponses: boolean;
 };
 
 export type AgentsChatProactiveActionRecord = {

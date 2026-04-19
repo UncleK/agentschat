@@ -18,6 +18,7 @@ import {
 } from "./constants.js";
 import type { AgentsChatRuntimeContext } from "./context.js";
 import { buildSessionKey, runEmbeddedReply } from "./embedded.js";
+import { resolveForumDiscoveryTarget } from "./forum-context.js";
 import { buildDebateCreatePrompt, buildForumDiscoveryReplyPrompt, buildForumTopicCreatePrompt, isNoReply } from "./prompts.js";
 import { readDebates, readDirectory, readForumTopic, readForumTopics } from "./launcher.js";
 import type {
@@ -115,30 +116,6 @@ function recordProactiveAction(
   state.lastProactiveActionType = record.type;
   runtimeState.lastProactiveActionAt = Date.parse(record.at);
   runtimeState.lastProactiveActionType = record.type;
-}
-
-function flattenReplies(replies: Record<string, unknown>[], output: Record<string, unknown>[] = []): Record<string, unknown>[] {
-  for (const reply of replies) {
-    output.push(reply);
-    const children = Array.isArray(reply.children) ? (reply.children as Record<string, unknown>[]) : [];
-    flattenReplies(children, output);
-  }
-  return output;
-}
-
-function resolveForumParentEventId(topic: Record<string, unknown>): string | undefined {
-  const rootEventId = normalizeOptionalString(topic.rootEventId);
-  const replies = flattenReplies(Array.isArray(topic.replies) ? (topic.replies as Record<string, unknown>[]) : []);
-  let latestReply: Record<string, unknown> | undefined;
-  let latestAt = -1;
-  for (const reply of replies) {
-    const occurredAt = parseIsoMs(normalizeOptionalString(reply.occurredAt)) ?? -1;
-    if (occurredAt > latestAt && normalizeOptionalString(reply.id)) {
-      latestAt = occurredAt;
-      latestReply = reply;
-    }
-  }
-  return normalizeOptionalString(latestReply?.id) ?? rootEventId;
 }
 
 function parsePlannerJson<T extends Record<string, unknown>>(value: string, sentinel: string): T | null {
@@ -340,10 +317,14 @@ async function tryProactiveForumReply(
   state: AgentsChatState,
   runtimeState: DiscoveryRuntimeState,
   topics: ForumTopicSummary[],
+  policy: AgentsChatSafetyPolicy,
   submitAndWaitForSuccess: SubmitAndWait,
   logger: LoggerLike
 ): Promise<boolean> {
-  if (!canSendProactiveReply(state) || !state.serverBaseUrl || !state.accessToken) {
+  if (policy.emergencyStopForumResponses
+    || !canSendProactiveReply(state)
+    || !state.serverBaseUrl
+    || !state.accessToken) {
     return false;
   }
 
@@ -351,8 +332,9 @@ async function tryProactiveForumReply(
   for (const candidate of candidates) {
     const topicResponse = await readForumTopic(state.serverBaseUrl, state.accessToken, candidate.threadId);
     const topic = asRecord(topicResponse.topic);
-    const parentEventId = resolveForumParentEventId(topic);
-    if (!parentEventId) {
+    const replyTarget = resolveForumDiscoveryTarget(topic);
+    const parentEventId = normalizeOptionalString(replyTarget?.eventId);
+    if (!parentEventId || replyTarget?.targetType === "second_level_reply") {
       continue;
     }
     const replyText = await runEmbeddedReply(context, {
@@ -407,9 +389,10 @@ async function tryProactiveTopicCreate(
   state: AgentsChatState,
   runtimeState: DiscoveryRuntimeState,
   recentTopics: ForumTopicSummary[],
+  policy: AgentsChatSafetyPolicy,
   submitAndWaitForSuccess: SubmitAndWait
 ): Promise<boolean> {
-  if (!canCreateTopic(state)) {
+  if (policy.emergencyStopForumResponses || !canCreateTopic(state)) {
     return false;
   }
 
@@ -478,10 +461,11 @@ async function tryProactiveDebateCreate(
   recentTopics: ForumTopicSummary[],
   directoryAgents: DirectoryAgentEntry[],
   recentDebates: DebateSummary[],
+  policy: AgentsChatSafetyPolicy,
   submitAndWaitForSuccess: SubmitAndWait,
   logger: LoggerLike
 ): Promise<boolean> {
-  if (!canCreateDebate(state) || !state.agentId) {
+  if (policy.emergencyStopLiveResponses || !canCreateDebate(state) || !state.agentId) {
     return false;
   }
 
@@ -645,6 +629,7 @@ export async function maybeRunHighActivityDiscovery(params: {
     params.state,
     params.runtimeState,
     topics,
+    params.policy,
     params.submitAndWaitForSuccess,
     params.logger
   );
@@ -655,6 +640,7 @@ export async function maybeRunHighActivityDiscovery(params: {
       params.state,
       params.runtimeState,
       recentTopics,
+      params.policy,
       params.submitAndWaitForSuccess
     );
   }
@@ -667,6 +653,7 @@ export async function maybeRunHighActivityDiscovery(params: {
       recentTopics,
       directoryAgents,
       recentDebates,
+      params.policy,
       params.submitAndWaitForSuccess,
       params.logger
     );

@@ -48,6 +48,9 @@ class DebateScreen extends StatefulWidget {
 }
 
 class _DebateScreenState extends State<DebateScreen> {
+  static const Duration _debateRefreshInterval = Duration(seconds: 3);
+  static const double _livePanelBottomSnapThreshold = 120;
+
   late DebateViewModel _viewModel;
   late final TextEditingController _spectatorController;
   late final ScrollController _scrollController;
@@ -58,7 +61,9 @@ class _DebateScreenState extends State<DebateScreen> {
   String? _sessionSignature;
   bool _isLoadingSessions = false;
   bool _isMutatingSession = false;
+  bool _isRefreshingDebatesSilently = false;
   String? _loadErrorMessage;
+  Timer? _debateRefreshTimer;
 
   @override
   void initState() {
@@ -67,6 +72,9 @@ class _DebateScreenState extends State<DebateScreen> {
     _spectatorController = TextEditingController();
     _scrollController = ScrollController()..addListener(_handleScrollChanged);
     _activePanel = widget.initialPanel;
+    _debateRefreshTimer = Timer.periodic(_debateRefreshInterval, (_) {
+      unawaited(_refreshDebatesSilently());
+    });
     _syncShellInitiateAction();
   }
 
@@ -100,6 +108,7 @@ class _DebateScreenState extends State<DebateScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       onInitiateActionChanged?.call(null);
     });
+    _debateRefreshTimer?.cancel();
     _scrollController.removeListener(_handleScrollChanged);
     _spectatorController.dispose();
     _scrollController.dispose();
@@ -374,6 +383,9 @@ class _DebateScreenState extends State<DebateScreen> {
         preferredSessionId: debateSession.id,
         resetScrollPosition: false,
       );
+      if (mounted && _activePanel == DebatePanel.spectator) {
+        _scrollLivePanelToBottom(animate: true);
+      }
     } on ApiException catch (error) {
       if (error.isUnauthorized) {
         await session!.handleUnauthorized();
@@ -441,6 +453,15 @@ class _DebateScreenState extends State<DebateScreen> {
     });
   }
 
+  bool _isNearLivePanelBottom() {
+    if (!_scrollController.hasClients) {
+      return true;
+    }
+    final position = _scrollController.position;
+    return position.maxScrollExtent - position.pixels <=
+        _livePanelBottomSnapThreshold;
+  }
+
   Future<void> _jumpToTop() async {
     if (!_scrollController.hasClients) {
       return;
@@ -451,6 +472,124 @@ class _DebateScreenState extends State<DebateScreen> {
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  void _scrollLivePanelToBottom({bool animate = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      final targetOffset = _scrollController.position.maxScrollExtent;
+      if (animate) {
+        _scrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+      _scrollController.jumpTo(targetOffset);
+    });
+  }
+
+  String _selectedSessionRefreshSignature(DebateViewModel viewModel) {
+    final session = viewModel.selectedSessionOrNull;
+    if (session == null) {
+      return [
+        viewModel.selectedSessionId,
+        viewModel.sessions.length,
+        viewModel.directoryErrorMessage ?? '',
+      ].join('|');
+    }
+    final lastTurn = session.visibleFormalTurns.isEmpty
+        ? null
+        : session.visibleFormalTurns.last;
+    final lastSpectatorMessage = session.spectatorMessages.isEmpty
+        ? null
+        : session.spectatorMessages.last;
+    return [
+      viewModel.selectedSessionId,
+      viewModel.sessions.length,
+      viewModel.directoryErrorMessage ?? '',
+      session.id,
+      session.lifecycle.name,
+      session.revealedTurnCount,
+      session.formalTurns.length,
+      session.proSeat.stance,
+      session.conSeat.stance,
+      session.spectatorCountLabel,
+      session.spectatorMessages.length,
+      lastTurn?.id ?? '',
+      lastTurn?.timestampLabel ?? '',
+      lastTurn?.quote ?? '',
+      lastSpectatorMessage?.id ?? '',
+      lastSpectatorMessage?.timestampLabel ?? '',
+      lastSpectatorMessage?.body ?? '',
+    ].join('|');
+  }
+
+  Future<void> _refreshDebatesSilently() async {
+    final repository = _debateRepository;
+    final session = AppSessionScope.maybeOf(context);
+    if (repository == null ||
+        session == null ||
+        session.bootstrapStatus != AppSessionBootstrapStatus.ready ||
+        _isLoadingSessions ||
+        _isMutatingSession ||
+        _isRefreshingDebatesSilently) {
+      return;
+    }
+
+    final hasAuthenticatedHumanSession = _hasAuthenticatedHumanSession(session);
+    final shouldAutoScroll =
+        (_activePanel == DebatePanel.process ||
+            _activePanel == DebatePanel.spectator) &&
+        _isNearLivePanelBottom();
+    final currentSignature = _selectedSessionRefreshSignature(_viewModel);
+    _isRefreshingDebatesSilently = true;
+
+    try {
+      final nextViewModel = await repository.readViewModel(
+        viewerId: _currentViewerId(session),
+        viewerName: _currentViewerName(session),
+        preferredSessionId:
+            _viewModel.selectedSessionOrNull?.id ?? widget.sessionTargetId,
+        activeAgentId: session.currentActiveAgent?.id,
+        usePublicDirectory: !hasAuthenticatedHumanSession,
+      );
+      if (!mounted) {
+        return;
+      }
+      final nextSignature = _selectedSessionRefreshSignature(nextViewModel);
+      if (nextSignature == currentSignature) {
+        return;
+      }
+
+      setState(() {
+        _viewModel = nextViewModel;
+        _loadErrorMessage = null;
+        if (!(_viewModel.selectedSessionOrNull?.showReplayTab ?? false) &&
+            _activePanel == DebatePanel.replay) {
+          _activePanel = DebatePanel.process;
+        }
+        if (_viewModel.selectedSessionOrNull?.missingSeatSide == null) {
+          _replacementProfileId = null;
+        }
+      });
+      if (shouldAutoScroll &&
+          (_activePanel == DebatePanel.process ||
+              _activePanel == DebatePanel.spectator)) {
+        _scrollLivePanelToBottom(animate: true);
+      }
+    } on ApiException catch (error) {
+      if (error.isUnauthorized && hasAuthenticatedHumanSession) {
+        await session.handleUnauthorized();
+      }
+    } catch (_) {
+      // Silent refresh should not disturb the current debate view.
+    } finally {
+      _isRefreshingDebatesSilently = false;
+    }
   }
 
   Future<void> _syncDebates(
@@ -2569,6 +2708,7 @@ class _StancePanel extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     seat.stance,
+                    textAlign: TextAlign.justify,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.onSurfaceMuted,
                       fontSize: 12,
@@ -2811,6 +2951,10 @@ class _LiveFormalTurnCard extends StatelessWidget {
         ? AppColors.primary
         : AppColors.tertiary;
     final alignRight = turn.speakerSide == DebateSide.con;
+    final normalizedSummary = turn.summary.trim();
+    final normalizedQuote = turn.quote.trim();
+    final showSummary =
+        normalizedSummary.isNotEmpty && normalizedSummary != normalizedQuote;
     final bubbleRadius = BorderRadius.only(
       topLeft: Radius.circular(alignRight ? 16 : 0),
       topRight: Radius.circular(alignRight ? 0 : 16),
@@ -2887,23 +3031,23 @@ class _LiveFormalTurnCard extends StatelessWidget {
                             ? CrossAxisAlignment.end
                             : CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            turn.summary,
-                            textAlign: alignRight
-                                ? TextAlign.right
-                                : TextAlign.left,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: AppColors.onSurfaceMuted,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
+                          if (showSummary) ...[
+                            Text(
+                              turn.summary,
+                              textAlign: alignRight
+                                  ? TextAlign.right
+                                  : TextAlign.left,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: AppColors.onSurfaceMuted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                          ],
                           Text(
                             turn.quote,
-                            textAlign: alignRight
-                                ? TextAlign.right
-                                : TextAlign.left,
+                            textAlign: TextAlign.justify,
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
                                   fontSize: 15,
@@ -3028,9 +3172,7 @@ class _LiveSpectatorMessageCard extends StatelessWidget {
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         message.body,
-                        textAlign: alignRight
-                            ? TextAlign.right
-                            : TextAlign.left,
+                        textAlign: TextAlign.justify,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: alignRight
                               ? AppColors.primary
@@ -3341,8 +3483,16 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
     }
     return DebateProfileModel(
       id: 'current-human',
-      name: localizedAppText(key: 'msgCurrentHuman48ab24c1', en: 'Current human', zhHans: '当前人类'),
-      headline: localizedAppText(key: 'msgCurrentHumanHost2f7e0577', en: 'Current human host', zhHans: '当前人类主持人'),
+      name: localizedAppText(
+        key: 'msgCurrentHuman48ab24c1',
+        en: 'Current human',
+        zhHans: '当前人类',
+      ),
+      headline: localizedAppText(
+        key: 'msgCurrentHumanHost2f7e0577',
+        en: 'Current human host',
+        zhHans: '当前人类主持人',
+      ),
       kind: DebateParticipantKind.human,
     );
   }

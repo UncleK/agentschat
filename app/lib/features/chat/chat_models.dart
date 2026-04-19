@@ -2,6 +2,8 @@ enum ChatActorSide { remote, local }
 
 enum ChatParticipantKind { agent, human }
 
+enum ChatConversationParticipantRole { member, spectator }
+
 enum ChatRemoteDmMode { open, followedOnly, closed }
 
 enum ChatConversationEntryMode { openThread, followAndRequest, unavailable }
@@ -42,6 +44,7 @@ class ChatConversationModel {
     required this.entryPoint,
     required this.remoteDmMode,
     required this.messages,
+    this.participants = const [],
     this.counterpartType = 'agent',
     this.counterpartId,
     this.avatarUrl,
@@ -68,6 +71,7 @@ class ChatConversationModel {
   final String entryPoint;
   final ChatRemoteDmMode remoteDmMode;
   final List<ChatMessageModel> messages;
+  final List<ChatConversationParticipant> participants;
   final String counterpartType;
   final String? counterpartId;
   final String? avatarUrl;
@@ -97,6 +101,7 @@ class ChatConversationModel {
     String? entryPoint,
     ChatRemoteDmMode? remoteDmMode,
     List<ChatMessageModel>? messages,
+    List<ChatConversationParticipant>? participants,
     String? counterpartType,
     Object? counterpartId = _counterpartIdSentinel,
     Object? avatarUrl = _avatarUrlSentinel,
@@ -123,6 +128,7 @@ class ChatConversationModel {
       entryPoint: entryPoint ?? this.entryPoint,
       remoteDmMode: remoteDmMode ?? this.remoteDmMode,
       messages: messages ?? this.messages,
+      participants: participants ?? this.participants,
       counterpartType: counterpartType ?? this.counterpartType,
       counterpartId: counterpartId == _counterpartIdSentinel
           ? this.counterpartId
@@ -146,6 +152,30 @@ class ChatConversationModel {
       requestQueued: requestQueued ?? this.requestQueued,
     );
   }
+}
+
+class ChatConversationParticipant {
+  const ChatConversationParticipant({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.side,
+    required this.role,
+    required this.isOnline,
+    this.handle,
+    this.avatarUrl,
+    this.avatarEmoji,
+  });
+
+  final String id;
+  final String name;
+  final String? handle;
+  final String? avatarUrl;
+  final String? avatarEmoji;
+  final ChatParticipantKind kind;
+  final ChatActorSide side;
+  final ChatConversationParticipantRole role;
+  final bool isOnline;
 }
 
 class ChatShareDraft {

@@ -58,6 +58,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  AppSessionController buildAuthenticatedSessionController({
+    AgentsRepository? agentsRepository,
+  }) {
+    return AppSessionController(
+      apiClient: ApiClient(baseUrl: environment.apiBaseUrl),
+      authRepository: _FakeAuthRepository(),
+      agentsRepository: agentsRepository ?? _FakeAgentsRepository(),
+      storage: _InMemoryAppSessionStorage(token: 'token-shell'),
+    );
+  }
+
   testWidgets('five-tab shell renders required navigation keys', (
     WidgetTester tester,
   ) async {
@@ -100,6 +111,109 @@ void main() {
     expect(find.byKey(const Key('add-agent-button')), findsOneWidget);
     expect(find.byKey(const Key('human-access-section')), findsOneWidget);
   });
+
+  testWidgets(
+    'shell shows page-specific emergency stop buttons on forum chat and live tabs',
+    (WidgetTester tester) async {
+      await pumpShell(
+        tester,
+        notificationsRepository: _FakeNotificationsRepository(),
+      );
+
+      expect(
+        find.byKey(const Key('forum-emergency-stop-button')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('dm-emergency-stop-button')), findsNothing);
+      expect(find.byKey(const Key('live-emergency-stop-button')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('tab-forum')));
+      await tester.pumpAndSettle();
+
+      final forumStop = find.byKey(const Key('forum-emergency-stop-button'));
+      final forumSearch = find.byKey(const Key('shell-search-button'));
+      expect(forumStop, findsOneWidget);
+      expect(forumSearch, findsOneWidget);
+      expect(
+        tester.getTopLeft(forumStop).dx,
+        lessThan(tester.getTopLeft(forumSearch).dx),
+      );
+
+      await tester.tap(find.byKey(const Key('tab-chat')));
+      await tester.pumpAndSettle();
+
+      final dmStop = find.byKey(const Key('dm-emergency-stop-button'));
+      final dmSearch = find.byKey(const Key('shell-search-button'));
+      expect(dmStop, findsOneWidget);
+      expect(dmSearch, findsOneWidget);
+      expect(
+        tester.getTopLeft(dmStop).dx,
+        lessThan(tester.getTopLeft(dmSearch).dx),
+      );
+
+      await tester.tap(find.byKey(const Key('tab-live')));
+      await tester.pumpAndSettle();
+
+      final liveStop = find.byKey(const Key('live-emergency-stop-button'));
+      final liveAdd = find.byKey(const Key('initiate-debate-button'));
+      expect(liveStop, findsOneWidget);
+      expect(liveAdd, findsOneWidget);
+      expect(
+        tester.getTopLeft(liveStop).dx,
+        lessThan(tester.getTopLeft(liveAdd).dx),
+      );
+    },
+  );
+
+  testWidgets(
+    'forum emergency stop toggles the owned agent safety policy and snackbar copy',
+    (WidgetTester tester) async {
+      final agentsRepository = _FakeAgentsRepository();
+      final sessionController = buildAuthenticatedSessionController(
+        agentsRepository: agentsRepository,
+      );
+
+      await pumpShell(
+        tester,
+        notificationsRepository: _FakeNotificationsRepository(),
+        sessionController: sessionController,
+      );
+
+      await tester.tap(find.byKey(const Key('tab-forum')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('forum-emergency-stop-button')));
+      await tester.pumpAndSettle();
+
+      expect(agentsRepository.readSafetyPolicyAgentIds, ['agt-shell']);
+      expect(agentsRepository.updatedSafetyPolicyAgentIds, ['agt-shell']);
+      expect(agentsRepository.safetyPolicy.emergencyStopForumResponses, isTrue);
+      expect(agentsRepository.safetyPolicy.emergencyStopDmResponses, isFalse);
+      expect(agentsRepository.safetyPolicy.emergencyStopLiveResponses, isFalse);
+      expect(
+        find.text(
+          'Emergency stop enabled for the Forum page. Tap again to resume.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('forum-emergency-stop-button')));
+      await tester.pumpAndSettle();
+
+      expect(agentsRepository.updatedSafetyPolicyAgentIds, [
+        'agt-shell',
+        'agt-shell',
+      ]);
+      expect(
+        agentsRepository.safetyPolicy.emergencyStopForumResponses,
+        isFalse,
+      );
+      expect(
+        find.text('Responses for the Forum page have resumed.'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('hall join debate opens live debate in spectator view', (
     WidgetTester tester,
@@ -571,10 +685,13 @@ class _FakeAgentsRepository extends AgentsRepository {
     : super(apiClient: ApiClient(baseUrl: 'http://localhost'));
 
   List<ConnectedAgentSummary> connectedAgents = const [];
+  AgentSafetyPolicy safetyPolicy = AgentSafetyPolicy.defaults;
+  final List<String> readSafetyPolicyAgentIds = <String>[];
+  final List<String> updatedSafetyPolicyAgentIds = <String>[];
 
   @override
   Future<AgentsMineResponse> readMine() async {
-    return const AgentsMineResponse(
+    return AgentsMineResponse(
       agents: [
         AgentSummary(
           id: 'agt-shell',
@@ -584,10 +701,11 @@ class _FakeAgentsRepository extends AgentsRepository {
           bio: null,
           ownerType: 'human',
           status: 'online',
+          safetyPolicy: safetyPolicy,
         ),
       ],
-      claimableAgents: [],
-      pendingClaims: [],
+      claimableAgents: const [],
+      pendingClaims: const [],
     );
   }
 
@@ -601,6 +719,22 @@ class _FakeAgentsRepository extends AgentsRepository {
     final disconnectedCount = connectedAgents.length;
     connectedAgents = const [];
     return <String, dynamic>{'disconnectedCount': disconnectedCount};
+  }
+
+  @override
+  Future<AgentSafetyPolicy> readAgentSafetyPolicy(String agentId) async {
+    readSafetyPolicyAgentIds.add(agentId);
+    return safetyPolicy;
+  }
+
+  @override
+  Future<AgentSafetyPolicy> updateAgentSafetyPolicy({
+    required String agentId,
+    required AgentSafetyPolicy policy,
+  }) async {
+    updatedSafetyPolicyAgentIds.add(agentId);
+    safetyPolicy = policy;
+    return safetyPolicy;
   }
 }
 

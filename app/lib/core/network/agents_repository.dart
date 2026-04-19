@@ -55,6 +55,9 @@ class AgentSafetyPolicy {
     required this.requiresMutualFollowForDm,
     required this.allowProactiveInteractions,
     required this.activityLevel,
+    required this.emergencyStopForumResponses,
+    required this.emergencyStopDmResponses,
+    required this.emergencyStopLiveResponses,
   });
 
   static const defaults = AgentSafetyPolicy(
@@ -62,18 +65,27 @@ class AgentSafetyPolicy {
     requiresMutualFollowForDm: false,
     allowProactiveInteractions: true,
     activityLevel: AgentActivityLevel.normal,
+    emergencyStopForumResponses: false,
+    emergencyStopDmResponses: false,
+    emergencyStopLiveResponses: false,
   );
 
   final AgentDmPolicyMode dmPolicyMode;
   final bool requiresMutualFollowForDm;
   final bool allowProactiveInteractions;
   final AgentActivityLevel activityLevel;
+  final bool emergencyStopForumResponses;
+  final bool emergencyStopDmResponses;
+  final bool emergencyStopLiveResponses;
 
   AgentSafetyPolicy copyWith({
     AgentDmPolicyMode? dmPolicyMode,
     bool? requiresMutualFollowForDm,
     bool? allowProactiveInteractions,
     AgentActivityLevel? activityLevel,
+    bool? emergencyStopForumResponses,
+    bool? emergencyStopDmResponses,
+    bool? emergencyStopLiveResponses,
   }) {
     final nextActivityLevel = activityLevel ?? this.activityLevel;
     final nextAllowProactiveInteractions =
@@ -92,6 +104,12 @@ class AgentSafetyPolicy {
           requiresMutualFollowForDm ?? this.requiresMutualFollowForDm,
       allowProactiveInteractions: nextAllowProactiveInteractions,
       activityLevel: normalizedActivityLevel,
+      emergencyStopForumResponses:
+          emergencyStopForumResponses ?? this.emergencyStopForumResponses,
+      emergencyStopDmResponses:
+          emergencyStopDmResponses ?? this.emergencyStopDmResponses,
+      emergencyStopLiveResponses:
+          emergencyStopLiveResponses ?? this.emergencyStopLiveResponses,
     );
   }
 
@@ -116,6 +134,12 @@ class AgentSafetyPolicy {
                 ? AgentActivityLevel.normal
                 : activityLevel
           : AgentActivityLevel.low,
+      emergencyStopForumResponses:
+          json['emergencyStopForumResponses'] as bool? ?? false,
+      emergencyStopDmResponses:
+          json['emergencyStopDmResponses'] as bool? ?? false,
+      emergencyStopLiveResponses:
+          json['emergencyStopLiveResponses'] as bool? ?? false,
     );
   }
 
@@ -125,6 +149,9 @@ class AgentSafetyPolicy {
       'requiresMutualFollowForDm': requiresMutualFollowForDm,
       'allowProactiveInteractions': allowProactiveInteractions,
       'activityLevel': _agentActivityLevelToJson(activityLevel),
+      'emergencyStopForumResponses': emergencyStopForumResponses,
+      'emergencyStopDmResponses': emergencyStopDmResponses,
+      'emergencyStopLiveResponses': emergencyStopLiveResponses,
     };
   }
 }

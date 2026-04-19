@@ -167,6 +167,9 @@ void main() {
                   requiresMutualFollowForDm: false,
                   allowProactiveInteractions: true,
                   activityLevel: AgentActivityLevel.normal,
+                  emergencyStopForumResponses: false,
+                  emergencyStopDmResponses: false,
+                  emergencyStopLiveResponses: false,
                 ),
               ),
             ],
@@ -212,12 +215,18 @@ void main() {
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
           activityLevel: AgentActivityLevel.normal,
+          emergencyStopForumResponses: false,
+          emergencyStopDmResponses: false,
+          emergencyStopLiveResponses: false,
         );
         const updatedPolicy = AgentSafetyPolicy(
           dmPolicyMode: AgentDmPolicyMode.followersOnly,
           requiresMutualFollowForDm: true,
           allowProactiveInteractions: false,
           activityLevel: AgentActivityLevel.low,
+          emergencyStopForumResponses: false,
+          emergencyStopDmResponses: false,
+          emergencyStopLiveResponses: false,
         );
 
         await authenticateWithMine(
@@ -291,6 +300,9 @@ void main() {
                   requiresMutualFollowForDm: false,
                   allowProactiveInteractions: true,
                   activityLevel: AgentActivityLevel.normal,
+                  emergencyStopForumResponses: false,
+                  emergencyStopDmResponses: false,
+                  emergencyStopLiveResponses: false,
                 ),
               ),
             ],
@@ -325,12 +337,18 @@ void main() {
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
           activityLevel: AgentActivityLevel.normal,
+          emergencyStopForumResponses: false,
+          emergencyStopDmResponses: false,
+          emergencyStopLiveResponses: false,
         );
         const updatedPolicy = AgentSafetyPolicy(
           dmPolicyMode: AgentDmPolicyMode.open,
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
           activityLevel: AgentActivityLevel.high,
+          emergencyStopForumResponses: false,
+          emergencyStopDmResponses: false,
+          emergencyStopLiveResponses: false,
         );
 
         await authenticateWithMine(
@@ -403,18 +421,27 @@ void main() {
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
           activityLevel: AgentActivityLevel.normal,
+          emergencyStopForumResponses: false,
+          emergencyStopDmResponses: false,
+          emergencyStopLiveResponses: false,
         );
         const initialSecondaryPolicy = AgentSafetyPolicy(
           dmPolicyMode: AgentDmPolicyMode.followersOnly,
           requiresMutualFollowForDm: true,
           allowProactiveInteractions: false,
           activityLevel: AgentActivityLevel.low,
+          emergencyStopForumResponses: false,
+          emergencyStopDmResponses: false,
+          emergencyStopLiveResponses: false,
         );
         const updatedPolicy = AgentSafetyPolicy(
           dmPolicyMode: AgentDmPolicyMode.open,
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
           activityLevel: AgentActivityLevel.high,
+          emergencyStopForumResponses: false,
+          emergencyStopDmResponses: false,
+          emergencyStopLiveResponses: false,
         );
         final updatedCalls = <String>[];
 

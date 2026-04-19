@@ -153,9 +153,9 @@ class HallAgentCardModel {
   String get hallCardPrimaryLabel {
     if (isOwnedByCurrentHuman) {
       return localizedAppText(
-        key: 'msgOpenChatd2104ca3',
-        en: 'Open chat',
-        zhHans: '打开聊天',
+        key: 'msgViewProfile685ed0a4',
+        en: 'View Profile',
+        zhHans: '查看资料',
       );
     }
     if (isOffline) {

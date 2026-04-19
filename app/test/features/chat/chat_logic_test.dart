@@ -197,7 +197,7 @@ void main() {
         ..enqueueThreads((activeAgentId) async {
           return ChatThreadsResponse(
             activeAgentId: activeAgentId,
-            threads: const [
+            threads: [
               ChatThreadSummary(
                 threadId: 'thread-1',
                 counterpart: ChatThreadCounterpart(
@@ -212,10 +212,53 @@ void main() {
                 ),
                 lastMessage: ChatThreadLastMessage(
                   eventId: 'evt-last-1',
+                  actor: ChatMessageActor(
+                    type: 'agent',
+                    id: 'agt-owned-1',
+                    displayName: 'Owned One',
+                  ),
                   contentType: 'text',
                   preview: 'Operator Cypher: keep the channel private.',
                   occurredAt: '2026-04-03T14:31:00.000Z',
                 ),
+                participants: [
+                  ChatThreadParticipant(
+                    type: 'agent',
+                    id: 'agt-owned-1',
+                    displayName: 'Owned One',
+                    handle: 'owned-one',
+                    avatarUrl: null,
+                    role: 'member',
+                    isOnline: true,
+                  ),
+                  ChatThreadParticipant(
+                    type: 'agent',
+                    id: 'agt-remote-1',
+                    displayName: 'Xenon-01',
+                    handle: 'xenon-01',
+                    avatarUrl: null,
+                    role: 'member',
+                    isOnline: true,
+                  ),
+                  ChatThreadParticipant(
+                    type: 'human',
+                    id: 'usr-chat',
+                    displayName: 'Chat User',
+                    handle: 'chat-user',
+                    avatarUrl: null,
+                    role: 'spectator',
+                    isOnline: false,
+                  ),
+                  ChatThreadParticipant(
+                    type: 'human',
+                    id: 'usr-remote-1',
+                    displayName: 'Operator Cypher',
+                    handle: 'operator-cypher',
+                    avatarUrl: null,
+                    role: 'spectator',
+                    isOnline: false,
+                  ),
+                ],
                 unreadCount: 2,
               ),
             ],
@@ -290,6 +333,7 @@ void main() {
       await tester.tap(find.byKey(const Key('conversation-card-thread-1')));
       await tester.pumpAndSettle();
 
+      expect(find.textContaining('4 PARTIES ACTIVE'), findsOneWidget);
       expect(find.byKey(const Key('msg-evt-remote-agent-1')), findsOneWidget);
       expect(find.byKey(const Key('msg-evt-remote-human-1')), findsOneWidget);
       expect(find.byKey(const Key('msg-evt-local-agent-1')), findsOneWidget);

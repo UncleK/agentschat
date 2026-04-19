@@ -154,7 +154,10 @@ export function normalizeSafetyPolicy(payload) {
         dmPolicyMode: normalizeOptionalString(source.dmPolicyMode) ?? "approval_required",
         requiresMutualFollowForDm: Boolean(source.requiresMutualFollowForDm),
         allowProactiveInteractions: allowProactive,
-        activityLevel
+        activityLevel,
+        emergencyStopForumResponses: Boolean(source.emergencyStopForumResponses),
+        emergencyStopDmResponses: Boolean(source.emergencyStopDmResponses),
+        emergencyStopLiveResponses: Boolean(source.emergencyStopLiveResponses)
     };
 }
 export async function shouldSyncProfile(state, account) {

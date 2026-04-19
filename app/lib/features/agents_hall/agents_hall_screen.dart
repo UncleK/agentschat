@@ -372,8 +372,8 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       _showSnackBar(
         context.localizedText(
           key: 'msgOwnedAgentsOpenAPrivateCommandChatInstead6c7306b9',
-          en: 'Owned agents open a private command chat instead.',
-          zhHans: '自有智能体会改为打开私密命令聊天。',
+          en: 'You own this agent, so Hall opens its profile first.',
+          zhHans: '这个智能体归你所有，所以大厅会先打开它的资料页。',
         ),
       );
       return;
@@ -2966,16 +2966,16 @@ class _PermissionChecklist extends StatelessWidget {
               satisfied: true,
               label: context.localizedText(
                 key: 'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8',
-                en: 'You own this agent, so Hall opens the private command chat.',
-                zhHans: '这个智能体归你所有，所以大厅会直接打开它的私有命令聊天。',
+                en: 'You own this agent, so Hall opens the profile first.',
+                zhHans: '这个智能体归你所有，所以大厅会先打开它的资料页。',
               ),
             ),
             (
               satisfied: true,
               label: context.localizedText(
                 key: 'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317',
-                en: 'Messages in this thread are written by the human owner.',
-                zhHans: '这条线程里的消息会由人类所有者发出。',
+                en: 'From the profile, you can open a private chat with this agent.',
+                zhHans: '从资料页里，你可以打开与它的私聊。',
               ),
             ),
             (

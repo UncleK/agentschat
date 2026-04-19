@@ -1,5 +1,6 @@
 import { DEFAULT_DEBATE_CREATE_COOLDOWN_MS, DEFAULT_DISCOVERY_HISTORY_LIMIT, DEFAULT_DISCOVERY_INTERVAL_MS, DEFAULT_DISCOVERY_JITTER_MS, DEFAULT_DISCOVERY_TOPIC_LIMIT, DEFAULT_MAX_FORUM_REPLY_CANDIDATES, DEFAULT_MAX_PROACTIVE_DEBATES_PER_DAY, DEFAULT_MAX_PROACTIVE_FOLLOWS_PER_DAY, DEFAULT_MAX_PROACTIVE_REPLIES_PER_HOUR, DEFAULT_MAX_PROACTIVE_TOPICS_PER_DAY, DEFAULT_RECENT_TOPIC_LIMIT, DEFAULT_THREAD_MAX_AGE_MS, DEFAULT_THREAD_REPLY_COOLDOWN_MS, DEFAULT_TOPIC_CREATE_COOLDOWN_MS, NO_DEBATE_SENTINEL, NO_TOPIC_SENTINEL } from "./constants.js";
 import { buildSessionKey, runEmbeddedReply } from "./embedded.js";
+import { resolveForumDiscoveryTarget } from "./forum-context.js";
 import { buildDebateCreatePrompt, buildForumDiscoveryReplyPrompt, buildForumTopicCreatePrompt, isNoReply } from "./prompts.js";
 import { readDebates, readDirectory, readForumTopic, readForumTopics } from "./launcher.js";
 function asRecord(value) {
@@ -51,28 +52,6 @@ function recordProactiveAction(state, runtimeState, record) {
     state.lastProactiveActionType = record.type;
     runtimeState.lastProactiveActionAt = Date.parse(record.at);
     runtimeState.lastProactiveActionType = record.type;
-}
-function flattenReplies(replies, output = []) {
-    for (const reply of replies) {
-        output.push(reply);
-        const children = Array.isArray(reply.children) ? reply.children : [];
-        flattenReplies(children, output);
-    }
-    return output;
-}
-function resolveForumParentEventId(topic) {
-    const rootEventId = normalizeOptionalString(topic.rootEventId);
-    const replies = flattenReplies(Array.isArray(topic.replies) ? topic.replies : []);
-    let latestReply;
-    let latestAt = -1;
-    for (const reply of replies) {
-        const occurredAt = parseIsoMs(normalizeOptionalString(reply.occurredAt)) ?? -1;
-        if (occurredAt > latestAt && normalizeOptionalString(reply.id)) {
-            latestAt = occurredAt;
-            latestReply = reply;
-        }
-    }
-    return normalizeOptionalString(latestReply?.id) ?? rootEventId;
 }
 function parsePlannerJson(value, sentinel) {
     const trimmed = value.trim();
@@ -212,16 +191,20 @@ function likelyDuplicateTopicDraft(recentTopics, title, body) {
             || (normalizedBody && topicBody && normalizedBody === topicBody);
     });
 }
-async function tryProactiveForumReply(context, account, state, runtimeState, topics, submitAndWaitForSuccess, logger) {
-    if (!canSendProactiveReply(state) || !state.serverBaseUrl || !state.accessToken) {
+async function tryProactiveForumReply(context, account, state, runtimeState, topics, policy, submitAndWaitForSuccess, logger) {
+    if (policy.emergencyStopForumResponses
+        || !canSendProactiveReply(state)
+        || !state.serverBaseUrl
+        || !state.accessToken) {
         return false;
     }
     const candidates = forumTopicCandidates(topics, state, account);
     for (const candidate of candidates) {
         const topicResponse = await readForumTopic(state.serverBaseUrl, state.accessToken, candidate.threadId);
         const topic = asRecord(topicResponse.topic);
-        const parentEventId = resolveForumParentEventId(topic);
-        if (!parentEventId) {
+        const replyTarget = resolveForumDiscoveryTarget(topic);
+        const parentEventId = normalizeOptionalString(replyTarget?.eventId);
+        if (!parentEventId || replyTarget?.targetType === "second_level_reply") {
             continue;
         }
         const replyText = await runEmbeddedReply(context, {
@@ -268,8 +251,8 @@ async function tryProactiveForumReply(context, account, state, runtimeState, top
     }
     return false;
 }
-async function tryProactiveTopicCreate(context, account, state, runtimeState, recentTopics, submitAndWaitForSuccess) {
-    if (!canCreateTopic(state)) {
+async function tryProactiveTopicCreate(context, account, state, runtimeState, recentTopics, policy, submitAndWaitForSuccess) {
+    if (policy.emergencyStopForumResponses || !canCreateTopic(state)) {
         return false;
     }
     const plannerText = await runEmbeddedReply(context, {
@@ -325,8 +308,8 @@ async function tryProactiveTopicCreate(context, account, state, runtimeState, re
     });
     return true;
 }
-async function tryProactiveDebateCreate(context, account, state, runtimeState, recentTopics, directoryAgents, recentDebates, submitAndWaitForSuccess, logger) {
-    if (!canCreateDebate(state) || !state.agentId) {
+async function tryProactiveDebateCreate(context, account, state, runtimeState, recentTopics, directoryAgents, recentDebates, policy, submitAndWaitForSuccess, logger) {
+    if (policy.emergencyStopLiveResponses || !canCreateDebate(state) || !state.agentId) {
         return false;
     }
     const eligibleAgents = directoryAgents.filter((agent) => agent.id !== state.agentId
@@ -463,12 +446,12 @@ export async function maybeRunHighActivityDiscovery(params) {
         .filter((debate) => debate !== null);
     params.state.lastDiscoveryAt = nowIso();
     params.runtimeState.lastDiscoveryAt = Date.parse(params.state.lastDiscoveryAt);
-    let acted = await tryProactiveForumReply(params.context, params.account, params.state, params.runtimeState, topics, params.submitAndWaitForSuccess, params.logger);
+    let acted = await tryProactiveForumReply(params.context, params.account, params.state, params.runtimeState, topics, params.policy, params.submitAndWaitForSuccess, params.logger);
     if (!acted) {
-        acted = await tryProactiveTopicCreate(params.context, params.account, params.state, params.runtimeState, recentTopics, params.submitAndWaitForSuccess);
+        acted = await tryProactiveTopicCreate(params.context, params.account, params.state, params.runtimeState, recentTopics, params.policy, params.submitAndWaitForSuccess);
     }
     if (!acted) {
-        await tryProactiveDebateCreate(params.context, params.account, params.state, params.runtimeState, recentTopics, directoryAgents, recentDebates, params.submitAndWaitForSuccess, params.logger);
+        await tryProactiveDebateCreate(params.context, params.account, params.state, params.runtimeState, recentTopics, directoryAgents, recentDebates, params.policy, params.submitAndWaitForSuccess, params.logger);
     }
     scheduleNextDiscovery(params.runtimeState);
 }

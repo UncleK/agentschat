@@ -1,5 +1,6 @@
 import { DEFAULT_DISCOVERY_INTERVAL_MS, DEFAULT_DISCOVERY_JITTER_MS, DEFAULT_MANAGER_INTERVAL_MS, DEFAULT_POLL_BACKOFF_SECONDS, DEFAULT_POLL_WAIT_SECONDS, DEFAULT_SAFETY_POLICY_REFRESH_MS } from "./constants.js";
 import { buildSessionKey, runEmbeddedReply } from "./embedded.js";
+import { resolveForumDeliveryTarget } from "./forum-context.js";
 import { buildDebatePrompt, buildDebateSpectatorPrompt, buildDmPrompt, buildForumPrompt, isNoReply } from "./prompts.js";
 import { maybeRunHighActivityDiscovery } from "./worker-discovery.js";
 import { accountFingerprint, isConfiguredAgentsChatAccount, listAgentsChatAccounts } from "./config.js";
@@ -43,7 +44,10 @@ function fallbackSafetyPolicy(state) {
         dmPolicyMode: "followers_only",
         requiresMutualFollowForDm: false,
         allowProactiveInteractions: true,
-        activityLevel: "normal"
+        activityLevel: "normal",
+        emergencyStopForumResponses: false,
+        emergencyStopDmResponses: false,
+        emergencyStopLiveResponses: false
     };
 }
 function effectiveActivityLevel(policy) {
@@ -51,6 +55,15 @@ function effectiveActivityLevel(policy) {
         return "low";
     }
     return policy.activityLevel;
+}
+function isEmergencyStopEnabled(policy, surface) {
+    if (surface === "forum") {
+        return policy.emergencyStopForumResponses === true;
+    }
+    if (surface === "dm") {
+        return policy.emergencyStopDmResponses === true;
+    }
+    return policy.emergencyStopLiveResponses === true;
 }
 function normalizeActorType(value) {
     return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -193,7 +206,8 @@ async function processDmDelivery(context, account, state, delivery, safetyPolicy
     const messagesResponse = await readDmThreadMessages(state.serverBaseUrl, state.accessToken, threadId);
     const messages = extractMessages(messagesResponse).slice(-24);
     const activityLevel = effectiveActivityLevel(safetyPolicy);
-    if (shouldIgnoreForHumanConversationGate(event, activityLevel, "dm")) {
+    if (isEmergencyStopEnabled(safetyPolicy, "dm")
+        || shouldIgnoreForHumanConversationGate(event, activityLevel, "dm")) {
         return;
     }
     const replyText = await runEmbeddedReply(context, {
@@ -233,13 +247,18 @@ async function processForumDelivery(context, account, state, delivery, safetyPol
         throw new Error("Forum delivery is missing required connection fields.");
     }
     const activityLevel = effectiveActivityLevel(safetyPolicy);
-    if (!allowsSurfaceReplies(activityLevel, "forum")
+    if (isEmergencyStopEnabled(safetyPolicy, "forum")
+        || !allowsSurfaceReplies(activityLevel, "forum")
         || isSelfAgentActor(event, state)
         || shouldIgnoreForHumanConversationGate(event, activityLevel, "forum")) {
         return;
     }
     const topicResponse = await readForumTopic(state.serverBaseUrl, state.accessToken, threadId);
     const topic = asRecord(topicResponse.topic);
+    const replyTarget = resolveForumDeliveryTarget(topic, event);
+    if (replyTarget.targetType === "second_level_reply") {
+        return;
+    }
     const replyText = await runEmbeddedReply(context, {
         account,
         kind: "forum",
@@ -292,7 +311,8 @@ async function processDebateSpectatorDelivery(context, account, state, delivery,
         throw new Error("Live delivery is missing required connection fields.");
     }
     const activityLevel = effectiveActivityLevel(safetyPolicy);
-    if (!allowsSurfaceReplies(activityLevel, "live")
+    if (isEmergencyStopEnabled(safetyPolicy, "live")
+        || !allowsSurfaceReplies(activityLevel, "live")
         || isSelfAgentActor(event, state)
         || shouldIgnoreForHumanConversationGate(event, activityLevel, "live")) {
         return;
@@ -342,6 +362,9 @@ async function processDebateDelivery(context, account, state, delivery, safetyPo
     }
     const debate = unwrapDebate(await readDebate(state.serverBaseUrl, debateSessionId));
     const activityLevel = effectiveActivityLevel(safetyPolicy);
+    if (isEmergencyStopEnabled(safetyPolicy, "live")) {
+        return;
+    }
     const turnText = await runEmbeddedReply(context, {
         account,
         kind: "debate",

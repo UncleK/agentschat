@@ -447,9 +447,11 @@ class _HubScreenState extends State<HubScreen> {
 
     setState(() {
       if (_applyAgentSecurityToAll) {
-        _globalAgentSafetyDraft = preset.policy;
+        _globalAgentSafetyDraft = preset.applyTo(_effectiveAgentSafety(agent));
       } else {
-        _agentSafetyOverrides[agent.id] = preset.policy;
+        _agentSafetyOverrides[agent.id] = preset.applyTo(
+          _effectiveAgentSafety(agent),
+        );
       }
     });
   }
@@ -474,7 +476,7 @@ class _HubScreenState extends State<HubScreen> {
 
     await _saveAgentSecurity(
       viewModel: viewModel,
-      buildNext: (_) => preset.policy,
+      buildNext: (current) => preset.applyTo(current),
       successMessage: _applyAgentSecurityToAll
           ? context.localizedText(
               key: 'msgAppliedTheAutonomyLevelToAllOwnedAgents27f7f616',
@@ -1726,6 +1728,7 @@ class _OwnedAgentCommandSheet extends StatefulWidget {
 class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
   static const Duration _refreshInterval = Duration(seconds: 3);
   static const double _bottomSnapThreshold = 96;
+  static const String _noReplySentinel = 'NO_REPLY';
 
   late final TextEditingController _composerController;
   late final FocusNode _composerFocusNode;
@@ -2132,7 +2135,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
 
     setState(() {
       _threadId = threadId;
-      _messages = response.messages.map(_mapMessage).toList(growable: false);
+      _messages = _mapVisibleMessages(response.messages);
       _isLoadingThread = false;
       _loadError = null;
     });
@@ -2177,9 +2180,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         return;
       }
 
-      final nextMessages = response.messages
-          .map(_mapMessage)
-          .toList(growable: false);
+      final nextMessages = _mapVisibleMessages(response.messages);
       if (!_messagesChanged(nextMessages)) {
         return;
       }
@@ -2237,7 +2238,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
           return;
         }
         setState(() {
-          _messages = [..._messages, _mapMessage(response.message)];
+          final mappedMessage = _mapMessage(response.message);
+          _messages = mappedMessage == null
+              ? _messages
+              : [..._messages, mappedMessage];
           _isSendingMessage = false;
           _sendError = null;
         });
@@ -2263,9 +2267,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         }
         setState(() {
           _threadId = createdThreadId;
-          _messages = messagesResponse.messages
-              .map(_mapMessage)
-              .toList(growable: false);
+          _messages = _mapVisibleMessages(messagesResponse.messages);
           _isSendingMessage = false;
           _sendError = null;
           _loadError = null;
@@ -2360,7 +2362,19 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     });
   }
 
-  _OwnedAgentCommandMessage _mapMessage(ChatMessageRecord message) {
+  List<_OwnedAgentCommandMessage> _mapVisibleMessages(
+    Iterable<ChatMessageRecord> messages,
+  ) {
+    return messages
+        .map(_mapMessage)
+        .whereType<_OwnedAgentCommandMessage>()
+        .toList(growable: false);
+  }
+
+  _OwnedAgentCommandMessage? _mapMessage(ChatMessageRecord message) {
+    if (_shouldSuppressAgentMessage(message)) {
+      return null;
+    }
     final currentHumanId = _currentHumanId;
     final isHuman = message.actor.type.toLowerCase() == 'human';
     final isLocal = isHuman && message.actor.id == currentHumanId;
@@ -2385,6 +2399,15 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       isHuman: isHuman,
       isLocal: isLocal,
     );
+  }
+
+  bool _shouldSuppressAgentMessage(ChatMessageRecord message) {
+    return message.actor.type.toLowerCase() == 'agent' &&
+        _isNoReplySentinel(message.content);
+  }
+
+  bool _isNoReplySentinel(String? value) {
+    return (value ?? '').trim().toUpperCase() == _noReplySentinel;
   }
 
   String _timestampLabel(String value) {
@@ -3356,7 +3379,7 @@ class _OwnedAgentCommandBubbleBody extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       message.body,
-                      textAlign: isRemote ? TextAlign.left : TextAlign.right,
+                      textAlign: TextAlign.justify,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontSize: 13.5,
                         height: 1.42,

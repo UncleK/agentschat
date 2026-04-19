@@ -246,7 +246,10 @@ export function normalizeSafetyPolicy(payload: unknown): AgentsChatSafetyPolicy 
     dmPolicyMode: normalizeOptionalString(source.dmPolicyMode) ?? "approval_required",
     requiresMutualFollowForDm: Boolean(source.requiresMutualFollowForDm),
     allowProactiveInteractions: allowProactive,
-    activityLevel
+    activityLevel,
+    emergencyStopForumResponses: Boolean(source.emergencyStopForumResponses),
+    emergencyStopDmResponses: Boolean(source.emergencyStopDmResponses),
+    emergencyStopLiveResponses: Boolean(source.emergencyStopLiveResponses)
   };
 }
 

@@ -82,6 +82,17 @@ interface DirectMessageCounterpartDto {
   agentFollowsViewer: boolean;
 }
 
+interface DirectMessageThreadParticipantDto {
+  type: SubjectType;
+  id: string;
+  displayName: string;
+  handle: string | null;
+  avatarUrl: string | null;
+  avatarEmoji: string | null;
+  isOnline: boolean;
+  role: ThreadParticipantRole;
+}
+
 type DirectMessageThreadUsage = 'network_dm' | 'owned_agent_command';
 
 interface DirectMessageAssetDto {
@@ -97,6 +108,14 @@ interface DirectMessageActorDto {
   type: SubjectType;
   id: string;
   displayName: string;
+}
+
+interface DirectMessageThreadLastMessageDto {
+  eventId: string;
+  actor: DirectMessageActorDto;
+  contentType: EventContentType;
+  preview: string;
+  occurredAt: string;
 }
 
 interface ForumTopicCreateInput extends AuthoredContentInput {
@@ -310,6 +329,7 @@ export class ContentService {
     );
     const pageEvents = latestEvents.slice(0, limit);
     const threadIds = pageEvents.map((event) => event.threadId);
+    const latestEventIds = pageEvents.map((event) => event.eventId);
     const participants =
       threadIds.length === 0
         ? []
@@ -323,6 +343,21 @@ export class ContentService {
             },
           });
     const participantsByThreadId = new Map<string, ThreadParticipantEntity[]>();
+    const latestEventEntities =
+      latestEventIds.length === 0
+        ? []
+        : await this.eventRepository.find({
+            where: {
+              id: In(latestEventIds),
+            },
+            relations: {
+              actorAgent: true,
+              actorUser: true,
+            },
+          });
+    const latestEventById = new Map(
+      latestEventEntities.map((event) => [event.id, event] as const),
+    );
     const unreadCountsByThreadId = await this.readDirectMessageUnreadCounts(
       humanViewerId,
       activeAgentId,
@@ -375,25 +410,36 @@ export class ContentService {
 
     return {
       activeAgentId,
-      threads: pageEvents.map((event) => ({
-        threadId: event.threadId,
-        threadUsage: threadUsageByThreadId.get(event.threadId) ?? 'network_dm',
-        counterpart: this.serializeDirectMessageCounterpart(
-          counterpartByThreadId.get(event.threadId)!,
-          viewerFollowedAgentIds,
-          agentFollowerIds,
-        ),
-        lastMessage: {
-          eventId: event.eventId,
-          contentType: event.contentType,
-          preview: this.buildDirectMessagePreview(
-            event.contentType,
-            event.content,
+      threads: pageEvents.map((event) => {
+        const latestEvent = latestEventById.get(event.eventId);
+        if (!latestEvent) {
+          throw new NotFoundException(
+            `Direct message event ${event.eventId} was not found.`,
+          );
+        }
+
+        const threadParticipants =
+          participantsByThreadId.get(event.threadId) ?? [];
+
+        return {
+          threadId: event.threadId,
+          threadUsage:
+            threadUsageByThreadId.get(event.threadId) ?? 'network_dm',
+          counterpart: this.serializeDirectMessageCounterpart(
+            counterpartByThreadId.get(event.threadId)!,
+            viewerFollowedAgentIds,
+            agentFollowerIds,
           ),
-          occurredAt: event.occurredAt.toISOString(),
-        },
-        unreadCount: unreadCountsByThreadId.get(event.threadId) ?? 0,
-      })),
+          participants: threadParticipants.map((participant) =>
+            this.serializeDirectMessageParticipant(participant),
+          ),
+          lastMessage: this.serializeDirectMessageThreadLastMessage(
+            event,
+            latestEvent,
+          ),
+          unreadCount: unreadCountsByThreadId.get(event.threadId) ?? 0,
+        };
+      }),
       nextCursor:
         latestEvents.length > limit && pageEvents.length > 0
           ? this.encodeDirectMessageCursor(pageEvents.at(-1)!)
@@ -778,10 +824,7 @@ export class ContentService {
     const viewerLikeKey =
       viewerLikeActor == null
         ? null
-        : this.forumReplyLikeSubject(
-            viewerLikeActor.type,
-            viewerLikeActor.id,
-          );
+        : this.forumReplyLikeSubject(viewerLikeActor.type, viewerLikeActor.id);
     const replies = this.buildForumReplyTree(
       events.filter((event) => event.id !== rootEvent.id),
       rootEvent.id,
@@ -859,6 +902,7 @@ export class ContentService {
     input: ForumTopicCreateInput,
   ) {
     await this.moderationService.assertActorAllowed(actor);
+    await this.assertAgentSurfaceResponseAllowed(actor, 'forum');
 
     const title = this.requiredString(input.title, 'title');
     const tags = this.normalizeTags(input.tags);
@@ -928,6 +972,7 @@ export class ContentService {
     input: ForumReplyCreateInput,
   ) {
     await this.moderationService.assertActorAllowed(actor);
+    await this.assertAgentSurfaceResponseAllowed(actor, 'forum');
 
     const threadId = this.requiredString(input.threadId, 'threadId');
     const thread = await this.threadRepository.findOneBy({
@@ -963,6 +1008,12 @@ export class ContentService {
         `Parent event ${parentEventId} was not found.`,
       );
     }
+
+    await this.assertForumReplyTargetDepth(
+      threadId,
+      topicView.rootEventId,
+      parentEvent,
+    );
 
     const authoredContent = await this.normalizeContentInput(input);
 
@@ -1074,6 +1125,13 @@ export class ContentService {
       type: SubjectType.Agent,
       id: actorAgentId,
     });
+    await this.assertAgentSurfaceResponseAllowed(
+      {
+        type: SubjectType.Agent,
+        id: actorAgentId,
+      },
+      'live',
+    );
 
     const debateSessionId = this.requiredString(
       input.debateSessionId,
@@ -1165,6 +1223,7 @@ export class ContentService {
     input: DebateSpectatorPostInput,
   ) {
     await this.moderationService.assertActorAllowed(actor);
+    await this.assertAgentSurfaceResponseAllowed(actor, 'live');
 
     const debateSessionId = this.requiredString(
       input.debateSessionId,
@@ -1223,6 +1282,7 @@ export class ContentService {
     idempotencyKey?: string | null,
   ) {
     await this.moderationService.assertActorAllowed(actor);
+    await this.assertAgentSurfaceResponseAllowed(actor, 'dm');
 
     const authoredContent = await this.normalizeContentInput(input);
 
@@ -1330,6 +1390,37 @@ export class ContentService {
     }
   }
 
+  private async assertAgentSurfaceResponseAllowed(
+    actor: SubjectReference,
+    surface: 'forum' | 'dm' | 'live',
+  ): Promise<void> {
+    if (actor.type !== SubjectType.Agent) {
+      return;
+    }
+
+    const agent = await this.agentRepository.findOneBy({ id: actor.id });
+    if (!agent) {
+      throw new NotFoundException(`Agent ${actor.id} was not found.`);
+    }
+
+    const metadata = agent.profileMetadata ?? {};
+    if (surface === 'forum' && metadata['emergencyStopForumResponses'] === true) {
+      throw new ForbiddenException(
+        'Agent emergency stop blocks forum responses.',
+      );
+    }
+    if (surface === 'dm' && metadata['emergencyStopDmResponses'] === true) {
+      throw new ForbiddenException(
+        'Agent emergency stop blocks direct-message responses.',
+      );
+    }
+    if (surface === 'live' && metadata['emergencyStopLiveResponses'] === true) {
+      throw new ForbiddenException(
+        'Agent emergency stop blocks live responses.',
+      );
+    }
+  }
+
   private async assertHumanForumReplyTarget(
     threadId: string,
     parentEventId: string,
@@ -1369,6 +1460,69 @@ export class ContentService {
         'Humans may only reply to first-level forum replies.',
       );
     }
+  }
+
+  private async assertForumReplyTargetDepth(
+    threadId: string,
+    rootEventId: string,
+    parentEvent: EventEntity,
+  ): Promise<void> {
+    const parentDepth = await this.readForumReplyDepth(
+      threadId,
+      rootEventId,
+      parentEvent,
+    );
+
+    if (parentDepth >= 2) {
+      throw new ForbiddenException(
+        'Forum replies may only be nested two levels deep.',
+      );
+    }
+  }
+
+  private async readForumReplyDepth(
+    threadId: string,
+    rootEventId: string,
+    event: EventEntity,
+  ): Promise<number> {
+    let depth = 0;
+    let currentEvent: EventEntity | null = event;
+
+    while (currentEvent != null) {
+      if (currentEvent.id === rootEventId) {
+        return depth;
+      }
+
+      if (currentEvent.eventType !== 'forum.reply.create') {
+        throw new ForbiddenException(
+          'Forum replies must target the topic root or another forum reply.',
+        );
+      }
+
+      depth += 1;
+
+      const nextParentEventId = currentEvent.parentEventId;
+      if (!nextParentEventId) {
+        throw new ForbiddenException('Forum reply chain is malformed.');
+      }
+
+      if (nextParentEventId === rootEventId) {
+        return depth;
+      }
+
+      currentEvent = await this.eventRepository.findOneBy({
+        id: nextParentEventId,
+        threadId,
+      });
+
+      if (!currentEvent) {
+        throw new NotFoundException(
+          `Parent event ${nextParentEventId} was not found.`,
+        );
+      }
+    }
+
+    return depth;
   }
 
   private async readLatestDirectMessageEvents(
@@ -1664,8 +1818,10 @@ ${selfAuthoredFilter}
     viewerLikeKey: string | null,
   ): ForumReplyDto[] {
     const replyById = new Map<string, ForumReplyDto>();
+    const eventById = new Map<string, EventEntity>();
 
     for (const event of replyEvents) {
+      eventById.set(event.id, event);
       replyById.set(event.id, this.serializeForumReply(event, viewerLikeKey));
     }
 
@@ -1676,12 +1832,18 @@ ${selfAuthoredFilter}
         continue;
       }
 
-      if (!event.parentEventId || event.parentEventId === rootEventId) {
+      const displayParentId = this.resolveForumReplyDisplayParentId(
+        event,
+        eventById,
+        rootEventId,
+      );
+
+      if (!displayParentId) {
         topLevelReplies.push(reply);
         continue;
       }
 
-      const parentReply = replyById.get(event.parentEventId);
+      const parentReply = replyById.get(displayParentId);
       if (!parentReply) {
         topLevelReplies.push(reply);
         continue;
@@ -1691,6 +1853,37 @@ ${selfAuthoredFilter}
     }
 
     return topLevelReplies.map((reply) => this.decorateForumReply(reply));
+  }
+
+  private resolveForumReplyDisplayParentId(
+    event: EventEntity,
+    eventById: ReadonlyMap<string, EventEntity>,
+    rootEventId: string,
+  ): string | null {
+    let parentEventId = event.parentEventId;
+
+    if (!parentEventId || parentEventId === rootEventId) {
+      return null;
+    }
+
+    let parentEvent = eventById.get(parentEventId);
+    if (!parentEvent || parentEvent.eventType !== 'forum.reply.create') {
+      return null;
+    }
+
+    while (
+      parentEvent.parentEventId &&
+      parentEvent.parentEventId !== rootEventId
+    ) {
+      parentEventId = parentEvent.parentEventId;
+      parentEvent = eventById.get(parentEventId);
+
+      if (!parentEvent || parentEvent.eventType !== 'forum.reply.create') {
+        return null;
+      }
+    }
+
+    return parentEvent.id;
   }
 
   private serializeForumReply(
@@ -2038,6 +2231,53 @@ ${selfAuthoredFilter}
       isOnline: false,
       viewerFollowsAgent: false,
       agentFollowsViewer: false,
+    };
+  }
+
+  private serializeDirectMessageParticipant(
+    participant: ThreadParticipantEntity,
+  ): DirectMessageThreadParticipantDto {
+    if (participant.participantType === SubjectType.Agent) {
+      const avatarEmojiValue = participant.agent?.profileMetadata?.avatarEmoji;
+      return {
+        type: SubjectType.Agent,
+        id: participant.participantSubjectId,
+        displayName: participant.agent?.displayName ?? 'Unknown agent',
+        handle: participant.agent?.handle ?? null,
+        avatarUrl: participant.agent?.avatarUrl ?? null,
+        avatarEmoji:
+          typeof avatarEmojiValue === 'string' && avatarEmojiValue.trim()
+            ? avatarEmojiValue.trim()
+            : null,
+        isOnline:
+          participant.agent?.status === AgentStatus.Online ||
+          participant.agent?.status === AgentStatus.Debating,
+        role: participant.role,
+      };
+    }
+
+    return {
+      type: SubjectType.Human,
+      id: participant.participantSubjectId,
+      displayName: participant.user?.displayName ?? 'Unknown human',
+      handle: participant.user?.username ?? null,
+      avatarUrl: participant.user?.avatarUrl ?? null,
+      avatarEmoji: null,
+      isOnline: false,
+      role: participant.role,
+    };
+  }
+
+  private serializeDirectMessageThreadLastMessage(
+    row: DirectMessageThreadEventRow,
+    event: EventEntity,
+  ): DirectMessageThreadLastMessageDto {
+    return {
+      eventId: row.eventId,
+      actor: this.serializeDirectMessageActor(event),
+      contentType: row.contentType,
+      preview: this.buildDirectMessagePreview(row.contentType, row.content),
+      occurredAt: row.occurredAt.toISOString(),
     };
   }
 

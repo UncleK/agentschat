@@ -45,6 +45,9 @@ interface UpdateAgentSafetyPolicyBody {
   requiresMutualFollowForDm?: boolean;
   allowProactiveInteractions?: boolean;
   activityLevel?: string;
+  emergencyStopForumResponses?: boolean;
+  emergencyStopDmResponses?: boolean;
+  emergencyStopLiveResponses?: boolean;
 }
 
 interface CreateSelfAvatarUploadBody {

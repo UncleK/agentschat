@@ -2181,7 +2181,25 @@ int _replyGraphDepth(List<ForumReplyModel> replies) {
       maxDepth = depth;
     }
   }
-  return maxDepth;
+  return maxDepth > 2 ? 2 : maxDepth;
+}
+
+List<ForumReplyModel> _flattenNestedRepliesForDisplay(
+  List<ForumReplyModel> replies,
+) {
+  final flattenedReplies = <ForumReplyModel>[];
+
+  void visit(List<ForumReplyModel> branch) {
+    for (final reply in branch) {
+      flattenedReplies.add(reply.copyWith(children: const <ForumReplyModel>[]));
+      if (reply.children.isNotEmpty) {
+        visit(reply.children);
+      }
+    }
+  }
+
+  visit(replies);
+  return flattenedReplies;
 }
 
 (List<ForumReplyModel>, bool) _insertReplyIntoBranch(
@@ -2904,29 +2922,36 @@ class _NestedReplyBranchState extends State<_NestedReplyBranch> {
 
   late int _visibleCount;
 
+  int get _flattenedReplyCount =>
+      _flattenNestedRepliesForDisplay(widget.replies).length;
+
   @override
   void initState() {
     super.initState();
-    _visibleCount = _initialVisibleCount(widget.replies.length);
+    _visibleCount = _initialVisibleCount(_flattenedReplyCount);
   }
 
   @override
   void didUpdateWidget(covariant _NestedReplyBranch oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.replies.length <= _pageSize &&
-        widget.replies.length > _pageSize) {
+    final oldReplyCount = _flattenNestedRepliesForDisplay(
+      oldWidget.replies,
+    ).length;
+    final nextReplyCount = _flattenedReplyCount;
+
+    if (oldReplyCount <= _pageSize && nextReplyCount > _pageSize) {
       _visibleCount = _pageSize;
       return;
     }
 
-    if (_visibleCount > widget.replies.length) {
-      _visibleCount = widget.replies.length;
+    if (_visibleCount > nextReplyCount) {
+      _visibleCount = nextReplyCount;
       return;
     }
 
-    if (_visibleCount == 0 && widget.replies.isNotEmpty) {
-      _visibleCount = _initialVisibleCount(widget.replies.length);
+    if (_visibleCount == 0 && nextReplyCount > 0) {
+      _visibleCount = _initialVisibleCount(nextReplyCount);
     }
   }
 
@@ -2938,17 +2963,18 @@ class _NestedReplyBranchState extends State<_NestedReplyBranch> {
     setState(() {
       _visibleCount = (_visibleCount + _pageSize).clamp(
         0,
-        widget.replies.length,
+        _flattenedReplyCount,
       );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final visibleReplies = widget.replies
+    final flattenedReplies = _flattenNestedRepliesForDisplay(widget.replies);
+    final visibleReplies = flattenedReplies
         .take(_visibleCount)
         .toList(growable: false);
-    final remainingReplies = widget.replies.length - visibleReplies.length;
+    final remainingReplies = flattenedReplies.length - visibleReplies.length;
 
     return DecoratedBox(
       decoration: BoxDecoration(

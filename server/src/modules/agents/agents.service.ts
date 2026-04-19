@@ -64,6 +64,9 @@ interface UpdateAgentSafetyPolicyInput {
   requiresMutualFollowForDm?: boolean;
   allowProactiveInteractions?: boolean;
   activityLevel?: string;
+  emergencyStopForumResponses?: boolean;
+  emergencyStopDmResponses?: boolean;
+  emergencyStopLiveResponses?: boolean;
 }
 
 export interface AgentSafetyPolicySummary {
@@ -71,6 +74,9 @@ export interface AgentSafetyPolicySummary {
   requiresMutualFollowForDm: boolean;
   allowProactiveInteractions: boolean;
   activityLevel: AgentActivityLevel;
+  emergencyStopForumResponses: boolean;
+  emergencyStopDmResponses: boolean;
+  emergencyStopLiveResponses: boolean;
 }
 
 export interface AgentSummary {
@@ -824,6 +830,18 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       input.allowProactiveInteractions,
       'allowProactiveInteractions',
     );
+    const emergencyStopForumResponses = this.parseOptionalBooleanField(
+      input.emergencyStopForumResponses,
+      'emergencyStopForumResponses',
+    );
+    const emergencyStopDmResponses = this.parseOptionalBooleanField(
+      input.emergencyStopDmResponses,
+      'emergencyStopDmResponses',
+    );
+    const emergencyStopLiveResponses = this.parseOptionalBooleanField(
+      input.emergencyStopLiveResponses,
+      'emergencyStopLiveResponses',
+    );
 
     await this.dataSource.transaction(async (manager) => {
       const agentRepository = manager.getRepository(AgentEntity);
@@ -865,6 +883,34 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
           'dmRequiresMutualFollow',
           requiresMutualFollowForDm,
         );
+      }
+      if (emergencyStopForumResponses !== undefined) {
+        agent.profileMetadata = this.setBooleanMetadata(
+          agent.profileMetadata,
+          'emergencyStopForumResponses',
+          emergencyStopForumResponses,
+        );
+      }
+      if (emergencyStopDmResponses !== undefined) {
+        agent.profileMetadata = this.setBooleanMetadata(
+          agent.profileMetadata,
+          'emergencyStopDmResponses',
+          emergencyStopDmResponses,
+        );
+      }
+      if (emergencyStopLiveResponses !== undefined) {
+        agent.profileMetadata = this.setBooleanMetadata(
+          agent.profileMetadata,
+          'emergencyStopLiveResponses',
+          emergencyStopLiveResponses,
+        );
+      }
+      if (
+        requiresMutualFollowForDm !== undefined ||
+        emergencyStopForumResponses !== undefined ||
+        emergencyStopDmResponses !== undefined ||
+        emergencyStopLiveResponses !== undefined
+      ) {
         await agentRepository.save(agent);
       }
     });
@@ -1485,6 +1531,18 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       ),
       allowProactiveInteractions: activityLevel !== AgentActivityLevel.Low,
       activityLevel,
+      emergencyStopForumResponses: this.readBooleanMetadata(
+        agent.profileMetadata,
+        'emergencyStopForumResponses',
+      ),
+      emergencyStopDmResponses: this.readBooleanMetadata(
+        agent.profileMetadata,
+        'emergencyStopDmResponses',
+      ),
+      emergencyStopLiveResponses: this.readBooleanMetadata(
+        agent.profileMetadata,
+        'emergencyStopLiveResponses',
+      ),
     };
   }
 

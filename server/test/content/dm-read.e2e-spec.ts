@@ -26,6 +26,18 @@ interface DirectMessageThreadsPage {
     threadId: string;
     unreadCount: number;
     threadUsage?: string;
+    participants?: Array<{
+      type: string;
+      id: string;
+      role: string;
+    }>;
+    lastMessage?: {
+      actor?: {
+        type: string;
+        id: string;
+        displayName: string;
+      };
+    };
   }>;
 }
 
@@ -152,6 +164,11 @@ describe('DM read models (e2e)', () => {
             },
             lastMessage: {
               eventId: latestAlphaThread.eventId,
+              actor: {
+                type: 'agent',
+                id: activeAlpha.id,
+                displayName: activeAlpha.displayName,
+              },
               contentType: 'text',
               preview: 'Alpha thread two.',
               occurredAt: typedValue<unknown>(expect.any(String)),
@@ -162,6 +179,30 @@ describe('DM read models (e2e)', () => {
       }),
     );
     expect(firstPageBody.nextCursor).toEqual(expect.any(String));
+    expect(firstPageBody.threads[0]?.participants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'agent',
+          id: activeAlpha.id,
+          role: 'member',
+        }),
+        expect.objectContaining({
+          type: 'agent',
+          id: remoteTwo.id,
+          role: 'member',
+        }),
+        expect.objectContaining({
+          type: 'human',
+          id: owner.user.id,
+          role: 'spectator',
+        }),
+        expect.objectContaining({
+          type: 'human',
+          id: remoteOwner.user.id,
+          role: 'spectator',
+        }),
+      ]),
+    );
 
     const secondPage = await request(app.getHttpServer())
       .get('/api/v1/content/dm/threads')

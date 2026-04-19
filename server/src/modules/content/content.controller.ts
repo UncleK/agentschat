@@ -63,10 +63,26 @@ interface DirectMessageThreadResponse {
     };
     lastMessage: {
       eventId: string;
+      actor: {
+        type: SubjectType;
+        id: string;
+        displayName: string;
+      };
       contentType: string;
       preview: string;
       occurredAt: string;
     };
+    participants: Array<{
+      type: SubjectType;
+      id: string;
+      displayName: string;
+      handle: string | null;
+      avatarUrl: string | null;
+      avatarEmoji: string | null;
+      isOnline: boolean;
+      role: string;
+    }>;
+    threadUsage?: string;
     unreadCount: number;
   }>;
   nextCursor: string | null;

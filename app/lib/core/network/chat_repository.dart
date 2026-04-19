@@ -41,18 +41,58 @@ class ChatThreadCounterpart {
   }
 }
 
+class ChatThreadParticipant {
+  const ChatThreadParticipant({
+    required this.type,
+    required this.id,
+    required this.displayName,
+    required this.handle,
+    required this.avatarUrl,
+    required this.isOnline,
+    required this.role,
+    this.avatarEmoji,
+  });
+
+  final String type;
+  final String id;
+  final String displayName;
+  final String? handle;
+  final String? avatarUrl;
+  final String? avatarEmoji;
+  final bool isOnline;
+  final String role;
+
+  factory ChatThreadParticipant.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
+    return ChatThreadParticipant(
+      type: json['type'] as String? ?? '',
+      id: json['id'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? '',
+      handle: json['handle'] as String?,
+      avatarUrl: _resolveUrl(json['avatarUrl'], resolveUrl),
+      avatarEmoji: _readOptionalString(json['avatarEmoji']),
+      isOnline: json['isOnline'] as bool? ?? false,
+      role: json['role'] as String? ?? '',
+    );
+  }
+}
+
 class ChatThreadLastMessage {
   const ChatThreadLastMessage({
     required this.eventId,
     required this.contentType,
     required this.preview,
     required this.occurredAt,
+    this.actor,
   });
 
   final String eventId;
   final String contentType;
   final String preview;
   final String occurredAt;
+  final ChatMessageActor? actor;
 
   factory ChatThreadLastMessage.fromJson(Map<String, dynamic> json) {
     return ChatThreadLastMessage(
@@ -60,6 +100,9 @@ class ChatThreadLastMessage {
       contentType: json['contentType'] as String? ?? '',
       preview: json['preview'] as String? ?? '',
       occurredAt: json['occurredAt'] as String? ?? '',
+      actor: json['actor'] is Map<String, dynamic>
+          ? ChatMessageActor.fromJson(json['actor'] as Map<String, dynamic>)
+          : null,
     );
   }
 }
@@ -71,6 +114,7 @@ class ChatThreadSummary {
     required this.lastMessage,
     required this.unreadCount,
     this.threadUsage = 'network_dm',
+    this.participants = const [],
   });
 
   final String threadId;
@@ -78,6 +122,7 @@ class ChatThreadSummary {
   final ChatThreadLastMessage lastMessage;
   final int unreadCount;
   final String threadUsage;
+  final List<ChatThreadParticipant> participants;
 
   bool get isOwnedAgentCommandThread => threadUsage == 'owned_agent_command';
 
@@ -96,6 +141,14 @@ class ChatThreadSummary {
       ),
       unreadCount: json['unreadCount'] as int? ?? 0,
       threadUsage: json['threadUsage'] as String? ?? 'network_dm',
+      participants: (json['participants'] as List<dynamic>? ?? const [])
+          .map(
+            (item) => ChatThreadParticipant.fromJson(
+              item as Map<String, dynamic>,
+              resolveUrl: resolveUrl,
+            ),
+          )
+          .toList(growable: false),
     );
   }
 }

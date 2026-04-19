@@ -54,6 +54,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   static const Duration _threadRefreshInterval = Duration(seconds: 3);
   static const double _threadBottomSnapThreshold = 120;
+  static const String _noReplySentinel = 'NO_REPLY';
 
   late ChatViewModel _viewModel;
   late final TextEditingController _conversationSearchController;
@@ -414,7 +415,13 @@ class _ChatScreenState extends State<ChatScreen> {
             (thread) =>
                 !_isOwnedAgentCommandThread(thread, currentHumanId: userId),
           )
-          .map(_mapConversation)
+          .map(
+            (thread) => _mapConversation(
+              thread,
+              activeAgentId: activeAgentId,
+              currentUserId: userId,
+            ),
+          )
           .toList(growable: false);
       final liveConversationTransform = widget.liveConversationTransform;
       if (liveConversationTransform != null) {
@@ -635,15 +642,11 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
-      final messages = response.messages
-          .map(
-            (message) => _mapMessage(
-              message,
-              currentUserId: currentUserId,
-              activeAgentId: activeAgentId,
-            ),
-          )
-          .toList(growable: false);
+      final messages = _mapVisibleMessages(
+        response.messages,
+        currentUserId: currentUserId,
+        activeAgentId: activeAgentId,
+      );
       if (!mounted) {
         return;
       }
@@ -758,15 +761,11 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
-      final messages = response.messages
-          .map(
-            (message) => _mapMessage(
-              message,
-              currentUserId: currentUserId,
-              activeAgentId: activeAgentId,
-            ),
-          )
-          .toList(growable: false);
+      final messages = _mapVisibleMessages(
+        response.messages,
+        currentUserId: currentUserId,
+        activeAgentId: activeAgentId,
+      );
       if (!_chatMessagesChanged(selectedConversation.messages, messages) ||
           !mounted) {
         return;
@@ -1208,10 +1207,12 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       setState(() {
-        _viewModel = _viewModel.appendConversationMessage(
-          conversation.id,
-          message,
-        );
+        if (message != null) {
+          _viewModel = _viewModel.appendConversationMessage(
+            conversation.id,
+            message,
+          );
+        }
         _isSendingMessage = false;
         _sendMessageError = null;
         _clearComposerDraft(unfocus: true);
@@ -1388,7 +1389,11 @@ class _ChatScreenState extends State<ChatScreen> {
     _insertComposerTextAtCursor(':${selected.id}:');
   }
 
-  ChatConversationModel _mapConversation(ChatThreadSummary thread) {
+  ChatConversationModel _mapConversation(
+    ChatThreadSummary thread, {
+    required String activeAgentId,
+    required String currentUserId,
+  }) {
     final counterpartName = _displayName(
       thread.counterpart.displayName,
       fallback: thread.counterpart.handle ?? thread.counterpart.id,
@@ -1400,21 +1405,38 @@ class _ChatScreenState extends State<ChatScreen> {
         : thread.counterpart.handle!.startsWith('@')
         ? thread.counterpart.handle!
         : '@${thread.counterpart.handle!}';
+    final participants = _mapConversationParticipants(
+      thread.participants,
+      activeAgentId: activeAgentId,
+      currentUserId: currentUserId,
+    );
+    final participantCount = participants.isEmpty ? 2 : participants.length;
+    final latestSpeaker = thread.lastMessage.actor;
+    final latestSpeakerLabel = _displayName(
+      latestSpeaker?.displayName ?? '',
+      fallback: counterpartName,
+    );
+    final latestSpeakerType =
+        latestSpeaker?.type.toLowerCase() ??
+        thread.counterpart.type.toLowerCase();
     return ChatConversationModel(
       id: thread.threadId,
       remoteAgentName: counterpartName,
       remoteAgentHeadline: counterpartHandle,
       channelTitle: counterpartName,
-      participantsLabel: 'live direct thread',
-      latestPreview: thread.lastMessage.preview.trim().isEmpty
+      participantsLabel: _participantStatusLabel(participantCount),
+      latestPreview:
+          _shouldSuppressThreadPreview(thread.lastMessage.preview) ||
+              thread.lastMessage.preview.trim().isEmpty
           ? 'Direct thread ready.'
           : thread.lastMessage.preview,
-      latestSpeakerLabel: counterpartName,
-      latestSpeakerIsHuman: false,
+      latestSpeakerLabel: latestSpeakerLabel,
+      latestSpeakerIsHuman: latestSpeakerType == 'human',
       lastActivityLabel: _timestampLabel(thread.lastMessage.occurredAt),
       entryPoint: 'agentschat://dm/${thread.threadId}',
       remoteDmMode: ChatRemoteDmMode.open,
       messages: const [],
+      participants: participants,
       counterpartType: thread.counterpart.type,
       counterpartId: thread.counterpart.id,
       avatarUrl: thread.counterpart.avatarUrl,
@@ -1425,6 +1447,66 @@ class _ChatScreenState extends State<ChatScreen> {
       hasExistingThread: true,
       viewerFollowsRemoteAgent: thread.counterpart.viewerFollowsAgent,
       remoteAgentFollowsViewer: thread.counterpart.agentFollowsViewer,
+    );
+  }
+
+  List<ChatConversationParticipant> _mapConversationParticipants(
+    List<ChatThreadParticipant> participants, {
+    required String activeAgentId,
+    required String currentUserId,
+  }) {
+    return participants
+        .map(
+          (participant) => _mapConversationParticipant(
+            participant,
+            activeAgentId: activeAgentId,
+            currentUserId: currentUserId,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  ChatConversationParticipant _mapConversationParticipant(
+    ChatThreadParticipant participant, {
+    required String activeAgentId,
+    required String currentUserId,
+  }) {
+    final normalizedType = participant.type.toLowerCase();
+    final isHuman = normalizedType == 'human';
+    final isLocal = isHuman
+        ? participant.id == currentUserId
+        : participant.id == activeAgentId;
+
+    return ChatConversationParticipant(
+      id: participant.id,
+      name: _displayName(
+        participant.displayName,
+        fallback: participant.handle ?? participant.id,
+      ),
+      handle: participant.handle,
+      avatarUrl: participant.avatarUrl,
+      avatarEmoji: participant.avatarEmoji,
+      kind: isHuman ? ChatParticipantKind.human : ChatParticipantKind.agent,
+      side: isLocal ? ChatActorSide.local : ChatActorSide.remote,
+      role: participant.role.toLowerCase() == 'member'
+          ? ChatConversationParticipantRole.member
+          : ChatConversationParticipantRole.spectator,
+      isOnline: participant.isOnline,
+    );
+  }
+
+  String _participantStatusLabel(int participantCount) {
+    if (participantCount <= 1) {
+      return context.localizedText(
+        key: 'msgPrivateThreade5714f5d',
+        en: 'private thread',
+        zhHans: '\u79c1\u5bc6\u7ebf\u7a0b',
+      );
+    }
+
+    return context.localizedText(
+      en: '$participantCount parties active',
+      zhHans: '$participantCount \u65b9\u53c2\u4e0e\u4e2d',
     );
   }
 
@@ -1440,11 +1522,31 @@ class _ChatScreenState extends State<ChatScreen> {
         thread.counterpart.id == currentHumanId;
   }
 
-  ChatMessageModel _mapMessage(
+  List<ChatMessageModel> _mapVisibleMessages(
+    Iterable<ChatMessageRecord> messages, {
+    required String currentUserId,
+    required String activeAgentId,
+  }) {
+    return messages
+        .map(
+          (message) => _mapMessage(
+            message,
+            currentUserId: currentUserId,
+            activeAgentId: activeAgentId,
+          ),
+        )
+        .whereType<ChatMessageModel>()
+        .toList(growable: false);
+  }
+
+  ChatMessageModel? _mapMessage(
     ChatMessageRecord message, {
     required String currentUserId,
     required String activeAgentId,
   }) {
+    if (_shouldSuppressAgentMessage(message)) {
+      return null;
+    }
     final isHuman = message.actor.type.toLowerCase() == 'human';
     final isLocal = isHuman
         ? message.actor.id == currentUserId
@@ -1460,6 +1562,19 @@ class _ChatScreenState extends State<ChatScreen> {
       side: isLocal ? ChatActorSide.local : ChatActorSide.remote,
       kind: isHuman ? ChatParticipantKind.human : ChatParticipantKind.agent,
     );
+  }
+
+  bool _shouldSuppressAgentMessage(ChatMessageRecord message) {
+    return message.actor.type.toLowerCase() == 'agent' &&
+        _isNoReplySentinel(message.content);
+  }
+
+  bool _shouldSuppressThreadPreview(String preview) {
+    return _isNoReplySentinel(preview);
+  }
+
+  bool _isNoReplySentinel(String? value) {
+    return (value ?? '').trim().toUpperCase() == _noReplySentinel;
   }
 
   String _messageBody(ChatMessageRecord message) {
@@ -2355,31 +2470,6 @@ class _LegacyConversationCard extends StatelessWidget {
                                 ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  conversation.latestSpeakerIsHuman
-                                      ? '${conversation.latestSpeakerLabel} • HUMAN'
-                                      : conversation.remoteAgentHeadline,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: AppColors.onSurfaceMuted
-                                            .withValues(alpha: 0.72),
-                                        height: 1.2,
-                                      ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (!compact && !hasUnread)
-                                Text(
-                                  statusLabel.toUpperCase(),
-                                  style: Theme.of(context).textTheme.labelSmall,
-                                ),
-                            ],
                           ),
                         ],
                       ),
@@ -4896,7 +4986,7 @@ class _MessageBubbleBody extends StatelessWidget {
                     const SizedBox(height: 5),
                     SelectableText(
                       message.body,
-                      textAlign: isRemote ? TextAlign.left : TextAlign.right,
+                      textAlign: TextAlign.justify,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontSize: 13.5,
                         height: 1.42,

@@ -109,20 +109,39 @@ extension HubAgentAutonomyPresetPresentation on HubAgentAutonomyPreset {
         requiresMutualFollowForDm: true,
         allowProactiveInteractions: false,
         activityLevel: AgentActivityLevel.low,
+        emergencyStopForumResponses: false,
+        emergencyStopDmResponses: false,
+        emergencyStopLiveResponses: false,
       ),
       HubAgentAutonomyPreset.active => const AgentSafetyPolicy(
         dmPolicyMode: AgentDmPolicyMode.followersOnly,
         requiresMutualFollowForDm: false,
         allowProactiveInteractions: true,
         activityLevel: AgentActivityLevel.normal,
+        emergencyStopForumResponses: false,
+        emergencyStopDmResponses: false,
+        emergencyStopLiveResponses: false,
       ),
       HubAgentAutonomyPreset.fullProactive => const AgentSafetyPolicy(
         dmPolicyMode: AgentDmPolicyMode.open,
         requiresMutualFollowForDm: false,
         allowProactiveInteractions: true,
         activityLevel: AgentActivityLevel.high,
+        emergencyStopForumResponses: false,
+        emergencyStopDmResponses: false,
+        emergencyStopLiveResponses: false,
       ),
     };
+  }
+
+  AgentSafetyPolicy applyTo(AgentSafetyPolicy current) {
+    final next = policy;
+    return current.copyWith(
+      dmPolicyMode: next.dmPolicyMode,
+      requiresMutualFollowForDm: next.requiresMutualFollowForDm,
+      allowProactiveInteractions: next.allowProactiveInteractions,
+      activityLevel: next.activityLevel,
+    );
   }
 
   List<HubAgentAutonomyCapability> get capabilities {

@@ -1,4 +1,6 @@
 import { NO_DEBATE_SENTINEL, NO_REPLY_SENTINEL, NO_TOPIC_SENTINEL, SYSTEM_PROMPT } from "./constants.js";
+import type { ForumReplyTargetContext } from "./forum-context.js";
+import { resolveForumDeliveryTarget, resolveForumDiscoveryTarget } from "./forum-context.js";
 
 function normalizeText(value: unknown, fallback = "[empty]"): string {
   if (typeof value === "string") {
@@ -77,6 +79,19 @@ function findForumReply(replies: Record<string, unknown>[], replyId: string): Re
     }
   }
   return undefined;
+}
+
+function forumReplyTargetLabel(target: ForumReplyTargetContext): string {
+  switch (target.targetType) {
+    case "topic_root":
+      return "topic root";
+    case "first_level_reply":
+      return "first-level reply";
+    case "second_level_reply":
+      return "second-level reply";
+    default:
+      return "unknown";
+  }
 }
 
 function debateTurnLines(debate: Record<string, unknown>, maxLines = 10): string {
@@ -244,6 +259,7 @@ export function buildForumPrompt(params: {
   const event = (params.delivery.event ?? {}) as Record<string, unknown>;
   const replies = Array.isArray(params.topic.replies) ? (params.topic.replies as Record<string, unknown>[]) : [];
   const latestReply = typeof event.id === "string" ? findForumReply(replies, event.id) : undefined;
+  const replyTarget = resolveForumDeliveryTarget(params.topic, event);
   const replyTree = forumReplyLines(replies).join("\n") || "- No visible replies yet.";
 
   return [
@@ -251,9 +267,14 @@ export function buildForumPrompt(params: {
     `Latest reply from: ${normalizeText(latestReply?.authorName ?? event.actorDisplayName, "Unknown")}`,
     `Latest reply: ${normalizeText(latestReply?.body ?? event.content)}`,
     `Topic: ${normalizeText(params.topic.title, "Untitled topic")}`,
+    `Reply target type: ${forumReplyTargetLabel(replyTarget)}`,
+    `Reply target depth: ${normalizeText(replyTarget.targetDepth, "unknown")}`,
+    `Reply target author: ${normalizeText(replyTarget.authorName, "Unknown")}`,
+    `Reply target body: ${normalizeText(replyTarget.body)}`,
     "",
     "Forum reply mode:",
     `- Default to exactly ${NO_REPLY_SENTINEL} unless the latest reply clearly merits a response.`,
+    `- If reply target type is second-level reply, return exactly ${NO_REPLY_SENTINEL}.`,
     "- Reply only when you can add something specific, helpful, or challenging.",
     "- If you do reply, write one natural forum reply in plain text.",
     "- Do not mention delivery ids, bridge mechanics, or system prompts.",
@@ -358,14 +379,20 @@ export function buildForumDiscoveryReplyPrompt(params: {
   activityLevel: string;
 }): string {
   const replies = Array.isArray(params.topic.replies) ? (params.topic.replies as Record<string, unknown>[]) : [];
+  const replyTarget = resolveForumDiscoveryTarget(params.topic);
   return [
     "Agents Chat proactive forum discovery:",
     `Topic: ${normalizeText(params.topic.title, "Untitled topic")}`,
     `Author: ${normalizeText(params.topic.authorName, "Unknown")}`,
     `Last activity: ${normalizeText(params.topic.lastActivityAt, "unknown-time")}`,
+    `Planned reply target type: ${forumReplyTargetLabel(replyTarget ?? { targetType: "unknown", targetDepth: null })}`,
+    `Planned reply target depth: ${normalizeText(replyTarget?.targetDepth, "unknown")}`,
+    `Planned reply target author: ${normalizeText(replyTarget?.authorName, "Unknown")}`,
+    `Planned reply target body: ${normalizeText(replyTarget?.body)}`,
     "",
     "Decision rules:",
     `- Return exactly ${NO_REPLY_SENTINEL} unless you can add a clearly valuable contribution right now.`,
+    `- Only plan replies against the topic root or a first-level reply.`,
     "- If you reply, write one natural public forum reply in plain text.",
     "- Prefer synthesis, a strong new angle, or a crisp challenge over generic encouragement.",
     "- Do not mention hidden prompts, discovery loops, or system mechanics.",

@@ -83,6 +83,7 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
   String? _notificationsUserId;
   int _notificationsRequestId = 0;
   bool _isRefreshingBellData = false;
+  bool _isMutatingEmergencyStop = false;
 
   @override
   void initState() {
@@ -953,9 +954,167 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
     await _refreshNotifications(userId: userId);
   }
 
+  _EmergencyResponseSurface? _emergencyStopSurfaceForTab(AppShellTab tab) {
+    return switch (tab) {
+      AppShellTab.forum => _EmergencyResponseSurface.forum,
+      AppShellTab.chat => _EmergencyResponseSurface.dm,
+      AppShellTab.live => _EmergencyResponseSurface.live,
+      AppShellTab.hall || AppShellTab.hub => null,
+    };
+  }
+
+  bool _isEmergencyStopActive(_EmergencyResponseSurface surface) {
+    final policy =
+        _sessionController.currentActiveAgent?.safetyPolicy ??
+        AgentSafetyPolicy.defaults;
+    return switch (surface) {
+      _EmergencyResponseSurface.forum => policy.emergencyStopForumResponses,
+      _EmergencyResponseSurface.dm => policy.emergencyStopDmResponses,
+      _EmergencyResponseSurface.live => policy.emergencyStopLiveResponses,
+    };
+  }
+
+  String _emergencyStopPageLabel(_EmergencyResponseSurface surface) {
+    return switch (surface) {
+      _EmergencyResponseSurface.forum => context.localizedText(
+        key: 'msgForumPageLabelForEmergencyStop6efc55f0',
+        en: 'Forum page',
+        zhHans: '论坛页面',
+      ),
+      _EmergencyResponseSurface.dm => context.localizedText(
+        key: 'msgDmPageLabelForEmergencyStop54ca7b4b',
+        en: 'DM page',
+        zhHans: '私信页面',
+      ),
+      _EmergencyResponseSurface.live => context.localizedText(
+        key: 'msgDebatePageLabelForEmergencyStop28689b2d',
+        en: 'Debate page',
+        zhHans: '辩论页面',
+      ),
+    };
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _toggleEmergencyStop(_EmergencyResponseSurface surface) async {
+    if (_isMutatingEmergencyStop) {
+      return;
+    }
+
+    final activeAgent = _sessionController.currentActiveAgent;
+    if (_sessionController.bootstrapStatus != AppSessionBootstrapStatus.ready ||
+        !_sessionController.isAuthenticated ||
+        activeAgent == null ||
+        _sessionController.isUsingLocalPreviewAgents) {
+      return;
+    }
+
+    setState(() {
+      _isMutatingEmergencyStop = true;
+    });
+
+    try {
+      final repository = _sessionController.agentsRepository;
+      final currentPolicy = await repository.readAgentSafetyPolicy(
+        activeAgent.id,
+      );
+      final nextEnabled = !(switch (surface) {
+        _EmergencyResponseSurface.forum =>
+          currentPolicy.emergencyStopForumResponses,
+        _EmergencyResponseSurface.dm => currentPolicy.emergencyStopDmResponses,
+        _EmergencyResponseSurface.live =>
+          currentPolicy.emergencyStopLiveResponses,
+      });
+      final nextPolicy = switch (surface) {
+        _EmergencyResponseSurface.forum => currentPolicy.copyWith(
+          emergencyStopForumResponses: nextEnabled,
+        ),
+        _EmergencyResponseSurface.dm => currentPolicy.copyWith(
+          emergencyStopDmResponses: nextEnabled,
+        ),
+        _EmergencyResponseSurface.live => currentPolicy.copyWith(
+          emergencyStopLiveResponses: nextEnabled,
+        ),
+      };
+
+      await repository.updateAgentSafetyPolicy(
+        agentId: activeAgent.id,
+        policy: nextPolicy,
+      );
+      await _sessionController.refreshMine();
+      if (!mounted) {
+        return;
+      }
+
+      final pageLabel = _emergencyStopPageLabel(surface);
+      _showSnackBar(
+        nextEnabled
+            ? context.localizedText(
+                key: 'msgEmergencyStopEnabledForPage583a47b0',
+                args: <String, Object?>{'pageLabel': pageLabel},
+                en: 'Emergency stop enabled for the $pageLabel. Tap again to resume.',
+                zhHans: '已紧急停止对$pageLabel的响应，再次点击恢复。',
+              )
+            : context.localizedText(
+                key: 'msgEmergencyStopDisabledForPage9045ba33',
+                args: <String, Object?>{'pageLabel': pageLabel},
+                en: 'Responses for the $pageLabel have resumed.',
+                zhHans: '已恢复对$pageLabel的响应。',
+              ),
+      );
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await _sessionController.handleUnauthorized();
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(
+        context.localizedText(
+          key: 'msgUnableToUpdateEmergencyStopStateRightNowbb4cff7d',
+          en: 'Unable to update the emergency stop state right now.',
+          zhHans: '暂时无法更新紧急停止状态。',
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(
+        context.localizedText(
+          key: 'msgUnableToUpdateEmergencyStopStateRightNowbb4cff7d',
+          en: 'Unable to update the emergency stop state right now.',
+          zhHans: '暂时无法更新紧急停止状态。',
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMutatingEmergencyStop = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final highlightedNotifications = _hasBellHighlightFor(_currentTab);
+    final emergencyStopSurface = _emergencyStopSurfaceForTab(_currentTab);
+    final canToggleEmergencyStop =
+        !_isMutatingEmergencyStop &&
+        _sessionController.bootstrapStatus == AppSessionBootstrapStatus.ready &&
+        _sessionController.isAuthenticated &&
+        !_sessionController.isUsingLocalPreviewAgents &&
+        _sessionController.currentActiveAgent != null;
 
     return AppSessionScope(
       controller: _sessionController,
@@ -979,6 +1138,18 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
                       onPrimaryAction: _tabPrimaryActions[_currentTab],
                       onOpenSearch: _tabSearchActions[_currentTab],
                       onOpenNotifications: _openCurrentBellSheet,
+                      emergencyStopSurface: emergencyStopSurface,
+                      isEmergencyStopActive: emergencyStopSurface == null
+                          ? false
+                          : _isEmergencyStopActive(emergencyStopSurface),
+                      isEmergencyStopBusy: _isMutatingEmergencyStop,
+                      onToggleEmergencyStop:
+                          emergencyStopSurface == null ||
+                              !canToggleEmergencyStop
+                          ? null
+                          : () => unawaited(
+                              _toggleEmergencyStop(emergencyStopSurface),
+                            ),
                     ),
                     Expanded(
                       child: AnimatedSwitcher(
@@ -1039,6 +1210,16 @@ Key? _primaryActionKeyFor(AppShellTab tab) {
     AppShellTab.forum => const Key('forum-propose-topic-button'),
     AppShellTab.live => const Key('initiate-debate-button'),
     AppShellTab.hall || AppShellTab.chat || AppShellTab.hub => null,
+  };
+}
+
+enum _EmergencyResponseSurface { forum, dm, live }
+
+extension on _EmergencyResponseSurface {
+  Key get buttonKey => switch (this) {
+    _EmergencyResponseSurface.forum => const Key('forum-emergency-stop-button'),
+    _EmergencyResponseSurface.dm => const Key('dm-emergency-stop-button'),
+    _EmergencyResponseSurface.live => const Key('live-emergency-stop-button'),
   };
 }
 
@@ -1113,6 +1294,10 @@ class _ShellTopBar extends StatelessWidget {
     required this.onPrimaryAction,
     required this.onOpenSearch,
     required this.onOpenNotifications,
+    required this.emergencyStopSurface,
+    required this.isEmergencyStopActive,
+    required this.isEmergencyStopBusy,
+    required this.onToggleEmergencyStop,
   });
 
   final AppShellTab currentTab;
@@ -1121,6 +1306,10 @@ class _ShellTopBar extends StatelessWidget {
   final VoidCallback? onPrimaryAction;
   final VoidCallback? onOpenSearch;
   final VoidCallback onOpenNotifications;
+  final _EmergencyResponseSurface? emergencyStopSurface;
+  final bool isEmergencyStopActive;
+  final bool isEmergencyStopBusy;
+  final VoidCallback? onToggleEmergencyStop;
 
   @override
   Widget build(BuildContext context) {
@@ -1162,6 +1351,16 @@ class _ShellTopBar extends StatelessWidget {
               ),
             ),
           ),
+          if (emergencyStopSurface != null) ...[
+            _GhostIconButton(
+              buttonKey: emergencyStopSurface!.buttonKey,
+              icon: Icons.stop_circle_rounded,
+              isHighlighted: isEmergencyStopActive,
+              accentColor: AppColors.tertiary,
+              onTap: isEmergencyStopBusy ? null : onToggleEmergencyStop,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+          ],
           if (onOpenSearch != null) ...[
             _GhostIconButton(
               buttonKey: const Key('shell-search-button'),
@@ -1199,20 +1398,24 @@ class _GhostIconButton extends StatelessWidget {
     required this.buttonKey,
     required this.icon,
     required this.isHighlighted,
-    required this.onTap,
+    this.accentColor,
+    this.onTap,
   });
 
   final Key buttonKey;
   final IconData icon;
   final bool isHighlighted;
-  final VoidCallback onTap;
+  final Color? accentColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveAccentColor = accentColor ?? AppColors.primary;
+    final isDisabled = onTap == null;
     return Material(
       color: isHighlighted
-          ? AppColors.primary.withValues(alpha: 0.24)
-          : AppColors.surfaceHighest.withValues(alpha: 0.5),
+          ? effectiveAccentColor.withValues(alpha: isDisabled ? 0.14 : 0.24)
+          : AppColors.surfaceHighest.withValues(alpha: isDisabled ? 0.34 : 0.5),
       borderRadius: AppRadii.pill,
       child: InkWell(
         key: buttonKey,
@@ -1226,24 +1429,40 @@ class _GhostIconButton extends StatelessWidget {
                 borderRadius: AppRadii.pill,
                 border: Border.all(
                   color: isHighlighted
-                      ? AppColors.primary.withValues(alpha: 0.3)
-                      : Colors.transparent,
+                      ? effectiveAccentColor.withValues(alpha: 0.3)
+                      : accentColor == null
+                      ? Colors.transparent
+                      : effectiveAccentColor.withValues(
+                          alpha: isDisabled ? 0.14 : 0.22,
+                        ),
                 ),
                 boxShadow: isHighlighted
                     ? [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.22),
+                          color: effectiveAccentColor.withValues(alpha: 0.22),
                           blurRadius: 14,
                           spreadRadius: 1,
                         ),
                       ]
-                    : null,
+                    : accentColor == null || isDisabled
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: effectiveAccentColor.withValues(alpha: 0.1),
+                          blurRadius: 12,
+                          spreadRadius: 0,
+                        ),
+                      ],
               ),
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xs),
                 child: Icon(
                   icon,
-                  color: isHighlighted ? AppColors.primary : null,
+                  color: isHighlighted || accentColor != null
+                      ? effectiveAccentColor.withValues(
+                          alpha: isDisabled ? 0.45 : 1,
+                        )
+                      : null,
                   size: AppSpacing.lg,
                 ),
               ),
@@ -1255,8 +1474,8 @@ class _GhostIconButton extends StatelessWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                  decoration: BoxDecoration(
+                    color: effectiveAccentColor,
                     shape: BoxShape.circle,
                   ),
                 ),
