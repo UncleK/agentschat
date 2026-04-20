@@ -4,12 +4,16 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
 import {
+  AgentStatus,
   AgentDmAcceptanceMode,
   DeliveryStatus,
 } from '../../src/database/domain.enums';
+import { AgentConnectionEntity } from '../../src/database/entities/agent-connection.entity';
+import { AgentEntity } from '../../src/database/entities/agent.entity';
 import { DeliveryEntity } from '../../src/database/entities/delivery.entity';
 import { EventEntity } from '../../src/database/entities/event.entity';
 import { FederationCredentialsService } from '../../src/modules/federation/federation-credentials.service';
+import { FederationDeliveryService } from '../../src/modules/federation/federation-delivery.service';
 import { PolicyService } from '../../src/modules/policy/policy.service';
 import {
   TestApplicationContext,
@@ -47,7 +51,10 @@ describe('Federation delivery (e2e)', () => {
   let app: INestApplication;
   let context: TestApplicationContext;
   let federationCredentialsService: FederationCredentialsService;
+  let federationDeliveryService: FederationDeliveryService;
   let policyService: PolicyService;
+  let agentRepository: Repository<AgentEntity>;
+  let agentConnectionRepository: Repository<AgentConnectionEntity>;
   let deliveryRepository: Repository<DeliveryEntity>;
   let eventRepository: Repository<EventEntity>;
 
@@ -55,7 +62,12 @@ describe('Federation delivery (e2e)', () => {
     context = await createTestApplication();
     app = context.app;
     federationCredentialsService = app.get(FederationCredentialsService);
+    federationDeliveryService = app.get(FederationDeliveryService);
     policyService = app.get(PolicyService);
+    agentRepository = context.dataSource.getRepository(AgentEntity);
+    agentConnectionRepository = context.dataSource.getRepository(
+      AgentConnectionEntity,
+    );
     deliveryRepository = context.dataSource.getRepository(DeliveryEntity);
     eventRepository = context.dataSource.getRepository(EventEntity);
   });
@@ -195,6 +207,64 @@ describe('Federation delivery (e2e)', () => {
     const emptyPollBody = typedValue<DeliveryPollBody>(emptyPoll.body);
 
     expect(emptyPollBody.deliveries).toEqual([]);
+  });
+
+  it('marks stale agent presence offline and restores online status on the next poll', async () => {
+    const agent = await importSelfAgent(
+      app,
+      'delivery-presence-agent',
+      'Delivery Presence Agent',
+    );
+    const claim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      agent.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+
+    const staleAt = new Date(Date.now() - 10 * 60 * 1000);
+
+    await agentConnectionRepository.update(
+      { agentId: agent.id },
+      {
+        lastHeartbeatAt: staleAt,
+        lastSeenAt: staleAt,
+      },
+    );
+    await agentRepository.update(
+      { id: agent.id },
+      {
+        status: AgentStatus.Online,
+        lastSeenAt: staleAt,
+      },
+    );
+
+    const sweepResult = await federationDeliveryService.sweepStaleAgentPresence(
+      new Date(),
+    );
+
+    expect(sweepResult.offlineAgentIds).toContain(agent.id);
+    await expect(
+      agentRepository.findOneByOrFail({ id: agent.id }),
+    ).resolves.toMatchObject({
+      status: AgentStatus.Offline,
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/deliveries/poll?wait_seconds=0')
+      .set('Authorization', `Bearer ${claim.accessToken}`)
+      .expect(200)
+      .expect(({ body }: { body: DeliveryPollBody }) => {
+        expect(body.deliveries).toEqual([]);
+      });
+
+    await expect(
+      agentRepository.findOneByOrFail({ id: agent.id }),
+    ).resolves.toMatchObject({
+      status: AgentStatus.Online,
+    });
   });
 
   it('retries webhook deliveries without ACK and eventually dead-letters them', async () => {

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { setTimeout as delay } from 'node:timers/promises';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
   AgentStatus,
@@ -33,8 +33,11 @@ export class FederationDeliveryService
 {
   private readonly retryScheduleMs: number[];
   private readonly replayWindowMs: number;
-  private readonly sweepIntervalMs: number;
-  private sweepTimer: NodeJS.Timeout | null = null;
+  private readonly deliverySweepIntervalMs: number;
+  private readonly presenceStaleAfterMs: number;
+  private readonly presenceSweepIntervalMs: number;
+  private deliverySweepTimer: NodeJS.Timeout | null = null;
+  private presenceSweepTimer: NodeJS.Timeout | null = null;
   private isStopped = false;
 
   constructor(
@@ -53,22 +56,34 @@ export class FederationDeliveryService
     this.retryScheduleMs =
       environment.nodeEnv === 'test' ? [0, 100, 200] : [0, 5_000, 30_000];
     this.replayWindowMs = environment.nodeEnv === 'test' ? 800 : 15 * 60 * 1000;
-    this.sweepIntervalMs = environment.nodeEnv === 'test' ? 50 : 1_000;
+    this.deliverySweepIntervalMs = environment.nodeEnv === 'test' ? 50 : 1_000;
+    this.presenceStaleAfterMs =
+      Math.max(1, environment.presence.staleAfterSeconds) * 1_000;
+    this.presenceSweepIntervalMs =
+      Math.max(1, environment.presence.sweepIntervalSeconds) * 1_000;
   }
 
   onModuleInit(): void {
     this.isStopped = false;
-    this.sweepTimer = setInterval(() => {
+    this.deliverySweepTimer = setInterval(() => {
       void this.processDueWebhookDeliveries();
-    }, this.sweepIntervalMs);
-    this.sweepTimer.unref();
+    }, this.deliverySweepIntervalMs);
+    this.deliverySweepTimer.unref();
+    this.presenceSweepTimer = setInterval(() => {
+      void this.sweepStaleAgentPresence();
+    }, this.presenceSweepIntervalMs);
+    this.presenceSweepTimer.unref();
   }
 
   onModuleDestroy(): void {
     this.isStopped = true;
-    if (this.sweepTimer) {
-      clearInterval(this.sweepTimer);
-      this.sweepTimer = null;
+    if (this.deliverySweepTimer) {
+      clearInterval(this.deliverySweepTimer);
+      this.deliverySweepTimer = null;
+    }
+    if (this.presenceSweepTimer) {
+      clearInterval(this.presenceSweepTimer);
+      this.presenceSweepTimer = null;
     }
   }
 
@@ -247,6 +262,52 @@ export class FederationDeliveryService
     setImmediate(() => {
       void this.processDueWebhookDeliveries();
     });
+  }
+
+  async sweepStaleAgentPresence(
+    referenceTime = new Date(),
+  ): Promise<{ offlineAgentIds: string[] }> {
+    if (this.isStopped) {
+      return {
+        offlineAgentIds: [],
+      };
+    }
+
+    const referenceTimeMs = referenceTime.getTime();
+    const connections = await this.agentConnectionRepository.find({
+      relations: {
+        agent: true,
+      },
+    });
+
+    const offlineAgentIds = [
+      ...new Set(
+        connections
+          .filter((connection) =>
+            this.shouldMarkAgentOffline(connection, referenceTimeMs),
+          )
+          .map((connection) => connection.agentId),
+      ),
+    ];
+
+    if (offlineAgentIds.length === 0) {
+      return {
+        offlineAgentIds: [],
+      };
+    }
+
+    await this.agentRepository.update(
+      {
+        id: In(offlineAgentIds),
+      },
+      {
+        status: AgentStatus.Offline,
+      },
+    );
+
+    return {
+      offlineAgentIds,
+    };
   }
 
   private async collectPollableDeliveries(
@@ -602,5 +663,31 @@ export class FederationDeliveryService
     }
 
     return Math.max(0, Math.min(waitSeconds, 5));
+  }
+
+  private shouldMarkAgentOffline(
+    connection: AgentConnectionEntity,
+    referenceTimeMs: number,
+  ): boolean {
+    const agent = connection.agent;
+
+    if (
+      !agent ||
+      (agent.status !== AgentStatus.Online &&
+        agent.status !== AgentStatus.Debating)
+    ) {
+      return false;
+    }
+
+    const lastPresenceAt =
+      connection.lastHeartbeatAt ?? connection.lastSeenAt ?? agent.lastSeenAt;
+
+    if (!lastPresenceAt) {
+      return false;
+    }
+
+    return (
+      referenceTimeMs - lastPresenceAt.getTime() >= this.presenceStaleAfterMs
+    );
   }
 }

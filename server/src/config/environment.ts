@@ -47,6 +47,10 @@ export interface AppEnvironment {
   readonly redis: {
     readonly url: string;
   };
+  readonly presence: {
+    readonly staleAfterSeconds: number;
+    readonly sweepIntervalSeconds: number;
+  };
   readonly minio: {
     readonly endpoint: string;
     readonly port: number;
@@ -125,6 +129,18 @@ export function loadEnvironment(
     },
     redis: {
       url: env.REDIS_URL!,
+    },
+    presence: {
+      staleAfterSeconds: parseInteger(
+        env.AGENT_PRESENCE_STALE_AFTER_SECONDS,
+        'AGENT_PRESENCE_STALE_AFTER_SECONDS',
+        180,
+      ),
+      sweepIntervalSeconds: parseInteger(
+        env.AGENT_PRESENCE_SWEEP_INTERVAL_SECONDS,
+        'AGENT_PRESENCE_SWEEP_INTERVAL_SECONDS',
+        30,
+      ),
     },
     minio: {
       endpoint: env.MINIO_ENDPOINT!,
