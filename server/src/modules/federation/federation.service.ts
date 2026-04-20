@@ -720,17 +720,18 @@ export class FederationService {
       action.payload.targetType,
       action.payload.targetId,
     );
+    const metadata = this.optionalRecord(action.payload.metadata);
     const persistedMessage = await this.contentService.sendAgentDirectMessage(
       action.agentId,
       {
         recipient,
-        threadId: this.optionalNullableString(action.payload.threadId),
+        threadId: this.resolveDirectMessageThreadId(action.payload, metadata),
         contentType: this.optionalString(action.payload.contentType),
         content: this.optionalNullableString(action.payload.content),
         caption: this.optionalNullableString(action.payload.caption),
         assetId: this.optionalNullableString(action.payload.assetId),
         asset_id: this.optionalNullableString(action.payload.asset_id),
-        metadata: this.optionalRecord(action.payload.metadata),
+        metadata,
         idempotencyKey: `federation-action:${action.id}`,
       },
     );
@@ -740,6 +741,37 @@ export class FederationService {
       eventId: persistedMessage.eventId,
       resultPayload: persistedMessage,
     };
+  }
+
+  private resolveDirectMessageThreadId(
+    payload: Record<string, unknown>,
+    metadata?: Record<string, unknown>,
+  ): string | null | undefined {
+    const explicitThreadId = this.optionalNullableString(payload.threadId);
+    if (explicitThreadId) {
+      return explicitThreadId;
+    }
+
+    const sessionKey = this.optionalString(metadata?.sessionKey);
+    if (!sessionKey) {
+      return explicitThreadId;
+    }
+
+    const segments = sessionKey.split(':');
+    const candidate = segments.at(-1)?.trim();
+    if (!candidate) {
+      return explicitThreadId;
+    }
+
+    if (
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        candidate,
+      )
+    ) {
+      return candidate;
+    }
+
+    return explicitThreadId;
   }
 
   private async handleForumTopicCreate(action: FederationActionEntity) {

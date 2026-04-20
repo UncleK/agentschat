@@ -317,6 +317,114 @@ describe('Federation actions (e2e)', () => {
         },
       );
   });
+
+  it('falls back to the DM thread encoded in metadata.sessionKey when legacy runtimes omit payload.threadId', async () => {
+    const owner = await registerHuman(
+      app,
+      'actions-session-key-owner@example.com',
+      'Actions Session Key Owner',
+    );
+    const ownerAgent = await importHumanOwnedAgent(
+      app,
+      owner.accessToken,
+      'actions-session-key-owner-agent',
+      'Actions Session Key Owner Agent',
+    );
+    const remoteAgent = await importSelfAgent(
+      app,
+      'actions-session-key-remote-agent',
+      'Actions Session Key Remote Agent',
+    );
+
+    await policyService.upsertAgentSafetyPolicy(ownerAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+    await policyService.upsertAgentSafetyPolicy(remoteAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+    const remoteClaim = await claimFederatedAgent(
+      app,
+      federationCredentialsService,
+      remoteAgent.id,
+      {
+        pollingEnabled: true,
+      },
+    );
+
+    const initialThreadResponse = await request(app.getHttpServer())
+      .post('/api/v1/content/dm')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        activeAgentId: ownerAgent.id,
+        recipientType: 'agent',
+        recipientAgentId: remoteAgent.id,
+        contentType: 'text',
+        content: 'Initial session-key fallback opener.',
+      })
+      .expect(201);
+    const initialThread = typedValue<{ threadId: string }>(
+      initialThreadResponse.body,
+    );
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/content/dm/threads/${initialThread.threadId}/messages`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        activeAgentId: ownerAgent.id,
+        contentType: 'text',
+        content: 'Human follow-up inside the shared DM thread.',
+      })
+      .expect(201);
+
+    const actionResponse = await request(app.getHttpServer())
+      .post('/api/v1/actions')
+      .set('Authorization', `Bearer ${remoteClaim.accessToken}`)
+      .set('Idempotency-Key', 'dm-session-key-fallback-1')
+      .send({
+        type: 'dm.send',
+        payload: {
+          targetType: 'human',
+          targetId: owner.user.id,
+          contentType: 'text',
+          content: 'Legacy runtime reply stays in the shared DM thread.',
+          metadata: {
+            runtime: 'openclaw-native-plugin',
+            sessionKey: `agentschatapp:main:${initialThread.threadId}`,
+          },
+        },
+      })
+      .expect(202);
+    const actionResponseBody = typedValue<{ id: string }>(actionResponse.body);
+
+    const finalAction = await waitForActionStatus(
+      app,
+      remoteClaim.accessToken,
+      actionResponseBody.id,
+    );
+
+    expect(finalAction.status).toBe('succeeded');
+    expect(finalAction.threadId).toBe(initialThread.threadId);
+
+    const threadEvents = await eventRepository.find({
+      where: {
+        threadId: initialThread.threadId,
+        eventType: 'dm.send',
+      },
+      order: {
+        occurredAt: 'ASC',
+        id: 'ASC',
+      },
+    });
+
+    expect(threadEvents).toHaveLength(3);
+    expect(threadEvents[2]).toMatchObject({
+      threadId: initialThread.threadId,
+      actorAgentId: remoteAgent.id,
+      targetType: 'human',
+      targetId: owner.user.id,
+      content: 'Legacy runtime reply stays in the shared DM thread.',
+    });
+  });
 });
 
 async function importHumanOwnedAgent(
