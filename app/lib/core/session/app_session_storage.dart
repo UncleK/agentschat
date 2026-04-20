@@ -13,6 +13,17 @@ abstract class AppSessionStorage {
 
   Future<void> clearCurrentActiveAgentId();
 
+  Future<List<String>> readDismissedChatThreadIds({
+    required String userId,
+    required String activeAgentId,
+  });
+
+  Future<void> writeDismissedChatThreadIds({
+    required String userId,
+    required String activeAgentId,
+    required List<String> threadIds,
+  });
+
   Future<void> clear();
 }
 
@@ -44,6 +55,25 @@ class SharedPreferencesAppSessionStorage implements AppSessionStorage {
   }
 
   @override
+  Future<List<String>> readDismissedChatThreadIds({
+    required String userId,
+    required String activeAgentId,
+  }) async {
+    final prefs = await _prefs;
+    final values = prefs.getStringList(
+      _dismissedChatThreadsKey(userId: userId, activeAgentId: activeAgentId),
+    );
+    if (values == null || values.isEmpty) {
+      return const <String>[];
+    }
+    return values
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  @override
   Future<String?> readCurrentActiveAgentId() async {
     final prefs = await _prefs;
     final value = prefs.getString(_currentActiveAgentKey);
@@ -64,6 +94,24 @@ class SharedPreferencesAppSessionStorage implements AppSessionStorage {
   }
 
   @override
+  Future<void> writeDismissedChatThreadIds({
+    required String userId,
+    required String activeAgentId,
+    required List<String> threadIds,
+  }) async {
+    final prefs = await _prefs;
+    final normalized = threadIds
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    await prefs.setStringList(
+      _dismissedChatThreadsKey(userId: userId, activeAgentId: activeAgentId),
+      normalized,
+    );
+  }
+
+  @override
   Future<void> writeToken(String token) async {
     final prefs = await _prefs;
     await prefs.setString(_tokenKey, token);
@@ -74,5 +122,12 @@ class SharedPreferencesAppSessionStorage implements AppSessionStorage {
       return null;
     }
     return value;
+  }
+
+  String _dismissedChatThreadsKey({
+    required String userId,
+    required String activeAgentId,
+  }) {
+    return 'chat.dismissed_threads.$userId.$activeAgentId';
   }
 }

@@ -572,7 +572,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     agent: AuthenticatedFederatedAgent,
     input: CreateAgentAvatarUploadInput,
   ) {
-    const persistedAgent = await this.agentRepository.findOneBy({ id: agent.id });
+    const persistedAgent = await this.agentRepository.findOneBy({
+      id: agent.id,
+    });
 
     if (!persistedAgent) {
       throw new NotFoundException(`Agent ${agent.id} was not found.`);
@@ -625,7 +627,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     mimeType: string;
     updatedAt: string;
   }> {
-    const persistedAgent = await this.agentRepository.findOneBy({ id: agent.id });
+    const persistedAgent = await this.agentRepository.findOneBy({
+      id: agent.id,
+    });
 
     if (!persistedAgent) {
       throw new NotFoundException(`Agent ${agent.id} was not found.`);
@@ -703,7 +707,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
 
     const storedAvatar = this.readStoredAvatarMetadata(agent.profileMetadata);
     if (!storedAvatar) {
-      throw new NotFoundException(`Agent ${agentId} does not have an uploaded avatar.`);
+      throw new NotFoundException(
+        `Agent ${agentId} does not have an uploaded avatar.`,
+      );
     }
 
     const object = await this.assetStorageService.readObject({
@@ -712,12 +718,15 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (!object) {
-      throw new NotFoundException(`Avatar object for agent ${agentId} was not found.`);
+      throw new NotFoundException(
+        `Avatar object for agent ${agentId} was not found.`,
+      );
     }
 
     return {
       body: object.body,
-      mimeType: storedAvatar.mimeType || object.mimeType || 'application/octet-stream',
+      mimeType:
+        storedAvatar.mimeType || object.mimeType || 'application/octet-stream',
       byteSize: object.byteSize,
     };
   }
@@ -1830,8 +1839,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     const bucketValue = metadata[AgentsService.avatarStorageBucketMetadataKey];
     const keyValue = metadata[AgentsService.avatarStorageKeyMetadataKey];
     const mimeTypeValue = metadata[AgentsService.avatarMimeTypeMetadataKey];
-    const bucket =
-      typeof bucketValue === 'string' ? bucketValue.trim() : '';
+    const bucket = typeof bucketValue === 'string' ? bucketValue.trim() : '';
     const key = typeof keyValue === 'string' ? keyValue.trim() : '';
     const mimeType =
       typeof mimeTypeValue === 'string' && mimeTypeValue.trim()
@@ -1885,10 +1893,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return nextMetadata;
   }
 
-  private buildAgentAvatarObjectKey(
-    agentId: string,
-    fileName: string,
-  ): string {
+  private buildAgentAvatarObjectKey(agentId: string, fileName: string): string {
     return `agent-avatars/${agentId}/${randomUUID()}-${this.sanitizePathSegment(fileName)}`;
   }
 

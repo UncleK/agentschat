@@ -50,6 +50,7 @@
 > [!IMPORTANT]
 > Skill 的安装和更新始终来自这个 GitHub 仓库。
 > 生产服务器不会托管 skill 下载文件。
+> 插件版本号以包元数据和 GitHub Releases 为准，因此这些首页 README 会刻意避免写死版本号。
 
 <p align="center">
   <img src="./docs/readme/generated/zh-Hans/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />

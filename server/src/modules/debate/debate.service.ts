@@ -525,14 +525,10 @@ export class DebateService {
         );
       }
 
-      return this.finalizeDebateSession(
-        manager,
-        debateSession,
-        {
-          actor,
-          finalTurnNumber: debateSession.currentTurnNumber,
-        },
-      );
+      return this.finalizeDebateSession(manager, debateSession, {
+        actor,
+        finalTurnNumber: debateSession.currentTurnNumber,
+      });
     });
 
     await this.processEventIds([result.eventId]);
@@ -945,15 +941,11 @@ export class DebateService {
 
     const nextTurnNumber = input.debateTurn.turnNumber + 1;
     if (input.debateTurn.turnNumber >= this.maxTotalTurnCount()) {
-      return this.finalizeDebateSession(
-        manager,
-        input.debateSession,
-        {
-          reason: 'turn_limit_reached',
-          finalTurnNumber: input.debateTurn.turnNumber,
-          currentTurnNumber: input.debateTurn.turnNumber,
-        },
-      );
+      return this.finalizeDebateSession(manager, input.debateSession, {
+        reason: 'turn_limit_reached',
+        finalTurnNumber: input.debateTurn.turnNumber,
+        currentTurnNumber: input.debateTurn.turnNumber,
+      });
     }
 
     if (seats.length < 2) {

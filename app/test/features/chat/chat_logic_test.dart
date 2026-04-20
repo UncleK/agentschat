@@ -422,6 +422,236 @@ void main() {
       );
     });
 
+    testWidgets(
+      'agent participants stay primary even when the backend counterpart is a human',
+      (WidgetTester tester) async {
+        await authenticateWithMine(
+          mineResponse(
+            agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+          ),
+        );
+        final repository = _FakeChatRepository()
+          ..enqueueThreads((activeAgentId) async {
+            return ChatThreadsResponse(
+              activeAgentId: activeAgentId,
+              threads: const [
+                ChatThreadSummary(
+                  threadId: 'thread-multi-hop',
+                  counterpart: ChatThreadCounterpart(
+                    type: 'human',
+                    id: 'usr-may',
+                    displayName: 'May',
+                    handle: null,
+                    avatarUrl: null,
+                    isOnline: false,
+                    viewerFollowsAgent: false,
+                    agentFollowsViewer: false,
+                  ),
+                  lastMessage: ChatThreadLastMessage(
+                    eventId: 'evt-multi-hop-last',
+                    actor: ChatMessageActor(
+                      type: 'human',
+                      id: 'usr-may',
+                      displayName: 'May',
+                    ),
+                    contentType: 'text',
+                    preview: '你在吗',
+                    occurredAt: '2026-04-03T14:31:00.000Z',
+                  ),
+                  participants: [
+                    ChatThreadParticipant(
+                      type: 'agent',
+                      id: 'agt-owned-1',
+                      displayName: 'Owned One',
+                      handle: 'owned-one',
+                      avatarUrl: null,
+                      role: 'member',
+                      isOnline: true,
+                    ),
+                    ChatThreadParticipant(
+                      type: 'agent',
+                      id: 'agt-remote-1',
+                      displayName: 'Xenon-01',
+                      handle: 'xenon-01',
+                      avatarUrl: null,
+                      role: 'member',
+                      isOnline: true,
+                    ),
+                    ChatThreadParticipant(
+                      type: 'human',
+                      id: 'usr-chat',
+                      displayName: 'Chat User',
+                      handle: 'chat-user',
+                      avatarUrl: null,
+                      role: 'spectator',
+                      isOnline: false,
+                    ),
+                    ChatThreadParticipant(
+                      type: 'human',
+                      id: 'usr-may',
+                      displayName: 'May',
+                      handle: 'may',
+                      avatarUrl: null,
+                      role: 'spectator',
+                      isOnline: false,
+                    ),
+                  ],
+                  unreadCount: 1,
+                ),
+              ],
+              nextCursor: null,
+            );
+          });
+
+        await pumpChat(tester, chatRepository: repository);
+
+        final cardFinder = find.byKey(
+          const Key('conversation-card-thread-multi-hop'),
+        );
+        expect(cardFinder, findsOneWidget);
+        expect(
+          find.descendant(of: cardFinder, matching: find.text('Xenon-01')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('human-only routed threads stay out of the DM rail', (
+      WidgetTester tester,
+    ) async {
+      await authenticateWithMine(
+        mineResponse(
+          agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+        ),
+      );
+      final repository = _FakeChatRepository()
+        ..enqueueThreads((activeAgentId) async {
+          return ChatThreadsResponse(
+            activeAgentId: activeAgentId,
+            threads: const [
+              ChatThreadSummary(
+                threadId: 'thread-human-only',
+                counterpart: ChatThreadCounterpart(
+                  type: 'human',
+                  id: 'usr-may',
+                  displayName: 'May',
+                  handle: null,
+                  avatarUrl: null,
+                  isOnline: false,
+                  viewerFollowsAgent: false,
+                  agentFollowsViewer: false,
+                ),
+                lastMessage: ChatThreadLastMessage(
+                  eventId: 'evt-human-only-last',
+                  contentType: 'text',
+                  preview: 'Human-routed thread.',
+                  occurredAt: '2026-04-03T14:31:00.000Z',
+                ),
+                participants: [
+                  ChatThreadParticipant(
+                    type: 'agent',
+                    id: 'agt-owned-1',
+                    displayName: 'Owned One',
+                    handle: 'owned-one',
+                    avatarUrl: null,
+                    role: 'member',
+                    isOnline: true,
+                  ),
+                  ChatThreadParticipant(
+                    type: 'human',
+                    id: 'usr-may',
+                    displayName: 'May',
+                    handle: 'may',
+                    avatarUrl: null,
+                    role: 'member',
+                    isOnline: false,
+                  ),
+                  ChatThreadParticipant(
+                    type: 'human',
+                    id: 'usr-chat',
+                    displayName: 'Chat User',
+                    handle: 'chat-user',
+                    avatarUrl: null,
+                    role: 'spectator',
+                    isOnline: false,
+                  ),
+                ],
+                unreadCount: 1,
+              ),
+            ],
+            nextCursor: null,
+          );
+        });
+
+      await pumpChat(tester, chatRepository: repository);
+
+      expect(
+        find.byKey(const Key('conversation-card-thread-human-only')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('long press hides a thread for the current active agent', (
+      WidgetTester tester,
+    ) async {
+      await authenticateWithMine(
+        mineResponse(
+          agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+        ),
+      );
+      final repository = _FakeChatRepository()
+        ..enqueueThreads((activeAgentId) async {
+          return ChatThreadsResponse(
+            activeAgentId: activeAgentId,
+            threads: const [
+              ChatThreadSummary(
+                threadId: 'thread-hideable',
+                counterpart: ChatThreadCounterpart(
+                  type: 'agent',
+                  id: 'agt-remote-1',
+                  displayName: 'Xenon-01',
+                  handle: 'xenon-01',
+                  avatarUrl: null,
+                  isOnline: true,
+                  viewerFollowsAgent: true,
+                  agentFollowsViewer: true,
+                ),
+                lastMessage: ChatThreadLastMessage(
+                  eventId: 'evt-hideable-last',
+                  contentType: 'text',
+                  preview: 'Hide me from the DM list.',
+                  occurredAt: '2026-04-03T14:31:00.000Z',
+                ),
+                unreadCount: 0,
+              ),
+            ],
+            nextCursor: null,
+          );
+        });
+
+      await pumpChat(tester, chatRepository: repository);
+
+      final cardFinder = find.byKey(const Key('conversation-card-thread-hideable'));
+      expect(cardFinder, findsOneWidget);
+
+      await tester.longPress(cardFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('chat-dismiss-thread-button')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('chat-dismiss-thread-button')));
+      await tester.pumpAndSettle();
+
+      expect(cardFinder, findsNothing);
+      expect(
+        await storage.readDismissedChatThreadIds(
+          userId: 'usr-chat',
+          activeAgentId: 'agt-owned-1',
+        ),
+        ['thread-hideable'],
+      );
+    });
+
     testWidgets('sending from an open thread posts a human-authored message', (
       WidgetTester tester,
     ) async {

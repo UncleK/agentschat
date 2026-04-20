@@ -94,104 +94,25 @@ void main() {
           ],
         );
       })
-      ..enqueueImportHumanOwnedAgent(({
-        required handle,
-        required displayName,
-        avatarUrl,
-        bio,
-      }) async {
-        expect(handle, 'imported-agent');
-        expect(displayName, 'Imported Agent');
-        expect(bio, 'Imported from integration test');
-        return <String, dynamic>{'id': 'agt-imported-1'};
-      })
-      ..enqueueReadMine(() async {
-        return mineResponse(
-          agents: [
-            agentSummary(
-              id: 'agt-imported-1',
-              handle: 'imported-agent',
-              displayName: 'Imported Agent',
-              bio: 'Imported from integration test',
-            ),
-            agentSummary(
-              id: 'agt-owned-1',
-              handle: 'owned-one',
-              displayName: 'Owned One',
-              bio: 'Primary owned agent',
-            ),
-            agentSummary(
-              id: 'agt-owned-2',
-              handle: 'owned-two',
-              displayName: 'Owned Two',
-            ),
-          ],
-          claimableAgents: [
-            agentSummary(
-              id: 'agt-claimable-1',
-              handle: 'claimable-one',
-              displayName: 'Claimable One',
-              ownerType: 'self',
-            ),
-          ],
-          pendingClaims: [
-            pendingClaimSummary(
-              claimRequestId: 'claim-pending-1',
-              agentId: 'agt-pending-1',
-              handle: 'pending-one',
-              displayName: 'Pending One',
-            ),
-          ],
+      ..enqueueCreateHumanOwnedAgentInvitation(() async {
+        return const HumanOwnedAgentInvitation(
+          agentId: 'agt-import-invite-1',
+          code: 'ABC123XYZ789',
+          bootstrapPath: '/api/v1/agents/bootstrap?claimToken=claim.v1.import',
+          claimToken: 'claim.v1.import',
+          expiresAt: '2026-04-17T11:00:00.000Z',
         );
       })
       ..enqueueRequestClaim((agentId, expiresInMinutes) async {
-        expect(agentId, 'agt-claimable-1');
+        expect(agentId, isNull);
         expect(expiresInMinutes, 60);
         return const AgentClaimRequest(
           claimRequestId: 'claim-claimable-1',
-          agentId: 'agt-claimable-1',
+          agentId: '',
           status: 'pending',
           requestedAt: '2026-04-17T10:00:00.000Z',
           expiresAt: '2026-04-17T11:00:00.000Z',
           challengeToken: 'claimreq.v1.integration',
-        );
-      })
-      ..enqueueReadMine(() async {
-        return mineResponse(
-          agents: [
-            agentSummary(
-              id: 'agt-imported-1',
-              handle: 'imported-agent',
-              displayName: 'Imported Agent',
-              bio: 'Imported from integration test',
-            ),
-            agentSummary(
-              id: 'agt-owned-1',
-              handle: 'owned-one',
-              displayName: 'Owned One',
-              bio: 'Primary owned agent',
-            ),
-            agentSummary(
-              id: 'agt-owned-2',
-              handle: 'owned-two',
-              displayName: 'Owned Two',
-            ),
-          ],
-          claimableAgents: const [],
-          pendingClaims: [
-            pendingClaimSummary(
-              claimRequestId: 'claim-claimable-1',
-              agentId: 'agt-claimable-1',
-              handle: 'claimable-one',
-              displayName: 'Claimable One',
-            ),
-            pendingClaimSummary(
-              claimRequestId: 'claim-pending-1',
-              agentId: 'agt-pending-1',
-              handle: 'pending-one',
-              displayName: 'Pending One',
-            ),
-          ],
         );
       });
     final storage = InMemoryAppSessionStorage();
@@ -214,15 +135,11 @@ void main() {
 
     expect(find.byKey(const Key('surface-hub')), findsOneWidget);
     expect(find.byKey(const Key('add-agent-button')), findsOneWidget);
-    expect(find.byKey(const Key('claimable-agents-section')), findsOneWidget);
+    expect(find.byKey(const Key('human-access-section')), findsOneWidget);
     expect(find.byKey(const Key('pending-claims-section')), findsOneWidget);
-    expect(find.byKey(const Key('human-safety-section')), findsOneWidget);
+    expect(find.byKey(const Key('agent-security-section')), findsOneWidget);
     expect(
       find.byKey(const Key('owned-agent-card-agt-owned-1')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('claimable-agent-card-agt-claimable-1')),
       findsOneWidget,
     );
     expect(
@@ -231,26 +148,21 @@ void main() {
     );
     expect(sessionController.currentActiveAgent?.id, 'agt-owned-1');
     expect(
-      find.byKey(const Key('agent-safety-section-agt-owned-1')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('following-section-agt-owned-1')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('followed-section-agt-owned-1')),
+      find.byKey(const Key('agent-safety-autonomy-slider-agt-owned-1')),
       findsOneWidget,
     );
     expect(sessionController.currentActiveAgent?.id, isNot('agt-claimable-1'));
 
-    await tester.ensureVisible(find.byKey(const Key('hub-agent-next')));
-    await tester.tap(find.byKey(const Key('hub-agent-next')));
+    await tester.ensureVisible(find.byKey(const Key('owned-agent-carousel')));
+    await tester.drag(
+      find.byKey(const Key('owned-agent-carousel')),
+      const Offset(-240, 0),
+    );
     await tester.pumpAndSettle();
 
     expect(sessionController.currentActiveAgent?.id, 'agt-owned-2');
     expect(
-      find.byKey(const Key('agent-safety-section-agt-owned-2')),
+      find.byKey(const Key('agent-safety-autonomy-slider-agt-owned-2')),
       findsOneWidget,
     );
 
@@ -258,40 +170,26 @@ void main() {
     await tester.tap(find.byKey(const Key('add-agent-button')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('create-new-agent-disabled')), findsOneWidget);
-    expect(find.byKey(const Key('import-agent-option')), findsOneWidget);
-    await tester.enterText(
-      find.byKey(const Key('import-handle-field')),
-      'imported-agent',
-    );
-    await tester.enterText(
-      find.byKey(const Key('import-display-name-field')),
-      'Imported Agent',
-    );
-    await tester.enterText(
-      find.byKey(const Key('import-bio-field')),
-      'Imported from integration test',
-    );
+    expect(find.byKey(const Key('add-agent-selection-import')), findsOneWidget);
+    expect(find.byKey(const Key('add-agent-selection-create')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('add-agent-selection-import')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('complete-import-button')));
+    expect(find.byKey(const Key('generate-import-link-button')), findsOneWidget);
+    expect(find.byKey(const Key('generated-import-link-text')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('generate-import-link-button')));
     await tester.pumpAndSettle();
 
-    expect(sessionController.currentActiveAgent?.id, 'agt-imported-1');
-    expect(
-      find.byKey(const Key('owned-agent-card-agt-imported-1')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('claimable-agent-card-agt-claimable-1')),
-      findsOneWidget,
-    );
+    expect(sessionController.currentActiveAgent?.id, 'agt-owned-2');
+    expect(find.byKey(const Key('generated-import-link-text')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('close-import-agent-button')));
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(
-      find.byKey(const Key('claim-agent-button-agt-claimable-1')),
+      find.byKey(const Key('human-access-claim-agent-button')),
     );
     await tester.tap(
-      find.byKey(const Key('claim-agent-button-agt-claimable-1')),
+      find.byKey(const Key('human-access-claim-agent-button')),
     );
     await tester.pumpAndSettle();
 
@@ -300,7 +198,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(sessionController.currentActiveAgent?.id, 'agt-imported-1');
+    expect(sessionController.currentActiveAgent?.id, 'agt-owned-2');
     expect(
       find.byKey(const Key('pending-claim-card-claim-pending-1')),
       findsOneWidget,

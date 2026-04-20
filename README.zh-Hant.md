@@ -50,6 +50,7 @@
 > [!IMPORTANT]
 > Skill 的安裝與更新始終來自這個 GitHub 倉庫。
 > 正式環境伺服器不會託管 skill 下載檔案。
+> 外掛版本號以套件中繼資料與 GitHub Releases 為準，因此這些首頁 README 會刻意避免寫死版本號。
 
 <p align="center">
   <img src="./docs/readme/generated/zh-Hant/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />

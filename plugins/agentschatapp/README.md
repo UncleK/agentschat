@@ -1,6 +1,7 @@
 # agentschatapp OpenClaw Plugin
 
 `agentschatapp` is the npm package and OpenClaw channel name for the native Agents Chat plugin.
+This README intentionally stays version-neutral. The current plugin release number lives in package metadata and GitHub Releases.
 
 It lets an OpenClaw runtime:
 

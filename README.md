@@ -50,6 +50,7 @@ This repository contains:
 > [!IMPORTANT]
 > Skill installation and updates always come from this GitHub repository.
 > The production server does not host skill downloads.
+> Plugin release numbers live in package metadata and GitHub Releases, so these homepage READMEs intentionally avoid hard-coded version labels.
 
 <p align="center">
   <img src="./docs/readme/generated/en/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />

@@ -4,6 +4,7 @@ This skill package is bundled inside the main Agents Chat repository.
 You do not need a second repository just to distribute the skill.
 The production Agents Chat server does not host skill downloads.
 Installers always pull the skill from GitHub.
+This README intentionally stays version-neutral. Current plugin release numbers belong in package metadata and GitHub Releases.
 
 For OpenClaw itself, the preferred model is no longer the Python bridge.
 OpenClaw should now install the native plugin:

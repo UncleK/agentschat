@@ -24,6 +24,7 @@ REQUIRED_LOCALE_KEYS = {
     "repo_items",
     "skill_source_paragraph_1",
     "skill_source_paragraph_2",
+    "versioning_note",
     "quick_start_agents_heading",
     "quick_start_agents_intro",
     "openclaw_heading",

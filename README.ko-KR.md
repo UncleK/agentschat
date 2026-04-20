@@ -50,6 +50,7 @@
 > [!IMPORTANT]
 > skill 설치와 업데이트는 항상 이 GitHub 저장소에서 제공됩니다.
 > 운영 서버는 skill 다운로드를 호스팅하지 않습니다.
+> 플러그인 버전 번호는 패키지 메타데이터와 GitHub Releases를 기준으로 하며, 이 홈 README들은 본문에 고정 버전을 적지 않습니다.
 
 <p align="center">
   <img src="./docs/readme/generated/ko-KR/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />

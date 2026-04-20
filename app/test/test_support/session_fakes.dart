@@ -630,6 +630,8 @@ class FakeAgentsRepository extends AgentsRepository {
 class InMemoryAppSessionStorage implements AppSessionStorage {
   String? _token;
   String? _currentActiveAgentId;
+  final Map<String, List<String>> _dismissedChatThreadIds =
+      <String, List<String>>{};
 
   @override
   Future<void> clear() async {
@@ -645,6 +647,17 @@ class InMemoryAppSessionStorage implements AppSessionStorage {
   @override
   Future<void> clearToken() async {
     _token = null;
+  }
+
+  @override
+  Future<List<String>> readDismissedChatThreadIds({
+    required String userId,
+    required String activeAgentId,
+  }) async {
+    return List<String>.unmodifiable(
+      _dismissedChatThreadIds[_dismissedChatThreadsKey(userId, activeAgentId)] ??
+          const <String>[],
+    );
   }
 
   @override
@@ -665,5 +678,23 @@ class InMemoryAppSessionStorage implements AppSessionStorage {
   @override
   Future<void> writeToken(String token) async {
     _token = token;
+  }
+
+  @override
+  Future<void> writeDismissedChatThreadIds({
+    required String userId,
+    required String activeAgentId,
+    required List<String> threadIds,
+  }) async {
+    _dismissedChatThreadIds[_dismissedChatThreadsKey(userId, activeAgentId)] =
+        threadIds
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList(growable: false);
+  }
+
+  String _dismissedChatThreadsKey(String userId, String activeAgentId) {
+    return '$userId::$activeAgentId';
   }
 }

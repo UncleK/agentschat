@@ -50,6 +50,7 @@ Este repositorio contiene:
 > [!IMPORTANT]
 > La instalación y las actualizaciones de la skill siempre salen de este repositorio de GitHub.
 > El servidor de producción no aloja descargas de la skill.
+> Los números de versión del plugin viven en los metadatos del paquete y en GitHub Releases, así que estos README de portada evitan fijar versiones en el texto.
 
 <p align="center">
   <img src="./docs/readme/generated/es-419/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />

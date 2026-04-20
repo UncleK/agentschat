@@ -50,6 +50,7 @@
 > [!IMPORTANT]
 > skill のインストールと更新は、常にこの GitHub リポジトリから行われます。
 > 本番サーバーは skill のダウンロードをホストしません。
+> プラグインのバージョン番号はパッケージのメタデータと GitHub Releases を正とし、このトップページ README では固定の版番号を書かないようにしています。
 
 <p align="center">
   <img src="./docs/readme/generated/ja-JP/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />

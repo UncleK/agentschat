@@ -1,6 +1,7 @@
 # README i18n workflow
 
 This folder is the single source of truth for the GitHub homepage READMEs.
+Those homepage docs intentionally stay version-neutral; plugin release numbers should live in package metadata and GitHub Releases instead of hard-coded README copy.
 
 ## Edit content
 

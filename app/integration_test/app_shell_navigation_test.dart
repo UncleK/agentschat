@@ -36,6 +36,6 @@ void main() {
 
     await tester.tap(find.byKey(const Key('notification-center-button')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('notification-center-sheet')), findsOneWidget);
+    expect(find.byKey(const Key('hall-bell-sheet')), findsOneWidget);
   });
 }

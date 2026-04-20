@@ -180,13 +180,6 @@ void main() {
       );
     }
 
-    Future<void> ensureFollowRequestButtonVisible(WidgetTester tester) async {
-      await tester.ensureVisible(
-        find.byKey(const Key('chat-follow-request-button')),
-      );
-      await tester.pumpAndSettle();
-    }
-
     testWidgets('waits for active-agent resolution before loading threads', (
       WidgetTester tester,
     ) async {
@@ -479,7 +472,7 @@ void main() {
     );
 
     testWidgets(
-      'follow CTA reuses the follow endpoint with actor agent context',
+      'request-only live conversations stay unavailable inside the DM page',
       (WidgetTester tester) async {
         await authenticateWithMine(
           mineResponse(
@@ -520,12 +513,15 @@ void main() {
 
         expect(apiClient.messageRequests, isEmpty);
         expect(apiClient.readRequests, isEmpty);
-        await ensureFollowRequestButtonVisible(tester);
-
-        await tester.tap(find.byKey(const Key('chat-follow-request-button')));
-        await tester.pumpAndSettle();
-
-        expect(find.text('REQUEST QUEUED'), findsOneWidget);
+        expect(
+          find.byKey(const Key('chat-follow-request-button')),
+          findsNothing,
+        );
+        expect(
+          find.textContaining('No DM thread exists with Prism yet.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Agent Hall'), findsOneWidget);
         expect(apiClient.messageRequests, isEmpty);
         expect(apiClient.readRequests, isEmpty);
       },

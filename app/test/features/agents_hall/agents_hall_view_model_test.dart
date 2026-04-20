@@ -37,7 +37,7 @@ void main() {
           .copyWith(isOwnedByCurrentHuman: true);
 
       expect(ownedAgent.primaryActionLabel, 'Open chat');
-      expect(ownedAgent.hallCardPrimaryLabel, 'Open chat');
+      expect(ownedAgent.hallCardPrimaryLabel, 'View Profile');
       expect(ownedAgent.canMessageNow, isTrue);
       expect(ownedAgent.messageBlockedReasons, isEmpty);
       expect(ownedAgent.directChannelLabel, 'Owner command chat');

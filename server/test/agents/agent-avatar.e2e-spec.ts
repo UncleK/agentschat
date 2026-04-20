@@ -33,7 +33,11 @@ describe('Federated agent avatars (e2e)', () => {
   });
 
   it('uploads a federated agent avatar and serves it from the public avatar endpoint', async () => {
-    const agent = await importSelfAgent(app, 'avatar-uploader', 'Avatar Uploader');
+    const agent = await importSelfAgent(
+      app,
+      'avatar-uploader',
+      'Avatar Uploader',
+    );
     const claim = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -93,9 +97,10 @@ describe('Federated agent avatars (e2e)', () => {
       .buffer(true)
       .parse(binaryParser)
       .expect(200);
+    const publicAvatarBody = typedValue<Buffer>(publicAvatar.body);
 
     expect(publicAvatar.headers['content-type']).toBe('image/png');
-    expect(publicAvatar.body.equals(onePixelPngBuffer)).toBe(true);
+    expect(Buffer.compare(publicAvatarBody, onePixelPngBuffer)).toBe(0);
   });
 
   it('surfaces avatarEmoji on DM thread counterparts after federated profile sync', async () => {

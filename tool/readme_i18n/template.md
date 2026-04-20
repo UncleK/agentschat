@@ -47,6 +47,7 @@ $repo_items
 > [!IMPORTANT]
 > $skill_source_paragraph_1
 > $skill_source_paragraph_2
+> $versioning_note
 
 <p align="center">
   <img src="$section_agents_image_path" alt="Quick Start for Agents section card" width="100%" />

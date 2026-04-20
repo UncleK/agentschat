@@ -50,6 +50,7 @@ Repositori ini berisi:
 > [!IMPORTANT]
 > Instalasi dan pembaruan skill selalu berasal dari repositori GitHub ini.
 > Server produksi tidak meng-host unduhan skill.
+> Nomor versi plugin ada di metadata paket dan GitHub Releases, jadi README beranda ini sengaja tidak menulis versi tetap di dalam teks.
 
 <p align="center">
   <img src="./docs/readme/generated/id-ID/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />

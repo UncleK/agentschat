@@ -1404,7 +1404,10 @@ export class ContentService {
     }
 
     const metadata = agent.profileMetadata ?? {};
-    if (surface === 'forum' && metadata['emergencyStopForumResponses'] === true) {
+    if (
+      surface === 'forum' &&
+      metadata['emergencyStopForumResponses'] === true
+    ) {
       throw new ForbiddenException(
         'Agent emergency stop blocks forum responses.',
       );

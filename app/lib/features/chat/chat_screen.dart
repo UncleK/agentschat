@@ -87,6 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _followRequestErrorMessage;
   Timer? _threadRefreshTimer;
   int _handledConversationRequestId = 0;
+  Set<String> _dismissedConversationIds = <String>{};
 
   @override
   void initState() {
@@ -140,6 +141,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _chatRepository = widget.chatRepository;
       _followRepository = widget.followRepository;
       _sessionSignature = null;
+      _dismissedConversationIds = <String>{};
       return;
     }
 
@@ -273,6 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() {
         _viewModel = ChatViewModel.resolvingActiveAgent();
+        _dismissedConversationIds = <String>{};
         _showCompactThread = false;
         _isLoadingMessages = false;
         _isSendingMessage = false;
@@ -298,6 +301,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       setState(() {
         _viewModel = ChatViewModel.previewForActiveAgent(previewAgentName);
+        _dismissedConversationIds = <String>{};
         _showCompactThread = false;
         _isLoadingMessages = false;
         _isSendingMessage = false;
@@ -327,6 +331,7 @@ class _ChatScreenState extends State<ChatScreen> {
             zhHans: '请先登录，并在 Hub 里选择一个自有智能体来加载私信。',
           ),
         );
+        _dismissedConversationIds = <String>{};
         _showCompactThread = false;
         _isLoadingMessages = false;
         _isSendingMessage = false;
@@ -356,6 +361,7 @@ class _ChatScreenState extends State<ChatScreen> {
             zhHans: '请先在 Hub 里选择一个自有智能体来加载私信。',
           ),
         );
+        _dismissedConversationIds = <String>{};
         _showCompactThread = false;
         _isLoadingMessages = false;
         _isSendingMessage = false;
@@ -398,6 +404,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
+      final dismissedConversationIds = (await session.storage
+              .readDismissedChatThreadIds(
+                userId: userId,
+                activeAgentId: activeAgentId,
+              ))
+          .toSet();
       final response = await _chatRepository!.getThreads(
         activeAgentId: activeAgentId,
       );
@@ -413,7 +425,12 @@ class _ChatScreenState extends State<ChatScreen> {
       var conversations = response.threads
           .where(
             (thread) =>
-                !_isOwnedAgentCommandThread(thread, currentHumanId: userId),
+                _shouldIncludeConversationInRail(
+                  thread,
+                  activeAgentId: activeAgentId,
+                  currentHumanId: userId,
+                ) &&
+                !dismissedConversationIds.contains(thread.threadId),
           )
           .map(
             (thread) => _mapConversation(
@@ -437,6 +454,7 @@ class _ChatScreenState extends State<ChatScreen> {
           conversations: conversations,
           activeAgentName: activeAgentName,
         );
+        _dismissedConversationIds = dismissedConversationIds;
         _isLoadingMessages = false;
         _isSendingMessage = false;
         _messageLoadError = null;
@@ -472,6 +490,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           activeAgentName: activeAgentName,
         );
+        _dismissedConversationIds = <String>{};
         _isLoadingMessages = false;
         _messageLoadError = null;
         _followRequestConversationId = null;
@@ -500,6 +519,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           activeAgentName: activeAgentName,
         );
+        _dismissedConversationIds = <String>{};
         _isLoadingMessages = false;
         _messageLoadError = null;
         _followRequestConversationId = null;
@@ -875,6 +895,72 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
     return null;
+  }
+
+  Future<void> _dismissConversation(ChatConversationModel conversation) async {
+    final session = AppSessionScope.maybeOf(context);
+    final userId = session?.currentUser?.id;
+    final activeAgentId = session?.currentActiveAgent?.id;
+    if (session == null ||
+        userId == null ||
+        userId.isEmpty ||
+        activeAgentId == null ||
+        activeAgentId.isEmpty) {
+      return;
+    }
+
+    final confirmed = await showSwipeBackSheet<bool>(
+      context: context,
+      builder: (context) => _DismissConversationSheet(
+        conversationName: conversation.remoteAgentName,
+      ),
+    );
+
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    final nextDismissedConversationIds = {
+      ..._dismissedConversationIds,
+      conversation.id,
+    }.toList(growable: false)..sort();
+    await session.storage.writeDismissedChatThreadIds(
+      userId: userId,
+      activeAgentId: activeAgentId,
+      threadIds: nextDismissedConversationIds,
+    );
+    if (!mounted) {
+      return;
+    }
+
+    final isSelectedConversation =
+        _viewModel.selectedConversationId == conversation.id;
+    setState(() {
+      _dismissedConversationIds = nextDismissedConversationIds.toSet();
+      _viewModel = _viewModel.copyWith(
+        conversations: _viewModel.conversations
+            .where((item) => item.id != conversation.id)
+            .toList(growable: false),
+        selectedConversationId: isSelectedConversation
+            ? null
+            : _viewModel.selectedConversationId,
+        isThreadSearchOpen: isSelectedConversation
+            ? false
+            : _viewModel.isThreadSearchOpen,
+        threadSearchQuery: isSelectedConversation
+            ? ''
+            : _viewModel.threadSearchQuery,
+      );
+      if (isSelectedConversation) {
+        _showCompactThread = false;
+        _isLoadingMessages = false;
+        _messageLoadError = null;
+        _sendMessageError = null;
+        _lastShareAnnouncement = null;
+        _clearComposerDraft(unfocus: true);
+        _syncThreadSearchController();
+      }
+    });
   }
 
   Future<void> _openConversationSearchSheet() async {
@@ -1394,17 +1480,22 @@ class _ChatScreenState extends State<ChatScreen> {
     required String activeAgentId,
     required String currentUserId,
   }) {
-    final counterpartName = _displayName(
-      thread.counterpart.displayName,
-      fallback: thread.counterpart.handle ?? thread.counterpart.id,
+    final primaryRemoteAgent = _resolvePrimaryRemoteAgentParticipant(
+      thread.participants,
+      activeAgentId: activeAgentId,
     );
-    final counterpartHandle =
-        thread.counterpart.handle == null ||
-            thread.counterpart.handle!.trim().isEmpty
-        ? '@${thread.counterpart.id}'
-        : thread.counterpart.handle!.startsWith('@')
-        ? thread.counterpart.handle!
-        : '@${thread.counterpart.handle!}';
+    final primaryDisplayName = _displayName(
+      primaryRemoteAgent?.displayName ?? thread.counterpart.displayName,
+      fallback:
+          primaryRemoteAgent?.handle ??
+          primaryRemoteAgent?.id ??
+          thread.counterpart.handle ??
+          thread.counterpart.id,
+    );
+    final primaryHandle = _normalizedDisplayHandle(
+      handle: primaryRemoteAgent?.handle ?? thread.counterpart.handle,
+      fallbackId: primaryRemoteAgent?.id ?? thread.counterpart.id,
+    );
     final participants = _mapConversationParticipants(
       thread.participants,
       activeAgentId: activeAgentId,
@@ -1414,16 +1505,21 @@ class _ChatScreenState extends State<ChatScreen> {
     final latestSpeaker = thread.lastMessage.actor;
     final latestSpeakerLabel = _displayName(
       latestSpeaker?.displayName ?? '',
-      fallback: counterpartName,
+      fallback: primaryDisplayName,
     );
     final latestSpeakerType =
         latestSpeaker?.type.toLowerCase() ??
-        thread.counterpart.type.toLowerCase();
+        (primaryRemoteAgent?.type.toLowerCase() ??
+            thread.counterpart.type.toLowerCase());
+    final primaryIsSerializedCounterpart =
+        primaryRemoteAgent == null ||
+        (thread.counterpart.type.toLowerCase() == 'agent' &&
+            thread.counterpart.id == primaryRemoteAgent.id);
     return ChatConversationModel(
       id: thread.threadId,
-      remoteAgentName: counterpartName,
-      remoteAgentHeadline: counterpartHandle,
-      channelTitle: counterpartName,
+      remoteAgentName: primaryDisplayName,
+      remoteAgentHeadline: primaryHandle,
+      channelTitle: primaryDisplayName,
       participantsLabel: _participantStatusLabel(participantCount),
       latestPreview:
           _shouldSuppressThreadPreview(thread.lastMessage.preview) ||
@@ -1437,17 +1533,56 @@ class _ChatScreenState extends State<ChatScreen> {
       remoteDmMode: ChatRemoteDmMode.open,
       messages: const [],
       participants: participants,
-      counterpartType: thread.counterpart.type,
-      counterpartId: thread.counterpart.id,
-      avatarUrl: thread.counterpart.avatarUrl,
-      avatarEmoji: thread.counterpart.avatarEmoji,
+      counterpartType: primaryRemoteAgent?.type ?? thread.counterpart.type,
+      counterpartId: primaryRemoteAgent?.id ?? thread.counterpart.id,
+      avatarUrl: primaryRemoteAgent?.avatarUrl ?? thread.counterpart.avatarUrl,
+      avatarEmoji:
+          primaryRemoteAgent?.avatarEmoji ?? thread.counterpart.avatarEmoji,
       hasUnread: thread.unreadCount > 0,
       unreadCount: thread.unreadCount,
-      remoteAgentOnline: thread.counterpart.isOnline,
+      remoteAgentOnline:
+          primaryRemoteAgent?.isOnline ?? thread.counterpart.isOnline,
       hasExistingThread: true,
-      viewerFollowsRemoteAgent: thread.counterpart.viewerFollowsAgent,
-      remoteAgentFollowsViewer: thread.counterpart.agentFollowsViewer,
+      viewerFollowsRemoteAgent: primaryIsSerializedCounterpart
+          ? thread.counterpart.viewerFollowsAgent
+          : false,
+      remoteAgentFollowsViewer: primaryIsSerializedCounterpart
+          ? thread.counterpart.agentFollowsViewer
+          : false,
     );
+  }
+
+  ChatThreadParticipant? _resolvePrimaryRemoteAgentParticipant(
+    List<ChatThreadParticipant> participants, {
+    required String activeAgentId,
+  }) {
+    for (final participant in participants) {
+      if (participant.type.toLowerCase() != 'agent' ||
+          participant.id == activeAgentId) {
+        continue;
+      }
+      if (participant.role.toLowerCase() == 'member') {
+        return participant;
+      }
+    }
+
+    for (final participant in participants) {
+      if (participant.type.toLowerCase() == 'agent' &&
+          participant.id != activeAgentId) {
+        return participant;
+      }
+    }
+    return null;
+  }
+
+  String _normalizedDisplayHandle({
+    required String? handle,
+    required String fallbackId,
+  }) {
+    if (handle == null || handle.trim().isEmpty) {
+      return '@$fallbackId';
+    }
+    return handle.startsWith('@') ? handle : '@$handle';
   }
 
   List<ChatConversationParticipant> _mapConversationParticipants(
@@ -1520,6 +1655,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return thread.counterpart.type.toLowerCase() == 'human' &&
         thread.counterpart.id == currentHumanId;
+  }
+
+  bool _shouldIncludeConversationInRail(
+    ChatThreadSummary thread, {
+    required String activeAgentId,
+    required String currentHumanId,
+  }) {
+    if (_isOwnedAgentCommandThread(thread, currentHumanId: currentHumanId)) {
+      return false;
+    }
+
+    if (_resolvePrimaryRemoteAgentParticipant(
+          thread.participants,
+          activeAgentId: activeAgentId,
+        ) !=
+        null) {
+      return true;
+    }
+
+    return thread.counterpart.type.toLowerCase() == 'agent';
   }
 
   List<ChatMessageModel> _mapVisibleMessages(
@@ -1917,6 +2072,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 onFocusConversationSearch:
                                     _focusConversationSearch,
                                 onSelectConversation: _selectConversation,
+                                onLongPressConversation: _dismissConversation,
                               ),
                             ),
                             const SizedBox(width: AppSpacing.lg),
@@ -2048,6 +2204,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                   onFocusConversationSearch:
                                       _focusConversationSearch,
                                   onSelectConversation: _selectConversation,
+                                  onLongPressConversation:
+                                      _dismissConversation,
                                 ),
                         ),
                 ),
@@ -2085,6 +2243,7 @@ class _ConversationRail extends StatelessWidget {
     required this.onClearConversationSearch,
     required this.onFocusConversationSearch,
     required this.onSelectConversation,
+    required this.onLongPressConversation,
   });
 
   final ChatViewModel viewModel;
@@ -2097,6 +2256,7 @@ class _ConversationRail extends StatelessWidget {
   final VoidCallback onClearConversationSearch;
   final VoidCallback onFocusConversationSearch;
   final ValueChanged<ChatConversationModel> onSelectConversation;
+  final ValueChanged<ChatConversationModel> onLongPressConversation;
 
   @override
   Widget build(BuildContext context) {
@@ -2216,6 +2376,8 @@ class _ConversationRail extends StatelessWidget {
                           statusLabel: viewModel.statusLabelFor(conversation),
                           compact: compact,
                           onTap: () => onSelectConversation(conversation),
+                          onLongPress: () =>
+                              onLongPressConversation(conversation),
                         );
                       },
                       separatorBuilder: (context, index) {
@@ -2310,6 +2472,7 @@ class _LegacyConversationCard extends StatelessWidget {
     required this.statusLabel,
     required this.compact,
     required this.onTap,
+    required this.onLongPress,
   });
 
   final ChatConversationModel conversation;
@@ -2317,6 +2480,7 @@ class _LegacyConversationCard extends StatelessWidget {
   final String statusLabel;
   final bool compact;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -2333,6 +2497,7 @@ class _LegacyConversationCard extends StatelessWidget {
       child: InkWell(
         key: Key('conversation-card-${conversation.id}'),
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: cardRadius,
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -2535,6 +2700,7 @@ class _ConversationCard extends StatelessWidget {
     required this.statusLabel,
     required this.compact,
     required this.onTap,
+    required this.onLongPress,
   });
 
   final ChatConversationModel conversation;
@@ -2542,6 +2708,7 @@ class _ConversationCard extends StatelessWidget {
   final String statusLabel;
   final bool compact;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -2567,6 +2734,7 @@ class _ConversationCard extends StatelessWidget {
       child: InkWell(
         key: Key('conversation-card-${conversation.id}'),
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: cardRadius,
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -3970,46 +4138,11 @@ class _OpenThreadView extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTight = constraints.maxHeight < 220;
         final bottomPadding = compact ? AppSpacing.xs : AppSpacing.sm;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!isTight) ...[
-              Center(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceHighest.withValues(alpha: 0.28),
-                    borderRadius: AppRadii.pill,
-                    border: Border.all(
-                      color: AppColors.outline.withValues(alpha: 0.08),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: 8,
-                    ),
-                    child: Text(
-                      context.localizedText(
-                        key: 'msgCYCLE892MULTILINKESTABLISHED1d1e996a',
-                        en: 'CYCLE 892 // MULTI-LINK ESTABLISHED',
-                        zhHans: '周期 892 // 多链路已建立',
-                      ),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.onSurfaceMuted.withValues(alpha: 0.76),
-                        letterSpacing: context.localeAwareLetterSpacing(
-                          latin: 1.7,
-                          chinese: 0.3,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ],
             Expanded(
               child: messages.isEmpty
                   ? _ThreadEmptyState(
@@ -4376,6 +4509,106 @@ class _ComposerActionButton extends StatelessWidget {
         color: accentColor,
         iconSize: 22,
         constraints: const BoxConstraints.tightFor(width: 46, height: 46),
+      ),
+    );
+  }
+}
+
+class _DismissConversationSheet extends StatelessWidget {
+  const _DismissConversationSheet({required this.conversationName});
+
+  final String conversationName;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: GlassPanel(
+          borderRadius: AppRadii.hero,
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          accentColor: AppColors.error,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.localizedText(
+                            en: 'Hide thread',
+                            zhHans: '隐藏会话',
+                          ),
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          context.localizedText(
+                            args: <String, Object?>{
+                              'conversationName': conversationName,
+                            },
+                            en: 'Remove $conversationName from this DM list on the current device.',
+                            zhHans: '把 $conversationName 从当前设备上的 DM 列表里隐藏。',
+                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.onSurfaceMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.14),
+                      borderRadius: AppRadii.pill,
+                    ),
+                    child: const Icon(
+                      Icons.visibility_off_rounded,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                context.localizedText(
+                  en: 'This only hides the thread locally for the current active agent. Server-side deletion is not applied here.',
+                  zhHans: '这里只会针对当前激活 agent 在本地隐藏这条会话，不会删除服务器上的线程。',
+                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.onSurfaceMuted.withValues(alpha: 0.88),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              SizedBox(
+                width: double.infinity,
+                child: PrimaryGradientButton(
+                  key: const Key('chat-dismiss-thread-button'),
+                  label: context.localizedText(
+                    en: 'Hide thread',
+                    zhHans: '隐藏会话',
+                  ),
+                  icon: Icons.visibility_off_rounded,
+                  useTertiary: true,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: SwipeBackSheetBackButton(),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -213,7 +213,9 @@ describe('Debate state machine (e2e)', () => {
     expect(openingViewBody.currentTurn?.turnNumber).toBe(1);
     expect(openingViewBody.currentTurn?.seatId).toBe(createdSeats[0].id);
     expect(openingViewBody.currentTurn?.deadlineAt).toEqual(expect.any(String));
-    const openingDeadlineMs = Date.parse(openingViewBody.currentTurn?.deadlineAt ?? '');
+    const openingDeadlineMs = Date.parse(
+      openingViewBody.currentTurn?.deadlineAt ?? '',
+    );
     expect(openingDeadlineMs - Date.now()).toBeGreaterThan(150_000);
     expect(openingDeadlineMs - Date.now()).toBeLessThanOrEqual(205_000);
     expect(openingViewBody.formalTurns).toHaveLength(1);
@@ -797,8 +799,16 @@ describe('Debate state machine (e2e)', () => {
       'debate-duration-host@example.com',
       'Debate Duration Host',
     );
-    const pro = await importSelfAgent(app, 'debate-duration-pro', 'Duration Pro');
-    const con = await importSelfAgent(app, 'debate-duration-con', 'Duration Con');
+    const pro = await importSelfAgent(
+      app,
+      'debate-duration-pro',
+      'Duration Pro',
+    );
+    const con = await importSelfAgent(
+      app,
+      'debate-duration-con',
+      'Duration Con',
+    );
 
     const createResponse = await request(app.getHttpServer())
       .post('/api/v1/debates')
@@ -850,8 +860,16 @@ describe('Debate state machine (e2e)', () => {
       'debate-turn-cap-host@example.com',
       'Debate Turn Cap Host',
     );
-    const pro = await importSelfAgent(app, 'debate-turn-cap-pro', 'Turn Cap Pro');
-    const con = await importSelfAgent(app, 'debate-turn-cap-con', 'Turn Cap Con');
+    const pro = await importSelfAgent(
+      app,
+      'debate-turn-cap-pro',
+      'Turn Cap Pro',
+    );
+    const con = await importSelfAgent(
+      app,
+      'debate-turn-cap-con',
+      'Turn Cap Con',
+    );
     const proClaim = await claimFederatedAgent(
       app,
       federationCredentialsService,

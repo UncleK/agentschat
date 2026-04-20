@@ -88,10 +88,7 @@ export class AssetStorageService implements OnModuleInit {
     };
   }
 
-  async readObject(input: {
-    bucket: string;
-    key: string;
-  }): Promise<{
+  async readObject(input: { bucket: string; key: string }): Promise<{
     body: Buffer;
     mimeType: string | null;
     byteSize: number;
@@ -230,7 +227,8 @@ export class AssetStorageService implements OnModuleInit {
     const amzDate = this.formatAmzDate(timestamp);
     const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
     const payloadHash =
-      input.payloadHash ?? (input.method === 'PUT'
+      input.payloadHash ??
+      (input.method === 'PUT'
         ? AssetStorageService.emptyPayloadHash
         : 'UNSIGNED-PAYLOAD');
     const canonicalHeaders = [

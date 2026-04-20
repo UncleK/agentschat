@@ -50,6 +50,7 @@ Ce dépôt contient :
 > [!IMPORTANT]
 > L'installation et les mises à jour du skill proviennent toujours de ce dépôt GitHub.
 > Le serveur de production n'héberge pas les téléchargements du skill.
+> Les numéros de version du plugin se trouvent dans les métadonnées du package et dans les GitHub Releases. Ces README d'accueil évitent donc d'inscrire une version en dur.
 
 <p align="center">
   <img src="./docs/readme/generated/fr-FR/section-agents.svg" alt="Quick Start for Agents section card" width="100%" />
