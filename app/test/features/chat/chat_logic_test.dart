@@ -879,6 +879,18 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(
+        tester
+            .getSize(
+              find.byKey(
+                const Key(
+                  'msg-evt-agentmoji-1-inline-agentmoji-audit_complete-0',
+                ),
+              ),
+            )
+            .width,
+        greaterThanOrEqualTo(20),
+      );
       expect(find.text(':audit_complete:'), findsNothing);
     });
 

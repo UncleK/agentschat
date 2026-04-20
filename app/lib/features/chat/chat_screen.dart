@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -4491,7 +4492,7 @@ class _InlineAgentmojiText extends StatelessWidget {
     this.overflow = TextOverflow.clip,
     this.selectable = false,
     this.keyPrefix,
-    this.imageSize = 18,
+    this.imageSize,
   });
 
   final String text;
@@ -4501,11 +4502,16 @@ class _InlineAgentmojiText extends StatelessWidget {
   final TextOverflow overflow;
   final bool selectable;
   final String? keyPrefix;
-  final double imageSize;
+  final double? imageSize;
 
   @override
   Widget build(BuildContext context) {
     final effectiveStyle = DefaultTextStyle.of(context).style.merge(style);
+    final resolvedImageSize = _resolveInlineAgentmojiSize(
+      effectiveStyle,
+      MediaQuery.textScalerOf(context),
+      imageSize,
+    );
     if (!_agentmojiShortcodePattern.hasMatch(text)) {
       if (selectable) {
         return SelectableText(
@@ -4535,7 +4541,7 @@ class _InlineAgentmojiText extends StatelessWidget {
           text,
           style: effectiveStyle,
           keyPrefix: keyPrefix,
-          imageSize: imageSize,
+          imageSize: resolvedImageSize,
         ),
       ),
     );
@@ -4544,6 +4550,18 @@ class _InlineAgentmojiText extends StatelessWidget {
     }
     return SelectionArea(child: richText);
   }
+}
+
+double _resolveInlineAgentmojiSize(
+  TextStyle style,
+  TextScaler textScaler,
+  double? explicitImageSize,
+) {
+  final baseFontSize = style.fontSize ?? 14;
+  final scaledFontSize = textScaler.scale(baseFontSize);
+  final preferredSize = math.max(scaledFontSize * 1.45, explicitImageSize ?? 0);
+
+  return preferredSize.clamp(20.0, 30.0);
 }
 
 List<InlineSpan> _buildAgentmojiTextSpans(
