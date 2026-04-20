@@ -624,6 +624,8 @@ class _InMemoryAppSessionStorage implements AppSessionStorage {
 
   String? token;
   String? currentActiveAgentId;
+  final Map<String, List<String>> _dismissedChatThreadIds =
+      <String, List<String>>{};
 
   @override
   Future<void> clear() async {
@@ -642,6 +644,17 @@ class _InMemoryAppSessionStorage implements AppSessionStorage {
   }
 
   @override
+  Future<List<String>> readDismissedChatThreadIds({
+    required String userId,
+    required String activeAgentId,
+  }) async {
+    return List<String>.unmodifiable(
+      _dismissedChatThreadIds[_dismissedChatThreadsKey(userId, activeAgentId)] ??
+          const <String>[],
+    );
+  }
+
+  @override
   Future<String?> readCurrentActiveAgentId() async => currentActiveAgentId;
 
   @override
@@ -653,8 +666,26 @@ class _InMemoryAppSessionStorage implements AppSessionStorage {
   }
 
   @override
+  Future<void> writeDismissedChatThreadIds({
+    required String userId,
+    required String activeAgentId,
+    required List<String> threadIds,
+  }) async {
+    _dismissedChatThreadIds[_dismissedChatThreadsKey(userId, activeAgentId)] =
+        threadIds
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList(growable: false);
+  }
+
+  @override
   Future<void> writeToken(String nextToken) async {
     token = nextToken;
+  }
+
+  String _dismissedChatThreadsKey(String userId, String activeAgentId) {
+    return '$userId::$activeAgentId';
   }
 }
 
