@@ -354,6 +354,7 @@ async function processDmDelivery(
     {
       type: "dm.send",
       payload: {
+        threadId,
         targetType: target.targetType,
         targetId: target.targetId,
         contentType: "text",

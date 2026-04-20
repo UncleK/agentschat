@@ -228,6 +228,7 @@ async function processDmDelivery(context, account, state, delivery, safetyPolicy
     await submitAndWaitForSuccess(state, {
         type: "dm.send",
         payload: {
+            threadId,
             targetType: target.targetType,
             targetId: target.targetId,
             contentType: "text",

@@ -51,6 +51,11 @@ interface AuthoredContentInput {
   metadata?: Record<string, unknown>;
 }
 
+interface DirectMessageSendInput extends AuthoredContentInput {
+  activeAgentId?: string | null;
+  threadId?: string | null;
+}
+
 interface DirectMessageReadInput {
   activeAgentId?: string | null;
   cursor?: string | null;
@@ -249,7 +254,7 @@ export class ContentService {
 
   async sendAgentDirectMessage(
     actorAgentId: string,
-    input: AuthoredContentInput & {
+    input: DirectMessageSendInput & {
       recipient: SubjectReference;
       idempotencyKey?: string | null;
     },
@@ -1278,30 +1283,44 @@ export class ContentService {
   private async sendDirectMessage(
     actor: SubjectReference,
     recipient: SubjectReference,
-    input: AuthoredContentInput & { activeAgentId?: string | null },
+    input: DirectMessageSendInput,
     idempotencyKey?: string | null,
   ) {
     await this.moderationService.assertActorAllowed(actor);
     await this.assertAgentSurfaceResponseAllowed(actor, 'dm');
 
     const authoredContent = await this.normalizeContentInput(input);
+    const explicitThreadId = this.optionalString(input.threadId);
 
-    await this.policyService.assertDirectMessageAllowed({
-      actor,
-      recipient,
-    });
-
-    const result = await this.dataSource.transaction(async (manager) => {
-      const eventRepository = manager.getRepository(EventEntity);
-      const thread = await this.findOrCreateDirectMessageThread(
-        manager,
+    if (explicitThreadId) {
+      await this.assertDirectMessageThreadRouting(
+        explicitThreadId,
         actor,
         recipient,
         input.activeAgentId,
       );
+    } else {
+      await this.policyService.assertDirectMessageAllowed({
+        actor,
+        recipient,
+      });
+    }
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const eventRepository = manager.getRepository(EventEntity);
+      const threadId =
+        explicitThreadId ??
+        (
+          await this.findOrCreateDirectMessageThread(
+            manager,
+            actor,
+            recipient,
+            input.activeAgentId,
+          )
+        ).id;
       const event = await eventRepository.save(
         eventRepository.create({
-          threadId: thread.id,
+          threadId,
           eventType: 'dm.send',
           ...this.bindActor(actor),
           targetType: recipient.type,
@@ -1315,7 +1334,7 @@ export class ContentService {
       );
 
       return {
-        threadId: thread.id,
+        threadId,
         eventId: event.id,
         eventType: event.eventType,
       };
@@ -1720,7 +1739,80 @@ ${selfAuthoredFilter}
     threadId: string,
     activeAgentId: string,
   ): Promise<ThreadParticipantEntity> {
-    const membership = await this.threadParticipantRepository
+    const membership = await this.findDirectMessageParticipant(
+      threadId,
+      {
+        type: SubjectType.Agent,
+        id: activeAgentId,
+      },
+      ThreadParticipantRole.Member,
+    );
+
+    if (!membership) {
+      throw new NotFoundException(
+        `Direct message thread ${threadId} was not found.`,
+      );
+    }
+
+    return membership;
+  }
+
+  private async assertDirectMessageThreadRouting(
+    threadId: string,
+    actor: SubjectReference,
+    recipient: SubjectReference,
+    activeAgentId?: string | null,
+  ): Promise<void> {
+    const threadActor = this.resolveDirectMessageThreadActor(
+      actor,
+      activeAgentId,
+    );
+    const membership = await this.findDirectMessageParticipant(
+      threadId,
+      threadActor,
+      ThreadParticipantRole.Member,
+    );
+
+    if (!membership) {
+      throw new NotFoundException(
+        `Direct message thread ${threadId} was not found.`,
+      );
+    }
+
+    const recipientParticipant = await this.findDirectMessageParticipant(
+      threadId,
+      recipient,
+    );
+
+    if (!recipientParticipant) {
+      throw new NotFoundException(
+        `Direct message recipient ${recipient.type}:${recipient.id} was not found in thread ${threadId}.`,
+      );
+    }
+  }
+
+  private resolveDirectMessageThreadActor(
+    actor: SubjectReference,
+    activeAgentId?: string | null,
+  ): SubjectReference {
+    const normalizedActiveAgentId = this.optionalString(activeAgentId);
+
+    if (normalizedActiveAgentId) {
+      return {
+        type: SubjectType.Agent,
+        id: normalizedActiveAgentId,
+      };
+    }
+
+    return actor;
+  }
+
+  private async findDirectMessageParticipant(
+    threadId: string,
+    subject: SubjectReference,
+    role?: ThreadParticipantRole,
+  ): Promise<ThreadParticipantEntity | null> {
+    const query = this.threadParticipantRepository
       .createQueryBuilder('participant')
       .innerJoin(
         'participant.thread',
@@ -1734,23 +1826,19 @@ ${selfAuthoredFilter}
         threadId,
       })
       .andWhere('participant.participantType = :participantType', {
-        participantType: SubjectType.Agent,
+        participantType: subject.type,
       })
-      .andWhere('participant.participantSubjectId = :activeAgentId', {
-        activeAgentId,
-      })
-      .andWhere('participant.role = :role', {
-        role: ThreadParticipantRole.Member,
-      })
-      .getOne();
+      .andWhere('participant.participantSubjectId = :participantSubjectId', {
+        participantSubjectId: subject.id,
+      });
 
-    if (!membership) {
-      throw new NotFoundException(
-        `Direct message thread ${threadId} was not found.`,
-      );
+    if (role) {
+      query.andWhere('participant.role = :role', {
+        role,
+      });
     }
 
-    return membership;
+    return query.getOne();
   }
 
   private async resolveDirectMessageCounterpartMember(

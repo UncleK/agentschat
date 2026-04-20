@@ -22,6 +22,12 @@ import 'agentmoji_catalog.dart';
 import 'chat_models.dart';
 import 'chat_view_model.dart';
 
+final RegExp _agentmojiShortcodePattern = RegExp(r':([a-z0-9_]+):');
+final Map<String, AgentmojiDefinition> _agentmojiById =
+    Map<String, AgentmojiDefinition>.unmodifiable(<String, AgentmojiDefinition>{
+      for (final definition in kAgentmojiCatalog) definition.id: definition,
+    });
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
@@ -404,12 +410,11 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
-      final dismissedConversationIds = (await session.storage
-              .readDismissedChatThreadIds(
-                userId: userId,
-                activeAgentId: activeAgentId,
-              ))
-          .toSet();
+      final dismissedConversationIds =
+          (await session.storage.readDismissedChatThreadIds(
+            userId: userId,
+            activeAgentId: activeAgentId,
+          )).toSet();
       final response = await _chatRepository!.getThreads(
         activeAgentId: activeAgentId,
       );
@@ -2204,8 +2209,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   onFocusConversationSearch:
                                       _focusConversationSearch,
                                   onSelectConversation: _selectConversation,
-                                  onLongPressConversation:
-                                      _dismissConversation,
+                                  onLongPressConversation: _dismissConversation,
                                 ),
                         ),
                 ),
@@ -2625,8 +2629,8 @@ class _LegacyConversationCard extends StatelessWidget {
                             },
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            conversation.latestPreview,
+                          _InlineAgentmojiText(
+                            text: conversation.latestPreview,
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
                                   fontSize: compact ? 13.5 : 14,
@@ -2834,8 +2838,8 @@ class _ConversationCard extends StatelessWidget {
                             },
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            conversation.latestPreview,
+                          _InlineAgentmojiText(
+                            text: conversation.latestPreview,
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
                                   fontSize: compact ? 13.5 : 14,
@@ -4216,8 +4220,8 @@ class _ThreadEmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              conversation.latestPreview,
+            _InlineAgentmojiText(
+              text: conversation.latestPreview,
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -4476,6 +4480,133 @@ class _ThreadComposer extends StatelessWidget {
       ),
     );
   }
+}
+
+class _InlineAgentmojiText extends StatelessWidget {
+  const _InlineAgentmojiText({
+    required this.text,
+    this.style,
+    this.textAlign = TextAlign.start,
+    this.maxLines,
+    this.overflow = TextOverflow.clip,
+    this.selectable = false,
+    this.keyPrefix,
+    this.imageSize = 18,
+  });
+
+  final String text;
+  final TextStyle? style;
+  final TextAlign textAlign;
+  final int? maxLines;
+  final TextOverflow overflow;
+  final bool selectable;
+  final String? keyPrefix;
+  final double imageSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveStyle = DefaultTextStyle.of(context).style.merge(style);
+    if (!_agentmojiShortcodePattern.hasMatch(text)) {
+      if (selectable) {
+        return SelectableText(
+          text,
+          textAlign: textAlign,
+          maxLines: maxLines,
+          style: effectiveStyle,
+        );
+      }
+      return Text(
+        text,
+        textAlign: textAlign,
+        maxLines: maxLines,
+        overflow: overflow,
+        style: effectiveStyle,
+      );
+    }
+
+    final richText = RichText(
+      textAlign: textAlign,
+      maxLines: maxLines,
+      overflow: overflow,
+      textScaler: MediaQuery.textScalerOf(context),
+      text: TextSpan(
+        style: effectiveStyle,
+        children: _buildAgentmojiTextSpans(
+          text,
+          style: effectiveStyle,
+          keyPrefix: keyPrefix,
+          imageSize: imageSize,
+        ),
+      ),
+    );
+    if (!selectable) {
+      return richText;
+    }
+    return SelectionArea(child: richText);
+  }
+}
+
+List<InlineSpan> _buildAgentmojiTextSpans(
+  String text, {
+  required TextStyle style,
+  required String? keyPrefix,
+  required double imageSize,
+}) {
+  final spans = <InlineSpan>[];
+  var cursor = 0;
+  var matchIndex = 0;
+
+  for (final match in _agentmojiShortcodePattern.allMatches(text)) {
+    if (match.start > cursor) {
+      spans.add(
+        TextSpan(text: text.substring(cursor, match.start), style: style),
+      );
+    }
+
+    final rawShortcode = match.group(0) ?? '';
+    final shortcodeId = match.group(1);
+    final definition = shortcodeId == null ? null : _agentmojiById[shortcodeId];
+    if (definition == null) {
+      spans.add(TextSpan(text: rawShortcode, style: style));
+    } else {
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 1.5),
+            child: Image.asset(
+              definition.assetPath,
+              key: keyPrefix == null
+                  ? null
+                  : Key(
+                      '$keyPrefix-inline-agentmoji-${definition.id}-$matchIndex',
+                    ),
+              width: imageSize,
+              height: imageSize,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stackTrace) {
+                return Text(rawShortcode, style: style);
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    cursor = match.end;
+    matchIndex += 1;
+  }
+
+  if (cursor < text.length) {
+    spans.add(TextSpan(text: text.substring(cursor), style: style));
+  }
+
+  if (spans.isEmpty) {
+    spans.add(TextSpan(text: text, style: style));
+  }
+
+  return spans;
 }
 
 class _ComposerActionButton extends StatelessWidget {
@@ -5217,9 +5348,12 @@ class _MessageBubbleBody extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 5),
-                    SelectableText(
-                      message.body,
+                    _InlineAgentmojiText(
+                      text: message.body,
+                      keyPrefix: 'msg-${message.id}',
+                      selectable: true,
                       textAlign: TextAlign.justify,
+                      imageSize: 18,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontSize: 13.5,
                         height: 1.42,

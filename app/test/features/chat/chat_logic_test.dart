@@ -631,13 +631,18 @@ void main() {
 
       await pumpChat(tester, chatRepository: repository);
 
-      final cardFinder = find.byKey(const Key('conversation-card-thread-hideable'));
+      final cardFinder = find.byKey(
+        const Key('conversation-card-thread-hideable'),
+      );
       expect(cardFinder, findsOneWidget);
 
       await tester.longPress(cardFinder);
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('chat-dismiss-thread-button')), findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-dismiss-thread-button')),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('chat-dismiss-thread-button')));
       await tester.pumpAndSettle();
@@ -800,6 +805,82 @@ void main() {
         expect(find.text(':gateway:'), findsOneWidget);
       },
     );
+
+    testWidgets('agentmoji shortcodes render inline inside thread messages', (
+      WidgetTester tester,
+    ) async {
+      await authenticateWithMine(
+        mineResponse(
+          agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+        ),
+      );
+      final repository = _FakeChatRepository()
+        ..enqueueThreads((activeAgentId) async {
+          return ChatThreadsResponse(
+            activeAgentId: activeAgentId,
+            threads: const [
+              ChatThreadSummary(
+                threadId: 'thread-agentmoji',
+                counterpart: ChatThreadCounterpart(
+                  type: 'agent',
+                  id: 'agt-remote-1',
+                  displayName: 'Xenon-01',
+                  handle: 'xenon-01',
+                  avatarUrl: null,
+                  isOnline: true,
+                  viewerFollowsAgent: true,
+                  agentFollowsViewer: true,
+                ),
+                lastMessage: ChatThreadLastMessage(
+                  eventId: 'evt-agentmoji-last',
+                  contentType: 'text',
+                  preview: ':audit_complete:',
+                  occurredAt: '2026-04-03T14:31:00.000Z',
+                ),
+                unreadCount: 0,
+              ),
+            ],
+            nextCursor: null,
+          );
+        })
+        ..enqueueMessages(({required threadId, required activeAgentId}) async {
+          return const ChatMessagesResponse(
+            threadId: 'thread-agentmoji',
+            activeAgentId: 'agt-owned-1',
+            messages: [
+              ChatMessageRecord(
+                eventId: 'evt-agentmoji-1',
+                actor: ChatMessageActor(
+                  type: 'agent',
+                  id: 'agt-remote-1',
+                  displayName: 'Xenon-01',
+                ),
+                contentType: 'text',
+                content: 'All clear :audit_complete:',
+                occurredAt: '2026-04-03T14:36:00.000Z',
+              ),
+            ],
+            nextCursor: null,
+          );
+        })
+        ..enqueueMarkRead(({required threadId, required activeAgentId}) async {
+          return ChatReadResponse(threadId: threadId, unreadCount: 0);
+        });
+
+      await pumpChat(tester, chatRepository: repository);
+      await tester.tap(
+        find.byKey(const Key('conversation-card-thread-agentmoji')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const Key('msg-evt-agentmoji-1-inline-agentmoji-audit_complete-0'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(':audit_complete:'), findsNothing);
+    });
 
     testWidgets(
       'switching active agents clears the open thread and ignores stale messages',

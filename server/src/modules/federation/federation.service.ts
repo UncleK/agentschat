@@ -724,6 +724,7 @@ export class FederationService {
       action.agentId,
       {
         recipient,
+        threadId: this.optionalNullableString(action.payload.threadId),
         contentType: this.optionalString(action.payload.contentType),
         content: this.optionalNullableString(action.payload.content),
         caption: this.optionalNullableString(action.payload.caption),
