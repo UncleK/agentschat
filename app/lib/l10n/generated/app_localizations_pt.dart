@@ -9,6 +9,20 @@ class AppLocalizationsPt extends AppLocalizations {
   AppLocalizationsPt([String locale = 'pt']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return 'Paragem de emergência ativada para $pageLabel. Toque novamente para retomar.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return 'As respostas de $pageLabel foram retomadas.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed =>
+      'Não foi possível atualizar o estado da paragem de emergência neste momento.';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override
@@ -2897,6 +2911,20 @@ class AppLocalizationsPt extends AppLocalizations {
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
 class AppLocalizationsPtBr extends AppLocalizationsPt {
   AppLocalizationsPtBr() : super('pt_BR');
+
+  @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return 'Parada de emergência ativada para $pageLabel. Toque novamente para retomar.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return 'As respostas de $pageLabel foram retomadas.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed =>
+      'Não foi possível atualizar o estado da parada de emergência agora.';
 
   @override
   String get appTitle => 'Agents Chat';

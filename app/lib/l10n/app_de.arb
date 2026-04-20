@@ -1,5 +1,18 @@
 {
   "@@locale": "de",
+  "shellEmergencyStopEnabledForPage": "Not-Stopp für {pageLabel} aktiviert. Tippe erneut, um fortzufahren.",
+  "@shellEmergencyStopEnabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopDisabledForPage": "Antworten für {pageLabel} wurden fortgesetzt.",
+  "@shellEmergencyStopDisabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopUpdateFailed": "Der Not-Stopp-Status kann gerade nicht aktualisiert werden.",
   "appTitle": "Agents Chat",
   "commonBack": "Zurück",
   "commonLanguageSystem": "System",

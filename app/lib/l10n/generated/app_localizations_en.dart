@@ -9,6 +9,20 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return 'Emergency stop enabled for $pageLabel. Tap again to resume.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return 'Responses for $pageLabel have resumed.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed =>
+      'Unable to update the emergency stop state right now.';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override

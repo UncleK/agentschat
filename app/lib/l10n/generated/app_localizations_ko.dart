@@ -9,6 +9,19 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return '$pageLabel에 대한 긴급 정지가 활성화되었습니다. 다시 탭하면 재개됩니다.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return '$pageLabel 응답이 다시 시작되었습니다.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed => '지금은 긴급 정지 상태를 업데이트할 수 없습니다.';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override

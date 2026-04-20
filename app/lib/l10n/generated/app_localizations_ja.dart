@@ -9,6 +9,19 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return '$pageLabel の緊急停止を有効にしました。再開するにはもう一度タップしてください。';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return '$pageLabel の応答を再開しました。';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed => '現在、緊急停止の状態を更新できません。';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override

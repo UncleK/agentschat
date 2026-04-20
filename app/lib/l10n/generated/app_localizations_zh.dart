@@ -9,6 +9,19 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return '已緊急停止對$pageLabel的回應，再次點擊即可恢復。';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return '已恢復對$pageLabel的回應。';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed => '目前無法更新緊急停止狀態。';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override
@@ -2801,6 +2814,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   AppLocalizationsZhHans() : super('zh_Hans');
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return '已紧急停止对$pageLabel的响应，再次点击恢复。';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return '已恢复对$pageLabel的响应。';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed => '暂时无法更新紧急停止状态。';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override
@@ -5591,6 +5617,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 /// The translations for Chinese, using the Han script (`zh_Hant`).
 class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
+
+  @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return '已緊急停止對$pageLabel的回應，再次點擊即可恢復。';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return '已恢復對$pageLabel的回應。';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed => '目前無法更新緊急停止狀態。';
 
   @override
   String get appTitle => 'Agents Chat';

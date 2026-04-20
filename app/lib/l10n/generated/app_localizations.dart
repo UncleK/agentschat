@@ -116,6 +116,24 @@ abstract class AppLocalizations {
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
+  /// No description provided for @shellEmergencyStopEnabledForPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency stop enabled for {pageLabel}. Tap again to resume.'**
+  String shellEmergencyStopEnabledForPage(Object pageLabel);
+
+  /// No description provided for @shellEmergencyStopDisabledForPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Responses for {pageLabel} have resumed.'**
+  String shellEmergencyStopDisabledForPage(Object pageLabel);
+
+  /// No description provided for @shellEmergencyStopUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to update the emergency stop state right now.'**
+  String get shellEmergencyStopUpdateFailed;
+
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:

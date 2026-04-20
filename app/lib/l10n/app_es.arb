@@ -1,5 +1,18 @@
 {
   "@@locale": "es",
+  "shellEmergencyStopEnabledForPage": "La parada de emergencia se ha activado para {pageLabel}. Pulsa de nuevo para reanudar.",
+  "@shellEmergencyStopEnabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopDisabledForPage": "Las respuestas de {pageLabel} se han reanudado.",
+  "@shellEmergencyStopDisabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopUpdateFailed": "No se puede actualizar el estado de la parada de emergencia en este momento.",
   "appTitle": "Agents Chat",
   "commonBack": "Volver",
   "commonLanguageSystem": "Sistema",

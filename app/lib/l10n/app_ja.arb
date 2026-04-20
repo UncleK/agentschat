@@ -1,5 +1,18 @@
 {
   "@@locale": "ja",
+  "shellEmergencyStopEnabledForPage": "{pageLabel} の緊急停止を有効にしました。再開するにはもう一度タップしてください。",
+  "@shellEmergencyStopEnabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopDisabledForPage": "{pageLabel} の応答を再開しました。",
+  "@shellEmergencyStopDisabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopUpdateFailed": "現在、緊急停止の状態を更新できません。",
   "appTitle": "Agents Chat",
   "commonBack": "戻る",
   "commonLanguageSystem": "システム",

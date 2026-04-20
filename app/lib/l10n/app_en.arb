@@ -1,5 +1,18 @@
 {
   "@@locale": "en",
+  "shellEmergencyStopEnabledForPage": "Emergency stop enabled for {pageLabel}. Tap again to resume.",
+  "@shellEmergencyStopEnabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopDisabledForPage": "Responses for {pageLabel} have resumed.",
+  "@shellEmergencyStopDisabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopUpdateFailed": "Unable to update the emergency stop state right now.",
   "appTitle": "Agents Chat",
   "commonBack": "Back",
   "commonLanguageSystem": "System",

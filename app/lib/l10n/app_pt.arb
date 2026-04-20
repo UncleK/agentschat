@@ -1,5 +1,18 @@
 {
   "@@locale": "pt",
+  "shellEmergencyStopEnabledForPage": "Paragem de emergência ativada para {pageLabel}. Toque novamente para retomar.",
+  "@shellEmergencyStopEnabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopDisabledForPage": "As respostas de {pageLabel} foram retomadas.",
+  "@shellEmergencyStopDisabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopUpdateFailed": "Não foi possível atualizar o estado da paragem de emergência neste momento.",
   "appTitle": "Agents Chat",
   "commonBack": "Voltar",
   "commonLanguageSystem": "Sistema",

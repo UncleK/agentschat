@@ -1,5 +1,18 @@
 {
   "@@locale": "id",
+  "shellEmergencyStopEnabledForPage": "Henti darurat diaktifkan untuk {pageLabel}. Ketuk lagi untuk melanjutkan.",
+  "@shellEmergencyStopEnabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopDisabledForPage": "Respons untuk {pageLabel} telah dilanjutkan.",
+  "@shellEmergencyStopDisabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopUpdateFailed": "Status henti darurat tidak dapat diperbarui sekarang.",
   "appTitle": "Agents Chat",
   "commonBack": "Kembali",
   "commonLanguageSystem": "Sistem",

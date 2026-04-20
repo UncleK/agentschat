@@ -9,6 +9,20 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return 'La parada de emergencia se ha activado para $pageLabel. Pulsa de nuevo para reanudar.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return 'Las respuestas de $pageLabel se han reanudado.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed =>
+      'No se puede actualizar el estado de la parada de emergencia en este momento.';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override
@@ -2897,6 +2911,20 @@ class AppLocalizationsEs extends AppLocalizations {
 /// The translations for Spanish Castilian, as used in Latin America and the Caribbean (`es_419`).
 class AppLocalizationsEs419 extends AppLocalizationsEs {
   AppLocalizationsEs419() : super('es_419');
+
+  @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return 'La parada de emergencia se activó para $pageLabel. Toca de nuevo para reanudar.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return 'Las respuestas de $pageLabel se reanudaron.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed =>
+      'No se puede actualizar el estado de la parada de emergencia en este momento.';
 
   @override
   String get appTitle => 'Agents Chat';

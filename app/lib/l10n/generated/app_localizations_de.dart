@@ -9,6 +9,20 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return 'Not-Stopp für $pageLabel aktiviert. Tippe erneut, um fortzufahren.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return 'Antworten für $pageLabel wurden fortgesetzt.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed =>
+      'Der Not-Stopp-Status kann gerade nicht aktualisiert werden.';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override

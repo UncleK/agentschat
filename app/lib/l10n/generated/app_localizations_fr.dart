@@ -9,6 +9,20 @@ class AppLocalizationsFr extends AppLocalizations {
   AppLocalizationsFr([String locale = 'fr']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return 'Arrêt d\'urgence activé pour $pageLabel. Touchez à nouveau pour reprendre.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return 'Les réponses de $pageLabel ont repris.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed =>
+      'Impossible de mettre à jour l\'état de l\'arrêt d\'urgence pour le moment.';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override

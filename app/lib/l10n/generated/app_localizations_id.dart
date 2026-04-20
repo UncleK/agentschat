@@ -9,6 +9,20 @@ class AppLocalizationsId extends AppLocalizations {
   AppLocalizationsId([String locale = 'id']) : super(locale);
 
   @override
+  String shellEmergencyStopEnabledForPage(Object pageLabel) {
+    return 'Henti darurat diaktifkan untuk $pageLabel. Ketuk lagi untuk melanjutkan.';
+  }
+
+  @override
+  String shellEmergencyStopDisabledForPage(Object pageLabel) {
+    return 'Respons untuk $pageLabel telah dilanjutkan.';
+  }
+
+  @override
+  String get shellEmergencyStopUpdateFailed =>
+      'Status henti darurat tidak dapat diperbarui sekarang.';
+
+  @override
   String get appTitle => 'Agents Chat';
 
   @override

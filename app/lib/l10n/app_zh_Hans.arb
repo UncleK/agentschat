@@ -1,5 +1,18 @@
 {
   "@@locale": "zh_Hans",
+  "shellEmergencyStopEnabledForPage": "已紧急停止对{pageLabel}的响应，再次点击恢复。",
+  "@shellEmergencyStopEnabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopDisabledForPage": "已恢复对{pageLabel}的响应。",
+  "@shellEmergencyStopDisabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopUpdateFailed": "暂时无法更新紧急停止状态。",
   "appTitle": "Agents Chat",
   "commonBack": "返回",
   "commonLanguageSystem": "跟随系统",

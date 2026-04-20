@@ -976,21 +976,9 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
 
   String _emergencyStopPageLabel(_EmergencyResponseSurface surface) {
     return switch (surface) {
-      _EmergencyResponseSurface.forum => context.localizedText(
-        key: 'msgForumPageLabelForEmergencyStop6efc55f0',
-        en: 'Forum page',
-        zhHans: '论坛页面',
-      ),
-      _EmergencyResponseSurface.dm => context.localizedText(
-        key: 'msgDmPageLabelForEmergencyStop54ca7b4b',
-        en: 'DM page',
-        zhHans: '私信页面',
-      ),
-      _EmergencyResponseSurface.live => context.localizedText(
-        key: 'msgDebatePageLabelForEmergencyStop28689b2d',
-        en: 'Debate page',
-        zhHans: '辩论页面',
-      ),
+      _EmergencyResponseSurface.forum => context.l10n.shellTopBarForum,
+      _EmergencyResponseSurface.dm => context.l10n.shellTopBarChat,
+      _EmergencyResponseSurface.live => context.l10n.shellTopBarLive,
     };
   }
 
@@ -1057,17 +1045,11 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
       final pageLabel = _emergencyStopPageLabel(surface);
       _showSnackBar(
         nextEnabled
-            ? context.localizedText(
-                key: 'msgEmergencyStopEnabledForPage583a47b0',
-                args: <String, Object?>{'pageLabel': pageLabel},
-                en: 'Emergency stop enabled for the $pageLabel. Tap again to resume.',
-                zhHans: '已紧急停止对$pageLabel的响应，再次点击恢复。',
+            ? context.l10n.shellEmergencyStopEnabledForPage(
+                pageLabel,
               )
-            : context.localizedText(
-                key: 'msgEmergencyStopDisabledForPage9045ba33',
-                args: <String, Object?>{'pageLabel': pageLabel},
-                en: 'Responses for the $pageLabel have resumed.',
-                zhHans: '已恢复对$pageLabel的响应。',
+            : context.l10n.shellEmergencyStopDisabledForPage(
+                pageLabel,
               ),
       );
     } on ApiException catch (error) {
@@ -1079,22 +1061,14 @@ class _AgentsChatAppShellState extends State<AgentsChatAppShell> {
         return;
       }
       _showSnackBar(
-        context.localizedText(
-          key: 'msgUnableToUpdateEmergencyStopStateRightNowbb4cff7d',
-          en: 'Unable to update the emergency stop state right now.',
-          zhHans: '暂时无法更新紧急停止状态。',
-        ),
+        context.l10n.shellEmergencyStopUpdateFailed,
       );
     } catch (_) {
       if (!mounted) {
         return;
       }
       _showSnackBar(
-        context.localizedText(
-          key: 'msgUnableToUpdateEmergencyStopStateRightNowbb4cff7d',
-          en: 'Unable to update the emergency stop state right now.',
-          zhHans: '暂时无法更新紧急停止状态。',
-        ),
+        context.l10n.shellEmergencyStopUpdateFailed,
       );
     } finally {
       if (mounted) {
@@ -1357,6 +1331,7 @@ class _ShellTopBar extends StatelessWidget {
               icon: Icons.stop_circle_rounded,
               isHighlighted: isEmergencyStopActive,
               accentColor: AppColors.tertiary,
+              invertHighlightEmphasis: true,
               onTap: isEmergencyStopBusy ? null : onToggleEmergencyStop,
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -1399,6 +1374,7 @@ class _GhostIconButton extends StatelessWidget {
     required this.icon,
     required this.isHighlighted,
     this.accentColor,
+    this.invertHighlightEmphasis = false,
     this.onTap,
   });
 
@@ -1406,16 +1382,46 @@ class _GhostIconButton extends StatelessWidget {
   final IconData icon;
   final bool isHighlighted;
   final Color? accentColor;
+  final bool invertHighlightEmphasis;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final effectiveAccentColor = accentColor ?? AppColors.primary;
     final isDisabled = onTap == null;
+    final showsAccentState = invertHighlightEmphasis
+        ? !isHighlighted
+        : isHighlighted;
+    final backgroundColor = showsAccentState
+        ? effectiveAccentColor.withValues(alpha: isDisabled ? 0.14 : 0.24)
+        : AppColors.surfaceHighest.withValues(alpha: isDisabled ? 0.34 : 0.5);
+    final borderColor = showsAccentState
+        ? effectiveAccentColor.withValues(alpha: 0.3)
+        : accentColor == null
+        ? Colors.transparent
+        : effectiveAccentColor.withValues(alpha: isDisabled ? 0.14 : 0.22);
+    final boxShadow = showsAccentState
+        ? [
+            BoxShadow(
+              color: effectiveAccentColor.withValues(alpha: 0.22),
+              blurRadius: 14,
+              spreadRadius: 1,
+            ),
+          ]
+        : accentColor == null || isDisabled
+        ? null
+        : [
+            BoxShadow(
+              color: effectiveAccentColor.withValues(alpha: 0.1),
+              blurRadius: 12,
+              spreadRadius: 0,
+            ),
+          ];
+    final iconColor = showsAccentState || accentColor != null
+        ? effectiveAccentColor.withValues(alpha: isDisabled ? 0.45 : 1)
+        : null;
     return Material(
-      color: isHighlighted
-          ? effectiveAccentColor.withValues(alpha: isDisabled ? 0.14 : 0.24)
-          : AppColors.surfaceHighest.withValues(alpha: isDisabled ? 0.34 : 0.5),
+      color: backgroundColor,
       borderRadius: AppRadii.pill,
       child: InkWell(
         key: buttonKey,
@@ -1427,42 +1433,14 @@ class _GhostIconButton extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 borderRadius: AppRadii.pill,
-                border: Border.all(
-                  color: isHighlighted
-                      ? effectiveAccentColor.withValues(alpha: 0.3)
-                      : accentColor == null
-                      ? Colors.transparent
-                      : effectiveAccentColor.withValues(
-                          alpha: isDisabled ? 0.14 : 0.22,
-                        ),
-                ),
-                boxShadow: isHighlighted
-                    ? [
-                        BoxShadow(
-                          color: effectiveAccentColor.withValues(alpha: 0.22),
-                          blurRadius: 14,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                    : accentColor == null || isDisabled
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: effectiveAccentColor.withValues(alpha: 0.1),
-                          blurRadius: 12,
-                          spreadRadius: 0,
-                        ),
-                      ],
+                border: Border.all(color: borderColor),
+                boxShadow: boxShadow,
               ),
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xs),
                 child: Icon(
                   icon,
-                  color: isHighlighted || accentColor != null
-                      ? effectiveAccentColor.withValues(
-                          alpha: isDisabled ? 0.45 : 1,
-                        )
-                      : null,
+                  color: iconColor,
                   size: AppSpacing.lg,
                 ),
               ),

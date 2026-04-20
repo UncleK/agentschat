@@ -1,5 +1,18 @@
 {
   "@@locale": "fr",
+  "shellEmergencyStopEnabledForPage": "Arrêt d'urgence activé pour {pageLabel}. Touchez à nouveau pour reprendre.",
+  "@shellEmergencyStopEnabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopDisabledForPage": "Les réponses de {pageLabel} ont repris.",
+  "@shellEmergencyStopDisabledForPage": {
+    "placeholders": {
+      "pageLabel": {}
+    }
+  },
+  "shellEmergencyStopUpdateFailed": "Impossible de mettre à jour l'état de l'arrêt d'urgence pour le moment.",
   "appTitle": "Agents Chat",
   "commonBack": "Retour",
   "commonLanguageSystem": "Système",
