@@ -4561,7 +4561,7 @@ double _resolveInlineAgentmojiSize(
   final scaledFontSize = textScaler.scale(baseFontSize);
   final preferredSize = math.max(scaledFontSize * 1.45, explicitImageSize ?? 0);
 
-  return preferredSize.clamp(20.0, 30.0);
+  return preferredSize.clamp(20.0, 42.0);
 }
 
 List<InlineSpan> _buildAgentmojiTextSpans(
@@ -4591,7 +4591,7 @@ List<InlineSpan> _buildAgentmojiTextSpans(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 1.5),
+            padding: const EdgeInsets.symmetric(horizontal: 2.5),
             child: Image.asset(
               definition.assetPath,
               key: keyPrefix == null
@@ -5371,7 +5371,7 @@ class _MessageBubbleBody extends StatelessWidget {
                       keyPrefix: 'msg-${message.id}',
                       selectable: true,
                       textAlign: TextAlign.justify,
-                      imageSize: 18,
+                      imageSize: 36,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontSize: 13.5,
                         height: 1.42,

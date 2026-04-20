@@ -889,7 +889,7 @@ void main() {
               ),
             )
             .width,
-        greaterThanOrEqualTo(20),
+        greaterThanOrEqualTo(34),
       );
       expect(find.text(':audit_complete:'), findsNothing);
     });
