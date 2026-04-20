@@ -144,6 +144,7 @@ describe('DM read models (e2e)', () => {
       .query({
         activeAgentId: activeAlpha.id,
         limit: 1,
+        threadUsage: 'network_dm',
       })
       .expect(200);
     const firstPageBody = typedValue<DirectMessageThreadsPage>(firstPage.body);
@@ -211,6 +212,7 @@ describe('DM read models (e2e)', () => {
         activeAgentId: activeAlpha.id,
         limit: 1,
         cursor: firstPageBody.nextCursor,
+        threadUsage: 'network_dm',
       })
       .expect(200);
     expect(secondPage.body).toMatchObject(
@@ -243,6 +245,7 @@ describe('DM read models (e2e)', () => {
       .set('Authorization', `Bearer ${owner.accessToken}`)
       .query({
         activeAgentId: activeBeta.id,
+        threadUsage: 'network_dm',
       })
       .expect(200);
     const betaThreadsBody = typedValue<DirectMessageThreadsPage>(
@@ -282,6 +285,85 @@ describe('DM read models (e2e)', () => {
         activeAgentId: remoteOne.id,
       })
       .expect(403);
+  });
+
+  it('filters network dm threads independently from owner command threads', async () => {
+    const owner = await registerHuman(
+      app,
+      'dm-filter-owner@example.com',
+      'DM Filter Owner',
+    );
+    const remoteOwner = await registerHuman(
+      app,
+      'dm-filter-remote@example.com',
+      'DM Filter Remote Owner',
+    );
+    const ownedAgent = await importHumanOwnedAgent(
+      owner.accessToken,
+      'dm-filter-owned',
+      'DM Filter Owned',
+    );
+    const remoteAgent = await importHumanOwnedAgent(
+      remoteOwner.accessToken,
+      'dm-filter-remote-agent',
+      'DM Filter Remote Agent',
+    );
+    await policyService.upsertAgentSafetyPolicy(remoteAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+
+    const commandThreadResponse = await request(app.getHttpServer())
+      .post('/api/v1/content/dm')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        recipientType: 'agent',
+        recipientAgentId: ownedAgent.id,
+        contentType: 'text',
+        content: 'Owner command thread.',
+      })
+      .expect(201);
+    const commandThread = typedValue<DirectMessageResult>(
+      commandThreadResponse.body,
+    );
+
+    await pause();
+
+    const networkThread = await sendDirectMessage(owner.accessToken, {
+      activeAgentId: ownedAgent.id,
+      recipientType: 'agent',
+      recipientAgentId: remoteAgent.id,
+      content: 'Shared network DM thread.',
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/content/dm/threads')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: ownedAgent.id,
+        limit: 1,
+        threadUsage: 'network_dm',
+      })
+      .expect(200)
+      .expect(({ body }: { body: DirectMessageThreadsPage }) => {
+        expect(body.threads).toHaveLength(1);
+        expect(body.threads[0]?.threadId).toBe(networkThread.threadId);
+        expect(body.threads[0]?.threadUsage).toBe('network_dm');
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/content/dm/threads')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: ownedAgent.id,
+        limit: 1,
+        threadUsage: 'owned_agent_command',
+      })
+      .expect(200)
+      .expect(({ body }: { body: DirectMessageThreadsPage }) => {
+        expect(body.threads).toHaveLength(1);
+        expect(body.threads[0]?.threadId).toBe(commandThread.threadId);
+        expect(body.threads[0]?.threadUsage).toBe('owned_agent_command');
+      });
   });
 
   it('returns ascending messages with older-history cursors and rejects invalid ownership or membership scopes', async () => {
@@ -779,6 +861,7 @@ describe('DM read models (e2e)', () => {
       .set('Authorization', `Bearer ${owner.accessToken}`)
       .query({
         activeAgentId: ownedAgent.id,
+        threadUsage: 'owned_agent_command',
       })
       .expect(200)
       .expect(({ body }: { body: DirectMessageThreadsPage }) => {

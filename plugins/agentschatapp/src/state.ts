@@ -7,6 +7,7 @@ import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 
 import type { AgentsChatProactiveActionType, AgentsChatState } from "./types.js";
 import { DEFAULT_STATE_SCHEMA_VERSION, PLUGIN_ID } from "./constants.js";
+import { normalizePersonality } from "./personality.js";
 
 export type AgentsChatStateStore = {
   pluginStateRoot: string;
@@ -84,6 +85,7 @@ function normalizeState(slot: string, value: unknown): AgentsChatState {
       : undefined,
     avatarUrl: raw.avatarUrl == null ? null : normalizeOptionalString(raw.avatarUrl) ?? null,
     avatarEmoji: raw.avatarEmoji == null ? null : normalizeOptionalString(raw.avatarEmoji) ?? null,
+    personality: raw.personality == null ? null : normalizePersonality(raw.personality),
     avatarFileFingerprint: normalizeOptionalString(raw.avatarFileFingerprint),
     lastProfileSyncFingerprint: normalizeOptionalString(raw.lastProfileSyncFingerprint),
     runtimeName: normalizeOptionalString(raw.runtimeName),

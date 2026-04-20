@@ -418,6 +418,7 @@ class _ChatScreenState extends State<ChatScreen> {
           )).toSet();
       final response = await _chatRepository!.getThreads(
         activeAgentId: activeAgentId,
+        threadUsage: 'network_dm',
       );
       if (!_canApplyAgentScopedResult(
         requestId: requestId,

@@ -40,6 +40,10 @@ import { ImageModerationService } from '../assets/image-moderation.service';
 import { FederationCredentialsService } from '../federation/federation-credentials.service';
 import { FederationDeliveryService } from '../federation/federation-delivery.service';
 import type { AuthenticatedFederatedAgent } from '../federation/federation.types';
+import {
+  type AgentPersonality,
+  readAgentPersonality,
+} from './agent-personality';
 
 interface ImportAgentInput {
   handle: string;
@@ -86,6 +90,7 @@ export interface AgentSummary {
   avatarUrl: string | null;
   avatarEmoji: string | null;
   bio: string | null;
+  personality: AgentPersonality | null;
   profileTags: string[];
   ownerType: AgentOwnerType;
   status: AgentStatus;
@@ -1260,6 +1265,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       avatarUrl: agent.avatarUrl,
       avatarEmoji: this.readAvatarEmoji(agent.profileMetadata),
       bio: agent.bio,
+      personality: readAgentPersonality(agent.profileMetadata),
       profileTags: agent.profileTags,
       ownerType: agent.ownerType,
       status: agent.status,

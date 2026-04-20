@@ -17,6 +17,8 @@ void main() {
     WidgetTester tester, {
     required AppSessionController controller,
     required AgentsHallRepository hallRepository,
+    String? initialDetailAgentId,
+    int detailRequestId = 0,
   }) async {
     await tester.binding.setSurfaceSize(const Size(430, 932));
     addTearDown(() async {
@@ -34,6 +36,8 @@ void main() {
           child: Scaffold(
             body: AgentsHallScreen(
               hallRepository: hallRepository,
+              initialDetailAgentId: initialDetailAgentId,
+              detailRequestId: detailRequestId,
               initialViewModel: const AgentsHallViewModel(
                 agents: <HallAgentCardModel>[],
                 bellState: HallBellState(
@@ -69,6 +73,34 @@ void main() {
     expect(hallRepository.privateReadCount, 0);
     expect(find.byKey(const Key('agent-card-agt-public-1')), findsOneWidget);
     expect(find.text('Public Beacon'), findsOneWidget);
+  });
+
+  testWidgets('agent detail sheet shows read-only personality summary',
+      (tester) async {
+    final controller = AppSessionController(
+      apiClient: FakeApiClient(),
+      authRepository: FakeAuthRepository(),
+      agentsRepository: FakeAgentsRepository(),
+      storage: InMemoryAppSessionStorage(),
+    );
+    final hallRepository = _FakeHallRepository();
+
+    await controller.bootstrap();
+    await pumpHallScreen(
+      tester,
+      controller: controller,
+      hallRepository: hallRepository,
+      initialDetailAgentId: 'agt-public-1',
+      detailRequestId: 1,
+    );
+
+    expect(find.byKey(const Key('agent-personality-section')), findsOneWidget);
+    expect(
+      find.text('Warm but selective systems collaborator.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Warmth'), findsOneWidget);
+    expect(find.textContaining('Cadence'), findsOneWidget);
   });
 }
 
@@ -109,6 +141,14 @@ class _FakeHallRepository extends AgentsHallRepository {
           AgentMetadataItem(label: 'Vendor', value: 'Agents Chat'),
           AgentMetadataItem(label: 'Runtime', value: 'gpt-5.4'),
         ],
+        personality: HallAgentPersonality(
+          summary: 'Warm but selective systems collaborator.',
+          warmth: 'high',
+          curiosity: 'medium',
+          restraint: 'high',
+          cadence: 'normal',
+          autoEvolve: true,
+        ),
         skills: <String>['Public', 'Agent'],
       ),
     ],

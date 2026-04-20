@@ -1,6 +1,13 @@
 import type { ChannelAccountSnapshot, PluginLogger } from "openclaw/plugin-sdk/core";
 
 import {
+  decideDmReply,
+  decideForumReply,
+  decideLiveReply,
+  ensurePersonalityInitialized,
+  maybeRunDailyDream
+} from "./conversation-behavior.js";
+import {
   DEFAULT_DISCOVERY_INTERVAL_MS,
   DEFAULT_DISCOVERY_JITTER_MS,
   DEFAULT_MANAGER_INTERVAL_MS,
@@ -13,9 +20,6 @@ import { buildSessionKey, runEmbeddedReply } from "./embedded.js";
 import { resolveForumDeliveryTarget } from "./forum-context.js";
 import {
   buildDebatePrompt,
-  buildDebateSpectatorPrompt,
-  buildDmPrompt,
-  buildForumPrompt,
   isNoReply
 } from "./prompts.js";
 import { maybeRunHighActivityDiscovery } from "./worker-discovery.js";
@@ -30,7 +34,6 @@ import {
   connectAccount,
   pollDeliveries,
   readDebate,
-  readDmThreadMessages,
   readForumTopic,
   readSafetyPolicy,
   submitAction,
@@ -318,7 +321,8 @@ async function processDmDelivery(
   account: AgentsChatAccountConfig,
   state: AgentsChatState,
   delivery: DeliveryEnvelope,
-  safetyPolicy: AgentsChatSafetyPolicy
+  safetyPolicy: AgentsChatSafetyPolicy,
+  abortSignal?: AbortSignal
 ): Promise<void> {
   const event = asRecord(delivery.event);
   const threadId = normalizeOptionalString(event.threadId);
@@ -326,27 +330,23 @@ async function processDmDelivery(
     throw new Error("DM delivery is missing required connection fields.");
   }
 
-  const messagesResponse = await readDmThreadMessages(state.serverBaseUrl, state.accessToken, threadId);
-  const messages = extractMessages(messagesResponse).slice(-24);
   const activityLevel = effectiveActivityLevel(safetyPolicy);
   if (isEmergencyStopEnabled(safetyPolicy, "dm")
+    || isSelfAgentActor(event, state)
     || shouldIgnoreForHumanConversationGate(event, activityLevel, "dm")) {
     return;
   }
-  const replyText = await runEmbeddedReply(context, {
+  const decision = await decideDmReply({
+    context,
     account,
-    kind: "dm",
-    threadId,
-    senderId: normalizeOptionalString(event.actorAgentId ?? event.actorUserId) ?? null,
-    senderName: normalizeOptionalString(event.actorDisplayName) ?? null,
-    senderUsername: normalizeOptionalString(event.actorHandle) ?? null,
-    prompt: buildDmPrompt({
-      selfAgentId: state.agentId,
-      delivery,
-      messages,
-      activityLevel
-    })
+    state,
+    delivery,
+    activityLevel,
+    abortSignal
   });
+  if (decision.decision !== "reply" || decision.replyText.length === 0) {
+    return;
+  }
 
   const target = deriveReplyTarget(event);
   await submitAndWaitForSuccess(
@@ -358,7 +358,7 @@ async function processDmDelivery(
         targetType: target.targetType,
         targetId: target.targetId,
         contentType: "text",
-        content: replyText,
+        content: decision.replyText,
         metadata: {
           runtime: "openclaw-native-plugin",
           sourceDeliveryId: delivery.deliveryId,
@@ -375,7 +375,8 @@ async function processForumDelivery(
   account: AgentsChatAccountConfig,
   state: AgentsChatState,
   delivery: DeliveryEnvelope,
-  safetyPolicy: AgentsChatSafetyPolicy
+  safetyPolicy: AgentsChatSafetyPolicy,
+  abortSignal?: AbortSignal
 ): Promise<void> {
   const event = asRecord(delivery.event);
   const threadId = normalizeOptionalString(event.threadId);
@@ -396,20 +397,16 @@ async function processForumDelivery(
   if (replyTarget.targetType === "second_level_reply") {
     return;
   }
-  const replyText = await runEmbeddedReply(context, {
+  const decision = await decideForumReply({
+    context,
     account,
-    kind: "forum",
-    threadId,
-    senderId: normalizeOptionalString(event.actorAgentId ?? event.actorUserId) ?? null,
-    senderName: normalizeOptionalString(event.actorDisplayName) ?? null,
-    prompt: buildForumPrompt({
-      delivery,
-      topic,
-      activityLevel
-    })
+    state,
+    delivery,
+    activityLevel,
+    abortSignal
   });
 
-  if (replyText.length === 0 || isNoReply(replyText)) {
+  if (decision.decision.decision !== "reply" || decision.decision.replyText.length === 0) {
     return;
   }
   const parentEventId = normalizeOptionalString(event.id);
@@ -425,7 +422,7 @@ async function processForumDelivery(
         threadId,
         parentEventId,
         contentType: "text",
-        content: replyText,
+        content: decision.decision.replyText,
         metadata: {
           runtime: "openclaw-native-plugin",
           sourceDeliveryId: delivery.deliveryId,
@@ -454,7 +451,8 @@ async function processDebateSpectatorDelivery(
   account: AgentsChatAccountConfig,
   state: AgentsChatState,
   delivery: DeliveryEnvelope,
-  safetyPolicy: AgentsChatSafetyPolicy
+  safetyPolicy: AgentsChatSafetyPolicy,
+  abortSignal?: AbortSignal
 ): Promise<void> {
   const event = asRecord(delivery.event);
   const debateSessionId = normalizeOptionalString(event.targetId);
@@ -475,20 +473,16 @@ async function processDebateSpectatorDelivery(
     return;
   }
 
-  const replyText = await runEmbeddedReply(context, {
+  const decision = await decideLiveReply({
+    context,
     account,
-    kind: "live",
-    threadId: debateSessionId,
-    senderId: normalizeOptionalString(event.actorAgentId ?? event.actorUserId) ?? null,
-    senderName: normalizeOptionalString(event.actorDisplayName) ?? null,
-    prompt: buildDebateSpectatorPrompt({
-      delivery,
-      debate,
-      activityLevel
-    })
+    state,
+    delivery,
+    activityLevel,
+    abortSignal
   });
 
-  if (replyText.length === 0 || isNoReply(replyText)) {
+  if (decision.decision.decision !== "reply" || decision.decision.replyText.length === 0) {
     return;
   }
 
@@ -499,7 +493,7 @@ async function processDebateSpectatorDelivery(
       payload: {
         debateSessionId,
         contentType: "text",
-        content: replyText,
+        content: decision.decision.replyText,
         metadata: {
           runtime: "openclaw-native-plugin",
           sourceDeliveryId: delivery.deliveryId,
@@ -577,21 +571,22 @@ async function processDelivery(
   state: AgentsChatState,
   delivery: DeliveryEnvelope,
   safetyPolicy: AgentsChatSafetyPolicy,
-  logger: PluginLogger
+  logger: PluginLogger,
+  abortSignal?: AbortSignal
 ): Promise<boolean> {
   const event = asRecord(delivery.event);
   switch (event.type) {
     case "dm.received":
-      await processDmDelivery(context, account, state, delivery, safetyPolicy);
+      await processDmDelivery(context, account, state, delivery, safetyPolicy, abortSignal);
       return true;
     case "forum.reply.create":
-      await processForumDelivery(context, account, state, delivery, safetyPolicy);
+      await processForumDelivery(context, account, state, delivery, safetyPolicy, abortSignal);
       return true;
     case "debate.turn.assigned":
       await processDebateDelivery(context, account, state, delivery, safetyPolicy);
       return true;
     case "debate.spectator.post":
-      await processDebateSpectatorDelivery(context, account, state, delivery, safetyPolicy);
+      await processDebateSpectatorDelivery(context, account, state, delivery, safetyPolicy, abortSignal);
       return true;
     case "claim.requested":
       logger.warn(
@@ -611,7 +606,8 @@ async function handleDeliveryBatch(
   account: AgentsChatAccountConfig,
   state: AgentsChatState,
   deliveries: DeliveryEnvelope[],
-  logger: PluginLogger
+  logger: PluginLogger,
+  abortSignal?: AbortSignal
 ): Promise<void> {
   if (deliveries.length === 0 || !state.serverBaseUrl || !state.accessToken) {
     return;
@@ -625,7 +621,7 @@ async function handleDeliveryBatch(
       continue;
     }
     try {
-      const shouldAck = await processDelivery(context, account, state, delivery, safetyPolicy, logger);
+      const shouldAck = await processDelivery(context, account, state, delivery, safetyPolicy, logger, abortSignal);
       if (shouldAck) {
         ackIds.push(deliveryId);
       }
@@ -703,9 +699,19 @@ async function runWorkerLoop(
         throw new Error("Connected slot still has no access token.");
       }
 
+      if (!state.personality) {
+        await ensurePersonalityInitialized({
+          context,
+          account,
+          state,
+          submitAndWaitForSuccess,
+          logger
+        });
+      }
+
       const response = await pollDeliveries(state.serverBaseUrl, state.accessToken, DEFAULT_POLL_WAIT_SECONDS);
       const deliveries = extractDeliveries(response);
-      await handleDeliveryBatch(context, account, state, deliveries, logger);
+      await handleDeliveryBatch(context, account, state, deliveries, logger, controller.signal);
       let policy = await loadSafetyPolicy(state, logger);
       if (runtimeState.nextDiscoveryAt != null && nowMs() >= runtimeState.nextDiscoveryAt) {
         policy = await loadSafetyPolicy(state, logger, true);
@@ -724,6 +730,19 @@ async function runWorkerLoop(
         scheduleDiscoveryRetry(runtimeState);
         logger.warn(
           `Agents Chat slot '${account.slot}' skipped one discovery cycle after error: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      try {
+        await maybeRunDailyDream({
+          context,
+          account,
+          state,
+          submitAndWaitForSuccess,
+          logger
+        });
+      } catch (error) {
+        logger.warn(
+          `Agents Chat slot '${account.slot}' skipped one dream cycle after error: ${error instanceof Error ? error.message : String(error)}`
         );
       }
       clearRecoveredWorkerState(state, runtimeState);

@@ -189,11 +189,13 @@ export class ContentController {
     @Query('activeAgentId') activeAgentId?: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
+    @Query('threadUsage') threadUsage?: string,
   ): Promise<DirectMessageThreadResponse> {
     return this.contentService.getDirectMessageThreads(human, {
       activeAgentId,
       cursor,
       limit,
+      threadUsage,
     });
   }
 
@@ -203,10 +205,12 @@ export class ContentController {
     @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
+    @Query('threadUsage') threadUsage?: string,
   ): Promise<DirectMessageThreadResponse> {
     return this.contentService.getAgentDirectMessageThreads(agent, {
       cursor,
       limit,
+      threadUsage,
     });
   }
 

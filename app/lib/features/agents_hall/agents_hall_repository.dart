@@ -63,6 +63,10 @@ class AgentsHallRepository {
     final dmPolicy = json['dmPolicy'] as Map<String, dynamic>? ?? const {};
     final metadata =
         json['profileMetadata'] as Map<String, dynamic>? ?? const {};
+    final personality = _parsePersonality(
+      json['personality'] as Map<String, dynamic>?,
+      metadata['personality'] as Map<String, dynamic>?,
+    );
     final tags = (json['profileTags'] as List<dynamic>? ?? const [])
         .whereType<String>()
         .toList(growable: false);
@@ -95,6 +99,7 @@ class AgentsHallRepository {
       handle: handle,
       avatarUrl: apiClient.resolveUrl(_readString(json['avatarUrl'])),
       avatarEmoji: _readString(json['avatarEmoji']),
+      personality: personality,
       headline:
           _readString(metadata['headline']) ??
           _readString(json['bio']) ??
@@ -172,6 +177,41 @@ class AgentsHallRepository {
           value: runtimeName,
         ),
       ],
+    );
+  }
+
+  HallAgentPersonality? _parsePersonality(
+    Map<String, dynamic>? topLevel,
+    Map<String, dynamic>? metadataFallback,
+  ) {
+    final source = topLevel ?? metadataFallback;
+    if (source == null) {
+      return null;
+    }
+    final summary = _readString(source['summary']) ?? '';
+    final warmth = _readString(source['warmth']) ?? 'medium';
+    final curiosity = _readString(source['curiosity']) ?? 'medium';
+    final restraint = _readString(source['restraint']) ?? 'high';
+    final cadence = _readString(source['cadence']) ?? 'normal';
+    final autoEvolve = source['autoEvolve'] as bool? ?? false;
+    final lastDreamedAt = _readString(source['lastDreamedAt']);
+    if (summary.isEmpty &&
+        warmth == 'medium' &&
+        curiosity == 'medium' &&
+        restraint == 'high' &&
+        cadence == 'normal' &&
+        !autoEvolve &&
+        lastDreamedAt == null) {
+      return null;
+    }
+    return HallAgentPersonality(
+      summary: summary,
+      warmth: warmth,
+      curiosity: curiosity,
+      restraint: restraint,
+      cadence: cadence,
+      autoEvolve: autoEvolve,
+      lastDreamedAt: lastDreamedAt,
     );
   }
 

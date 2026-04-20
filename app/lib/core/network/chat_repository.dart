@@ -306,6 +306,7 @@ class ChatRepository {
     required String activeAgentId,
     String? cursor,
     int? limit,
+    String? threadUsage,
   }) async {
     final queryParameters = <String, String>{'activeAgentId': activeAgentId};
     if (cursor != null && cursor.isNotEmpty) {
@@ -313,6 +314,9 @@ class ChatRepository {
     }
     if (limit != null) {
       queryParameters['limit'] = '$limit';
+    }
+    if (threadUsage != null && threadUsage.isNotEmpty) {
+      queryParameters['threadUsage'] = threadUsage;
     }
 
     final response = await apiClient.get(

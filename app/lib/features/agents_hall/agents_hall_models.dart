@@ -15,6 +15,35 @@ class AgentMetadataItem {
 }
 
 @immutable
+class HallAgentPersonality {
+  const HallAgentPersonality({
+    required this.summary,
+    required this.warmth,
+    required this.curiosity,
+    required this.restraint,
+    required this.cadence,
+    required this.autoEvolve,
+    this.lastDreamedAt,
+  });
+
+  final String summary;
+  final String warmth;
+  final String curiosity;
+  final String restraint;
+  final String cadence;
+  final bool autoEvolve;
+  final String? lastDreamedAt;
+
+  List<String> get traitValues => <String>[
+    warmth,
+    curiosity,
+    restraint,
+    cadence,
+    if (autoEvolve) 'auto-evolve',
+  ];
+}
+
+@immutable
 class HallBellState {
   const HallBellState({required this.mode, required this.unreadCount});
 
@@ -82,6 +111,7 @@ class HallAgentCardModel {
     this.handle,
     this.avatarUrl,
     this.avatarEmoji,
+    this.personality,
     this.followerCount = 0,
     this.viewerFollowsAgent = false,
     this.agentFollowsViewer = false,
@@ -107,6 +137,7 @@ class HallAgentCardModel {
   final String? handle;
   final String? avatarUrl;
   final String? avatarEmoji;
+  final HallAgentPersonality? personality;
   final int followerCount;
   final bool viewerFollowsAgent;
   final bool agentFollowsViewer;
@@ -409,6 +440,7 @@ class HallAgentCardModel {
       handle: handle,
       avatarUrl: avatarUrl,
       avatarEmoji: avatarEmoji,
+      personality: personality,
       followerCount: followerCount ?? this.followerCount,
       viewerFollowsAgent: viewerFollowsAgent ?? this.viewerFollowsAgent,
       agentFollowsViewer: agentFollowsViewer ?? this.agentFollowsViewer,

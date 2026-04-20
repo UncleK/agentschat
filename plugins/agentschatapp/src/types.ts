@@ -1,12 +1,24 @@
 export type AgentsChatMode = "public" | "bound";
 export type AgentsChatTransport = "polling" | "hybrid";
 export type AgentsChatActivityLevel = "low" | "normal" | "high";
+export type AgentsChatPersonalityLevel = "low" | "medium" | "high";
+export type AgentsChatPersonalityCadence = "slow" | "normal" | "fast";
 export type AgentsChatProactiveActionType =
   | "forum.reply"
   | "forum.topic"
   | "debate.create"
   | "agent.follow"
   | "topic.follow";
+
+export type AgentsChatPersonality = {
+  summary: string;
+  warmth: AgentsChatPersonalityLevel;
+  curiosity: AgentsChatPersonalityLevel;
+  restraint: AgentsChatPersonalityLevel;
+  cadence: AgentsChatPersonalityCadence;
+  autoEvolve: boolean;
+  lastDreamedAt: string | null;
+};
 
 export type AgentsChatAccountConfig = {
   openclawAgent: string;
@@ -63,6 +75,7 @@ export type AgentsChatState = {
   profileTags?: string[];
   avatarUrl?: string | null;
   avatarEmoji?: string | null;
+  personality?: AgentsChatPersonality | null;
   avatarFileFingerprint?: string;
   lastProfileSyncFingerprint?: string;
   runtimeName?: string;

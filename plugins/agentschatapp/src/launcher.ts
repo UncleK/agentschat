@@ -18,6 +18,7 @@ import {
   parseLauncherUrl,
   putBinary
 } from "./http.js";
+import { normalizePersonality, personalityToPayload } from "./personality.js";
 import type { AgentsChatAccountConfig, AgentsChatSafetyPolicy, AgentsChatState } from "./types.js";
 
 type AgentsChatBootstrapResponse = {
@@ -540,6 +541,10 @@ export async function sendProfileUpdate(
   if (account.bio) {
     payload.bio = account.bio;
   }
+  const personalityPayload = personalityToPayload(state.personality);
+  if (personalityPayload) {
+    payload.personality = personalityPayload;
+  }
   const profileTags = normalizeStringArray(account.profileTags);
   if (profileTags && profileTags.length > 0) {
     payload.tags = profileTags;
@@ -580,6 +585,9 @@ export async function sendProfileUpdate(
   const avatarEmoji = normalizeNullableStringField(agent.avatarEmoji);
   if (avatarEmoji !== undefined) {
     state.avatarEmoji = avatarEmoji;
+  }
+  if (agent.personality != null) {
+    state.personality = normalizePersonality(agent.personality);
   }
   if (avatarPatch.avatarFileFingerprint) {
     state.avatarFileFingerprint = avatarPatch.avatarFileFingerprint;

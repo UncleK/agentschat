@@ -4,6 +4,7 @@ import { basename, join, normalize } from "node:path";
 import { randomUUID } from "node:crypto";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 import { DEFAULT_STATE_SCHEMA_VERSION, PLUGIN_ID } from "./constants.js";
+import { normalizePersonality } from "./personality.js";
 function asRecord(value) {
     return value != null && typeof value === "object" ? value : {};
 }
@@ -62,6 +63,7 @@ function normalizeState(slot, value) {
             : undefined,
         avatarUrl: raw.avatarUrl == null ? null : normalizeOptionalString(raw.avatarUrl) ?? null,
         avatarEmoji: raw.avatarEmoji == null ? null : normalizeOptionalString(raw.avatarEmoji) ?? null,
+        personality: raw.personality == null ? null : normalizePersonality(raw.personality),
         avatarFileFingerprint: normalizeOptionalString(raw.avatarFileFingerprint),
         lastProfileSyncFingerprint: normalizeOptionalString(raw.lastProfileSyncFingerprint),
         runtimeName: normalizeOptionalString(raw.runtimeName),

@@ -60,6 +60,7 @@ interface DirectMessageReadInput {
   activeAgentId?: string | null;
   cursor?: string | null;
   limit?: string | null;
+  threadUsage?: string | null;
 }
 
 interface DirectMessageCursor {
@@ -99,6 +100,7 @@ interface DirectMessageThreadParticipantDto {
 }
 
 type DirectMessageThreadUsage = 'network_dm' | 'owned_agent_command';
+type DirectMessageThreadUsageFilter = DirectMessageThreadUsage | 'all';
 
 interface DirectMessageAssetDto {
   id: string;
@@ -272,7 +274,7 @@ export class ContentService {
 
   async getAgentDirectMessageThreads(
     agent: AuthenticatedFederatedAgent,
-    input: Pick<DirectMessageReadInput, 'cursor' | 'limit'>,
+    input: Pick<DirectMessageReadInput, 'cursor' | 'limit' | 'threadUsage'>,
   ) {
     return this.readDirectMessageThreadsForActor(agent.id, input, null);
   }
@@ -322,62 +324,111 @@ export class ContentService {
 
   private async readDirectMessageThreadsForActor(
     activeAgentId: string,
-    input: Pick<DirectMessageReadInput, 'cursor' | 'limit'>,
+    input: Pick<DirectMessageReadInput, 'cursor' | 'limit' | 'threadUsage'>,
     humanViewerId: string | null,
   ) {
     const limit = this.parseLimit(input.limit, 20, 50);
     const cursor = this.parseDirectMessageCursor(input.cursor);
-    const latestEvents = await this.readLatestDirectMessageEvents(
-      activeAgentId,
-      cursor,
-      limit,
+    const threadUsageFilter = this.parseDirectMessageThreadUsageFilter(
+      input.threadUsage,
     );
-    const pageEvents = latestEvents.slice(0, limit);
-    const threadIds = pageEvents.map((event) => event.threadId);
-    const latestEventIds = pageEvents.map((event) => event.eventId);
-    const participants =
-      threadIds.length === 0
-        ? []
-        : await this.threadParticipantRepository.find({
-            where: {
-              threadId: In(threadIds),
-            },
-            relations: {
-              agent: true,
-              user: true,
-            },
-          });
+    const filteredEvents: DirectMessageThreadEventRow[] = [];
     const participantsByThreadId = new Map<string, ThreadParticipantEntity[]>();
-    const latestEventEntities =
-      latestEventIds.length === 0
-        ? []
-        : await this.eventRepository.find({
-            where: {
-              id: In(latestEventIds),
-            },
-            relations: {
-              actorAgent: true,
-              actorUser: true,
-            },
-          });
-    const latestEventById = new Map(
-      latestEventEntities.map((event) => [event.id, event] as const),
-    );
+    const latestEventById = new Map<string, EventEntity>();
+    const threadUsageByThreadId = new Map<string, DirectMessageThreadUsage>();
+    let scanCursor = cursor;
+
+    while (filteredEvents.length < limit + 1) {
+      const latestEvents = await this.readLatestDirectMessageEvents(
+        activeAgentId,
+        scanCursor,
+        50,
+      );
+      const batchEvents = latestEvents.slice(0, 50);
+      if (batchEvents.length === 0) {
+        break;
+      }
+
+      const participants = await this.threadParticipantRepository.find({
+        where: {
+          threadId: In(batchEvents.map((event) => event.threadId)),
+        },
+        relations: {
+          agent: true,
+          user: true,
+        },
+      });
+      const batchParticipantsByThreadId = new Map<
+        string,
+        ThreadParticipantEntity[]
+      >();
+      for (const participant of participants) {
+        const threadParticipants =
+          batchParticipantsByThreadId.get(participant.threadId) ?? [];
+        threadParticipants.push(participant);
+        batchParticipantsByThreadId.set(
+          participant.threadId,
+          threadParticipants,
+        );
+      }
+
+      const latestEventEntities = await this.eventRepository.find({
+        where: {
+          id: In(batchEvents.map((event) => event.eventId)),
+        },
+        relations: {
+          actorAgent: true,
+          actorUser: true,
+        },
+      });
+      const batchLatestEventById = new Map(
+        latestEventEntities.map((event) => [event.id, event] as const),
+      );
+
+      for (const finalEvent of batchEvents) {
+        const threadParticipants =
+          batchParticipantsByThreadId.get(finalEvent.threadId) ?? [];
+        const threadUsage = this.resolveDirectMessageThreadUsage(
+          threadParticipants,
+          activeAgentId,
+          humanViewerId,
+        );
+        if (threadUsageFilter !== 'all' && threadUsage !== threadUsageFilter) {
+          continue;
+        }
+
+        filteredEvents.push(finalEvent);
+        participantsByThreadId.set(finalEvent.threadId, threadParticipants);
+        threadUsageByThreadId.set(finalEvent.threadId, threadUsage);
+        const latestEvent = batchLatestEventById.get(finalEvent.eventId);
+        if (latestEvent) {
+          latestEventById.set(finalEvent.eventId, latestEvent);
+        }
+
+        if (filteredEvents.length >= limit + 1) {
+          break;
+        }
+      }
+
+      if (filteredEvents.length >= limit + 1 || latestEvents.length <= 50) {
+        break;
+      }
+
+      scanCursor = {
+        occurredAt: batchEvents.at(-1)!.occurredAt,
+        eventId: batchEvents.at(-1)!.eventId,
+      };
+    }
+
+    const pageEvents = filteredEvents.slice(0, limit);
+    const threadIds = pageEvents.map((event) => event.threadId);
     const unreadCountsByThreadId = await this.readDirectMessageUnreadCounts(
       humanViewerId,
       activeAgentId,
       threadIds,
     );
 
-    for (const participant of participants) {
-      const threadParticipants =
-        participantsByThreadId.get(participant.threadId) ?? [];
-      threadParticipants.push(participant);
-      participantsByThreadId.set(participant.threadId, threadParticipants);
-    }
-
     const counterpartByThreadId = new Map<string, ThreadParticipantEntity>();
-    const threadUsageByThreadId = new Map<string, DirectMessageThreadUsage>();
     for (const finalEvent of pageEvents) {
       const threadParticipants =
         participantsByThreadId.get(finalEvent.threadId) ?? [];
@@ -386,14 +437,6 @@ export class ContentService {
         this.resolveDirectMessageCounterpartParticipant(
           threadParticipants,
           activeAgentId,
-        ),
-      );
-      threadUsageByThreadId.set(
-        finalEvent.threadId,
-        this.resolveDirectMessageThreadUsage(
-          threadParticipants,
-          activeAgentId,
-          humanViewerId,
         ),
       );
     }
@@ -446,7 +489,7 @@ export class ContentService {
         };
       }),
       nextCursor:
-        latestEvents.length > limit && pageEvents.length > 0
+        filteredEvents.length > limit && pageEvents.length > 0
           ? this.encodeDirectMessageCursor(pageEvents.at(-1)!)
           : null,
     };
@@ -2161,6 +2204,27 @@ ${selfAuthoredFilter}
         'cursor must be a valid direct message cursor.',
       );
     }
+  }
+
+  private parseDirectMessageThreadUsageFilter(
+    value: string | null | undefined,
+  ): DirectMessageThreadUsageFilter {
+    const normalizedValue = this.optionalString(value)?.toLowerCase();
+
+    if (!normalizedValue || normalizedValue === 'all') {
+      return 'all';
+    }
+
+    if (
+      normalizedValue === 'network_dm' ||
+      normalizedValue === 'owned_agent_command'
+    ) {
+      return normalizedValue;
+    }
+
+    throw new BadRequestException(
+      'threadUsage must be network_dm, owned_agent_command, or all.',
+    );
   }
 
   private encodeDirectMessageCursor(cursor: {

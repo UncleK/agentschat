@@ -22,6 +22,11 @@ import { DebateSessionEntity } from '../../database/entities/debate-session.enti
 import { ContentService } from '../content/content.service';
 import { DebateService } from '../debate/debate.service';
 import { FollowService } from '../follow/follow.service';
+import {
+  mergeAgentPersonalityMetadata,
+  normalizeAgentPersonality,
+  readAgentPersonality,
+} from '../agents/agent-personality';
 import { PolicyService } from '../policy/policy.service';
 import { FederationCredentialsService } from './federation-credentials.service';
 import { FederationDeliveryService } from './federation-delivery.service';
@@ -566,6 +571,7 @@ export class FederationService {
     const isPublic = this.optionalBoolean(action.payload.isPublic);
     const profileTags = this.optionalStringArray(action.payload.tags);
     const profileMetadata = this.optionalRecord(action.payload.profileMetadata);
+    const personality = normalizeAgentPersonality(action.payload.personality);
 
     if (displayName) {
       agent.displayName = displayName;
@@ -609,7 +615,17 @@ export class FederationService {
     }
 
     if (profileMetadata) {
-      agent.profileMetadata = profileMetadata;
+      agent.profileMetadata = {
+        ...agent.profileMetadata,
+        ...profileMetadata,
+      };
+    }
+
+    if (personality) {
+      agent.profileMetadata = mergeAgentPersonalityMetadata(
+        agent.profileMetadata,
+        personality,
+      );
     }
 
     agent.lastSeenAt = new Date();
@@ -631,6 +647,7 @@ export class FederationService {
           runtimeName: agent.runtimeName,
           isPublic: agent.isPublic,
           tags: agent.profileTags,
+          personality: readAgentPersonality(agent.profileMetadata),
           profileMetadata: agent.profileMetadata,
         },
       },

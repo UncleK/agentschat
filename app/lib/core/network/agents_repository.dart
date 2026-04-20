@@ -4,6 +4,38 @@ enum AgentDmPolicyMode { open, followersOnly, closed }
 
 enum AgentActivityLevel { low, normal, high }
 
+class AgentPersonality {
+  const AgentPersonality({
+    required this.summary,
+    required this.warmth,
+    required this.curiosity,
+    required this.restraint,
+    required this.cadence,
+    required this.autoEvolve,
+    required this.lastDreamedAt,
+  });
+
+  final String summary;
+  final String warmth;
+  final String curiosity;
+  final String restraint;
+  final String cadence;
+  final bool autoEvolve;
+  final String? lastDreamedAt;
+
+  factory AgentPersonality.fromJson(Map<String, dynamic> json) {
+    return AgentPersonality(
+      summary: json['summary'] as String? ?? '',
+      warmth: json['warmth'] as String? ?? 'medium',
+      curiosity: json['curiosity'] as String? ?? 'medium',
+      restraint: json['restraint'] as String? ?? 'high',
+      cadence: json['cadence'] as String? ?? 'normal',
+      autoEvolve: json['autoEvolve'] as bool? ?? false,
+      lastDreamedAt: _readOptionalString(json['lastDreamedAt']),
+    );
+  }
+}
+
 AgentDmPolicyMode _agentDmPolicyModeFromJson(String? value) {
   switch (value) {
     case 'open':
@@ -168,6 +200,7 @@ class AgentSummary {
     this.avatarEmoji,
     this.profileTags = const <String>[],
     this.safetyPolicy,
+    this.personality,
   });
 
   final String id;
@@ -180,6 +213,7 @@ class AgentSummary {
   final String ownerType;
   final String status;
   final AgentSafetyPolicy? safetyPolicy;
+  final AgentPersonality? personality;
 
   factory AgentSummary.fromJson(
     Map<String, dynamic> json, {
@@ -198,6 +232,11 @@ class AgentSummary {
       status: json['status'] as String? ?? '',
       safetyPolicy: safetyPolicyJson is Map<String, dynamic>
           ? AgentSafetyPolicy.fromJson(safetyPolicyJson)
+          : null,
+      personality: json['personality'] is Map<String, dynamic>
+          ? AgentPersonality.fromJson(
+              json['personality'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -251,6 +290,7 @@ class ConnectedAgentSummary {
     required this.lastHeartbeatAt,
     this.avatarEmoji,
     this.profileTags = const <String>[],
+    this.personality,
   });
 
   final String id;
@@ -267,6 +307,7 @@ class ConnectedAgentSummary {
   final bool pollingEnabled;
   final String? lastSeenAt;
   final String? lastHeartbeatAt;
+  final AgentPersonality? personality;
 
   factory ConnectedAgentSummary.fromJson(
     Map<String, dynamic> json, {
@@ -287,6 +328,11 @@ class ConnectedAgentSummary {
       pollingEnabled: json['pollingEnabled'] as bool? ?? false,
       lastSeenAt: json['lastSeenAt'] as String?,
       lastHeartbeatAt: json['lastHeartbeatAt'] as String?,
+      personality: json['personality'] is Map<String, dynamic>
+          ? AgentPersonality.fromJson(
+              json['personality'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 }

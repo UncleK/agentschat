@@ -1,10 +1,11 @@
+import { decideDmReply, decideForumReply, decideLiveReply, ensurePersonalityInitialized, maybeRunDailyDream } from "./conversation-behavior.js";
 import { DEFAULT_DISCOVERY_INTERVAL_MS, DEFAULT_DISCOVERY_JITTER_MS, DEFAULT_MANAGER_INTERVAL_MS, DEFAULT_POLL_BACKOFF_SECONDS, DEFAULT_POLL_WAIT_SECONDS, DEFAULT_SAFETY_POLICY_REFRESH_MS } from "./constants.js";
 import { buildSessionKey, runEmbeddedReply } from "./embedded.js";
 import { resolveForumDeliveryTarget } from "./forum-context.js";
-import { buildDebatePrompt, buildDebateSpectatorPrompt, buildDmPrompt, buildForumPrompt, isNoReply } from "./prompts.js";
+import { buildDebatePrompt, isNoReply } from "./prompts.js";
 import { maybeRunHighActivityDiscovery } from "./worker-discovery.js";
 import { accountFingerprint, isConfiguredAgentsChatAccount, listAgentsChatAccounts } from "./config.js";
-import { ackDeliveries, AgentsChatConnectionStateError, connectAccount, pollDeliveries, readDebate, readDmThreadMessages, readForumTopic, readSafetyPolicy, submitAction, waitForActionCompletion } from "./launcher.js";
+import { ackDeliveries, AgentsChatConnectionStateError, connectAccount, pollDeliveries, readDebate, readForumTopic, readSafetyPolicy, submitAction, waitForActionCompletion } from "./launcher.js";
 import { AgentsChatHttpError, AgentsChatNetworkError, wait } from "./http.js";
 import { clearSlotState, loadSlotState, saveSlotState } from "./state.js";
 let managerTimer = null;
@@ -197,33 +198,29 @@ async function loadSafetyPolicy(state, logger, force = false) {
         return fallbackSafetyPolicy(state);
     }
 }
-async function processDmDelivery(context, account, state, delivery, safetyPolicy) {
+async function processDmDelivery(context, account, state, delivery, safetyPolicy, abortSignal) {
     const event = asRecord(delivery.event);
     const threadId = normalizeOptionalString(event.threadId);
     if (!threadId || !state.serverBaseUrl || !state.accessToken || !state.agentId) {
         throw new Error("DM delivery is missing required connection fields.");
     }
-    const messagesResponse = await readDmThreadMessages(state.serverBaseUrl, state.accessToken, threadId);
-    const messages = extractMessages(messagesResponse).slice(-24);
     const activityLevel = effectiveActivityLevel(safetyPolicy);
     if (isEmergencyStopEnabled(safetyPolicy, "dm")
+        || isSelfAgentActor(event, state)
         || shouldIgnoreForHumanConversationGate(event, activityLevel, "dm")) {
         return;
     }
-    const replyText = await runEmbeddedReply(context, {
+    const decision = await decideDmReply({
+        context,
         account,
-        kind: "dm",
-        threadId,
-        senderId: normalizeOptionalString(event.actorAgentId ?? event.actorUserId) ?? null,
-        senderName: normalizeOptionalString(event.actorDisplayName) ?? null,
-        senderUsername: normalizeOptionalString(event.actorHandle) ?? null,
-        prompt: buildDmPrompt({
-            selfAgentId: state.agentId,
-            delivery,
-            messages,
-            activityLevel
-        })
+        state,
+        delivery,
+        activityLevel,
+        abortSignal
     });
+    if (decision.decision !== "reply" || decision.replyText.length === 0) {
+        return;
+    }
     const target = deriveReplyTarget(event);
     await submitAndWaitForSuccess(state, {
         type: "dm.send",
@@ -232,7 +229,7 @@ async function processDmDelivery(context, account, state, delivery, safetyPolicy
             targetType: target.targetType,
             targetId: target.targetId,
             contentType: "text",
-            content: replyText,
+            content: decision.replyText,
             metadata: {
                 runtime: "openclaw-native-plugin",
                 sourceDeliveryId: delivery.deliveryId,
@@ -241,7 +238,7 @@ async function processDmDelivery(context, account, state, delivery, safetyPolicy
         }
     }, `agentschatapp-native-dm-${delivery.deliveryId}`);
 }
-async function processForumDelivery(context, account, state, delivery, safetyPolicy) {
+async function processForumDelivery(context, account, state, delivery, safetyPolicy, abortSignal) {
     const event = asRecord(delivery.event);
     const threadId = normalizeOptionalString(event.threadId);
     if (!threadId || !state.serverBaseUrl || !state.accessToken || !state.agentId) {
@@ -260,19 +257,15 @@ async function processForumDelivery(context, account, state, delivery, safetyPol
     if (replyTarget.targetType === "second_level_reply") {
         return;
     }
-    const replyText = await runEmbeddedReply(context, {
+    const decision = await decideForumReply({
+        context,
         account,
-        kind: "forum",
-        threadId,
-        senderId: normalizeOptionalString(event.actorAgentId ?? event.actorUserId) ?? null,
-        senderName: normalizeOptionalString(event.actorDisplayName) ?? null,
-        prompt: buildForumPrompt({
-            delivery,
-            topic,
-            activityLevel
-        })
+        state,
+        delivery,
+        activityLevel,
+        abortSignal
     });
-    if (replyText.length === 0 || isNoReply(replyText)) {
+    if (decision.decision.decision !== "reply" || decision.decision.replyText.length === 0) {
         return;
     }
     const parentEventId = normalizeOptionalString(event.id);
@@ -285,7 +278,7 @@ async function processForumDelivery(context, account, state, delivery, safetyPol
             threadId,
             parentEventId,
             contentType: "text",
-            content: replyText,
+            content: decision.decision.replyText,
             metadata: {
                 runtime: "openclaw-native-plugin",
                 sourceDeliveryId: delivery.deliveryId,
@@ -305,7 +298,7 @@ function isFormalDebater(debate, selfAgentId) {
         return seatAgentId === selfAgentId;
     });
 }
-async function processDebateSpectatorDelivery(context, account, state, delivery, safetyPolicy) {
+async function processDebateSpectatorDelivery(context, account, state, delivery, safetyPolicy, abortSignal) {
     const event = asRecord(delivery.event);
     const debateSessionId = normalizeOptionalString(event.targetId);
     if (!state.serverBaseUrl || !state.accessToken || !state.agentId || !debateSessionId) {
@@ -322,19 +315,15 @@ async function processDebateSpectatorDelivery(context, account, state, delivery,
     if (isFormalDebater(debate, state.agentId)) {
         return;
     }
-    const replyText = await runEmbeddedReply(context, {
+    const decision = await decideLiveReply({
+        context,
         account,
-        kind: "live",
-        threadId: debateSessionId,
-        senderId: normalizeOptionalString(event.actorAgentId ?? event.actorUserId) ?? null,
-        senderName: normalizeOptionalString(event.actorDisplayName) ?? null,
-        prompt: buildDebateSpectatorPrompt({
-            delivery,
-            debate,
-            activityLevel
-        })
+        state,
+        delivery,
+        activityLevel,
+        abortSignal
     });
-    if (replyText.length === 0 || isNoReply(replyText)) {
+    if (decision.decision.decision !== "reply" || decision.decision.replyText.length === 0) {
         return;
     }
     await submitAndWaitForSuccess(state, {
@@ -342,7 +331,7 @@ async function processDebateSpectatorDelivery(context, account, state, delivery,
         payload: {
             debateSessionId,
             contentType: "text",
-            content: replyText,
+            content: decision.decision.replyText,
             metadata: {
                 runtime: "openclaw-native-plugin",
                 sourceDeliveryId: delivery.deliveryId,
@@ -397,20 +386,20 @@ async function processDebateDelivery(context, account, state, delivery, safetyPo
         }
     }, `agentschatapp-native-debate-${delivery.deliveryId}`);
 }
-async function processDelivery(context, account, state, delivery, safetyPolicy, logger) {
+async function processDelivery(context, account, state, delivery, safetyPolicy, logger, abortSignal) {
     const event = asRecord(delivery.event);
     switch (event.type) {
         case "dm.received":
-            await processDmDelivery(context, account, state, delivery, safetyPolicy);
+            await processDmDelivery(context, account, state, delivery, safetyPolicy, abortSignal);
             return true;
         case "forum.reply.create":
-            await processForumDelivery(context, account, state, delivery, safetyPolicy);
+            await processForumDelivery(context, account, state, delivery, safetyPolicy, abortSignal);
             return true;
         case "debate.turn.assigned":
             await processDebateDelivery(context, account, state, delivery, safetyPolicy);
             return true;
         case "debate.spectator.post":
-            await processDebateSpectatorDelivery(context, account, state, delivery, safetyPolicy);
+            await processDebateSpectatorDelivery(context, account, state, delivery, safetyPolicy, abortSignal);
             return true;
         case "claim.requested":
             logger.warn(`Agents Chat slot '${account.slot}' received claim.requested. Native plugin does not auto-confirm claims.`);
@@ -420,7 +409,7 @@ async function processDelivery(context, account, state, delivery, safetyPolicy, 
             return true;
     }
 }
-async function handleDeliveryBatch(context, account, state, deliveries, logger) {
+async function handleDeliveryBatch(context, account, state, deliveries, logger, abortSignal) {
     if (deliveries.length === 0 || !state.serverBaseUrl || !state.accessToken) {
         return;
     }
@@ -432,7 +421,7 @@ async function handleDeliveryBatch(context, account, state, deliveries, logger) 
             continue;
         }
         try {
-            const shouldAck = await processDelivery(context, account, state, delivery, safetyPolicy, logger);
+            const shouldAck = await processDelivery(context, account, state, delivery, safetyPolicy, logger, abortSignal);
             if (shouldAck) {
                 ackIds.push(deliveryId);
             }
@@ -494,9 +483,18 @@ async function runWorkerLoop(context, account, controller, logger) {
             if (!state.serverBaseUrl || !state.accessToken) {
                 throw new Error("Connected slot still has no access token.");
             }
+            if (!state.personality) {
+                await ensurePersonalityInitialized({
+                    context,
+                    account,
+                    state,
+                    submitAndWaitForSuccess,
+                    logger
+                });
+            }
             const response = await pollDeliveries(state.serverBaseUrl, state.accessToken, DEFAULT_POLL_WAIT_SECONDS);
             const deliveries = extractDeliveries(response);
-            await handleDeliveryBatch(context, account, state, deliveries, logger);
+            await handleDeliveryBatch(context, account, state, deliveries, logger, controller.signal);
             let policy = await loadSafetyPolicy(state, logger);
             if (runtimeState.nextDiscoveryAt != null && nowMs() >= runtimeState.nextDiscoveryAt) {
                 policy = await loadSafetyPolicy(state, logger, true);
@@ -515,6 +513,18 @@ async function runWorkerLoop(context, account, controller, logger) {
             catch (error) {
                 scheduleDiscoveryRetry(runtimeState);
                 logger.warn(`Agents Chat slot '${account.slot}' skipped one discovery cycle after error: ${error instanceof Error ? error.message : String(error)}`);
+            }
+            try {
+                await maybeRunDailyDream({
+                    context,
+                    account,
+                    state,
+                    submitAndWaitForSuccess,
+                    logger
+                });
+            }
+            catch (error) {
+                logger.warn(`Agents Chat slot '${account.slot}' skipped one dream cycle after error: ${error instanceof Error ? error.message : String(error)}`);
             }
             clearRecoveredWorkerState(state, runtimeState);
             persistState(context, account.slot, state, runtimeState);

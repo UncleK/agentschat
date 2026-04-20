@@ -82,6 +82,14 @@ describe('Federation conformance (e2e)', () => {
       'conformance-owner@example.com',
       'Conformance Owner',
     );
+    const persistedProfileAgent = await agentRepository.findOneByOrFail({
+      id: profileAgent.id,
+    });
+    persistedProfileAgent.profileMetadata = {
+      ...persistedProfileAgent.profileMetadata,
+      existingFlag: true,
+    };
+    await agentRepository.save(persistedProfileAgent);
 
     const profileUpdate = await request(app.getHttpServer())
       .post('/api/v1/actions')
@@ -93,15 +101,35 @@ describe('Federation conformance (e2e)', () => {
           displayName: 'Conformance Profile Updated',
           bio: 'Updated through federation.',
           tags: ['federation', 'task-5'],
+          personality: {
+            summary: 'Warm but selective systems collaborator.',
+            warmth: 'high',
+            curiosity: 'medium',
+            restraint: 'high',
+            cadence: 'normal',
+            autoEvolve: true,
+            lastDreamedAt: '2026-04-20T00:00:00.000Z',
+          },
         },
       })
       .expect(202);
     const profileUpdateBody = typedValue<{ id: string }>(profileUpdate.body);
-    await waitForActionStatus(
+    const finalProfileAction = await waitForActionStatus(
       app,
       profileClaim.accessToken,
       profileUpdateBody.id,
     );
+    const updatedProfileActionAgent = finalProfileAction.result?.agent as
+      | {
+          personality?: { summary?: string; warmth?: string };
+          profileMetadata?: { existingFlag?: boolean };
+        }
+      | undefined;
+    expect(updatedProfileActionAgent?.personality?.summary).toBe(
+      'Warm but selective systems collaborator.',
+    );
+    expect(updatedProfileActionAgent?.personality?.warmth).toBe('high');
+    expect(updatedProfileActionAgent?.profileMetadata?.existingFlag).toBe(true);
 
     const updatedProfileAgent = await agentRepository.findOneByOrFail({
       id: profileAgent.id,
@@ -109,6 +137,31 @@ describe('Federation conformance (e2e)', () => {
     expect(updatedProfileAgent.displayName).toBe('Conformance Profile Updated');
     expect(updatedProfileAgent.bio).toBe('Updated through federation.');
     expect(updatedProfileAgent.profileTags).toEqual(['federation', 'task-5']);
+    expect(updatedProfileAgent.profileMetadata).toMatchObject({
+      existingFlag: true,
+      personality: {
+        summary: 'Warm but selective systems collaborator.',
+        warmth: 'high',
+        curiosity: 'medium',
+        restraint: 'high',
+        cadence: 'normal',
+        autoEvolve: true,
+        lastDreamedAt: '2026-04-20T00:00:00.000Z',
+      },
+    });
+
+    const publicDirectoryResponse = await request(app.getHttpServer())
+      .get('/api/v1/agents/public-directory')
+      .expect(200);
+    const publicDirectoryBody = typedValue<{
+      agents: Array<{ id: string; personality?: { summary?: string } | null }>;
+    }>(publicDirectoryResponse.body);
+    const publicDirectoryAgent = publicDirectoryBody.agents.find(
+      (agent) => agent.id === profileAgent.id,
+    );
+    expect(publicDirectoryAgent?.personality?.summary).toBe(
+      'Warm but selective systems collaborator.',
+    );
 
     const followAction = await request(app.getHttpServer())
       .post('/api/v1/actions')

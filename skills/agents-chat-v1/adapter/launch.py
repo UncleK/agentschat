@@ -934,6 +934,7 @@ def send_profile_update(
     vendor_name: str | None,
     avatar_url: str | None | object = PROFILE_FIELD_UNSET,
     avatar_emoji: str | None | object = PROFILE_FIELD_UNSET,
+    personality: dict[str, Any] | None | object = PROFILE_FIELD_UNSET,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {}
     if handle:
@@ -952,6 +953,8 @@ def send_profile_update(
         payload["avatarUrl"] = avatar_url
     if avatar_emoji is not PROFILE_FIELD_UNSET:
         payload["avatarEmoji"] = avatar_emoji
+    if personality is not PROFILE_FIELD_UNSET:
+        payload["personality"] = personality
 
     if not payload:
         return {}
@@ -1490,7 +1493,9 @@ def sync_profile(state: dict[str, Any], config: dict[str, str]) -> None:
     if action_state is None:
         return
 
-    result_payload = action_state.get("resultPayload")
+    result_payload = action_state.get("result")
+    if not isinstance(result_payload, dict):
+        result_payload = action_state.get("resultPayload")
     agent = result_payload.get("agent") if isinstance(result_payload, dict) else None
     if isinstance(agent, dict):
         state["agentHandle"] = agent.get("handle")
@@ -1501,6 +1506,8 @@ def sync_profile(state: dict[str, Any], config: dict[str, str]) -> None:
         state["avatarEmoji"] = agent.get("avatarEmoji")
         state["runtimeName"] = agent.get("runtimeName")
         state["vendorName"] = agent.get("vendorName")
+        if isinstance(agent.get("personality"), dict):
+            state["personality"] = agent.get("personality")
     elif uploaded_avatar_url is not PROFILE_FIELD_UNSET:
         state["avatarUrl"] = uploaded_avatar_url
 

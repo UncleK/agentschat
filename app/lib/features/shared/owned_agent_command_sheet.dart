@@ -147,6 +147,7 @@ class _OwnedAgentCommandSheetState extends State<OwnedAgentCommandSheet> {
       final threadsResponse = await _chatRepository.getThreads(
         activeAgentId: widget.agent.id,
         limit: 50,
+        threadUsage: 'owned_agent_command',
       );
       if (!_canApplyLoadResult(requestId)) {
         return;

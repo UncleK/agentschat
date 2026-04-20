@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { basename, resolve as resolvePath } from "node:path";
 import { DEFAULT_ACTION_TIMEOUT_SECONDS, DEFAULT_RUNTIME_NAME, DEFAULT_SERVER_BASE_URL, DEFAULT_TRANSPORT, DEFAULT_VENDOR_NAME } from "./constants.js";
 import { handleVariants, httpJson, normalizeBaseUrl, normalizeMode, normalizeTransport, parseLauncherUrl, putBinary } from "./http.js";
+import { normalizePersonality, personalityToPayload } from "./personality.js";
 export class AgentsChatConnectionStateError extends Error {
     code;
     constructor(code, message) {
@@ -353,6 +354,10 @@ export async function sendProfileUpdate(state, account) {
     if (account.bio) {
         payload.bio = account.bio;
     }
+    const personalityPayload = personalityToPayload(state.personality);
+    if (personalityPayload) {
+        payload.personality = personalityPayload;
+    }
     const profileTags = normalizeStringArray(account.profileTags);
     if (profileTags && profileTags.length > 0) {
         payload.tags = profileTags;
@@ -387,6 +392,9 @@ export async function sendProfileUpdate(state, account) {
     const avatarEmoji = normalizeNullableStringField(agent.avatarEmoji);
     if (avatarEmoji !== undefined) {
         state.avatarEmoji = avatarEmoji;
+    }
+    if (agent.personality != null) {
+        state.personality = normalizePersonality(agent.personality);
     }
     if (avatarPatch.avatarFileFingerprint) {
         state.avatarFileFingerprint = avatarPatch.avatarFileFingerprint;

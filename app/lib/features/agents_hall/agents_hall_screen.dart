@@ -1944,6 +1944,117 @@ class _AgentDetailSheet extends StatelessWidget {
                                   height: 1.72,
                                 ),
                           ),
+                          if (agent.personality != null) ...[
+                            const SizedBox(height: AppSpacing.xxl),
+                            _DetailSectionTitle(
+                              label: context.localizedText(
+                                key: 'msgBehavioralProfilecb3cb734',
+                                en: 'Behavioral Profile',
+                                zhHans: '行为画像',
+                              ),
+                              accentColor: accentColor,
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            DecoratedBox(
+                              key: const Key('agent-personality-section'),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceLow.withValues(
+                                  alpha: 0.82,
+                                ),
+                                borderRadius: AppRadii.large,
+                                border: Border.all(
+                                  color: AppColors.outline.withValues(
+                                    alpha: 0.14,
+                                  ),
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(AppSpacing.lg),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      agent.personality!.summary.trim().isEmpty
+                                          ? context.localizedText(
+                                              key:
+                                                  'msgNoBehaviorSummaryYet0f3ae2fb',
+                                              en:
+                                                  'No behavior summary synced yet.',
+                                              zhHans: '暂时还没有同步人格摘要。',
+                                            )
+                                          : agent.personality!.summary,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            color: AppColors.onSurface,
+                                            height: 1.64,
+                                          ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    Wrap(
+                                      spacing: AppSpacing.sm,
+                                      runSpacing: AppSpacing.sm,
+                                      children: [
+                                        _DetailTagChip(
+                                          label:
+                                              '${context.localizedText(
+                                                key: 'msgWarmth763a2ad7',
+                                                en: 'Warmth',
+                                                zhHans: '温度',
+                                              )} · ${_localizedPersonalityValue(context, agent.personality!.warmth)}',
+                                          accentColor: accentColor,
+                                        ),
+                                        _DetailTagChip(
+                                          label:
+                                              '${context.localizedText(
+                                                key: 'msgCuriosity4403ea7a',
+                                                en: 'Curiosity',
+                                                zhHans: '好奇心',
+                                              )} · ${_localizedPersonalityValue(context, agent.personality!.curiosity)}',
+                                          accentColor: accentColor,
+                                        ),
+                                        _DetailTagChip(
+                                          label:
+                                              '${context.localizedText(
+                                                key: 'msgRestraintd68829ef',
+                                                en: 'Restraint',
+                                                zhHans: '克制',
+                                              )} · ${_localizedPersonalityValue(context, agent.personality!.restraint)}',
+                                          accentColor: accentColor,
+                                        ),
+                                        _DetailTagChip(
+                                          label:
+                                              '${context.localizedText(
+                                                key: 'msgCadence1d5232de',
+                                                en: 'Cadence',
+                                                zhHans: '节奏',
+                                              )} · ${_localizedPersonalityValue(context, agent.personality!.cadence)}',
+                                          accentColor: accentColor,
+                                        ),
+                                        _DetailTagChip(
+                                          label: agent.personality!.autoEvolve
+                                              ? context.localizedText(
+                                                  key:
+                                                      'msgAutoEvolveEnableda7e9da53',
+                                                  en: 'Auto evolve on',
+                                                  zhHans: '自动演化开启',
+                                                )
+                                              : context.localizedText(
+                                                  key:
+                                                      'msgAutoEvolvePaused6c06dba1',
+                                                  en: 'Auto evolve off',
+                                                  zhHans: '自动演化关闭',
+                                                ),
+                                          accentColor: AppColors.tertiary,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                           if (agent.skills.isNotEmpty) ...[
                             const SizedBox(height: AppSpacing.xxl),
                             _DetailSectionTitle(
@@ -3385,6 +3496,42 @@ String _localizedAgentMetadataValue(BuildContext context, String value) {
       key: 'msgCore68836c55',
       en: 'Core',
       zhHans: '核心',
+    ),
+    _ => value,
+  };
+}
+
+String _localizedPersonalityValue(BuildContext context, String value) {
+  return switch (value.trim().toLowerCase()) {
+    'low' => context.localizedText(
+      key: 'msgLow6a1f8d4d',
+      en: 'Low',
+      zhHans: '低',
+    ),
+    'medium' => context.localizedText(
+      key: 'msgMedium83ef57b8',
+      en: 'Medium',
+      zhHans: '中',
+    ),
+    'high' => context.localizedText(
+      key: 'msgHigh79851a2f',
+      en: 'High',
+      zhHans: '高',
+    ),
+    'slow' => context.localizedText(
+      key: 'msgSlow6bf42b06',
+      en: 'Slow',
+      zhHans: '慢',
+    ),
+    'normal' => context.localizedText(
+      key: 'msgNormalf4ad3f45',
+      en: 'Normal',
+      zhHans: '正常',
+    ),
+    'fast' => context.localizedText(
+      key: 'msgFastb7d0958f',
+      en: 'Fast',
+      zhHans: '快',
     ),
     _ => value,
   };

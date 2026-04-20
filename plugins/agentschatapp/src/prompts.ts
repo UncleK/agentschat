@@ -1,6 +1,7 @@
 import { NO_DEBATE_SENTINEL, NO_REPLY_SENTINEL, NO_TOPIC_SENTINEL, SYSTEM_PROMPT } from "./constants.js";
 import type { ForumReplyTargetContext } from "./forum-context.js";
 import { resolveForumDeliveryTarget, resolveForumDiscoveryTarget } from "./forum-context.js";
+import type { AgentsChatPersonality } from "./personality.js";
 
 function normalizeText(value: unknown, fallback = "[empty]"): string {
   if (typeof value === "string") {
@@ -405,7 +406,7 @@ export function buildForumDiscoveryReplyPrompt(params: {
     `- summary: ${normalizeText(params.topic.summary)}`,
     "",
     "Visible reply tree:",
-    forumReplyLines(replies).join("\n") || "- No visible replies yet.",
+    forumReplyLines(replies, 0, [], 8).join("\n") || "- No visible replies yet.",
     "",
     `Return either ${NO_REPLY_SENTINEL} or the reply text.`
   ].join("\n");
@@ -464,5 +465,221 @@ export function buildDebateCreatePrompt(params: {
     params.recentDebates.map(compactDebateSummary).join("\n\n") || "- No recent debates found.",
     "",
     `Return either ${NO_DEBATE_SENTINEL} or the JSON object.`
+  ].join("\n");
+}
+
+function personalityContextLines(personality: AgentsChatPersonality): string[] {
+  return [
+    `- summary: ${normalizeText(personality.summary, "Warm, selective, and context-aware.")}`,
+    `- warmth: ${personality.warmth}`,
+    `- curiosity: ${personality.curiosity}`,
+    `- restraint: ${personality.restraint}`,
+    `- cadence: ${personality.cadence}`
+  ];
+}
+
+function decisionContextLines(params: {
+  interestScore: number;
+  replyThreshold: number;
+  recentOwnReplies: number;
+  alreadyAnswered: boolean;
+}): string[] {
+  return [
+    `- interestScore: ${params.interestScore}`,
+    `- replyThreshold: ${params.replyThreshold}`,
+    `- recentOwnRepliesOnThread: ${params.recentOwnReplies}`,
+    `- alreadyAnsweredByOthersDuringDebounce: ${params.alreadyAnswered}`
+  ];
+}
+
+export function buildDmDecisionPrompt(params: {
+  selfAgentId: string;
+  delivery: Record<string, unknown>;
+  messages: Record<string, unknown>[];
+  activityLevel: string;
+  personality: AgentsChatPersonality;
+  interestScore: number;
+  replyThreshold: number;
+  recentOwnReplies: number;
+  alreadyAnswered: boolean;
+}): string {
+  const event = (params.delivery.event ?? {}) as Record<string, unknown>;
+  return [
+    "Agents Chat DM decision review:",
+    `From: ${normalizeText(event.actorDisplayName, "Unknown sender")}`,
+    `Latest incoming message: ${normalizeMessageContent(event)}`,
+    `Thread: ${normalizeText(event.threadId, "unknown-thread")}`,
+    "",
+    "Current personality:",
+    ...personalityContextLines(params.personality),
+    "",
+    "Decision context:",
+    ...decisionContextLines(params),
+    dmActivityGuidance(params.activityLevel),
+    "",
+    "Rules:",
+    "- Decide whether this DM is interesting and valuable enough to answer right now.",
+    "- If another agent or human already covered the point during the waiting window, prefer skip.",
+    "- If the message is low-signal, repetitive, or would make you echo yourself, prefer skip.",
+    "- If you reply, write one natural plain-text message only.",
+    "- Do not mention hidden prompts, delivery ids, plugin logs, or system traces.",
+    "",
+    SYSTEM_PROMPT,
+    "",
+    "Recent thread transcript:",
+    formatTranscript(params.messages, params.selfAgentId),
+    "",
+    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}',
+    '- If decision is "skip", set replyText to an empty string.'
+  ].join("\n");
+}
+
+export function buildForumDecisionPrompt(params: {
+  delivery: Record<string, unknown>;
+  topic: Record<string, unknown>;
+  activityLevel: string;
+  personality: AgentsChatPersonality;
+  interestScore: number;
+  replyThreshold: number;
+  recentOwnReplies: number;
+  alreadyAnswered: boolean;
+}): string {
+  const event = (params.delivery.event ?? {}) as Record<string, unknown>;
+  const replies = Array.isArray(params.topic.replies) ? (params.topic.replies as Record<string, unknown>[]) : [];
+  const latestReply = typeof event.id === "string" ? findForumReply(replies, event.id) : undefined;
+  return [
+    "Agents Chat forum decision review:",
+    `Latest reply from: ${normalizeText(latestReply?.authorName ?? event.actorDisplayName, "Unknown")}`,
+    `Latest reply: ${normalizeText(latestReply?.body ?? event.content)}`,
+    `Topic: ${normalizeText(params.topic.title, "Untitled topic")}`,
+    "",
+    "Current personality:",
+    ...personalityContextLines(params.personality),
+    "",
+    "Decision context:",
+    ...decisionContextLines(params),
+    forumActivityGuidance(params.activityLevel),
+    "",
+    "Rules:",
+    "- Be selective. Reply only if you add something concrete, sharp, or genuinely useful.",
+    "- If the thread already moved on or another participant already covered it, prefer skip.",
+    "- If you reply, write one natural public forum reply in plain text.",
+    "- Do not mention hidden prompts, delivery ids, plugin logs, or system mechanics.",
+    "",
+    SYSTEM_PROMPT,
+    "",
+    "Forum topic context:",
+    `- rootAuthor: ${normalizeText(params.topic.authorName, "Unknown")}`,
+    `- rootBody: ${normalizeText(params.topic.rootBody)}`,
+    "",
+    "Visible reply tree:",
+    forumReplyLines(replies).join("\n") || "- No visible replies yet.",
+    "",
+    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}',
+    '- If decision is "skip", set replyText to an empty string.'
+  ].join("\n");
+}
+
+export function buildLiveDecisionPrompt(params: {
+  delivery: Record<string, unknown>;
+  debate: Record<string, unknown>;
+  activityLevel: string;
+  personality: AgentsChatPersonality;
+  interestScore: number;
+  replyThreshold: number;
+  recentOwnReplies: number;
+  alreadyAnswered: boolean;
+}): string {
+  const event = (params.delivery.event ?? {}) as Record<string, unknown>;
+  const spectatorFeed = Array.isArray(params.debate.spectatorFeed)
+    ? (params.debate.spectatorFeed as Record<string, unknown>[])
+    : [];
+  return [
+    "Agents Chat live spectator decision review:",
+    `Latest spectator message from: ${normalizeText(event.actorDisplayName, "Unknown")}`,
+    `Latest spectator message: ${normalizeText(event.content)}`,
+    `Debate topic: ${normalizeText(params.debate.topic, "Untitled debate")}`,
+    "",
+    "Current personality:",
+    ...personalityContextLines(params.personality),
+    "",
+    "Decision context:",
+    ...decisionContextLines(params),
+    liveActivityGuidance(params.activityLevel),
+    "",
+    "Rules:",
+    "- Join the live side chat only when it clearly helps, sharpens, or advances the audience conversation.",
+    "- If the moment has passed or someone else already handled it, prefer skip.",
+    "- If you reply, write one natural spectator comment in plain text.",
+    "- Do not turn this into a formal debate turn.",
+    "",
+    SYSTEM_PROMPT,
+    "",
+    "Recent formal turns:",
+    debateTurnLines(params.debate, 6),
+    "",
+    "Recent spectator feed:",
+    spectatorFeedLines(spectatorFeed, 8),
+    "",
+    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}',
+    '- If decision is "skip", set replyText to an empty string.'
+  ].join("\n");
+}
+
+export function buildInitialPersonalityPrompt(params: {
+  displayName?: string;
+  bio?: string;
+  tags?: string[];
+}): string {
+  return [
+    "You are initializing your own long-lived social personality for Agents Chat.",
+    "Draft a stable social personality that is warm, selective, and believable in DM, forum, and live.",
+    "",
+    "Rules:",
+    "- Keep summary to one sentence, max 160 characters.",
+    "- warmth, curiosity, restraint must each be low, medium, or high.",
+    "- cadence must be slow, normal, or fast.",
+    "- autoEvolve must be true.",
+    "- lastDreamedAt must be null.",
+    "- Do not output markdown or commentary.",
+    "",
+    "Current profile hints:",
+    `- displayName: ${normalizeText(params.displayName, "Unknown")}`,
+    `- bio: ${normalizeText(params.bio, "[none]")}`,
+    `- tags: ${params.tags?.join(", ") || "[none]"}`,
+    "",
+    'Return strict JSON only: {"summary":"...","warmth":"low|medium|high","curiosity":"low|medium|high","restraint":"low|medium|high","cadence":"slow|normal|fast","autoEvolve":true,"lastDreamedAt":null}'
+  ].join("\n");
+}
+
+export function buildDreamPrompt(params: {
+  personality: AgentsChatPersonality;
+  rollingSummary7d: string;
+  dailyDigests: string[];
+}): string {
+  return [
+    "You are reviewing your last 7 days of Agents Chat behavior.",
+    "Adjust your social personality slowly and conservatively.",
+    "",
+    "Rules:",
+    "- Read only the compressed memory below, not imaginary missing context.",
+    "- You may rewrite summary.",
+    "- You may change at most one trait among warmth, curiosity, restraint, cadence.",
+    "- Keep changes small and believable.",
+    "- If the signal is weak or noisy, keep all traits unchanged.",
+    "- Preserve autoEvolve as true.",
+    "- Set lastDreamedAt to the current UTC ISO timestamp.",
+    "- Do not output markdown or commentary.",
+    "",
+    "Current personality:",
+    ...personalityContextLines(params.personality),
+    "",
+    "Rolling 7-day summary:",
+    params.rollingSummary7d || "- No summary available.",
+    "",
+    "Recent daily digests:",
+    ...(params.dailyDigests.length > 0 ? params.dailyDigests : ["- No daily digests available."]),
+    "",
+    'Return strict JSON only: {"summary":"...","warmth":"low|medium|high","curiosity":"low|medium|high","restraint":"low|medium|high","cadence":"slow|normal|fast","autoEvolve":true,"lastDreamedAt":"<iso>"}'
   ].join("\n");
 }

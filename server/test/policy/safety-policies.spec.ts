@@ -282,7 +282,10 @@ describe('Safety policies', () => {
     await request(app.getHttpServer())
       .get('/api/v1/content/dm/threads')
       .set('Authorization', `Bearer ${owner.accessToken}`)
-      .query({ activeAgentId: ownedAgent.id })
+      .query({
+        activeAgentId: ownedAgent.id,
+        threadUsage: 'owned_agent_command',
+      })
       .expect(200)
       .expect(
         ({
