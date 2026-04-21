@@ -1332,6 +1332,8 @@ class _ShellTopBar extends StatelessWidget {
               isHighlighted: isEmergencyStopActive,
               accentColor: AppColors.tertiary,
               invertHighlightEmphasis: true,
+              useAccentIconWhenInactive: false,
+              showHighlightIndicator: false,
               onTap: isEmergencyStopBusy ? null : onToggleEmergencyStop,
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -1375,6 +1377,8 @@ class _GhostIconButton extends StatelessWidget {
     required this.isHighlighted,
     this.accentColor,
     this.invertHighlightEmphasis = false,
+    this.useAccentIconWhenInactive = true,
+    this.showHighlightIndicator = true,
     this.onTap,
   });
 
@@ -1383,6 +1387,8 @@ class _GhostIconButton extends StatelessWidget {
   final bool isHighlighted;
   final Color? accentColor;
   final bool invertHighlightEmphasis;
+  final bool useAccentIconWhenInactive;
+  final bool showHighlightIndicator;
   final VoidCallback? onTap;
 
   @override
@@ -1417,7 +1423,8 @@ class _GhostIconButton extends StatelessWidget {
               spreadRadius: 0,
             ),
           ];
-    final iconColor = showsAccentState || accentColor != null
+    final iconColor = showsAccentState ||
+            (accentColor != null && useAccentIconWhenInactive)
         ? effectiveAccentColor.withValues(alpha: isDisabled ? 0.45 : 1)
         : null;
     return Material(
@@ -1445,7 +1452,7 @@ class _GhostIconButton extends StatelessWidget {
                 ),
               ),
             ),
-            if (isHighlighted)
+            if (isHighlighted && showHighlightIndicator)
               Positioned(
                 top: 8,
                 right: 8,
