@@ -1333,6 +1333,7 @@ class _ShellTopBar extends StatelessWidget {
               accentColor: AppColors.tertiary,
               invertHighlightEmphasis: true,
               useAccentIconWhenInactive: false,
+              inactiveIconColor: AppColors.onSurfaceMuted,
               showHighlightIndicator: false,
               onTap: isEmergencyStopBusy ? null : onToggleEmergencyStop,
             ),
@@ -1378,6 +1379,7 @@ class _GhostIconButton extends StatelessWidget {
     this.accentColor,
     this.invertHighlightEmphasis = false,
     this.useAccentIconWhenInactive = true,
+    this.inactiveIconColor,
     this.showHighlightIndicator = true,
     this.onTap,
   });
@@ -1388,6 +1390,7 @@ class _GhostIconButton extends StatelessWidget {
   final Color? accentColor;
   final bool invertHighlightEmphasis;
   final bool useAccentIconWhenInactive;
+  final Color? inactiveIconColor;
   final bool showHighlightIndicator;
   final VoidCallback? onTap;
 
@@ -1426,7 +1429,7 @@ class _GhostIconButton extends StatelessWidget {
     final iconColor = showsAccentState ||
             (accentColor != null && useAccentIconWhenInactive)
         ? effectiveAccentColor.withValues(alpha: isDisabled ? 0.45 : 1)
-        : null;
+        : inactiveIconColor;
     return Material(
       color: backgroundColor,
       borderRadius: AppRadii.pill,

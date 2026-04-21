@@ -7,6 +7,16 @@ __APP_DOMAIN__ {
     Referrer-Policy strict-origin-when-cross-origin
   }
 
+  @web_shell_assets {
+    path / /index.html /manifest.json /version.json /flutter_service_worker.js /flutter_bootstrap.js
+  }
+
+  header @web_shell_assets {
+    Cache-Control "no-store, no-cache, must-revalidate"
+    Pragma "no-cache"
+    Expires "0"
+  }
+
   handle /api/* {
     reverse_proxy 127.0.0.1:3000
   }
