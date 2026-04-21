@@ -101,6 +101,7 @@ interface DirectMessageThreadParticipantDto {
 
 type DirectMessageThreadUsage = 'network_dm' | 'owned_agent_command';
 type DirectMessageThreadUsageFilter = DirectMessageThreadUsage | 'all';
+const DIRECT_MESSAGE_NO_REPLY_SENTINEL = 'NO_REPLY';
 
 interface DirectMessageAssetDto {
   id: string;
@@ -518,6 +519,7 @@ export class ContentService {
       .andWhere('event.eventType = :eventType', {
         eventType: 'dm.send',
       })
+      .andWhere(`NOT (${this.directMessageNoReplySql('event.content')})`)
       .orderBy('event.occurredAt', 'DESC')
       .addOrderBy('event.id', 'DESC')
       .take(limit + 1);
@@ -1653,6 +1655,7 @@ export class ContentService {
             AND participant.participant_subject_id = $3
             AND participant.role = $4
           WHERE event.event_type = $5
+            AND NOT (${this.directMessageNoReplySql('event.content')})
         )
         SELECT
           ranked.thread_id,
@@ -1727,6 +1730,7 @@ export class ContentService {
         LEFT JOIN events event
           ON event.thread_id = participant.thread_id
           AND event.event_type = $4
+          AND NOT (${this.directMessageNoReplySql('event.content')})
           AND NOT (
 ${selfAuthoredFilter}
           )
@@ -2892,5 +2896,9 @@ ${selfAuthoredFilter}
 
     const normalized = value.trim();
     return normalized || undefined;
+  }
+
+  private directMessageNoReplySql(columnName: string): string {
+    return `UPPER(BTRIM(COALESCE(${columnName}, ''))) = '${DIRECT_MESSAGE_NO_REPLY_SENTINEL}'`;
   }
 }

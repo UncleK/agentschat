@@ -526,6 +526,101 @@ describe('DM read models (e2e)', () => {
       .expect(404);
   });
 
+  it('skips no-reply sentinel messages when building thread previews, unread counts, and message history pages', async () => {
+    const owner = await registerHuman(
+      app,
+      'dm-no-reply-owner@example.com',
+      'DM No Reply Owner',
+    );
+    const remoteOwner = await registerHuman(
+      app,
+      'dm-no-reply-remote@example.com',
+      'DM No Reply Remote',
+    );
+    const activeAgent = await importHumanOwnedAgent(
+      owner.accessToken,
+      'dm-no-reply-active',
+      'DM No Reply Active',
+    );
+    const remoteAgent = await importHumanOwnedAgent(
+      remoteOwner.accessToken,
+      'dm-no-reply-remote-agent',
+      'DM No Reply Remote Agent',
+    );
+    await policyService.upsertAgentSafetyPolicy(activeAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+    await policyService.upsertAgentSafetyPolicy(remoteAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+
+    const visibleMessage = await sendDirectMessage(owner.accessToken, {
+      activeAgentId: activeAgent.id,
+      recipientType: 'agent',
+      recipientAgentId: remoteAgent.id,
+      content: 'Visible opener that should stay in history.',
+    });
+
+    for (let index = 0; index < 52; index += 1) {
+      await pause();
+      await sendDirectMessage(remoteOwner.accessToken, {
+        activeAgentId: remoteAgent.id,
+        recipientType: 'agent',
+        recipientAgentId: activeAgent.id,
+        content: 'NO_REPLY',
+      });
+    }
+
+    await request(app.getHttpServer())
+      .get('/api/v1/content/dm/threads')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: activeAgent.id,
+        threadUsage: 'network_dm',
+      })
+      .expect(200)
+      .expect(({ body }: { body: DirectMessageThreadsPage }) => {
+        expect(body.threads).toHaveLength(1);
+        expect(body.threads[0]).toMatchObject({
+          threadId: visibleMessage.threadId,
+          unreadCount: 0,
+          lastMessage: {
+            contentType: 'text',
+            preview: 'Visible opener that should stay in history.',
+          },
+        });
+      });
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/content/dm/threads/${visibleMessage.threadId}/messages`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: activeAgent.id,
+      })
+      .expect(200)
+      .expect(({ body }: { body: Record<string, unknown> }) => {
+        expect(body).toMatchObject(
+          typedValue<Record<string, unknown>>({
+            threadId: visibleMessage.threadId,
+            activeAgentId: activeAgent.id,
+            messages: [
+              {
+                eventId: visibleMessage.eventId,
+                actor: {
+                  type: 'agent',
+                  id: activeAgent.id,
+                  displayName: activeAgent.displayName,
+                },
+                contentType: 'text',
+                content: 'Visible opener that should stay in history.',
+              },
+            ],
+            nextCursor: null,
+          }),
+        );
+      });
+  });
+
   it('computes unread counts from participant read markers and marks DM threads read idempotently', async () => {
     const owner = await registerHuman(
       app,
