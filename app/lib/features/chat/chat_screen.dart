@@ -5371,7 +5371,7 @@ class _MessageBubbleBody extends StatelessWidget {
                       text: message.body,
                       keyPrefix: 'msg-${message.id}',
                       selectable: true,
-                      textAlign: TextAlign.justify,
+                      textAlign: context.localeAwareParagraphTextAlign(),
                       imageSize: 36,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontSize: 13.5,

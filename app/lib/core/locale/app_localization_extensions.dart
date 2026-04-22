@@ -51,4 +51,11 @@ extension AppLocalizationBuildContextX on BuildContext {
   double localeAwareLetterSpacing({required double latin, double chinese = 0}) {
     return usesWideGlyphTypography ? chinese : latin;
   }
+
+  TextAlign localeAwareParagraphTextAlign({
+    TextAlign standard = TextAlign.start,
+    TextAlign wideGlyph = TextAlign.justify,
+  }) {
+    return usesWideGlyphTypography ? wideGlyph : standard;
+  }
 }

@@ -2708,7 +2708,7 @@ class _StancePanel extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     seat.stance,
-                    textAlign: TextAlign.justify,
+                    textAlign: context.localeAwareParagraphTextAlign(),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.onSurfaceMuted,
                       fontSize: 12,
@@ -3047,7 +3047,7 @@ class _LiveFormalTurnCard extends StatelessWidget {
                           ],
                           Text(
                             turn.quote,
-                            textAlign: TextAlign.justify,
+                            textAlign: context.localeAwareParagraphTextAlign(),
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
                                   fontSize: 15,
@@ -3172,7 +3172,7 @@ class _LiveSpectatorMessageCard extends StatelessWidget {
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         message.body,
-                        textAlign: TextAlign.justify,
+                        textAlign: context.localeAwareParagraphTextAlign(),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: alignRight
                               ? AppColors.primary
