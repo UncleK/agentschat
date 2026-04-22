@@ -143,9 +143,42 @@ class _LandingHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 1260;
+        final isTablet = constraints.maxWidth < 1260;
+        final isPhone = constraints.maxWidth < 720;
 
-        if (isCompact) {
+        if (isPhone) {
+          return GlassPanel(
+            borderRadius: AppRadii.hero,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(child: _LandingBrand(compact: true)),
+                    const SizedBox(width: AppSpacing.sm),
+                    _LandingLanguageMenu(
+                      onSelected: onSetLanguage,
+                      compact: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  child: PrimaryGradientButton(
+                    label: context.l10n.landingLaunchApp,
+                    icon: Icons.rocket_launch_rounded,
+                    compact: true,
+                    onPressed: onOpenApp,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (isTablet) {
           return GlassPanel(
             borderRadius: AppRadii.hero,
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -156,7 +189,20 @@ class _LandingHeader extends StatelessWidget {
                   children: [
                     const _LandingBrand(),
                     const Spacer(),
-                    _LandingLanguageMenu(onSelected: onSetLanguage),
+                    _LandingLanguageMenu(
+                      onSelected: onSetLanguage,
+                      compact: true,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    SizedBox(
+                      width: 176,
+                      child: PrimaryGradientButton(
+                        label: context.l10n.landingLaunchApp,
+                        icon: Icons.rocket_launch_rounded,
+                        compact: true,
+                        onPressed: onOpenApp,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -185,16 +231,6 @@ class _LandingHeader extends StatelessWidget {
                       onTap: onShowDevelopers,
                     ),
                   ],
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                SizedBox(
-                  width: double.infinity,
-                  child: PrimaryGradientButton(
-                    label: context.l10n.landingLaunchApp,
-                    icon: Icons.rocket_launch_rounded,
-                    compact: true,
-                    onPressed: onOpenApp,
-                  ),
                 ),
               ],
             ),
@@ -239,7 +275,7 @@ class _LandingHeader extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: AppSpacing.lg),
-              _LandingLanguageMenu(onSelected: onSetLanguage),
+              _LandingLanguageMenu(onSelected: onSetLanguage, compact: true),
               const SizedBox(width: AppSpacing.md),
               SizedBox(
                 width: 176,
@@ -269,6 +305,7 @@ class _LandingHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 1100;
+        final isPhone = constraints.maxWidth < 720;
         final textColumn = ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: isCompact ? double.infinity : 560,
@@ -277,50 +314,61 @@ class _LandingHero extends StatelessWidget {
             key: const Key('landing-hero'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xs,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: AppRadii.pill,
-                  color: AppColors.primary.withValues(alpha: 0.14),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.24),
+              if (!isPhone) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
                   ),
-                ),
-                child: Text(
-                  context.localeAwareCaps(context.l10n.landingHeroEyebrow),
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.primaryFixed,
-                    letterSpacing: context.localeAwareLetterSpacing(
-                      latin: 1.4,
-                      chinese: 0.2,
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadii.pill,
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.24),
                     ),
-                    fontWeight: FontWeight.w600,
+                  ),
+                  child: Text(
+                    context.localeAwareCaps(context.l10n.landingHeroEyebrow),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.primaryFixed,
+                      letterSpacing: context.localeAwareLetterSpacing(
+                        latin: 1.4,
+                        chinese: 0.2,
+                      ),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
+              ],
               Text(
                 context.l10n.landingHeroTitleLineOne,
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                style: (isPhone
+                        ? Theme.of(context).textTheme.displayMedium
+                        : Theme.of(context).textTheme.displayLarge)
+                    ?.copyWith(
                   fontWeight: FontWeight.w700,
-                  height: 0.92,
+                  height: isPhone ? 0.98 : 0.92,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              _GradientHeadline(text: context.l10n.landingHeroTitleLineTwo),
+              _GradientHeadline(
+                text: context.l10n.landingHeroTitleLineTwo,
+                compact: isPhone,
+              ),
               const SizedBox(height: AppSpacing.xl),
               Text(
                 context.l10n.landingHeroSubtitle,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                style: (isPhone
+                        ? Theme.of(context).textTheme.titleLarge
+                        : Theme.of(context).textTheme.headlineSmall)
+                    ?.copyWith(
                   color: AppColors.onSurfaceMuted,
                   height: 1.45,
                   fontWeight: FontWeight.w400,
                 ),
               ),
-              const SizedBox(height: AppSpacing.xxl),
+              SizedBox(height: isPhone ? AppSpacing.xl : AppSpacing.xxl),
               Wrap(
                 spacing: AppSpacing.md,
                 runSpacing: AppSpacing.md,
@@ -358,7 +406,7 @@ class _LandingHero extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.xl),
+              SizedBox(height: isPhone ? AppSpacing.lg : AppSpacing.xl),
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
@@ -421,14 +469,15 @@ class _LandingCapabilitiesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = _gridCardWidth(
-          maxWidth: constraints.maxWidth,
-          compactColumns: 1,
-          mediumColumns: 2,
-          largeColumns: 5,
-        );
+        final isCompact = constraints.maxWidth < 760;
+        final isMedium = constraints.maxWidth < 1180;
+        final featureCardWidth = isCompact
+            ? constraints.maxWidth
+            : isMedium
+            ? (constraints.maxWidth - AppSpacing.lg) / 2
+            : (constraints.maxWidth - (AppSpacing.lg * 3)) / 4;
 
-        final entries = [
+        final featureEntries = [
           (
             accent: AppColors.primary,
             icon: Icons.language_rounded,
@@ -453,40 +502,40 @@ class _LandingCapabilitiesSection extends StatelessWidget {
             title: context.l10n.landingCapabilityLiveTitle,
             subtitle: context.l10n.landingCapabilityLiveSubtitle,
           ),
-          (
-            accent: const Color(0xFF8F66FF),
-            icon: Icons.dashboard_customize_rounded,
-            title: context.l10n.landingCapabilityHubTitle,
-            subtitle: context.l10n.landingCapabilityHubSubtitle,
-          ),
         ];
 
         return Column(
           key: const Key('landing-capabilities-section'),
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               context.l10n.landingCapabilitiesTitle,
               style: Theme.of(
                 context,
               ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              context.l10n.landingCapabilitiesSubtitle,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.onSurfaceMuted,
-                height: 1.5,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Text(
+                context.l10n.landingCapabilitiesSubtitle,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
             Wrap(
               spacing: AppSpacing.lg,
               runSpacing: AppSpacing.lg,
+              alignment: WrapAlignment.center,
               children: [
-                for (final entry in entries)
+                for (final entry in featureEntries)
                   SizedBox(
-                    width: cardWidth,
+                    width: featureCardWidth,
                     child: _CapabilityCard(
                       accentColor: entry.accent,
                       icon: entry.icon,
@@ -495,6 +544,14 @@ class _LandingCapabilitiesSection extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _CapabilityCard(
+              accentColor: const Color(0xFF8F66FF),
+              icon: Icons.dashboard_customize_rounded,
+              title: context.l10n.landingCapabilityHubTitle,
+              subtitle: context.l10n.landingCapabilityHubSubtitle,
+              wide: true,
             ),
           ],
         );
@@ -518,82 +575,114 @@ class _LandingAudienceSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = _gridCardWidth(
-          maxWidth: constraints.maxWidth,
-          compactColumns: 1,
-          mediumColumns: 2,
-          largeColumns: 3,
-        );
+        final isCompact = constraints.maxWidth < 820;
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               context.l10n.landingAudienceTitle,
               style: Theme.of(
                 context,
               ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              context.l10n.landingAudienceSubtitle,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.onSurfaceMuted,
-                height: 1.5,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Text(
+                context.l10n.landingAudienceSubtitle,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
-            Wrap(
-              spacing: AppSpacing.lg,
-              runSpacing: AppSpacing.lg,
-              children: [
-                SizedBox(
-                  key: agentsKey,
-                  width: cardWidth,
-                  child: _AudienceCard(
-                    accentColor: AppColors.primary,
-                    icon: Icons.smart_toy_rounded,
-                    title: context.l10n.landingAudienceAgentsTitle,
-                    bullets: [
-                      context.l10n.landingAudienceAgentsItemOne,
-                      context.l10n.landingAudienceAgentsItemTwo,
-                      context.l10n.landingAudienceAgentsItemThree,
-                      context.l10n.landingAudienceAgentsItemFour,
-                      context.l10n.landingAudienceAgentsItemFive,
-                    ],
+            if (isCompact)
+              Column(
+                children: [
+                  KeyedSubtree(
+                    key: agentsKey,
+                    child: _AudienceCard(
+                      accentColor: AppColors.primary,
+                      icon: Icons.smart_toy_rounded,
+                      title: context.l10n.landingAudienceAgentsTitle,
+                      bullets: [
+                        context.l10n.landingAudienceAgentsItemOne,
+                        context.l10n.landingAudienceAgentsItemTwo,
+                        context.l10n.landingAudienceAgentsItemThree,
+                        context.l10n.landingAudienceAgentsItemFour,
+                        context.l10n.landingAudienceAgentsItemFive,
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(
-                  key: humansKey,
-                  width: cardWidth,
-                  child: _AudienceCard(
-                    accentColor: const Color(0xFF31E6B2),
-                    icon: Icons.person_rounded,
-                    title: context.l10n.landingAudienceHumansTitle,
-                    bullets: [
-                      context.l10n.landingAudienceHumansItemOne,
-                      context.l10n.landingAudienceHumansItemTwo,
-                      context.l10n.landingAudienceHumansItemThree,
-                      context.l10n.landingAudienceHumansItemFour,
-                    ],
+                  const SizedBox(height: AppSpacing.lg),
+                  KeyedSubtree(
+                    key: humansKey,
+                    child: _AudienceCard(
+                      accentColor: const Color(0xFF31E6B2),
+                      icon: Icons.person_rounded,
+                      title: context.l10n.landingAudienceHumansTitle,
+                      bullets: [
+                        context.l10n.landingAudienceHumansItemOne,
+                        context.l10n.landingAudienceHumansItemTwo,
+                        context.l10n.landingAudienceHumansItemThree,
+                        context.l10n.landingAudienceHumansItemFour,
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(
-                  key: developersKey,
-                  width: cardWidth,
-                  child: _AudienceCard(
-                    accentColor: AppColors.tertiary,
-                    icon: Icons.code_rounded,
-                    title: context.l10n.landingAudienceDevelopersTitle,
-                    bullets: [
-                      context.l10n.landingAudienceDevelopersItemOne,
-                      context.l10n.landingAudienceDevelopersItemTwo,
-                      context.l10n.landingAudienceDevelopersItemThree,
-                      context.l10n.landingAudienceDevelopersItemFour,
-                    ],
+                ],
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    key: agentsKey,
+                    child: _AudienceCard(
+                      accentColor: AppColors.primary,
+                      icon: Icons.smart_toy_rounded,
+                      title: context.l10n.landingAudienceAgentsTitle,
+                      bullets: [
+                        context.l10n.landingAudienceAgentsItemOne,
+                        context.l10n.landingAudienceAgentsItemTwo,
+                        context.l10n.landingAudienceAgentsItemThree,
+                        context.l10n.landingAudienceAgentsItemFour,
+                        context.l10n.landingAudienceAgentsItemFive,
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: AppSpacing.lg),
+                  Expanded(
+                    key: humansKey,
+                    child: _AudienceCard(
+                      accentColor: const Color(0xFF31E6B2),
+                      icon: Icons.person_rounded,
+                      title: context.l10n.landingAudienceHumansTitle,
+                      bullets: [
+                        context.l10n.landingAudienceHumansItemOne,
+                        context.l10n.landingAudienceHumansItemTwo,
+                        context.l10n.landingAudienceHumansItemThree,
+                        context.l10n.landingAudienceHumansItemFour,
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: AppSpacing.lg),
+            KeyedSubtree(
+              key: developersKey,
+              child: _DevelopersRibbon(
+                title: context.l10n.landingAudienceDevelopersTitle,
+                bullets: [
+                  context.l10n.landingAudienceDevelopersItemOne,
+                  context.l10n.landingAudienceDevelopersItemTwo,
+                  context.l10n.landingAudienceDevelopersItemThree,
+                  context.l10n.landingAudienceDevelopersItemFour,
+                ],
+              ),
             ),
           ],
         );
@@ -612,7 +701,7 @@ class _LandingHowItWorksSection extends StatelessWidget {
         final cardWidth = _gridCardWidth(
           maxWidth: constraints.maxWidth,
           compactColumns: 1,
-          mediumColumns: 2,
+          mediumColumns: 1,
           largeColumns: 3,
         );
 
@@ -641,18 +730,20 @@ class _LandingHowItWorksSection extends StatelessWidget {
         ];
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               context.l10n.landingHowItWorksTitle,
               style: Theme.of(
                 context,
               ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.lg),
             Wrap(
               spacing: AppSpacing.lg,
               runSpacing: AppSpacing.lg,
+              alignment: WrapAlignment.center,
               children: [
                 for (final step in steps)
                   SizedBox(
@@ -698,6 +789,8 @@ class _LandingClosingCta extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const _ClosingOrbit(compact: true),
+                const SizedBox(height: AppSpacing.lg),
                 Text(
                   context.l10n.landingClosingTitle,
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
@@ -728,6 +821,8 @@ class _LandingClosingCta extends StatelessWidget {
 
           return Row(
             children: [
+              const _ClosingOrbit(),
+              const SizedBox(width: AppSpacing.xl),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -774,11 +869,15 @@ class _LandingFooter extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 780;
-        final tagline = Text(
-          context.l10n.landingFooterTagline,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceMuted),
+        final links = Wrap(
+          spacing: AppSpacing.xl,
+          runSpacing: AppSpacing.sm,
+          children: [
+            _FooterLabel(label: context.l10n.landingNavFeatures),
+            _FooterLabel(label: context.l10n.landingAudienceAgentsTitle),
+            _FooterLabel(label: context.l10n.landingAudienceHumansTitle),
+            _FooterLabel(label: context.l10n.landingAudienceDevelopersTitle),
+          ],
         );
 
         return Padding(
@@ -788,15 +887,15 @@ class _LandingFooter extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const _LandingBrand(compact: true),
-                    const SizedBox(height: AppSpacing.sm),
-                    tagline,
+                    const SizedBox(height: AppSpacing.md),
+                    links,
                   ],
                 )
               : Row(
                   children: [
                     const _LandingBrand(compact: true),
                     const Spacer(),
-                    tagline,
+                    links,
                   ],
                 ),
         );
@@ -825,9 +924,10 @@ class _LandingBrand extends StatelessWidget {
         const SizedBox(width: AppSpacing.sm),
         Text(
           context.l10n.appTitle,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+          style: (compact
+                  ? Theme.of(context).textTheme.titleLarge
+                  : Theme.of(context).textTheme.headlineSmall)
+              ?.copyWith(fontWeight: FontWeight.w700),
         ),
       ],
     );
@@ -835,9 +935,13 @@ class _LandingBrand extends StatelessWidget {
 }
 
 class _LandingLanguageMenu extends StatelessWidget {
-  const _LandingLanguageMenu({required this.onSelected});
+  const _LandingLanguageMenu({
+    required this.onSelected,
+    this.compact = false,
+  });
 
   final ValueChanged<AppLocalePreference> onSelected;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -880,8 +984,8 @@ class _LandingLanguageMenu extends StatelessWidget {
         ];
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? AppSpacing.sm : AppSpacing.md,
           vertical: AppSpacing.sm,
         ),
         decoration: BoxDecoration(
@@ -897,13 +1001,15 @@ class _LandingLanguageMenu extends StatelessWidget {
               size: 18,
               color: AppColors.onSurfaceMuted,
             ),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              _languagePreferenceLabel(context, currentPreference),
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(color: AppColors.onSurface),
-            ),
+            if (!compact) ...[
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                _languagePreferenceLabel(context, currentPreference),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: AppColors.onSurface),
+              ),
+            ],
           ],
         ),
       ),
@@ -937,16 +1043,36 @@ class _LandingNavButton extends StatelessWidget {
   }
 }
 
-class _GradientHeadline extends StatelessWidget {
-  const _GradientHeadline({required this.text});
+class _FooterLabel extends StatelessWidget {
+  const _FooterLabel({required this.label});
 
-  final String text;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.displayLarge?.copyWith(
+    return Text(
+      label,
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceMuted),
+    );
+  }
+}
+
+class _GradientHeadline extends StatelessWidget {
+  const _GradientHeadline({required this.text, this.compact = false});
+
+  final String text;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = (compact
+            ? Theme.of(context).textTheme.displayMedium
+            : Theme.of(context).textTheme.displayLarge)
+        ?.copyWith(
       fontWeight: FontWeight.w700,
-      height: 0.92,
+      height: compact ? 0.98 : 0.92,
     );
 
     return ShaderMask(
@@ -1006,87 +1132,68 @@ class _LandingPreviewFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      borderRadius: AppRadii.hero,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      accentColor: AppColors.tertiary,
-      child: Column(
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = constraints.maxWidth < 620;
+        final isPhone = constraints.maxWidth < 440;
+
+        final searchField = Container(
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.pill,
+            color: AppColors.surfaceLow,
+            border: Border.all(color: AppColors.outline.withValues(alpha: 0.7)),
+          ),
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Row(
             children: [
-              const _LandingBrand(compact: true),
-              const Spacer(),
-              Expanded(
-                child: Container(
-                  height: 40,
-                  margin: const EdgeInsets.only(left: AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadii.pill,
-                    color: AppColors.surfaceLow,
-                    border: Border.all(
-                      color: AppColors.outline.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.search_rounded,
-                        color: AppColors.onSurfaceMuted,
-                        size: 18,
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          context.l10n.landingPreviewSearchHint,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppColors.onSurfaceMuted),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              const Icon(
+                Icons.search_rounded,
+                color: AppColors.onSurfaceMuted,
+                size: 18,
               ),
-              const SizedBox(width: AppSpacing.md),
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.surfaceLow,
-                  border: Border.all(
-                    color: AppColors.outline.withValues(alpha: 0.8),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  context.l10n.landingPreviewSearchHint,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.onSurfaceMuted,
                   ),
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: AppColors.onSurface,
-                  size: 18,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _LandingPreviewRail(),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.landingPreviewGreeting,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
+        );
+
+        final previewBody = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    context.l10n.landingPreviewGreeting,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
+                  ),
+                ),
+                if (!isTablet)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: AppRadii.large,
+                      color: AppColors.surfaceLow,
+                      border: Border.all(
+                        color: AppColors.outline.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    child: Row(
                       children: [
                         Container(
                           width: 8,
@@ -1104,68 +1211,192 @@ class _LandingPreviewFrame extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _PreviewTile(
-                            accentColor: AppColors.primary,
-                            icon: Icons.language_rounded,
-                            title: context.l10n.landingCapabilityHallTitle,
-                            subtitle:
-                                context.l10n.landingCapabilityHallSubtitle,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: _PreviewTile(
-                            accentColor: const Color(0xFF27F4E5),
-                            icon: Icons.send_rounded,
-                            title: context.l10n.landingCapabilityDmTitle,
-                            subtitle: context.l10n.landingCapabilityDmSubtitle,
-                          ),
-                        ),
-                      ],
+                  ),
+              ],
+            ),
+            if (isTablet) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF35F39B),
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _PreviewTile(
-                            accentColor: AppColors.tertiary,
-                            icon: Icons.forum_rounded,
-                            title: context.l10n.landingCapabilityForumTitle,
-                            subtitle:
-                                context.l10n.landingCapabilityForumSubtitle,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: _PreviewTile(
-                            accentColor: const Color(0xFFFF63C1),
-                            icon: Icons.graphic_eq_rounded,
-                            title: context.l10n.landingCapabilityLiveTitle,
-                            subtitle:
-                                context.l10n.landingCapabilityLiveSubtitle,
-                          ),
-                        ),
-                      ],
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    context.l10n.landingPreviewNetworkStatus,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.onSurfaceMuted,
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    _PreviewTile(
-                      accentColor: const Color(0xFF8F66FF),
-                      icon: Icons.dashboard_customize_rounded,
-                      title: context.l10n.landingCapabilityHubTitle,
-                      subtitle: context.l10n.landingCapabilityHubSubtitle,
-                      wide: true,
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
+            if (isTablet) ...[
+              _PreviewTile(
+                accentColor: AppColors.primary,
+                icon: Icons.language_rounded,
+                title: context.l10n.landingCapabilityHallTitle,
+                subtitle: context.l10n.landingCapabilityHallSubtitle,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _PreviewTile(
+                accentColor: const Color(0xFF27F4E5),
+                icon: Icons.send_rounded,
+                title: context.l10n.landingCapabilityDmTitle,
+                subtitle: context.l10n.landingCapabilityDmSubtitle,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _PreviewTile(
+                accentColor: AppColors.tertiary,
+                icon: Icons.forum_rounded,
+                title: context.l10n.landingCapabilityForumTitle,
+                subtitle: context.l10n.landingCapabilityForumSubtitle,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _PreviewTile(
+                accentColor: const Color(0xFFFF63C1),
+                icon: Icons.graphic_eq_rounded,
+                title: context.l10n.landingCapabilityLiveTitle,
+                subtitle: context.l10n.landingCapabilityLiveSubtitle,
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _PreviewTile(
+                      accentColor: AppColors.primary,
+                      icon: Icons.language_rounded,
+                      title: context.l10n.landingCapabilityHallTitle,
+                      subtitle: context.l10n.landingCapabilityHallSubtitle,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: _PreviewTile(
+                      accentColor: const Color(0xFF27F4E5),
+                      icon: Icons.send_rounded,
+                      title: context.l10n.landingCapabilityDmTitle,
+                      subtitle: context.l10n.landingCapabilityDmSubtitle,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: _PreviewTile(
+                      accentColor: AppColors.tertiary,
+                      icon: Icons.forum_rounded,
+                      title: context.l10n.landingCapabilityForumTitle,
+                      subtitle: context.l10n.landingCapabilityForumSubtitle,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: _PreviewTile(
+                      accentColor: const Color(0xFFFF63C1),
+                      icon: Icons.graphic_eq_rounded,
+                      title: context.l10n.landingCapabilityLiveTitle,
+                      subtitle: context.l10n.landingCapabilityLiveSubtitle,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            _PreviewTile(
+              accentColor: const Color(0xFF8F66FF),
+              icon: Icons.dashboard_customize_rounded,
+              title: context.l10n.landingCapabilityHubTitle,
+              subtitle: context.l10n.landingCapabilityHubSubtitle,
+              wide: true,
+            ),
+          ],
+        );
+
+        return GlassPanel(
+          borderRadius: AppRadii.hero,
+          padding: EdgeInsets.all(isPhone ? AppSpacing.md : AppSpacing.lg),
+          accentColor: AppColors.tertiary,
+          child: Column(
+            children: [
+              if (isTablet) ...[
+                Row(
+                  children: [
+                    const Expanded(child: _LandingBrand(compact: true)),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.surfaceLow,
+                        border: Border.all(
+                          color: AppColors.outline.withValues(alpha: 0.8),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.person_rounded,
+                        color: AppColors.onSurface,
+                        size: 18,
+                      ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: AppSpacing.md),
+                searchField,
+                const SizedBox(height: AppSpacing.lg),
+                previewBody,
+              ] else ...[
+                Row(
+                  children: [
+                    const _LandingBrand(compact: true),
+                    const Spacer(),
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(left: AppSpacing.lg),
+                        child: searchField,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.surfaceLow,
+                        border: Border.all(
+                          color: AppColors.outline.withValues(alpha: 0.8),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.person_rounded,
+                        color: AppColors.onSurface,
+                        size: 18,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _LandingPreviewRail(),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(child: previewBody),
+                  ],
+                ),
+              ],
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1301,12 +1532,14 @@ class _CapabilityCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.wide = false,
   });
 
   final Color accentColor;
   final IconData icon;
   final String title;
   final String subtitle;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
@@ -1315,28 +1548,241 @@ class _CapabilityCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: accentColor.withValues(alpha: 0.12),
+          if (wide)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accentColor.withValues(alpha: 0.12),
+                  ),
+                  child: Icon(icon, color: accentColor, size: 28),
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.onSurfaceMuted,
+                          height: 1.55,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accentColor.withValues(alpha: 0.12),
+              ),
+              child: Icon(icon, color: accentColor, size: 28),
             ),
-            child: Icon(icon, color: accentColor, size: 28),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.onSurfaceMuted,
+                height: 1.55,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DevelopersRibbon extends StatelessWidget {
+  const _DevelopersRibbon({
+    required this.title,
+    required this.bullets,
+  });
+
+  final String title;
+  final List<String> bullets;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      accentColor: AppColors.tertiary,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 760;
+
+          return isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.tertiary.withValues(alpha: 0.12),
+                          ),
+                          child: const Icon(
+                            Icons.code_rounded,
+                            color: AppColors.tertiary,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    for (final bullet in bullets) ...[
+                      _AudienceBullet(
+                        accentColor: AppColors.tertiary,
+                        text: bullet,
+                      ),
+                      if (bullet != bullets.last)
+                        const SizedBox(height: AppSpacing.sm),
+                    ],
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.tertiary.withValues(alpha: 0.12),
+                      ),
+                      child: const Icon(
+                        Icons.code_rounded,
+                        color: AppColors.tertiary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    SizedBox(
+                      width: 220,
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: Wrap(
+                        spacing: AppSpacing.lg,
+                        runSpacing: AppSpacing.md,
+                        children: [
+                          for (final bullet in bullets)
+                            SizedBox(
+                              width: constraints.maxWidth > 1120
+                                  ? (constraints.maxWidth - 420) / 2
+                                  : double.infinity,
+                              child: _AudienceBullet(
+                                accentColor: AppColors.tertiary,
+                                text: bullet,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+        },
+      ),
+    );
+  }
+}
+
+class _ClosingOrbit extends StatelessWidget {
+  const _ClosingOrbit({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = compact ? 96.0 : 136.0;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.24)),
+        gradient: RadialGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.3),
+            AppColors.tertiary.withValues(alpha: 0.1),
+            Colors.transparent,
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Container(
+              width: compact ? 14 : 18,
+              height: compact ? 14 : 18,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primaryFixed,
+              ),
+            ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          Positioned(
+            top: compact ? 18 : 24,
+            right: compact ? 18 : 22,
+            child: Container(
+              width: compact ? 10 : 14,
+              height: compact ? 10 : 14,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.tertiary,
+              ),
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.onSurfaceMuted,
-              height: 1.55,
+          Positioned(
+            bottom: compact ? 14 : 20,
+            left: compact ? 20 : 28,
+            child: Container(
+              width: compact ? 10 : 14,
+              height: compact ? 10 : 14,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF31E6B2),
+              ),
             ),
           ),
         ],
@@ -1364,6 +1810,7 @@ class _AudienceCard extends StatelessWidget {
       accentColor: accentColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -1443,6 +1890,7 @@ class _StepCard extends StatelessWidget {
       accentColor: accentColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [

@@ -17,6 +17,9 @@ void main() {
   testWidgets('five-tab navigation works end to end', (
     WidgetTester tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(
       const AgentsChatBootstrapApp(environment: environment),
     );
@@ -24,7 +27,9 @@ void main() {
 
     expect(find.byKey(const Key('landing-hero')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('landing-launch-app-primary')));
+    final launchButton = find.byKey(const Key('landing-launch-app-primary'));
+    await tester.ensureVisible(launchButton);
+    await tester.tap(launchButton);
     await tester.pumpAndSettle();
 
     for (final entry in const [

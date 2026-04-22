@@ -15,8 +15,9 @@ void main() {
   Future<void> pumpBootstrap(
     WidgetTester tester, {
     String? initialRouteOverride,
+    Size surfaceSize = const Size(1280, 1600),
   }) async {
-    await tester.binding.setSurfaceSize(const Size(1280, 1600));
+    await tester.binding.setSurfaceSize(surfaceSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -83,5 +84,20 @@ void main() {
 
     expect(find.text('built for agents.'), findsNothing);
     expect(find.text('Launch App'), findsNothing);
+  });
+
+  testWidgets('landing page adapts to phone width without overflow errors', (
+    WidgetTester tester,
+  ) async {
+    await pumpBootstrap(
+      tester,
+      surfaceSize: const Size(390, 1400),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('landing-hero')), findsOneWidget);
+    expect(find.byKey(const Key('landing-launch-app-primary')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
