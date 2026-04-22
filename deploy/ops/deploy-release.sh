@@ -15,6 +15,7 @@ SMOKE_DELAY_SECONDS="${SMOKE_DELAY_SECONDS:-2}"
 PUBLIC_EDGE_WS_RETRIES="${PUBLIC_EDGE_WS_RETRIES:-3}"
 PUBLIC_EDGE_WS_DELAY_SECONDS="${PUBLIC_EDGE_WS_DELAY_SECONDS:-3}"
 PUBLIC_EDGE_WS_REQUIRED="${PUBLIC_EDGE_WS_REQUIRED:-false}"
+USE_PREBUILT_WEB="${USE_PREBUILT_WEB:-false}"
 GIT_REF=""
 SOURCE_DIR=""
 RELEASE_ID=""
@@ -43,6 +44,7 @@ usage() {
 Usage:
   deploy-release.sh --git-ref <ref>
   deploy-release.sh --source-dir <path> [--release-id <id>]
+  deploy-release.sh [--git-ref <ref> | --source-dir <path>] [--release-id <id>] [--use-prebuilt-web]
 EOF
 }
 
@@ -59,6 +61,10 @@ while [[ $# -gt 0 ]]; do
     --release-id)
       RELEASE_ID="$2"
       shift 2
+      ;;
+    --use-prebuilt-web)
+      USE_PREBUILT_WEB="true"
+      shift
       ;;
     -h|--help)
       usage
@@ -137,13 +143,27 @@ retry_command() {
 
 run_local_static_web_smoke() {
   local caddy_domain="${1:-}"
+  local root_response=""
+  local app_response=""
+  local expected_title='<title>Agents Chat | Social Network for Agents</title>'
 
   if [[ -n "$caddy_domain" ]]; then
-    curl -fsS -H "Host: $caddy_domain" http://127.0.0.1/ >/dev/null
-    return
+    root_response="$(curl -fsS -H "Host: $caddy_domain" http://127.0.0.1/)"
+    app_response="$(curl -fsS -H "Host: $caddy_domain" http://127.0.0.1/app)"
+  else
+    root_response="$(curl -fsS http://127.0.0.1/)"
+    app_response="$(curl -fsS http://127.0.0.1/app)"
   fi
 
-  curl -fsS http://127.0.0.1/ >/dev/null
+  if [[ "$root_response" != *"$expected_title"* ]]; then
+    echo "Static web smoke check failed: root route is not serving the expected landing page shell." >&2
+    return 1
+  fi
+
+  if [[ "$app_response" != *"$expected_title"* ]]; then
+    echo "Static web smoke check failed: /app route is not serving the expected Flutter web shell." >&2
+    return 1
+  fi
 }
 
 run_local_websocket_smoke() {
@@ -199,7 +219,23 @@ checkout_release() {
       exit 1
     fi
 
-    tar --exclude=.git -cf - -C "$SOURCE_DIR" . | tar -xf - -C "$RELEASE_DIR"
+    tar \
+      --exclude=.git \
+      --exclude=.playwright-cli \
+      --exclude=.sisyphus \
+      --exclude=output \
+      --exclude=app/.dart_tool \
+      --exclude=app/.flutter-plugins-dependencies \
+      --exclude=app/build \
+      --exclude=server/node_modules \
+      --exclude=server/dist \
+      --exclude=server/coverage \
+      -cf - -C "$SOURCE_DIR" . | tar -xf - -C "$RELEASE_DIR"
+
+    if [[ "$USE_PREBUILT_WEB" == "true" && -d "$SOURCE_DIR/app/build/web" ]]; then
+      install -d "$RELEASE_DIR/app/build"
+      cp -a "$SOURCE_DIR/app/build/web" "$RELEASE_DIR/app/build/web"
+    fi
   fi
 
   chown -R "$APP_USER:$APP_USER" "$RELEASE_DIR"
@@ -248,7 +284,7 @@ build_backend() {
 }
 
 build_web() {
-  if [[ -d "$RELEASE_DIR/app/build/web" ]]; then
+  if [[ "$USE_PREBUILT_WEB" == "true" && -d "$RELEASE_DIR/app/build/web" ]]; then
     echo "Using prebuilt Flutter web assets from source."
     return
   fi
@@ -261,6 +297,7 @@ build_web() {
       exit 1
     fi
     cd '$RELEASE_DIR/app'
+    rm -rf '$RELEASE_DIR/app/build/web'
     flutter config --enable-web >/dev/null
     flutter pub get
     flutter build web --release --dart-define-from-file='$DART_DEFINE_FILE'

@@ -44,7 +44,11 @@ fi
 current_release="$(basename "$(readlink -f "$CURRENT_LINK")")"
 
 if [[ -z "$TARGET_RELEASE" ]]; then
-  mapfile -t release_ids < <(find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+  mapfile -t release_ids < <(
+    find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' |
+      sort -n |
+      awk '{print $2}'
+  )
 
   previous_release=""
   for release_id in "${release_ids[@]}"; do

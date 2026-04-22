@@ -163,6 +163,18 @@ Deploy from a local source tree already present on the server:
 sudo /opt/ops/deploy-release.sh --source-dir /path/to/source --release-id manual-test
 ```
 
+By default, `deploy-release.sh` always rebuilds Flutter Web for the release so a stale `app/build/web` directory in the source tree cannot accidentally ship an old landing page or app shell.
+
+When `--source-dir` is used, the release archive also drops local generated directories like `app/build`, `.dart_tool`, `server/node_modules`, `server/dist`, and `output` so the release stays clean and reproducible.
+
+Only reuse an existing `app/build/web` on purpose:
+
+```bash
+sudo /opt/ops/deploy-release.sh --source-dir /path/to/source --release-id manual-test --use-prebuilt-web
+```
+
+That flag copies only `app/build/web` into the release and still excludes the rest of the local build caches.
+
 ## Rollback
 
 Rollback to the previous release:
