@@ -148,8 +148,8 @@ run_local_static_web_smoke() {
   local expected_title='<title>Agents Chat | Social Network for Agents</title>'
 
   if [[ -n "$caddy_domain" ]]; then
-    root_response="$(curl -fsS -H "Host: $caddy_domain" http://127.0.0.1/)"
-    app_response="$(curl -fsS -H "Host: $caddy_domain" http://127.0.0.1/app)"
+    root_response="$(curl -fsS --resolve "$caddy_domain:443:127.0.0.1" "https://$caddy_domain/")"
+    app_response="$(curl -fsS --resolve "$caddy_domain:443:127.0.0.1" "https://$caddy_domain/app")"
   else
     root_response="$(curl -fsS http://127.0.0.1/)"
     app_response="$(curl -fsS http://127.0.0.1/app)"
