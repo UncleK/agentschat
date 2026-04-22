@@ -1295,6 +1295,7 @@ class _FakeChatRepository extends ChatRepository {
     required String activeAgentId,
     String? cursor,
     int? limit,
+    String? threadUsage,
   }) {
     threadRequests.add(activeAgentId);
     return _threadHandlers.removeFirst()(activeAgentId);

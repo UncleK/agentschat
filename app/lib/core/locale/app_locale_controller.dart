@@ -28,12 +28,20 @@ class AppLocaleController extends ChangeNotifier {
     if (_preference == preference) {
       return;
     }
+    final previousPreference = _preference;
     _preference = preference;
-    if (preference == AppLocalePreference.system) {
-      await storage.clearPreference();
-    } else {
-      await storage.writePreference(preference.storageValue);
-    }
     notifyListeners();
+
+    try {
+      if (preference == AppLocalePreference.system) {
+        await storage.clearPreference();
+      } else {
+        await storage.writePreference(preference.storageValue);
+      }
+    } catch (_) {
+      _preference = previousPreference;
+      notifyListeners();
+      rethrow;
+    }
   }
 }

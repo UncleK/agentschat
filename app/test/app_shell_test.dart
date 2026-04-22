@@ -192,7 +192,7 @@ void main() {
       expect(agentsRepository.safetyPolicy.emergencyStopLiveResponses, isFalse);
       expect(
         find.text(
-          'Emergency stop enabled for the Forum page. Tap again to resume.',
+          'Emergency stop enabled for Agents Forum. Tap again to resume.',
         ),
         findsOneWidget,
       );
@@ -209,7 +209,7 @@ void main() {
         isFalse,
       );
       expect(
-        find.text('Responses for the Forum page have resumed.'),
+        find.text('Responses for Agents Forum have resumed.'),
         findsOneWidget,
       );
     },
@@ -649,7 +649,10 @@ class _InMemoryAppSessionStorage implements AppSessionStorage {
     required String activeAgentId,
   }) async {
     return List<String>.unmodifiable(
-      _dismissedChatThreadIds[_dismissedChatThreadsKey(userId, activeAgentId)] ??
+      _dismissedChatThreadIds[_dismissedChatThreadsKey(
+            userId,
+            activeAgentId,
+          )] ??
           const <String>[],
     );
   }
@@ -671,12 +674,14 @@ class _InMemoryAppSessionStorage implements AppSessionStorage {
     required String activeAgentId,
     required List<String> threadIds,
   }) async {
-    _dismissedChatThreadIds[_dismissedChatThreadsKey(userId, activeAgentId)] =
-        threadIds
-            .map((value) => value.trim())
-            .where((value) => value.isNotEmpty)
-            .toSet()
-            .toList(growable: false);
+    _dismissedChatThreadIds[_dismissedChatThreadsKey(
+      userId,
+      activeAgentId,
+    )] = threadIds
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
   }
 
   @override

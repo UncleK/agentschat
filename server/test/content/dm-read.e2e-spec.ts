@@ -1,6 +1,18 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AgentDmAcceptanceMode } from '../../src/database/domain.enums';
+import { Repository } from 'typeorm';
+import {
+  AgentDmAcceptanceMode,
+  EventActorType,
+  EventContentType,
+  SubjectType,
+  ThreadContextType,
+  ThreadParticipantRole,
+  ThreadVisibility,
+} from '../../src/database/domain.enums';
+import { EventEntity } from '../../src/database/entities/event.entity';
+import { ThreadParticipantEntity } from '../../src/database/entities/thread-participant.entity';
+import { ThreadEntity } from '../../src/database/entities/thread.entity';
 import { PolicyService } from '../../src/modules/policy/policy.service';
 import {
   TestApplicationContext,
@@ -68,11 +80,19 @@ describe('DM read models (e2e)', () => {
   let app: INestApplication;
   let context: TestApplicationContext;
   let policyService: PolicyService;
+  let threadRepository: Repository<ThreadEntity>;
+  let participantRepository: Repository<ThreadParticipantEntity>;
+  let eventRepository: Repository<EventEntity>;
 
   beforeAll(async () => {
     context = await createTestApplication();
     app = context.app;
     policyService = app.get(PolicyService);
+    threadRepository = context.dataSource.getRepository(ThreadEntity);
+    participantRepository = context.dataSource.getRepository(
+      ThreadParticipantEntity,
+    );
+    eventRepository = context.dataSource.getRepository(EventEntity);
   });
 
   afterAll(async () => {
@@ -363,6 +383,230 @@ describe('DM read models (e2e)', () => {
         expect(body.threads).toHaveLength(1);
         expect(body.threads[0]?.threadId).toBe(commandThread.threadId);
         expect(body.threads[0]?.threadUsage).toBe('owned_agent_command');
+      });
+  });
+
+  it('deduplicates historical network dm threads by agent pair and routes stale thread ids back to the canonical thread', async () => {
+    const owner = await registerHuman(
+      app,
+      'dm-dedupe-owner@example.com',
+      'DM Dedupe Owner',
+    );
+    const remoteOwner = await registerHuman(
+      app,
+      'dm-dedupe-remote@example.com',
+      'DM Dedupe Remote Owner',
+    );
+    const activeAgent = await importHumanOwnedAgent(
+      owner.accessToken,
+      'dm-dedupe-active',
+      'DM Dedupe Active',
+    );
+    const remoteAgent = await importHumanOwnedAgent(
+      remoteOwner.accessToken,
+      'dm-dedupe-remote',
+      'DM Dedupe Remote',
+    );
+    await policyService.upsertAgentSafetyPolicy(activeAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+    await policyService.upsertAgentSafetyPolicy(remoteAgent.id, {
+      dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+    });
+
+    const canonicalThread = await sendDirectMessage(owner.accessToken, {
+      activeAgentId: activeAgent.id,
+      recipientType: 'agent',
+      recipientAgentId: remoteAgent.id,
+      content: 'Canonical opener.',
+    });
+    await pause();
+
+    const duplicateThread = await threadRepository.save(
+      threadRepository.create({
+        contextType: ThreadContextType.DirectMessage,
+        visibility: ThreadVisibility.Private,
+      }),
+    );
+    await participantRepository.save([
+      participantRepository.create({
+        threadId: duplicateThread.id,
+        participantType: SubjectType.Agent,
+        participantSubjectId: activeAgent.id,
+        userId: null,
+        agentId: activeAgent.id,
+        role: ThreadParticipantRole.Member,
+      }),
+      participantRepository.create({
+        threadId: duplicateThread.id,
+        participantType: SubjectType.Agent,
+        participantSubjectId: remoteAgent.id,
+        userId: null,
+        agentId: remoteAgent.id,
+        role: ThreadParticipantRole.Member,
+      }),
+      participantRepository.create({
+        threadId: duplicateThread.id,
+        participantType: SubjectType.Human,
+        participantSubjectId: owner.user.id,
+        userId: owner.user.id,
+        agentId: null,
+        role: ThreadParticipantRole.Spectator,
+      }),
+      participantRepository.create({
+        threadId: duplicateThread.id,
+        participantType: SubjectType.Human,
+        participantSubjectId: remoteOwner.user.id,
+        userId: remoteOwner.user.id,
+        agentId: null,
+        role: ThreadParticipantRole.Spectator,
+      }),
+    ]);
+    await eventRepository.save(
+      eventRepository.create({
+        threadId: duplicateThread.id,
+        eventType: 'dm.send',
+        actorType: EventActorType.Agent,
+        actorUserId: null,
+        actorAgentId: remoteAgent.id,
+        targetType: SubjectType.Agent,
+        targetId: activeAgent.id,
+        contentType: EventContentType.Text,
+        content: 'Duplicate thread reply that should merge back.',
+      }),
+    );
+    await pause();
+
+    await request(app.getHttpServer())
+      .get('/api/v1/content/dm/threads')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: activeAgent.id,
+        threadUsage: 'network_dm',
+      })
+      .expect(200)
+      .expect(({ body }: { body: DirectMessageThreadsPage }) => {
+        expect(body.threads).toHaveLength(1);
+        expect(body.threads[0]).toMatchObject({
+          threadId: canonicalThread.threadId,
+          threadUsage: 'network_dm',
+          lastMessage: {
+            preview: 'Duplicate thread reply that should merge back.',
+          },
+          unreadCount: 1,
+        });
+      });
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/content/dm/threads/${canonicalThread.threadId}/messages`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: activeAgent.id,
+      })
+      .expect(200)
+      .expect(({ body }: { body: Record<string, unknown> }) => {
+        expect(body).toMatchObject(
+          typedValue<Record<string, unknown>>({
+            threadId: canonicalThread.threadId,
+            activeAgentId: activeAgent.id,
+            messages: [
+              {
+                content: 'Canonical opener.',
+              },
+              {
+                content: 'Duplicate thread reply that should merge back.',
+              },
+            ],
+          }),
+        );
+      });
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/content/dm/threads/${duplicateThread.id}/messages`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: activeAgent.id,
+      })
+      .expect(200)
+      .expect(({ body }: { body: Record<string, unknown> }) => {
+        expect(body).toMatchObject(
+          typedValue<Record<string, unknown>>({
+            threadId: canonicalThread.threadId,
+            activeAgentId: activeAgent.id,
+            messages: [
+              {
+                content: 'Canonical opener.',
+              },
+              {
+                content: 'Duplicate thread reply that should merge back.',
+              },
+            ],
+          }),
+        );
+      });
+
+    const routedReply = await sendDirectMessage(owner.accessToken, {
+      activeAgentId: activeAgent.id,
+      recipientType: 'agent',
+      recipientAgentId: remoteAgent.id,
+      threadId: duplicateThread.id,
+      content: 'Routed follow-up on the canonical thread.',
+    });
+    expect(routedReply.threadId).toBe(canonicalThread.threadId);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/content/dm/threads/${canonicalThread.threadId}/messages`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: activeAgent.id,
+      })
+      .expect(200)
+      .expect(({ body }: { body: Record<string, unknown> }) => {
+        expect(body).toMatchObject(
+          typedValue<Record<string, unknown>>({
+            threadId: canonicalThread.threadId,
+            activeAgentId: activeAgent.id,
+            messages: [
+              {
+                content: 'Canonical opener.',
+              },
+              {
+                content: 'Duplicate thread reply that should merge back.',
+              },
+              {
+                content: 'Routed follow-up on the canonical thread.',
+              },
+            ],
+          }),
+        );
+      });
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/content/dm/threads/${canonicalThread.threadId}/read`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        activeAgentId: activeAgent.id,
+      })
+      .expect(200)
+      .expect(({ body }: { body: MarkReadResponse }) => {
+        expect(body).toEqual({
+          threadId: canonicalThread.threadId,
+          unreadCount: 0,
+        });
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/content/dm/threads')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        activeAgentId: activeAgent.id,
+        threadUsage: 'network_dm',
+      })
+      .expect(200)
+      .expect(({ body }: { body: DirectMessageThreadsPage }) => {
+        expect(body.threads).toHaveLength(1);
+        expect(body.threads[0]?.threadId).toBe(canonicalThread.threadId);
+        expect(body.threads[0]?.unreadCount).toBe(0);
       });
   });
 
@@ -1015,6 +1259,7 @@ describe('DM read models (e2e)', () => {
       activeAgentId: string;
       recipientType: 'agent';
       recipientAgentId: string;
+      threadId?: string;
       content: string;
     },
   ): Promise<DirectMessageResult> {

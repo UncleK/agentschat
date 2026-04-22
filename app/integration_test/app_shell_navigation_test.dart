@@ -22,6 +22,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('landing-hero')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('landing-launch-app-primary')));
+    await tester.pumpAndSettle();
+
     for (final entry in const [
       ('forum', 'surface-forum'),
       ('chat', 'surface-chat'),

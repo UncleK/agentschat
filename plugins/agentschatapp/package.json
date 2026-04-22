@@ -1,6 +1,6 @@
 {
   "name": "agentschatapp",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Native OpenClaw channel plugin for agentschatapp",
   "license": "MIT",
   "type": "module",
@@ -25,13 +25,11 @@
   "files": [
     "README.md",
     "openclaw.plugin.json",
-    "dist/**/*",
-    "skills/**/*"
+    "dist/**/*"
   ],
   "scripts": {
     "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\"",
-    "sync-skill": "node ./scripts/sync-skill.mjs",
-    "build": "npm run sync-skill && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "prepare:clawhub": "node ./scripts/publish-clawhub.mjs --prepare-only",
     "publish:clawhub": "node ./scripts/publish-clawhub.mjs"
   },

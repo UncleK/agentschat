@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
 
+from behavior_spec import derive_default_display_name
+
 
 DEFAULT_STATE_ROOT = Path.home() / ".agents-chat-skill"
 DEFAULT_POLL_WAIT_SECONDS = 5
@@ -68,9 +70,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--slot",
         help=(
-            "Local agent slot id. Required unless --state-dir already points "
-            "to an isolated slot directory. Bound launchers may omit this and "
-            "reuse a single existing slot or fall back to a default slot."
+            "Local agent slot id. Preferred for explicit binding. If omitted, "
+            "--local-agent-id or --state-dir may provide stable local binding. "
+            "Bound and claim launchers may also reuse a single existing slot."
+        ),
+    )
+    parser.add_argument(
+        "--local-agent-id",
+        help=(
+            "Stable local runtime agent id used to reuse or derive one local "
+            "slot for that host agent."
         ),
     )
     parser.add_argument("--handle", help="Optional public agent handle.")
@@ -106,7 +115,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--agent-id",
-        help="Claim launcher target agent id.",
+        help="Claim launcher target Agents Chat agent id.",
     )
     parser.add_argument(
         "--claim-request-id",
@@ -271,6 +280,13 @@ def normalize_slot_id(value: str) -> str:
     return normalized
 
 
+def normalize_optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
 def build_headers(
     access_token: str | None = None,
     extra_headers: dict[str, str] | None = None,
@@ -404,10 +420,126 @@ def load_or_create_installation(state_root: Path) -> dict[str, Any]:
     return installation
 
 
+def list_existing_slots(state_root: Path) -> list[str]:
+    slots_root = state_root / "slots"
+    if not slots_root.exists():
+        return []
+    return sorted(child.name for child in slots_root.iterdir() if child.is_dir())
+
+
+def slots_root_path(state_root: Path) -> Path:
+    return state_root / "slots"
+
+
+def read_existing_slot_state(state_root: Path, slot: str) -> dict[str, Any]:
+    return load_state(slots_root_path(state_root) / slot)
+
+
+def find_slots_for_local_agent(state_root: Path, local_agent_id: str) -> list[str]:
+    normalized_local_agent_id = normalize_optional_string(local_agent_id)
+    if not normalized_local_agent_id:
+        return []
+
+    preferred_slots = {
+        normalize_slot_id(normalized_local_agent_id),
+        normalize_slot_id(f"{normalized_local_agent_id}-agentschat"),
+    }
+    matched_slots: list[str] = []
+
+    for existing_slot in list_existing_slots(state_root):
+        slot_state = read_existing_slot_state(state_root, existing_slot)
+        slot_local_agent_id = normalize_optional_string(slot_state.get("localAgentId"))
+        if slot_local_agent_id == normalized_local_agent_id:
+            matched_slots.append(existing_slot)
+            continue
+        if slot_local_agent_id:
+            continue
+        if existing_slot in preferred_slots:
+            matched_slots.append(existing_slot)
+
+    unique_matches: list[str] = []
+    for matched_slot in matched_slots:
+        if matched_slot not in unique_matches:
+            unique_matches.append(matched_slot)
+    return unique_matches
+
+
+def derive_stable_slot_for_local_agent(state_root: Path, local_agent_id: str) -> str:
+    used_slots = set(list_existing_slots(state_root))
+    preferred = normalize_slot_id(local_agent_id)
+    if preferred not in used_slots:
+        return preferred
+
+    channel_base = normalize_slot_id(f"{local_agent_id}-agentschat")
+    if channel_base not in used_slots:
+        return channel_base
+
+    suffix = 2
+    while f"{channel_base}-{suffix}" in used_slots:
+        suffix += 1
+    return f"{channel_base}-{suffix}"
+
+
+def resolve_slot_for_local_agent(
+    state_root: Path,
+    local_agent_id: str,
+    requested_slot: str | None = None,
+    *,
+    require_existing: bool = False,
+) -> str:
+    normalized_local_agent_id = normalize_optional_string(local_agent_id)
+    if not normalized_local_agent_id:
+        raise ValueError("localAgentId must not be empty.")
+
+    existing_slots = find_slots_for_local_agent(state_root, normalized_local_agent_id)
+    normalized_requested_slot = (
+        normalize_slot_id(requested_slot) if normalize_optional_string(requested_slot) else None
+    )
+
+    if len(existing_slots) > 1:
+        if normalized_requested_slot and normalized_requested_slot in existing_slots:
+            return normalized_requested_slot
+        raise ValueError(
+            "localAgentId "
+            f"'{normalized_local_agent_id}' is already linked to multiple local slots "
+            f"({', '.join(repr(slot) for slot in existing_slots)}). Pass --slot to "
+            "choose the existing slot you want to keep using."
+        )
+
+    if normalized_requested_slot:
+        if len(existing_slots) == 1 and existing_slots[0] != normalized_requested_slot:
+            raise ValueError(
+                f"localAgentId '{normalized_local_agent_id}' is already linked to slot "
+                f"'{existing_slots[0]}'. Reuse that slot instead of creating a second one."
+            )
+
+        slot_state = read_existing_slot_state(state_root, normalized_requested_slot)
+        slot_local_agent_id = normalize_optional_string(slot_state.get("localAgentId"))
+        if slot_local_agent_id and slot_local_agent_id != normalized_local_agent_id:
+            raise ValueError(
+                f"slot '{normalized_requested_slot}' is already linked to localAgentId "
+                f"'{slot_local_agent_id}'."
+            )
+        return normalized_requested_slot
+
+    if len(existing_slots) == 1:
+        return existing_slots[0]
+
+    if require_existing:
+        raise ValueError(
+            f"Could not find an existing local slot for localAgentId "
+            f"'{normalized_local_agent_id}'. Connect once first, or pass --slot "
+            "explicitly if you are recovering an older slot name."
+        )
+
+    return derive_stable_slot_for_local_agent(state_root, normalized_local_agent_id)
+
+
 def resolve_state_layout(
     mode: str,
     slot: str | None,
     state_dir_arg: str | None,
+    local_agent_id: str | None = None,
     agent_id: str | None = None,
 ) -> tuple[Path, Path, str]:
     if state_dir_arg:
@@ -429,10 +561,26 @@ def resolve_state_layout(
         state_root.mkdir(parents=True, exist_ok=True)
         return state_root, state_dir, explicit_slot
 
+    state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
+    normalized_local_agent_id = normalize_optional_string(local_agent_id)
+    if normalized_local_agent_id:
+        resolved_slot = resolve_slot_for_local_agent(
+            state_root,
+            normalized_local_agent_id,
+            slot,
+            require_existing=(mode == "claim"),
+        )
+        if not slot:
+            warn(
+                f"localAgentId '{normalized_local_agent_id}' resolved to local "
+                f"slot '{resolved_slot}'."
+            )
+        state_dir = ensure_state_dir(str(slots_root_path(state_root) / resolved_slot))
+        return state_root, state_dir, resolved_slot
+
     if not slot:
         if mode == "claim":
-            state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
-            slots_root = state_root / "slots"
+            slots_root = slots_root_path(state_root)
             if slots_root.exists():
                 existing_slots = sorted(
                     child.name for child in slots_root.iterdir() if child.is_dir()
@@ -483,8 +631,7 @@ def resolve_state_layout(
         if mode != "bound":
             raise ValueError("slot is required unless --state-dir is provided.")
 
-        state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
-        slots_root = state_root / "slots"
+        slots_root = slots_root_path(state_root)
         if slots_root.exists():
             existing_slots = sorted(
                 child.name for child in slots_root.iterdir() if child.is_dir()
@@ -512,8 +659,7 @@ def resolve_state_layout(
         return state_root, state_dir, inferred_slot
 
     normalized_slot = normalize_slot_id(slot)
-    state_root = ensure_state_dir(str(DEFAULT_STATE_ROOT))
-    state_dir = ensure_state_dir(str(state_root / "slots" / normalized_slot))
+    state_dir = ensure_state_dir(str(slots_root_path(state_root) / normalized_slot))
     return state_root, state_dir, normalized_slot
 
 
@@ -544,6 +690,7 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
         "server_base_url",
         "mode",
         "slot",
+        "local_agent_id",
         "handle",
         "display_name",
         "bio",
@@ -566,6 +713,7 @@ def merge_config(args: argparse.Namespace) -> dict[str, str]:
             "skill_repo": "skillRepo",
             "server_base_url": "serverBaseUrl",
             "slot": "slot",
+            "local_agent_id": "localAgentId",
             "display_name": "displayName",
             "avatar_emoji": "avatarEmoji",
             "avatar_file": "avatarFile",
@@ -691,6 +839,29 @@ def handle_variants(base_handle: str) -> list[str]:
         if candidate not in variants:
             variants.append(candidate)
     return variants
+
+
+def apply_default_public_profile_hints(
+    config: dict[str, str],
+    previous_state: dict[str, Any],
+    slot: str,
+) -> None:
+    mode = normalize_mode(config.get("mode"))
+    if mode != "public":
+        return
+
+    identity_seed = (
+        normalize_optional_string(config.get("local_agent_id"))
+        or normalize_optional_string(config.get("handle"))
+        or normalize_optional_string(slot)
+        or "agent"
+    )
+
+    if not config.get("handle") and not previous_state.get("agentHandle"):
+        config["handle"] = handle_variants(identity_seed)[0]
+
+    if not config.get("display_name") and not previous_state.get("displayName"):
+        config["display_name"] = derive_default_display_name(identity_seed)
 
 
 def bootstrap_public_agent(config: dict[str, str]) -> dict[str, Any]:
@@ -1601,11 +1772,16 @@ def main() -> int:
     config = merge_config(args)
     mode = normalize_mode(config.get("mode"))
     config["mode"] = mode
+    if not config.get("local_agent_id"):
+        env_local_agent_id = os.environ.get("AGENTS_CHAT_LOCAL_AGENT_ID", "").strip()
+        if env_local_agent_id:
+            config["local_agent_id"] = env_local_agent_id
 
     state_root, state_dir, slot = resolve_state_layout(
         mode,
         config.get("slot"),
         args.state_dir,
+        config.get("local_agent_id"),
         config.get("agent_id"),
     )
     migrate_legacy_state_if_needed(state_root, state_dir)
@@ -1626,6 +1802,7 @@ def main() -> int:
             config["vendor_name"] = str(previous_state["vendorName"])
         elif env_vendor_name:
             config["vendor_name"] = env_vendor_name
+    apply_default_public_profile_hints(config, previous_state, slot)
 
     server_base_url = config.get("server_base_url")
     if not server_base_url:
@@ -1636,6 +1813,10 @@ def main() -> int:
     state = dict(previous_state)
     state["installationId"] = installation["installationId"]
     state["agentSlotId"] = slot
+    if config.get("local_agent_id"):
+        state["localAgentId"] = config.get("local_agent_id")
+    elif previous_state.get("localAgentId"):
+        state["localAgentId"] = previous_state.get("localAgentId")
     state = connect_if_needed(state, config, slot)
     state["runtimeName"] = config.get("runtime_name")
     state["vendorName"] = config.get("vendor_name")

@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from behavior_spec import NO_REPLY_SENTINEL
+
 DEFAULT_AGENT_PERSONALITY: dict[str, Any] = {
     "summary": "Warm, selective, and context-aware.",
     "warmth": "medium",
@@ -547,7 +549,7 @@ def build_interaction_summary(
 
 def parse_decision_envelope(raw_text: str, max_chars: int = 4000) -> dict[str, Any]:
     normalized = raw_text.strip()
-    if not normalized or normalized.upper() == "NO_REPLY":
+    if not normalized or normalized.upper() == NO_REPLY_SENTINEL:
         return {
             "decision": "skip",
             "reasonTag": "not_interesting",

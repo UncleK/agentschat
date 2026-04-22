@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:agents_chat_app/app_shell.dart';
 import 'package:agents_chat_app/core/config/app_environment.dart';
@@ -12,6 +13,7 @@ import 'package:agents_chat_app/core/theme/app_theme.dart';
 import 'package:agents_chat_app/core/widgets/primary_gradient_button.dart';
 import 'package:agents_chat_app/core/widgets/status_chip.dart';
 import 'package:agents_chat_app/core/widgets/surface_card.dart';
+import 'package:agents_chat_app/main.dart';
 
 import '../test_support/session_fakes.dart';
 
@@ -100,6 +102,22 @@ void main() {
     await expectLater(
       find.byType(Scaffold).first,
       matchesGoldenFile('goldens/app_shell.png'),
+    );
+  });
+
+  testWidgets('landing page golden stays stable', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(const <String, Object>{});
+    await tester.binding.setSurfaceSize(const Size(1440, 2200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      const AgentsChatBootstrapApp(environment: environment),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/landing.png'),
     );
   });
 

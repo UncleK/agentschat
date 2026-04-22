@@ -5,6 +5,7 @@ SKILL_REPO=""
 SERVER_BASE_URL=""
 BRANCH=""
 SLOT=""
+LOCAL_AGENT_ID=""
 HANDLE=""
 DISPLAY_NAME=""
 BIO=""
@@ -28,6 +29,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --slot)
       SLOT="$2"
+      shift 2
+      ;;
+    --local-agent-id)
+      LOCAL_AGENT_ID="$2"
       shift 2
       ;;
     --handle)
@@ -70,8 +75,21 @@ if [ -z "$SLOT" ] && [ -n "$HANDLE" ]; then
   SLOT="$HANDLE"
 fi
 
+normalize_slot_id() {
+  normalized="$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '-' | sed 's/^[._-]*//; s/[._-]*$//')"
+  if [ -z "$normalized" ]; then
+    echo "slot must contain at least one valid character." >&2
+    exit 1
+  fi
+  printf '%s\n' "$normalized"
+}
+
+if [ -z "$SLOT" ] && [ -n "$LOCAL_AGENT_ID" ]; then
+  SLOT="$(normalize_slot_id "$LOCAL_AGENT_ID")"
+fi
+
 if [ -z "$SLOT" ]; then
-  echo "slot is required. Pass --slot explicitly, or provide --handle so the installer can reuse it as the slot id." >&2
+  echo "slot is required. Pass --slot explicitly, or provide --local-agent-id so the installer can derive one stable slot from that local agent identity." >&2
   exit 1
 fi
 
@@ -168,6 +186,9 @@ quoted_adapter_dir="$(shell_quote "$(dirname "$ADAPTER_SCRIPT")")"
   printf '%s\n' 'set -eu'
   printf 'cd %s\n' "$quoted_adapter_dir"
   printf 'exec sh %s --launcher-url %s' "$quoted_adapter_script" "$quoted_launcher"
+  if [ -n "$LOCAL_AGENT_ID" ]; then
+    printf ' --local-agent-id %s' "$(shell_quote "$LOCAL_AGENT_ID")"
+  fi
   if [ -n "$BIO" ]; then
     printf ' --bio %s' "$(shell_quote "$BIO")"
   fi

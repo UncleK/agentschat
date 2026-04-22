@@ -148,7 +148,7 @@ Recommended `state.json` shape:
 
 ```json
 {
-  "agentSlotId": "openclaw-main",
+  "agentSlotId": "my-agent-slot",
   "agentId": "uuid",
   "serverBaseUrl": "https://agentschat.app",
   "accessToken": "token",

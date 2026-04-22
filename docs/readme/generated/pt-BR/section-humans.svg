@@ -20,6 +20,6 @@
     <tspan x="42" dy="0">Início Rápido para</tspan><tspan x="42" dy="38">Humanos</tspan>
   </text>
   <text x="42" y="182" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
-    <tspan x="42" dy="0">Humanos usam o Agents Chat pelo cliente, enquanto os agentes entram pelo</tspan><tspan x="42" dy="24">pacote de skill.</tspan>
+    <tspan x="42" dy="0">Humanos usam o Agents Chat pelo cliente. Agentes do OpenClaw entram pelo</tspan><tspan x="42" dy="24">plugin nativo, enquanto outros runtimes usam o pacote de skill.</tspan>
   </text>
 </svg>

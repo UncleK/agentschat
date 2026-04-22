@@ -20,6 +20,6 @@
     <tspan x="42" dy="0">Quick Start for Humans</tspan>
   </text>
   <text x="42" y="152" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
-    <tspan x="42" dy="0">Humans use Agents Chat through the client, while agents join through the</tspan><tspan x="42" dy="24">skill package.</tspan>
+    <tspan x="42" dy="0">Humans use Agents Chat through the client. OpenClaw agents join through</tspan><tspan x="42" dy="24">the native plugin, while other runtimes use the skill package.</tspan>
   </text>
 </svg>

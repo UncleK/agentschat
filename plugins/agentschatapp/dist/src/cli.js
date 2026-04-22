@@ -1,4 +1,5 @@
-import { DEFAULT_OPENCLAW_AGENT, DEFAULT_SERVER_BASE_URL, DEFAULT_SLOT, DEFAULT_TRANSPORT } from "./constants.js";
+import { resolve as resolvePath } from "node:path";
+import { DEFAULT_SERVER_BASE_URL, DEFAULT_TRANSPORT } from "./constants.js";
 import { draftInitialPublicProfile } from "./embedded.js";
 import { describeAgentsChatAccountConfiguredState, findAgentsChatAccount, listAgentsChatAccounts, removeAgentsChatAccount, upsertAgentsChatAccount } from "./config.js";
 import { normalizeMode, normalizeSlot, parseLauncherUrl } from "./http.js";
@@ -31,10 +32,187 @@ function toUnixMs(value) {
     const parsed = Date.parse(value);
     return Number.isNaN(parsed) ? null : parsed;
 }
+function asRecord(value) {
+    return value != null && typeof value === "object" ? value : {};
+}
+function normalizeOptionalString(value) {
+    if (typeof value !== "string") {
+        return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+}
+function uniqueStrings(values) {
+    return values.filter((value, index, source) => Boolean(value) && source.indexOf(value) === index);
+}
+function normalizeComparablePath(value) {
+    return resolvePath(value).replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
+}
+function pathMatchesRoot(currentPath, candidateRoot) {
+    return currentPath === candidateRoot || currentPath.startsWith(`${candidateRoot}/`);
+}
+function listConfiguredOpenClawAgentIds(cfg) {
+    const list = Array.isArray(cfg.agents?.list) ? cfg.agents.list : [];
+    return uniqueStrings(list.map((entry) => normalizeOptionalString(asRecord(entry).id)));
+}
+function formatKnownAgentIds(agentIds) {
+    if (agentIds.length === 0) {
+        return "none";
+    }
+    return agentIds.map((agentId) => `'${agentId}'`).join(", ");
+}
+function validateKnownOpenClawAgentId(cfg, agentId) {
+    const knownAgentIds = listConfiguredOpenClawAgentIds(cfg);
+    if (knownAgentIds.length === 0 || knownAgentIds.includes(agentId)) {
+        return;
+    }
+    throw new Error(`OpenClaw agent '${agentId}' was not found in the local config. Known local agents: ${formatKnownAgentIds(knownAgentIds)}.`);
+}
+function inferOpenClawAgentIdFromWorkspace(runtimeContext, ctx, cfg) {
+    const knownAgentIds = listConfiguredOpenClawAgentIds(cfg);
+    if (knownAgentIds.length === 0) {
+        return null;
+    }
+    const workspaceDir = normalizeOptionalString(ctx.workspaceDir);
+    if (workspaceDir) {
+        const currentPath = normalizeComparablePath(workspaceDir);
+        const matches = knownAgentIds
+            .map((agentId) => {
+            const roots = uniqueStrings([
+                (() => {
+                    try {
+                        return runtimeContext.runtime.agent.resolveAgentWorkspaceDir(cfg, agentId);
+                    }
+                    catch {
+                        return undefined;
+                    }
+                })(),
+                (() => {
+                    try {
+                        return runtimeContext.runtime.agent.resolveAgentDir(cfg, agentId);
+                    }
+                    catch {
+                        return undefined;
+                    }
+                })()
+            ]).map((path) => normalizeComparablePath(path));
+            const matchedRoot = roots
+                .filter((root) => pathMatchesRoot(currentPath, root))
+                .sort((left, right) => right.length - left.length)[0];
+            return matchedRoot ? { agentId, matchedRoot } : null;
+        })
+            .filter((entry) => Boolean(entry))
+            .sort((left, right) => right.matchedRoot.length - left.matchedRoot.length);
+        if (matches.length === 1) {
+            return {
+                agentId: matches[0].agentId,
+                reason: `workspace '${workspaceDir}'`
+            };
+        }
+        if (matches.length > 1 && matches[0].matchedRoot.length > matches[1].matchedRoot.length) {
+            return {
+                agentId: matches[0].agentId,
+                reason: `workspace '${workspaceDir}'`
+            };
+        }
+    }
+    if (knownAgentIds.length === 1) {
+        return {
+            agentId: knownAgentIds[0],
+            reason: "the only configured local OpenClaw agent"
+        };
+    }
+    return null;
+}
+function deriveStableSlotForAgent(cfg, openclawAgent) {
+    const usedSlots = new Set(listAgentsChatAccounts(cfg).map((account) => account.slot));
+    const preferred = normalizeSlot(openclawAgent);
+    if (!usedSlots.has(preferred)) {
+        return preferred;
+    }
+    const channelBase = normalizeSlot(`${openclawAgent}-agentschat`);
+    if (!usedSlots.has(channelBase)) {
+        return channelBase;
+    }
+    let suffix = 2;
+    while (usedSlots.has(`${channelBase}-${suffix}`)) {
+        suffix += 1;
+    }
+    return `${channelBase}-${suffix}`;
+}
+function resolveConnectAgentId(runtimeContext, ctx, cfg, opts, launcherValues) {
+    const explicitAgentId = normalizeOptionalString(opts.openclawAgent);
+    if (explicitAgentId) {
+        validateKnownOpenClawAgentId(cfg, explicitAgentId);
+        return {
+            agentId: explicitAgentId,
+            inferred: false
+        };
+    }
+    const explicitSlot = normalizeOptionalString(opts.slot) ?? normalizeOptionalString(launcherValues?.slot);
+    if (explicitSlot) {
+        const existingAccount = findAgentsChatAccount(cfg, normalizeSlot(explicitSlot));
+        if (existingAccount?.openclawAgent) {
+            return {
+                agentId: existingAccount.openclawAgent,
+                inferred: true,
+                reason: `existing slot '${existingAccount.slot}'`
+            };
+        }
+    }
+    const inferred = inferOpenClawAgentIdFromWorkspace(runtimeContext, ctx, cfg);
+    if (inferred) {
+        return {
+            agentId: inferred.agentId,
+            inferred: true,
+            reason: inferred.reason
+        };
+    }
+    throw new Error("Could not infer the local OpenClaw agent for this Agents Chat connect. Run the command from that agent's workspace, or pass --agent <local-agent-id> once.");
+}
+function resolveSlotForAgent(cfg, openclawAgent, requestedSlot, options) {
+    const existingSlots = uniqueStrings(listAgentsChatAccounts(cfg)
+        .filter((account) => account.openclawAgent === openclawAgent)
+        .map((account) => account.slot));
+    const normalizedRequestedSlot = normalizeOptionalString(requestedSlot)
+        ? normalizeSlot(requestedSlot)
+        : undefined;
+    if (existingSlots.length > 1) {
+        if (normalizedRequestedSlot && existingSlots.includes(normalizedRequestedSlot)) {
+            return normalizedRequestedSlot;
+        }
+        throw new Error(`Local OpenClaw agent '${openclawAgent}' is already linked to multiple Agents Chat slots (${existingSlots.map((slot) => `'${slot}'`).join(", ")}). Pass --slot to choose the existing slot you want to keep using.`);
+    }
+    if (normalizedRequestedSlot) {
+        if (existingSlots.length === 1 && existingSlots[0] !== normalizedRequestedSlot) {
+            throw new Error(`Local OpenClaw agent '${openclawAgent}' is already linked to slot '${existingSlots[0]}'. Reuse that slot instead of creating a second one.`);
+        }
+        const existingAccount = findAgentsChatAccount(cfg, normalizedRequestedSlot);
+        if (existingAccount && existingAccount.openclawAgent !== openclawAgent) {
+            throw new Error(`Agents Chat slot '${normalizedRequestedSlot}' is already linked to local OpenClaw agent '${existingAccount.openclawAgent}'.`);
+        }
+        return normalizedRequestedSlot;
+    }
+    if (existingSlots.length === 1) {
+        return existingSlots[0];
+    }
+    if (options?.requireExisting) {
+        throw new Error(`Could not find an existing Agents Chat slot for local OpenClaw agent '${openclawAgent}'. Connect once first, or pass --slot explicitly if you are recovering an old slot.`);
+    }
+    return deriveStableSlotForAgent(cfg, openclawAgent);
+}
 function buildBaseAccount(input) {
+    const openclawAgent = normalizeOptionalString(input.openclawAgent);
+    const slot = normalizeOptionalString(input.slot);
+    if (!openclawAgent) {
+        throw new Error("openclawAgent is required before building the account config.");
+    }
+    if (!slot) {
+        throw new Error("slot is required before building the account config.");
+    }
     return {
-        openclawAgent: input.openclawAgent?.trim() || DEFAULT_OPENCLAW_AGENT,
-        slot: normalizeSlot(input.slot?.trim() || DEFAULT_SLOT),
+        openclawAgent,
+        slot: normalizeSlot(slot),
         mode: input.mode ?? "public",
         launcherUrl: input.launcherUrl?.trim() || undefined,
         serverBaseUrl: input.serverBaseUrl?.trim() || DEFAULT_SERVER_BASE_URL,
@@ -111,9 +289,21 @@ function buildManagerDecision(account, slot, runtimeContext) {
     };
 }
 async function handleConnect(runtimeContext, opts, ctx) {
+    const cfg = runtimeContext.runtime.config.loadConfig();
     const launcherValues = opts.launcherUrl ? parseLauncherUrl(opts.launcherUrl) : null;
     if (launcherValues?.mode === "claim") {
-        const slot = normalizeSlot(opts.slot?.trim() || launcherValues.slot || DEFAULT_SLOT);
+        const requestedClaimSlot = normalizeOptionalString(opts.slot) ?? normalizeOptionalString(launcherValues.slot);
+        const slot = requestedClaimSlot
+            ? normalizeSlot(requestedClaimSlot)
+            : (() => {
+                const resolvedAgent = resolveConnectAgentId(runtimeContext, ctx, cfg, opts, launcherValues);
+                if (resolvedAgent.inferred && resolvedAgent.reason) {
+                    ctx.logger.info(`Agents Chat inferred local OpenClaw agent '${resolvedAgent.agentId}' from ${resolvedAgent.reason}.`);
+                }
+                return resolveSlotForAgent(cfg, resolvedAgent.agentId, undefined, {
+                    requireExisting: true
+                });
+            })();
         migrateLegacyStateIfNeeded(slot, runtimeContext.stateStore);
         const state = loadSlotState(slot, runtimeContext.stateStore);
         const result = await confirmClaimLauncher(state, opts.launcherUrl);
@@ -125,11 +315,16 @@ async function handleConnect(runtimeContext, opts, ctx) {
         }));
         return;
     }
+    const resolvedAgent = resolveConnectAgentId(runtimeContext, ctx, cfg, opts, launcherValues);
+    if (resolvedAgent.inferred && resolvedAgent.reason) {
+        ctx.logger.info(`Agents Chat inferred local OpenClaw agent '${resolvedAgent.agentId}' from ${resolvedAgent.reason}.`);
+    }
     let account = buildBaseAccount({
         ...opts,
+        openclawAgent: resolvedAgent.agentId,
         mode: opts.mode ?? (launcherValues?.mode ? normalizeMode(launcherValues.mode) : "public"),
         serverBaseUrl: opts.serverBaseUrl ?? launcherValues?.serverBaseUrl ?? DEFAULT_SERVER_BASE_URL,
-        slot: opts.slot ?? launcherValues?.slot ?? DEFAULT_SLOT,
+        slot: resolveSlotForAgent(cfg, resolvedAgent.agentId, normalizeOptionalString(opts.slot) ?? normalizeOptionalString(launcherValues?.slot)),
         handle: opts.handle ?? launcherValues?.handle,
         displayName: opts.displayName ?? launcherValues?.displayName
     });
@@ -409,8 +604,8 @@ export function registerAgentsChatCli(runtimeContext, ctx) {
         .command("connect")
         .description("Connect or update an agentschatapp account")
         .option("--launcher-url <url>", "Agents Chat public, bound, or claim launcher")
-        .option("--agent <id>", "OpenClaw agent id", DEFAULT_OPENCLAW_AGENT)
-        .option("--slot <slot>", "Local Agents Chat slot", DEFAULT_SLOT)
+        .option("--agent <id>", "Local OpenClaw agent id; optional when the plugin can infer the current agent")
+        .option("--slot <slot>", "Advanced override for the local Agents Chat slot; normally auto-derived from the local agent")
         .option("--mode <mode>", "public or bound")
         .option("--server-base-url <url>", "Agents Chat server base URL", DEFAULT_SERVER_BASE_URL)
         .option("--handle <handle>", "Optional public Agents Chat handle override")

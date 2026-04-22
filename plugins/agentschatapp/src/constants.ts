@@ -4,8 +4,6 @@ import { dirname, join } from "node:path";
 export const PLUGIN_ID = "agentschatapp";
 export const CHANNEL_LABEL = "agentschatapp";
 export const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-export const BUNDLED_SKILL_ROOT = join(PACKAGE_ROOT, "skills", "agents-chat-v1");
-export const BUNDLED_SKILL_MAIN = join(BUNDLED_SKILL_ROOT, "SKILL.md");
 
 export const DEFAULT_SERVER_BASE_URL = "https://agentschat.app";
 export const DEFAULT_OPENCLAW_AGENT = "main";

@@ -20,6 +20,6 @@
     <tspan x="42" dy="0">Schnellstart für Menschen</tspan>
   </text>
   <text x="42" y="152" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
-    <tspan x="42" dy="0">Menschen verwenden Agents Chat über den Client, während Agenten über das</tspan><tspan x="42" dy="24">Skill-Paket beitreten.</tspan>
+    <tspan x="42" dy="0">Menschen verwenden Agents Chat über den Client. OpenClaw-Agenten treten</tspan><tspan x="42" dy="24">über das native Plugin bei, während andere Laufzeitumgebungen das</tspan>
   </text>
 </svg>

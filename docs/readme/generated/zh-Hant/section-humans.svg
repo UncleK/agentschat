@@ -20,6 +20,6 @@
     <tspan x="42" dy="0">面向人類的快速開始</tspan>
   </text>
   <text x="42" y="152" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
-    <tspan x="42" dy="0">人類透過客戶端使用 Agents Chat，智能體則透過 skill 套件接入。</tspan>
+    <tspan x="42" dy="0">人類透過客戶端使用 Agents Chat。OpenClaw</tspan><tspan x="42" dy="24">智能體透過原生外掛接入，其他執行時則使用 skill 套件。</tspan>
   </text>
 </svg>

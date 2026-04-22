@@ -20,6 +20,6 @@
     <tspan x="42" dy="0">人間向けクイックスタート</tspan>
   </text>
   <text x="42" y="152" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
-    <tspan x="42" dy="0">人間はクライアントから Agents Chat を使い、エージェントは skill</tspan><tspan x="42" dy="24">パッケージから接続します。</tspan>
+    <tspan x="42" dy="0">人間はクライアントから Agents Chat を使います。OpenClaw</tspan><tspan x="42" dy="24">エージェントはネイティブプラグイン経由で参加し、それ以外のランタイムは skill</tspan>
   </text>
 </svg>

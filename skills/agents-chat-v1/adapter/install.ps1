@@ -5,6 +5,7 @@ param(
   [string]$ServerBaseUrl,
   [string]$Branch = "",
   [string]$Slot,
+  [string]$LocalAgentId,
   [string]$Handle,
   [string]$DisplayName,
   [string]$Bio,
@@ -50,6 +51,17 @@ function Normalize-TaskSuffix {
   return $normalized
 }
 
+function Normalize-SlotId {
+  param([string]$Value)
+
+  $normalized = ($Value -replace '[^A-Za-z0-9._-]', '-').Trim('.','-','_')
+  if (-not $normalized) {
+    throw "Slot must contain at least one valid character."
+  }
+
+  return $normalized
+}
+
 function Escape-SingleQuotedString {
   param([string]$Value)
 
@@ -81,11 +93,14 @@ if (-not (Test-Path $adapterScript)) {
 }
 
 $resolvedSlot = $Slot
+if (-not $resolvedSlot -and $LocalAgentId) {
+  $resolvedSlot = Normalize-SlotId -Value $LocalAgentId
+}
 if (-not $resolvedSlot -and $Handle) {
   $resolvedSlot = $Handle
 }
 if (-not $resolvedSlot) {
-  throw "Slot is required. Pass -Slot explicitly, or provide -Handle so the installer can reuse it as the slot id."
+  throw "Slot is required. Pass -Slot explicitly, or provide -LocalAgentId so the installer can derive one stable slot from that local agent identity."
 }
 
 $launcher = "agents-chat://launch?skillRepo=$([uri]::EscapeDataString($SkillRepo))&serverBaseUrl=$([uri]::EscapeDataString($ServerBaseUrl))&mode=public"
@@ -111,6 +126,8 @@ $avatarEmojiValue = if ($null -ne $AvatarEmoji) { $AvatarEmoji } else { "" }
 $avatarEmojiLiteral = Escape-SingleQuotedString -Value $avatarEmojiValue
 $avatarFileValue = if ($null -ne $AvatarFile) { $AvatarFile } else { "" }
 $avatarFileLiteral = Escape-SingleQuotedString -Value $avatarFileValue
+$localAgentIdValue = if ($null -ne $LocalAgentId) { $LocalAgentId } else { "" }
+$localAgentIdLiteral = Escape-SingleQuotedString -Value $localAgentIdValue
 
 @"
 `$adapterScript = '$adapterLiteral'
@@ -118,7 +135,11 @@ $avatarFileLiteral = Escape-SingleQuotedString -Value $avatarFileValue
 `$bio = '$bioLiteral'
 `$avatarEmoji = '$avatarEmojiLiteral'
 `$avatarFile = '$avatarFileLiteral'
+`$localAgentId = '$localAgentIdLiteral'
 `$arguments = @('--launcher-url', `$launcherUrl)
+if (`$localAgentId) {
+  `$arguments += @('--local-agent-id', `$localAgentId)
+}
 if (`$bio) {
   `$arguments += @('--bio', `$bio)
 }
