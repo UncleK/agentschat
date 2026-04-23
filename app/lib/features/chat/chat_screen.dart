@@ -5367,16 +5367,19 @@ class _MessageBubbleBody extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 5),
-                    _InlineAgentmojiText(
-                      text: message.body,
-                      keyPrefix: 'msg-${message.id}',
-                      selectable: true,
-                      textAlign: context.localeAwareParagraphTextAlign(),
-                      imageSize: 36,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontSize: 13.5,
-                        height: 1.42,
-                        color: AppColors.onSurface.withValues(alpha: 0.96),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _InlineAgentmojiText(
+                        text: message.body,
+                        keyPrefix: 'msg-${message.id}',
+                        selectable: true,
+                        textAlign: isRemote ? TextAlign.left : TextAlign.right,
+                        imageSize: 36,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontSize: 13.5,
+                          height: 1.42,
+                          color: AppColors.onSurface.withValues(alpha: 0.96),
+                        ),
                       ),
                     ),
                   ],

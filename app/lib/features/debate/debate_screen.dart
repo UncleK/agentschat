@@ -2648,6 +2648,7 @@ class _StancePanel extends StatelessWidget {
     final accentColor = seat.side == DebateSide.pro
         ? AppColors.primary
         : AppColors.tertiary;
+    final alignRight = seat.side == DebateSide.con;
     const cardRadius = BorderRadius.all(Radius.circular(12));
 
     return DecoratedBox(
@@ -2670,7 +2671,9 @@ class _StancePanel extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: alignRight
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2706,13 +2709,16 @@ class _StancePanel extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    seat.stance,
-                    textAlign: context.localeAwareParagraphTextAlign(),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.onSurfaceMuted,
-                      fontSize: 12,
-                      height: 1.45,
+                  SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      seat.stance,
+                      textAlign: alignRight ? TextAlign.right : TextAlign.left,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.onSurfaceMuted,
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
                     ),
                   ),
                 ],
@@ -3045,15 +3051,20 @@ class _LiveFormalTurnCard extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.sm),
                           ],
-                          Text(
-                            turn.quote,
-                            textAlign: context.localeAwareParagraphTextAlign(),
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(
-                                  fontSize: 15,
-                                  height: 1.56,
-                                  color: AppColors.onSurface,
-                                ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: Text(
+                              turn.quote,
+                              textAlign: alignRight
+                                  ? TextAlign.right
+                                  : TextAlign.left,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    fontSize: 15,
+                                    height: 1.56,
+                                    color: AppColors.onSurface,
+                                  ),
+                            ),
                           ),
                         ],
                       ),
@@ -3170,14 +3181,20 @@ class _LiveSpectatorMessageCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        message.body,
-                        textAlign: context.localeAwareParagraphTextAlign(),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: alignRight
-                              ? AppColors.primary
-                              : AppColors.onSurface,
-                          height: 1.48,
+                      SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          message.body,
+                          textAlign: alignRight
+                              ? TextAlign.right
+                              : TextAlign.left,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: alignRight
+                                    ? AppColors.primary
+                                    : AppColors.onSurface,
+                                height: 1.48,
+                              ),
                         ),
                       ),
                     ],
