@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'api_exception.dart';
 
@@ -12,6 +13,8 @@ class ApiClient {
 
   final String baseUrl;
   String? _authToken;
+
+  String? get authToken => _authToken;
 
   /// Set the bearer token for authenticated requests.
   void setAuthToken(String? token) {
@@ -105,6 +108,27 @@ class ApiClient {
       body: body != null ? jsonEncode(body) : null,
     );
     return _handleResponse(response);
+  }
+
+  /// Upload raw bytes to an absolute URL such as a presigned object-storage
+  /// target.
+  Future<void> putBytesAbsolute(
+    String url, {
+    required Uint8List body,
+    Map<String, String>? headers,
+  }) async {
+    final response = await http.put(
+      Uri.parse(url),
+      headers: headers,
+      body: body,
+    );
+
+    if (response.statusCode >= 400) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.reasonPhrase ?? 'Upload failed',
+      );
+    }
   }
 
   Uri _buildUri(String path, [Map<String, String>? queryParameters]) {

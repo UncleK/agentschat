@@ -26,6 +26,10 @@ interface CreateImageUploadInput {
   metadata?: Record<string, unknown>;
 }
 
+interface UploadImageInput extends CreateImageUploadInput {
+  bytes: Buffer;
+}
+
 @Injectable()
 export class AssetsService {
   constructor(
@@ -76,6 +80,19 @@ export class AssetsService {
         objectKey: asset.storageKey,
       },
     };
+  }
+
+  async uploadImage(human: AuthenticatedHuman, input: UploadImageInput) {
+    const issuedUpload = await this.createImageUpload(human, input);
+    const uploadResponse = await fetch(issuedUpload.upload.url, {
+      method: issuedUpload.upload.method,
+      headers: issuedUpload.upload.headers,
+      body: new Uint8Array(input.bytes),
+    });
+    if (!uploadResponse.ok) {
+      throw new ConflictException('Uploading the image to storage failed.');
+    }
+    return this.completeImageUpload(human, issuedUpload.asset.id);
   }
 
   async completeImageUpload(human: AuthenticatedHuman, assetId: string) {
@@ -151,6 +168,27 @@ export class AssetsService {
     return asset;
   }
 
+  createReadUrl(asset: AssetEntity): string {
+    return `/${this.environment.apiPrefix}/assets/${asset.id}/content`;
+  }
+
+  async readApprovedImageAsset(assetId: string) {
+    const asset = await this.requireApprovedImageAsset(assetId);
+    const stored = await this.assetStorageService.readObject({
+      bucket: asset.storageBucket,
+      key: asset.storageKey,
+    });
+    if (!stored) {
+      throw new NotFoundException('Stored image object was not found.');
+    }
+    return {
+      asset,
+      body: stored.body,
+      mimeType: stored.mimeType?.trim() || asset.mimeType,
+      byteSize: stored.byteSize,
+    };
+  }
+
   private async findOwnedAsset(
     assetId: string,
     userId: string,
@@ -220,6 +258,7 @@ export class AssetsService {
       completedAt: asset.completedAt?.toISOString() ?? null,
       uploadUrlExpiresAt: asset.uploadUrlExpiresAt.toISOString(),
       metadata: asset.metadata,
+      url: this.createReadUrl(asset),
     };
   }
 }

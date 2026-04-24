@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/locale/app_localization_extensions.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/network/assets_repository.dart';
 import '../../core/network/chat_repository.dart';
 import '../../core/network/follow_repository.dart';
 import '../../core/session/app_session_controller.dart';
@@ -87,6 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _messagesRequestId = 0;
   int _readRequestId = 0;
   int _followRequestId = 0;
+  AssetsRepository? _assetsRepository;
   ChatRepository? _chatRepository;
   FollowRepository? _followRepository;
   String? _followRequestConversationId;
@@ -145,6 +147,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.didChangeDependencies();
     final session = AppSessionScope.maybeOf(context);
     if (session == null) {
+      _assetsRepository = null;
       _chatRepository = widget.chatRepository;
       _followRepository = widget.followRepository;
       _sessionSignature = null;
@@ -152,6 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    _assetsRepository = AssetsRepository(apiClient: session.apiClient);
     _chatRepository =
         widget.chatRepository ?? ChatRepository(apiClient: session.apiClient);
     _followRepository =
@@ -1236,21 +1240,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendThreadMessage(ChatConversationModel conversation) async {
     final draft = _composerController.text.trim();
-    if (draft.isEmpty || _isSendingMessage) {
-      return;
-    }
-    if (_composerImagePath != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            context.localizedText(
-              key: 'msgImageUploadIsNotWiredYetRemoveTheImageToa6e9bd5c',
-              en: 'Image upload is not wired yet. Remove the image to send text.',
-              zhHans: '图片上传功能暂未接通，请先移除图片后再发送文字。',
-            ),
-          ),
-        ),
-      );
+    final composerImagePath = _composerImagePath;
+    if ((draft.isEmpty && composerImagePath == null) || _isSendingMessage) {
       return;
     }
 
@@ -1263,7 +1254,8 @@ class _ChatScreenState extends State<ChatScreen> {
         currentUserId.isEmpty ||
         activeAgentId == null ||
         activeAgentId.isEmpty ||
-        _chatRepository == null) {
+        _chatRepository == null ||
+        _assetsRepository == null) {
       return;
     }
 
@@ -1276,12 +1268,19 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
-      final response = await _chatRepository!.sendThreadMessage(
-        threadId: conversation.id,
-        activeAgentId: activeAgentId,
-        content: draft,
-        contentType: 'text',
-      );
+      final response = composerImagePath != null
+          ? await _sendImageThreadMessage(
+              conversationId: conversation.id,
+              activeAgentId: activeAgentId,
+              imagePath: composerImagePath,
+              caption: draft.isEmpty ? null : draft,
+            )
+          : await _chatRepository!.sendThreadMessage(
+              threadId: conversation.id,
+              activeAgentId: activeAgentId,
+              content: draft,
+              contentType: 'text',
+            );
       if (!_canApplyMessageResult(
         requestId: requestId,
         userId: currentUserId,
@@ -1354,6 +1353,50 @@ class _ChatScreenState extends State<ChatScreen> {
         _sendMessageError = 'Unable to send this message right now.';
       });
     }
+  }
+
+  Future<ChatThreadMessageResponse> _sendImageThreadMessage({
+    required String conversationId,
+    required String activeAgentId,
+    required String imagePath,
+    required String? caption,
+  }) async {
+    final file = File(imagePath);
+    final bytes = await file.readAsBytes();
+    final fileName = imagePath.split(Platform.pathSeparator).last;
+    final mimeType = _guessImageMimeType(fileName);
+    final asset = await _assetsRepository!.uploadImage(
+      fileName: fileName,
+      mimeType: mimeType,
+      bytes: bytes,
+    );
+    return _chatRepository!.sendThreadMessage(
+      threadId: conversationId,
+      activeAgentId: activeAgentId,
+      contentType: 'image',
+      assetId: asset.id,
+      caption: caption,
+    );
+  }
+
+  String _guessImageMimeType(String fileName) {
+    final normalized = fileName.trim().toLowerCase();
+    if (normalized.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (normalized.endsWith('.gif')) {
+      return 'image/gif';
+    }
+    if (normalized.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    if (normalized.endsWith('.heic')) {
+      return 'image/heic';
+    }
+    if (normalized.endsWith('.heif')) {
+      return 'image/heif';
+    }
+    return 'image/jpeg';
   }
 
   void _insertComposerTextAtCursor(String text) {
@@ -1720,9 +1763,13 @@ class _ChatScreenState extends State<ChatScreen> {
         fallback: message.actor.id,
       ),
       body: _messageBody(message),
+      contentType: message.contentType,
       timestampLabel: _timeLabel(message.occurredAt),
       side: isLocal ? ChatActorSide.local : ChatActorSide.remote,
       kind: isHuman ? ChatParticipantKind.human : ChatParticipantKind.agent,
+      caption: message.content?.trim(),
+      imageUrl: message.asset?.url,
+      imageAssetId: message.asset?.id,
     );
   }
 
@@ -5317,6 +5364,14 @@ class _MessageBubbleBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final isRemote = message.side == ChatActorSide.remote;
     final showInlineAccent = message.kind == ChatParticipantKind.human;
+    final caption = message.caption?.trim();
+    final hasCaption = caption != null && caption.isNotEmpty;
+    final showImage =
+        message.isImage && (message.imageUrl?.trim().isNotEmpty ?? false);
+    final authToken = AppSessionScope.maybeOf(context)?.apiClient.authToken;
+    final imageHeaders = authToken == null || authToken.isEmpty
+        ? null
+        : <String, String>{'Authorization': 'Bearer $authToken'};
 
     return ClipRRect(
       borderRadius: bubbleRadius,
@@ -5367,21 +5422,56 @@ class _MessageBubbleBody extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 5),
-                    SizedBox(
-                      width: double.infinity,
-                      child: _InlineAgentmojiText(
-                        text: message.body,
-                        keyPrefix: 'msg-${message.id}',
-                        selectable: true,
-                        textAlign: isRemote ? TextAlign.left : TextAlign.right,
-                        imageSize: 36,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontSize: 13.5,
-                          height: 1.42,
-                          color: AppColors.onSurface.withValues(alpha: 0.96),
+                    if (showImage) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: 228,
+                            maxHeight: 228,
+                          ),
+                          child: Image.network(
+                            message.imageUrl!,
+                            headers: imageHeaders,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 188,
+                                height: 152,
+                                color: AppColors.surfaceHighest,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.broken_image_outlined,
+                                  color: AppColors.onSurfaceMuted,
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
-                    ),
+                      if (hasCaption) const SizedBox(height: 8),
+                    ],
+                    if (!showImage || hasCaption)
+                      SizedBox(
+                        width: double.infinity,
+                        child: _InlineAgentmojiText(
+                          text: showImage ? caption! : message.body,
+                          keyPrefix: 'msg-${message.id}',
+                          selectable: true,
+                          textAlign: isRemote
+                              ? TextAlign.left
+                              : TextAlign.right,
+                          imageSize: 36,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                fontSize: 13.5,
+                                height: 1.42,
+                                color: AppColors.onSurface.withValues(
+                                  alpha: 0.96,
+                                ),
+                              ),
+                        ),
+                      ),
                   ],
                 ),
               ),

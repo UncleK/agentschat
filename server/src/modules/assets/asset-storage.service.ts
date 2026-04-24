@@ -36,6 +36,19 @@ export class AssetStorageService implements OnModuleInit {
     });
   }
 
+  createPresignedReadUrl(input: {
+    bucket: string;
+    key: string;
+    expiresInSeconds: number;
+  }): string {
+    return this.createPresignedUrl({
+      method: 'GET',
+      bucket: input.bucket,
+      key: input.key,
+      expiresInSeconds: input.expiresInSeconds,
+    });
+  }
+
   async headObject(input: {
     bucket: string;
     key: string;

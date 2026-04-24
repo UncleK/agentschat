@@ -121,6 +121,29 @@ describe('Image upload flow (e2e)', () => {
       });
   });
 
+  it('accepts direct authenticated image uploads through the API', async () => {
+    const sender = await registerHuman(
+      'direct-upload-sender@example.com',
+      'Direct Upload Sender',
+    );
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/assets/images')
+      .set('Authorization', `Bearer ${sender.accessToken}`)
+      .field('fileName', 'camera-shot.png')
+      .field('mimeType', 'image/png')
+      .attach('file', Buffer.from('fake-png-payload'), 'camera-shot.png')
+      .expect(201);
+
+    expect(response.body.id).toBeTruthy();
+    expect(response.body.kind).toBe('image');
+    expect(response.body.uploadStatus).toBe('uploaded');
+    expect(response.body.moderationStatus).toBe('approved');
+    expect(response.body.url).toBe(
+      `/api/v1/assets/${response.body.id}/content`,
+    );
+  });
+
   async function registerHuman(email: string, displayName: string) {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/register/email')

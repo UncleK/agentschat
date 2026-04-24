@@ -204,12 +204,48 @@ class ChatMessageActor {
   }
 }
 
+class ChatMessageAsset {
+  const ChatMessageAsset({
+    required this.id,
+    required this.kind,
+    required this.mimeType,
+    required this.byteSize,
+    required this.storageBucket,
+    required this.storageKey,
+    this.url,
+  });
+
+  final String id;
+  final String kind;
+  final String mimeType;
+  final int? byteSize;
+  final String storageBucket;
+  final String storageKey;
+  final String? url;
+
+  factory ChatMessageAsset.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
+    return ChatMessageAsset(
+      id: json['id'] as String? ?? '',
+      kind: json['kind'] as String? ?? '',
+      mimeType: json['mimeType'] as String? ?? '',
+      byteSize: json['byteSize'] as int?,
+      storageBucket: json['storageBucket'] as String? ?? '',
+      storageKey: json['storageKey'] as String? ?? '',
+      url: _resolveUrl(json['url'], resolveUrl),
+    );
+  }
+}
+
 class ChatMessageRecord {
   const ChatMessageRecord({
     required this.eventId,
     required this.actor,
     required this.contentType,
     required this.content,
+    required this.asset,
     required this.occurredAt,
   });
 
@@ -217,9 +253,13 @@ class ChatMessageRecord {
   final ChatMessageActor actor;
   final String contentType;
   final String? content;
+  final ChatMessageAsset? asset;
   final String occurredAt;
 
-  factory ChatMessageRecord.fromJson(Map<String, dynamic> json) {
+  factory ChatMessageRecord.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     return ChatMessageRecord(
       eventId: json['eventId'] as String? ?? '',
       actor: ChatMessageActor.fromJson(
@@ -227,6 +267,12 @@ class ChatMessageRecord {
       ),
       contentType: json['contentType'] as String? ?? '',
       content: json['content'] as String?,
+      asset: json['asset'] is Map<String, dynamic>
+          ? ChatMessageAsset.fromJson(
+              json['asset'] as Map<String, dynamic>,
+              resolveUrl: resolveUrl,
+            )
+          : null,
       occurredAt: json['occurredAt'] as String? ?? '',
     );
   }
@@ -245,14 +291,20 @@ class ChatMessagesResponse {
   final List<ChatMessageRecord> messages;
   final String? nextCursor;
 
-  factory ChatMessagesResponse.fromJson(Map<String, dynamic> json) {
+  factory ChatMessagesResponse.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     final rawMessages = json['messages'] as List<dynamic>? ?? const [];
     return ChatMessagesResponse(
       threadId: json['threadId'] as String? ?? '',
       activeAgentId: json['activeAgentId'] as String? ?? '',
       messages: rawMessages
           .map(
-            (item) => ChatMessageRecord.fromJson(item as Map<String, dynamic>),
+            (item) => ChatMessageRecord.fromJson(
+              item as Map<String, dynamic>,
+              resolveUrl: resolveUrl,
+            ),
           )
           .toList(growable: false),
       nextCursor: json['nextCursor'] as String?,
@@ -271,12 +323,16 @@ class ChatThreadMessageResponse {
   final String activeAgentId;
   final ChatMessageRecord message;
 
-  factory ChatThreadMessageResponse.fromJson(Map<String, dynamic> json) {
+  factory ChatThreadMessageResponse.fromJson(
+    Map<String, dynamic> json, {
+    String? Function(String?)? resolveUrl,
+  }) {
     return ChatThreadMessageResponse(
       threadId: json['threadId'] as String? ?? '',
       activeAgentId: json['activeAgentId'] as String? ?? '',
       message: ChatMessageRecord.fromJson(
         json['message'] as Map<String, dynamic>? ?? const {},
+        resolveUrl: resolveUrl,
       ),
     );
   }
@@ -347,7 +403,10 @@ class ChatRepository {
       '/content/dm/threads/$threadId/messages',
       queryParameters: queryParameters,
     );
-    return ChatMessagesResponse.fromJson(response);
+    return ChatMessagesResponse.fromJson(
+      response,
+      resolveUrl: apiClient.resolveUrl,
+    );
   }
 
   Future<ChatReadResponse> markThreadRead({
@@ -366,6 +425,8 @@ class ChatRepository {
     required String activeAgentId,
     String? content,
     String? contentType,
+    String? caption,
+    String? assetId,
     Map<String, dynamic>? metadata,
   }) async {
     final body = <String, dynamic>{'activeAgentId': activeAgentId};
@@ -375,6 +436,12 @@ class ChatRepository {
     if (contentType != null) {
       body['contentType'] = contentType;
     }
+    if (caption != null) {
+      body['caption'] = caption;
+    }
+    if (assetId != null) {
+      body['assetId'] = assetId;
+    }
     if (metadata != null) {
       body['metadata'] = metadata;
     }
@@ -383,7 +450,10 @@ class ChatRepository {
       '/content/dm/threads/$threadId/messages',
       body: body,
     );
-    return ChatThreadMessageResponse.fromJson(response);
+    return ChatThreadMessageResponse.fromJson(
+      response,
+      resolveUrl: apiClient.resolveUrl,
+    );
   }
 
   /// Send a direct message on behalf of the authenticated human.
@@ -397,6 +467,8 @@ class ChatRepository {
     String? recipientAgentId,
     String? content,
     String? contentType,
+    String? caption,
+    String? assetId,
     String? activeAgentId,
     Map<String, dynamic>? metadata,
   }) async {
@@ -406,6 +478,8 @@ class ChatRepository {
     if (recipientAgentId != null) body['recipientAgentId'] = recipientAgentId;
     if (content != null) body['content'] = content;
     if (contentType != null) body['contentType'] = contentType;
+    if (caption != null) body['caption'] = caption;
+    if (assetId != null) body['assetId'] = assetId;
     if (activeAgentId != null) body['activeAgentId'] = activeAgentId;
     if (metadata != null) body['metadata'] = metadata;
 

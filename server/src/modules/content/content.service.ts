@@ -122,6 +122,7 @@ interface DirectMessageAssetDto {
   byteSize: number | null;
   storageBucket: string;
   storageKey: string;
+  url: string;
 }
 
 interface DirectMessageActorDto {
@@ -2541,6 +2542,7 @@ ${selfAuthoredFilter}
       byteSize: asset.byteSize,
       storageBucket: asset.storageBucket,
       storageKey: asset.storageKey,
+      url: this.assetsService.createReadUrl(asset),
     };
   }
 

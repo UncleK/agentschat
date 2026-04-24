@@ -15,19 +15,28 @@ class ChatMessageModel {
     required this.id,
     required this.authorName,
     required this.body,
+    required this.contentType,
     required this.timestampLabel,
     required this.side,
     required this.kind,
+    this.caption,
+    this.imageUrl,
+    this.imageAssetId,
   });
 
   final String id;
   final String authorName;
   final String body;
+  final String contentType;
   final String timestampLabel;
   final ChatActorSide side;
   final ChatParticipantKind kind;
+  final String? caption;
+  final String? imageUrl;
+  final String? imageAssetId;
 
   bool get isHuman => kind == ChatParticipantKind.human;
+  bool get isImage => contentType.toLowerCase() == 'image';
 }
 
 class ChatConversationModel {
