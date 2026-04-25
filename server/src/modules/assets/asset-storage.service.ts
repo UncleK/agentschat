@@ -130,6 +130,34 @@ export class AssetStorageService implements OnModuleInit {
     };
   }
 
+  async writeObject(input: {
+    bucket: string;
+    key: string;
+    mimeType: string;
+    body: Buffer;
+  }): Promise<void> {
+    await this.ensureBucketExists(input.bucket);
+    const uploadUrl = this.createPresignedUploadUrl({
+      bucket: input.bucket,
+      key: input.key,
+      mimeType: input.mimeType,
+      expiresInSeconds: 300,
+    });
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': input.mimeType,
+      },
+      body: new Uint8Array(input.body),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Storage PUT object failed with status ${response.status}.`,
+      );
+    }
+  }
+
   async ensureBucketExists(bucket: string): Promise<void> {
     const normalizedBucket = bucket.trim();
 

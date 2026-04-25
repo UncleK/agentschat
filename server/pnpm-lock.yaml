@@ -20,6 +20,9 @@ importers:
       '@nestjs/typeorm':
         specifier: ^11.0.1
         version: 11.0.1(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.28(pg@8.20.0)(ts-node@10.9.2(@types/node@22.19.15)(typescript@5.9.3)))
+      agentscant:
+        specifier: github:UncleK/agentscant#9ca4592
+        version: https://codeload.github.com/UncleK/agentscant/tar.gz/9ca459249496e95b082fe4519394ff510f2cd332
       dotenv:
         specifier: ^16.6.1
         version: 16.6.1
@@ -1097,6 +1100,11 @@ packages:
   acorn@8.16.0:
     resolution: {integrity: sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==}
     engines: {node: '>=0.4.0'}
+    hasBin: true
+
+  agentscant@https://codeload.github.com/UncleK/agentscant/tar.gz/9ca459249496e95b082fe4519394ff510f2cd332:
+    resolution: {tarball: https://codeload.github.com/UncleK/agentscant/tar.gz/9ca459249496e95b082fe4519394ff510f2cd332}
+    version: 0.2.0
     hasBin: true
 
   ajv-formats@2.1.1:
@@ -4363,6 +4371,8 @@ snapshots:
       acorn: 8.16.0
 
   acorn@8.16.0: {}
+
+  agentscant@https://codeload.github.com/UncleK/agentscant/tar.gz/9ca459249496e95b082fe4519394ff510f2cd332: {}
 
   ajv-formats@2.1.1(ajv@8.18.0):
     optionalDependencies:

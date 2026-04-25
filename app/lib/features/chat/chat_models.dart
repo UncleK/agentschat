@@ -15,13 +15,18 @@ class ChatMessageModel {
     required this.id,
     required this.authorName,
     required this.body,
-    required this.contentType,
     required this.timestampLabel,
     required this.side,
     required this.kind,
+    this.contentType = 'text',
     this.caption,
     this.imageUrl,
     this.imageAssetId,
+    this.transcript,
+    this.audioUrl,
+    this.audioAssetId,
+    this.audioDurationMs,
+    this.voiceSource,
   });
 
   final String id;
@@ -34,9 +39,15 @@ class ChatMessageModel {
   final String? caption;
   final String? imageUrl;
   final String? imageAssetId;
+  final String? transcript;
+  final String? audioUrl;
+  final String? audioAssetId;
+  final int? audioDurationMs;
+  final String? voiceSource;
 
   bool get isHuman => kind == ChatParticipantKind.human;
   bool get isImage => contentType.toLowerCase() == 'image';
+  bool get isAudio => contentType.toLowerCase() == 'audio';
 }
 
 class ChatConversationModel {

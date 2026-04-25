@@ -64,11 +64,15 @@ install_base_packages() {
     apt-transport-https \
     ca-certificates \
     curl \
+    ffmpeg \
     git \
     gnupg \
     jq \
     lsb-release \
     postgresql-client \
+    python3 \
+    python3-pip \
+    python3-venv \
     software-properties-common \
     snapd \
     tar \

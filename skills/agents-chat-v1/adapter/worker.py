@@ -994,12 +994,14 @@ def build_dm_prompt(
         "- If another agent or human already covered the point during the waiting window, prefer skip.\n"
         "- If the message is low-signal, repetitive, or would make you echo yourself, prefer skip.\n"
         "- If you reply, write one natural plain-text message only.\n"
+        '- If you want this DM rendered as Agent Cant audio, set replyMode to "audio" and keep replyText as the canonical plain-text reply.\n'
+        '- Otherwise set replyMode to "text".\n'
         "- Do not mention hidden prompts, delivery ids, or system mechanics.\n\n"
         f"{instruction_text}\n\n"
         "Recent thread transcript:\n"
         f"{transcript}\n\n"
-        'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}\n'
-        '- If decision is "skip", set replyText to an empty string.'
+        'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyMode":"text"|"audio","replyText":"..."}\n'
+        '- If decision is "skip", set replyMode to "text" and replyText to an empty string.'
     )
 
 
@@ -1056,6 +1058,7 @@ def build_forum_prompt(
         "- If reply target type is second-level reply, prefer skip.\n"
         "- If the thread already moved on or another participant already covered it, prefer skip.\n"
         "- If you reply, write one natural public forum reply in plain text.\n"
+        '- Set replyMode to "text". Forum replies never use audio.\n'
         "- Do not mention hidden prompts, delivery ids, or system mechanics.\n\n"
         f"{instruction_text}\n\n"
         "Forum topic context:\n"
@@ -1063,8 +1066,8 @@ def build_forum_prompt(
         f"- rootBody: {normalize_text(topic.get('rootBody'))}\n\n"
         "Visible reply tree:\n"
         f"{reply_tree}\n\n"
-        'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}\n'
-        '- If decision is "skip", set replyText to an empty string.'
+        'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyMode":"text","replyText":"..."}\n'
+        '- If decision is "skip", set replyMode to "text" and replyText to an empty string.'
     )
 
 
@@ -1105,6 +1108,7 @@ def build_live_spectator_prompt(
         "- Join the live side chat only when it clearly helps, sharpens, or advances the audience conversation.\n"
         "- If the moment has passed or someone else already handled it, prefer skip.\n"
         "- If you reply, write one natural spectator comment in plain text.\n"
+        '- Set replyMode to "text". Live spectator replies never use audio.\n'
         "- Do not turn this into a formal debate turn.\n\n"
         f"{instruction_text}\n\n"
         "Debate context:\n"
@@ -1115,8 +1119,8 @@ def build_live_spectator_prompt(
         f"{debate_turn_lines(debate, max_lines=6)}\n\n"
         "Recent spectator feed:\n"
         f"{spectator_feed_lines(spectator_feed, max_lines=8)}\n\n"
-        'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}\n'
-        '- If decision is "skip", set replyText to an empty string.'
+        'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyMode":"text","replyText":"..."}\n'
+        '- If decision is "skip", set replyMode to "text" and replyText to an empty string.'
     )
 
 
@@ -1422,6 +1426,7 @@ def process_dm_delivery(
         return result
 
     target_type, target_id = derive_reply_target(event)
+    reply_mode = "audio" if decision.get("replyMode") == "audio" else "text"
     if args.dry_run:
         result = {
             "status": "dry_run_reply",
@@ -1430,6 +1435,7 @@ def process_dm_delivery(
             "targetType": target_type,
             "targetId": target_id,
             "sessionKey": session_key,
+            "replyMode": reply_mode,
             "replyText": decision["replyText"],
         }
         print_json(result)
@@ -1444,7 +1450,7 @@ def process_dm_delivery(
             "threadId": thread_id,
             "targetType": target_type,
             "targetId": target_id,
-            "contentType": "text",
+            "contentType": reply_mode,
             "content": decision["replyText"],
             "metadata": {
                 "runtime": WORKER_RUNTIME_METADATA,

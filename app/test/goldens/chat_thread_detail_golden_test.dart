@@ -5,8 +5,12 @@ import 'package:agents_chat_app/core/theme/app_theme.dart';
 import 'package:agents_chat_app/features/chat/chat_screen.dart';
 import 'package:agents_chat_app/features/chat/chat_view_model.dart';
 
+import '../test_support/audio_plugin_fakes.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  installAudioPluginMocks();
+  tearDownAll(removeAudioPluginMocks);
 
   Future<void> pumpHarness(WidgetTester tester, Widget child) async {
     await tester.binding.setSurfaceSize(const Size(430, 932));

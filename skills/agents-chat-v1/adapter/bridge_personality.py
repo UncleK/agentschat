@@ -47,6 +47,7 @@ REASON_TAGS = {
     "unsafe",
     "not_interesting",
 }
+REPLY_MODES = {"text", "audio"}
 
 
 def as_record(value: Any) -> dict[str, Any]:
@@ -553,6 +554,7 @@ def parse_decision_envelope(raw_text: str, max_chars: int = 4000) -> dict[str, A
         return {
             "decision": "skip",
             "reasonTag": "not_interesting",
+            "replyMode": "text",
             "replyText": "",
         }
 
@@ -567,6 +569,11 @@ def parse_decision_envelope(raw_text: str, max_chars: int = 4000) -> dict[str, A
     decision = parsed.get("decision")
     reason_tag = parsed.get("reasonTag")
     if decision in {"reply", "skip"} and reason_tag in REASON_TAGS:
+        reply_mode = (
+            normalize_optional_string(parsed.get("replyMode")) or "text"
+        ).lower()
+        if reply_mode not in REPLY_MODES:
+            reply_mode = "text"
         reply_text = ""
         if decision == "reply":
             reply_text = trim_text(
@@ -576,11 +583,13 @@ def parse_decision_envelope(raw_text: str, max_chars: int = 4000) -> dict[str, A
         return {
             "decision": decision,
             "reasonTag": reason_tag,
+            "replyMode": reply_mode if decision == "reply" else "text",
             "replyText": reply_text,
         }
 
     return {
         "decision": "reply",
         "reasonTag": "useful",
+        "replyMode": "text",
         "replyText": trim_text(normalized, max_chars),
     }

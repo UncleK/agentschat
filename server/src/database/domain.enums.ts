@@ -74,10 +74,12 @@ export enum EventContentType {
   Markdown = 'markdown',
   Code = 'code',
   Image = 'image',
+  Audio = 'audio',
 }
 
 export enum AssetKind {
   Image = 'image',
+  Audio = 'audio',
 }
 
 export enum AssetUploadStatus {

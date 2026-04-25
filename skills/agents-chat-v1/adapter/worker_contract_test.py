@@ -7,6 +7,9 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from behavior_spec import normalize_safety_policy
 from bridge_personality import normalize_personality
@@ -175,6 +178,7 @@ class WorkerContractTest(unittest.TestCase):
                 {
                     "decision": "reply",
                     "reasonTag": "useful",
+                    "replyMode": "text",
                     "replyText": "I can help with that.",
                 }
             ]
@@ -220,6 +224,41 @@ class WorkerContractTest(unittest.TestCase):
         self.assertEqual(action["payload"]["content"], "I can help with that.")
         self.assertEqual(acked_batches, [["del-1"]])
         self.assertEqual(runtime.reply_calls[0]["input_payload"]["surface"], "dm")
+
+    def test_dm_received_can_request_audio_rendering(self) -> None:
+        runtime = FakeRuntimeDriver(
+            [
+                {
+                    "decision": "reply",
+                    "reasonTag": "useful",
+                    "replyMode": "audio",
+                    "replyText": "Let me answer this in Agent Cant.",
+                }
+            ]
+        )
+        delivery = {
+            "deliveryId": "del-audio-1",
+            "event": {
+                "type": "dm.received",
+                "threadId": "dm-audio-1",
+                "actorType": "human",
+                "actorUserId": "usr-human",
+                "actorDisplayName": "Human",
+                "content": "Can you send this as voice?",
+                "occurredAt": "2026-04-22T10:00:00.000Z",
+            },
+        }
+
+        submitted_actions, acked_batches = self.run_batch([delivery], runtime)
+
+        self.assertEqual(len(submitted_actions), 1)
+        action = submitted_actions[0]["action_body"]
+        self.assertEqual(action["type"], "dm.send")
+        self.assertEqual(action["payload"]["contentType"], "audio")
+        self.assertEqual(
+            action["payload"]["content"], "Let me answer this in Agent Cant."
+        )
+        self.assertEqual(acked_batches, [["del-audio-1"]])
 
     def test_forum_second_level_reply_skips_without_runtime_call(self) -> None:
         runtime = FakeRuntimeDriver()
@@ -282,6 +321,7 @@ class WorkerContractTest(unittest.TestCase):
                 {
                     "decision": "reply",
                     "reasonTag": "useful",
+                    "replyMode": "text",
                     "replyText": "Here is a sharper framing.",
                 }
             ]
@@ -333,12 +373,69 @@ class WorkerContractTest(unittest.TestCase):
         self.assertEqual(action["payload"]["parentEventId"], "reply-top")
         self.assertEqual(action["payload"]["content"], "Here is a sharper framing.")
 
+    def test_forum_audio_reply_mode_is_coerced_to_text(self) -> None:
+        runtime = FakeRuntimeDriver(
+            [
+                {
+                    "decision": "reply",
+                    "reasonTag": "useful",
+                    "replyMode": "audio",
+                    "replyText": "This should stay text in forum.",
+                }
+            ]
+        )
+        delivery = {
+            "deliveryId": "del-forum-audio",
+            "event": {
+                "type": "forum.reply.create",
+                "threadId": "topic-audio",
+                "id": "reply-audio",
+                "parentEventId": "root-audio",
+                "actorType": "agent",
+                "actorAgentId": "agent-other",
+                "actorDisplayName": "Other Agent",
+                "content": "Could you answer with audio?",
+                "occurredAt": "2026-04-22T10:00:00.000Z",
+            },
+        }
+        topic = {
+            "topic": {
+                "id": "topic-audio",
+                "rootEventId": "root-audio",
+                "title": "Topic",
+                "authorName": "Alice",
+                "rootBody": "Root body",
+                "replies": [
+                    {
+                        "id": "reply-audio",
+                        "authorType": "agent",
+                        "authorAgentId": "agent-other",
+                        "authorName": "Other Agent",
+                        "body": "Could you answer with audio?",
+                        "children": [],
+                    }
+                ],
+            }
+        }
+
+        submitted_actions, _acked_batches = self.run_batch(
+            [delivery],
+            runtime,
+            read_forum_topic_result=topic,
+        )
+
+        self.assertEqual(len(submitted_actions), 1)
+        action = submitted_actions[0]["action_body"]
+        self.assertEqual(action["type"], "forum.reply.create")
+        self.assertEqual(action["payload"]["contentType"], "text")
+
     def test_live_spectator_reply_creates_action(self) -> None:
         runtime = FakeRuntimeDriver(
             [
                 {
                     "decision": "reply",
                     "reasonTag": "novelty",
+                    "replyMode": "text",
                     "replyText": "That reframes the audience question well.",
                 }
             ]
@@ -389,6 +486,7 @@ class WorkerContractTest(unittest.TestCase):
                 {
                     "decision": "reply",
                     "reasonTag": "useful",
+                    "replyMode": "text",
                     "replyText": "The strongest rebuttal is about incentives.",
                 }
             ]
@@ -498,6 +596,7 @@ class WorkerContractTest(unittest.TestCase):
                 {
                     "decision": "reply",
                     "reasonTag": "useful",
+                    "replyMode": "audio",
                     "replyText": "This should not be used.",
                 }
             ]

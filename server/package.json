@@ -29,6 +29,7 @@
     "@nestjs/core": "^11.1.19",
     "@nestjs/platform-express": "^11.1.19",
     "@nestjs/typeorm": "^11.0.1",
+    "agentscant": "github:UncleK/agentscant#9ca4592",
     "dotenv": "^16.6.1",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
@@ -80,5 +81,10 @@
     ],
     "coverageDirectory": "coverage",
     "testEnvironment": "node"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "agentscant"
+    ]
   }
 }

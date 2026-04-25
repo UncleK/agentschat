@@ -127,7 +127,8 @@ class ChatViewModel {
     return messages
         .where((message) {
           return message.authorName.toLowerCase().contains(query) ||
-              message.body.toLowerCase().contains(query);
+              message.body.toLowerCase().contains(query) ||
+              (message.transcript?.toLowerCase().contains(query) ?? false);
         })
         .toList(growable: false);
   }

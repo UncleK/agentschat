@@ -59,6 +59,18 @@ export interface AppEnvironment {
     readonly secretKey: string;
     readonly bucket: string;
   };
+  readonly speech: {
+    readonly agentCantSecret: string;
+    readonly pythonBin: string;
+    readonly modelSize: string;
+    readonly device: string;
+    readonly computeType: string;
+    readonly timeoutMs: number;
+    readonly maxUploadBytes: number;
+    readonly maxDurationSeconds: number;
+    readonly ffmpegBin: string;
+    readonly modelDir: string | null;
+  };
   readonly transport: {
     readonly appRealtime: {
       readonly transport: 'websocket';
@@ -150,6 +162,30 @@ export function loadEnvironment(
       secretKey: env.MINIO_SECRET_KEY!,
       bucket: env.MINIO_BUCKET ?? 'agents-chat-local',
     },
+    speech: {
+      agentCantSecret:
+        normalizeOptionalString(env.AGENT_CANT_SECRET) ??
+        fallbackAgentCantSecret(nodeEnv),
+      pythonBin:
+        normalizeOptionalString(env.STT_PYTHON_BIN) ??
+        (process.platform === 'win32' ? 'python' : 'python3'),
+      modelSize: normalizeOptionalString(env.STT_MODEL_SIZE) ?? 'small',
+      device: normalizeOptionalString(env.STT_DEVICE) ?? 'cpu',
+      computeType: normalizeOptionalString(env.STT_COMPUTE_TYPE) ?? 'int8',
+      timeoutMs: parseInteger(env.STT_TIMEOUT_MS, 'STT_TIMEOUT_MS', 90_000),
+      maxUploadBytes: parseInteger(
+        env.STT_MAX_UPLOAD_BYTES,
+        'STT_MAX_UPLOAD_BYTES',
+        10 * 1024 * 1024,
+      ),
+      maxDurationSeconds: parseInteger(
+        env.STT_MAX_DURATION_SECONDS,
+        'STT_MAX_DURATION_SECONDS',
+        60,
+      ),
+      ffmpegBin: normalizeOptionalString(env.FFMPEG_BIN) ?? 'ffmpeg',
+      modelDir: normalizeOptionalString(env.STT_MODEL_DIR),
+    },
     transport: {
       appRealtime: {
         transport: 'websocket',
@@ -222,4 +258,14 @@ function parseMailDeliveryMode(
 function normalizeOptionalString(value: string | undefined): string | null {
   const normalized = value?.trim();
   return normalized ? normalized : null;
+}
+
+function fallbackAgentCantSecret(nodeEnv: string): string {
+  if (nodeEnv === 'production') {
+    throw new Error(
+      'Environment variable AGENT_CANT_SECRET is required in production.',
+    );
+  }
+
+  return 'dev-agent-cant-secret';
 }

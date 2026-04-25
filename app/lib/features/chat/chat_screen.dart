@@ -1,10 +1,13 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show PlatformException;
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:record/record.dart';
 
 import '../../core/locale/app_localization_extensions.dart';
 import '../../core/network/api_exception.dart';
@@ -73,13 +76,17 @@ class _ChatScreenState extends State<ChatScreen> {
   late final FocusNode _composerFocusNode;
   late final ScrollController _messageScrollController;
   final ImagePicker _imagePicker = ImagePicker();
+  late final AudioRecorder _audioRecorder;
+  late final AudioPlayer _audioPlayer;
   bool _composerHasDraft = false;
   bool _showCompactThread = false;
   bool _isLoadingMessages = false;
   bool _isSendingMessage = false;
+  bool _isRecordingVoice = false;
   bool _isRefreshingSelectedThread = false;
   bool _forceScrollToBottomOnNextMessageLoad = false;
-  String? _composerImagePath;
+  Uint8List? _composerImageBytes;
+  String? _composerImageName;
   String? _messageLoadError;
   String? _sendMessageError;
   String? _lastShareAnnouncement;
@@ -95,6 +102,14 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _followRequestErrorConversationId;
   String? _followRequestErrorMessage;
   Timer? _threadRefreshTimer;
+  Timer? _voiceRecordingTimer;
+  StreamSubscription<Uint8List>? _voiceRecordingStreamSubscription;
+  BytesBuilder? _voiceRecordingBytesBuilder;
+  Completer<void>? _voiceRecordingDone;
+  Duration _voiceRecordingDuration = Duration.zero;
+  String? _currentAudioMessageId;
+  String? _loadingAudioMessageId;
+  final Set<String> _expandedTranscriptMessageIds = <String>{};
   int _handledConversationRequestId = 0;
   Set<String> _dismissedConversationIds = <String>{};
 
@@ -116,8 +131,23 @@ class _ChatScreenState extends State<ChatScreen> {
     _composerController.addListener(_handleComposerDraftChanged);
     _composerFocusNode = FocusNode();
     _messageScrollController = ScrollController();
+    _audioRecorder = AudioRecorder();
+    _audioPlayer = AudioPlayer();
     _threadRefreshTimer = Timer.periodic(_threadRefreshInterval, (_) {
       unawaited(_refreshSelectedConversationSilently());
+    });
+    _audioPlayer.playerStateStream.listen((state) {
+      if (!mounted) {
+        return;
+      }
+      if (state.processingState == ProcessingState.completed) {
+        unawaited(_audioPlayer.seek(Duration.zero));
+        setState(() {
+          _currentAudioMessageId = null;
+        });
+        return;
+      }
+      setState(() {});
     });
     _syncShellSearchAction();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -187,6 +217,10 @@ class _ChatScreenState extends State<ChatScreen> {
       onSearchActionChanged?.call(null);
     });
     _threadRefreshTimer?.cancel();
+    _voiceRecordingTimer?.cancel();
+    unawaited(_voiceRecordingStreamSubscription?.cancel() ?? Future<void>.value());
+    unawaited(_audioRecorder.dispose());
+    unawaited(_audioPlayer.dispose());
     _conversationSearchController.dispose();
     _conversationSearchFocusNode.dispose();
     _threadSearchController.dispose();
@@ -253,14 +287,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _clearComposerDraft({bool unfocus = false}) {
     _composerController.clear();
-    _composerImagePath = null;
+    _composerImageBytes = null;
+    _composerImageName = null;
+    _updateComposerHasDraft();
     if (unfocus) {
       _composerFocusNode.unfocus();
     }
   }
 
   void _handleComposerDraftChanged() {
-    final hasDraft = _composerController.text.trim().isNotEmpty;
+    final hasDraft =
+        _composerController.text.trim().isNotEmpty || _composerImageBytes != null;
     if (!mounted || hasDraft == _composerHasDraft) {
       return;
     }
@@ -276,6 +313,11 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _sendMessageError = null;
     });
+  }
+
+  void _updateComposerHasDraft() {
+    _composerHasDraft =
+        _composerController.text.trim().isNotEmpty || _composerImageBytes != null;
   }
 
   Future<void> _syncToSession(AppSessionController session) async {
@@ -616,6 +658,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     final shouldForceScroll =
         _viewModel.selectedConversationId != conversation.id;
+    if (shouldForceScroll && _currentAudioMessageId != null) {
+      unawaited(_audioPlayer.stop());
+      _currentAudioMessageId = null;
+    }
     _forceScrollToBottomOnNextMessageLoad = shouldForceScroll;
     setState(() {
       _viewModel = _viewModel.selectConversation(conversation.id);
@@ -1238,10 +1284,20 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _handleComposerSubmit(ChatConversationModel conversation) async {
+    if (_isRecordingVoice) {
+      await _sendThreadVoiceMessage(conversation);
+      return;
+    }
+
+    await _sendThreadMessage(conversation);
+  }
+
   Future<void> _sendThreadMessage(ChatConversationModel conversation) async {
     final draft = _composerController.text.trim();
-    final composerImagePath = _composerImagePath;
-    if ((draft.isEmpty && composerImagePath == null) || _isSendingMessage) {
+    final composerImageBytes = _composerImageBytes;
+    final composerImageName = _composerImageName;
+    if ((draft.isEmpty && composerImageBytes == null) || _isSendingMessage) {
       return;
     }
 
@@ -1268,11 +1324,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
-      final response = composerImagePath != null
+      final response = composerImageBytes != null
           ? await _sendImageThreadMessage(
               conversationId: conversation.id,
               activeAgentId: activeAgentId,
-              imagePath: composerImagePath,
+              imageBytes: composerImageBytes,
+              fileName: composerImageName ?? 'image.jpg',
               caption: draft.isEmpty ? null : draft,
             )
           : await _chatRepository!.sendThreadMessage(
@@ -1358,17 +1415,15 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<ChatThreadMessageResponse> _sendImageThreadMessage({
     required String conversationId,
     required String activeAgentId,
-    required String imagePath,
+    required Uint8List imageBytes,
+    required String fileName,
     required String? caption,
   }) async {
-    final file = File(imagePath);
-    final bytes = await file.readAsBytes();
-    final fileName = imagePath.split(Platform.pathSeparator).last;
     final mimeType = _guessImageMimeType(fileName);
     final asset = await _assetsRepository!.uploadImage(
       fileName: fileName,
       mimeType: mimeType,
-      bytes: bytes,
+      bytes: imageBytes,
     );
     return _chatRepository!.sendThreadMessage(
       threadId: conversationId,
@@ -1377,6 +1432,142 @@ class _ChatScreenState extends State<ChatScreen> {
       assetId: asset.id,
       caption: caption,
     );
+  }
+
+  Future<void> _sendThreadVoiceMessage(ChatConversationModel conversation) async {
+    if (!_isRecordingVoice || _isSendingMessage) {
+      return;
+    }
+
+    final session = AppSessionScope.maybeOf(context);
+    final currentUserId = session?.currentUser?.id;
+    final activeAgentId = session?.currentActiveAgent?.id;
+    if (session == null ||
+        !session.isAuthenticated ||
+        currentUserId == null ||
+        currentUserId.isEmpty ||
+        activeAgentId == null ||
+        activeAgentId.isEmpty ||
+        _chatRepository == null) {
+      return;
+    }
+
+    final requestId = ++_messagesRequestId;
+    var recordingStateCleared = false;
+    if (mounted) {
+      setState(() {
+        _isSendingMessage = true;
+        _sendMessageError = null;
+      });
+    }
+
+    try {
+      await _audioRecorder.stop();
+      await _voiceRecordingDone?.future.timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {},
+      );
+      final pcmBytes =
+          _voiceRecordingBytesBuilder?.takeBytes() ?? Uint8List(0);
+      _resetVoiceRecordingState();
+      recordingStateCleared = true;
+
+      if (pcmBytes.isEmpty) {
+        throw const ApiException(
+          statusCode: 422,
+          message: 'No voice audio was captured.',
+        );
+      }
+
+      final response = await _chatRepository!.sendThreadVoiceMessage(
+        threadId: conversation.id,
+        activeAgentId: activeAgentId,
+        bytes: _buildPcm16Wav(
+          pcmBytes,
+          sampleRate: 16000,
+          channels: 1,
+        ),
+        fileName: 'voice-${DateTime.now().millisecondsSinceEpoch}.wav',
+      );
+      if (!_canApplyMessageResult(
+        requestId: requestId,
+        userId: currentUserId,
+        activeAgentId: activeAgentId,
+        conversationId: conversation.id,
+      )) {
+        return;
+      }
+
+      final message = _mapMessage(
+        response.message,
+        currentUserId: currentUserId,
+        activeAgentId: activeAgentId,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        if (message != null) {
+          _viewModel = _viewModel.appendConversationMessage(
+            conversation.id,
+            message,
+          );
+        }
+        _isSendingMessage = false;
+        _sendMessageError = null;
+      });
+      _scrollMessageListToBottom(animate: true);
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await session.handleUnauthorized();
+        return;
+      }
+      if (!_canApplyMessageResult(
+        requestId: requestId,
+        userId: currentUserId,
+        activeAgentId: activeAgentId,
+        conversationId: conversation.id,
+      )) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSendingMessage = false;
+        _sendMessageError = error.message.trim().isEmpty
+            ? context.localizedText(
+                key: 'msgUnableToSendVoiceMessage',
+                en: 'Unable to send this voice message right now.',
+                zhHans: '暂时无法发送这条语音消息。',
+              )
+            : error.message;
+      });
+    } catch (_) {
+      if (!_canApplyMessageResult(
+        requestId: requestId,
+        userId: currentUserId,
+        activeAgentId: activeAgentId,
+        conversationId: conversation.id,
+      )) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSendingMessage = false;
+        _sendMessageError = context.localizedText(
+          key: 'msgUnableToSendVoiceMessage',
+          en: 'Unable to send this voice message right now.',
+          zhHans: '暂时无法发送这条语音消息。',
+        );
+      });
+    } finally {
+      if (!recordingStateCleared && _isRecordingVoice) {
+        _resetVoiceRecordingState();
+      }
+    }
   }
 
   String _guessImageMimeType(String fileName) {
@@ -1456,14 +1647,112 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _showComposerKeyboard() async {
-    _composerFocusNode.requestFocus();
-    await Future<void>.delayed(const Duration(milliseconds: 40));
-    await SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-  }
-
   Future<void> _openComposerVoiceInput() async {
-    await _showComposerKeyboard();
+    if (_isSendingMessage || _isRecordingVoice) {
+      return;
+    }
+
+    if (_composerController.text.trim().isNotEmpty || _composerImageBytes != null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.localizedText(
+              key: 'msgSendOrClearDraftBeforeVoice',
+              en: 'Send or clear the current draft before recording voice.',
+              zhHans: '请先发送或清除当前草稿，再开始录音。',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.localizedText(
+                key: 'msgMicrophonePermissionRequired',
+                en: 'Microphone permission is required to record voice.',
+                zhHans: '录制语音需要麦克风权限。',
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+
+      await _voiceRecordingStreamSubscription?.cancel();
+      _voiceRecordingBytesBuilder = BytesBuilder(copy: false);
+      _voiceRecordingDone = Completer<void>();
+      final startedAt = DateTime.now();
+      final stream = await _audioRecorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+      );
+      _voiceRecordingStreamSubscription = stream.listen(
+        (chunk) {
+          _voiceRecordingBytesBuilder?.add(chunk);
+        },
+        onDone: () {
+          final done = _voiceRecordingDone;
+          if (done != null && !done.isCompleted) {
+            done.complete();
+          }
+        },
+        onError: (error, stackTrace) {
+          final done = _voiceRecordingDone;
+          if (done != null && !done.isCompleted) {
+            done.completeError(error, stackTrace);
+          }
+        },
+      );
+      _voiceRecordingTimer?.cancel();
+      _voiceRecordingTimer = Timer.periodic(const Duration(milliseconds: 200), (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _voiceRecordingDuration = DateTime.now().difference(startedAt);
+        });
+      });
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRecordingVoice = true;
+        _voiceRecordingDuration = Duration.zero;
+        _sendMessageError = null;
+      });
+    } on PlatformException {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.localizedText(
+              key: 'msgUnableToStartVoiceRecording',
+              en: 'Unable to start voice recording.',
+              zhHans: '暂时无法开始录音。',
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   // ignore: unused_element
@@ -1477,8 +1766,11 @@ class _ChatScreenState extends State<ChatScreen> {
       if (image == null || !mounted) {
         return;
       }
+      final bytes = await image.readAsBytes();
       setState(() {
-        _composerImagePath = image.path;
+        _composerImageBytes = bytes;
+        _composerImageName = image.name.trim().isEmpty ? 'image.jpg' : image.name;
+        _updateComposerHasDraft();
         _sendMessageError = null;
       });
     } on PlatformException {
@@ -1500,12 +1792,70 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _removeComposerImage() {
-    if (_composerImagePath == null) {
+    if (_composerImageBytes == null) {
       return;
     }
     setState(() {
-      _composerImagePath = null;
+      _composerImageBytes = null;
+      _composerImageName = null;
+      _updateComposerHasDraft();
     });
+  }
+
+  Future<void> _cancelVoiceRecording() async {
+    if (!_isRecordingVoice) {
+      return;
+    }
+
+    try {
+      await _audioRecorder.cancel();
+    } finally {
+      _resetVoiceRecordingState();
+    }
+  }
+
+  void _resetVoiceRecordingState() {
+    _voiceRecordingTimer?.cancel();
+    _voiceRecordingTimer = null;
+    unawaited(_voiceRecordingStreamSubscription?.cancel() ?? Future<void>.value());
+    _voiceRecordingStreamSubscription = null;
+    _voiceRecordingBytesBuilder = null;
+    _voiceRecordingDone = null;
+    if (!mounted) {
+      _isRecordingVoice = false;
+      _voiceRecordingDuration = Duration.zero;
+      return;
+    }
+    setState(() {
+      _isRecordingVoice = false;
+      _voiceRecordingDuration = Duration.zero;
+    });
+  }
+
+  Uint8List _buildPcm16Wav(
+    Uint8List pcmBytes, {
+    required int sampleRate,
+    required int channels,
+  }) {
+    const bitsPerSample = 16;
+    final byteRate = sampleRate * channels * bitsPerSample ~/ 8;
+    final blockAlign = channels * bitsPerSample ~/ 8;
+    final header = ByteData(44)
+      ..setUint32(0, 0x52494646, Endian.big)
+      ..setUint32(4, 36 + pcmBytes.length, Endian.little)
+      ..setUint32(8, 0x57415645, Endian.big)
+      ..setUint32(12, 0x666d7420, Endian.big)
+      ..setUint32(16, 16, Endian.little)
+      ..setUint16(20, 1, Endian.little)
+      ..setUint16(22, channels, Endian.little)
+      ..setUint32(24, sampleRate, Endian.little)
+      ..setUint32(28, byteRate, Endian.little)
+      ..setUint16(32, blockAlign, Endian.little)
+      ..setUint16(34, bitsPerSample, Endian.little)
+      ..setUint32(36, 0x64617461, Endian.big)
+      ..setUint32(40, pcmBytes.length, Endian.little);
+
+    return Uint8List.fromList([...header.buffer.asUint8List(), ...pcmBytes]);
   }
 
   void _handleComposerEmojiTap() {
@@ -1767,9 +2117,26 @@ class _ChatScreenState extends State<ChatScreen> {
       timestampLabel: _timeLabel(message.occurredAt),
       side: isLocal ? ChatActorSide.local : ChatActorSide.remote,
       kind: isHuman ? ChatParticipantKind.human : ChatParticipantKind.agent,
-      caption: message.content?.trim(),
-      imageUrl: message.asset?.url,
-      imageAssetId: message.asset?.id,
+      caption: message.contentType.toLowerCase() == 'image'
+          ? message.content?.trim()
+          : null,
+      imageUrl: message.contentType.toLowerCase() == 'image'
+          ? message.asset?.url
+          : null,
+      imageAssetId: message.contentType.toLowerCase() == 'image'
+          ? message.asset?.id
+          : null,
+      transcript: message.contentType.toLowerCase() == 'audio'
+          ? message.content?.trim()
+          : null,
+      audioUrl: message.contentType.toLowerCase() == 'audio'
+          ? message.asset?.url
+          : null,
+      audioAssetId: message.contentType.toLowerCase() == 'audio'
+          ? message.asset?.id
+          : null,
+      audioDurationMs: message.voice?.durationMs,
+      voiceSource: message.voice?.source,
     );
   }
 
@@ -1787,6 +2154,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _messageBody(ChatMessageRecord message) {
+    if (message.contentType.toLowerCase() == 'audio') {
+      return context.localizedText(
+        key: 'msgVoiceMessagePreview',
+        en: 'Voice message',
+        zhHans: '语音消息',
+      );
+    }
+
     final content = message.content?.trim();
     if (content != null && content.isNotEmpty) {
       return content;
@@ -1803,6 +2178,125 @@ class _ChatScreenState extends State<ChatScreen> {
       en: 'Unsupported message',
       zhHans: '暂不支持的消息类型',
     );
+  }
+
+  Future<void> _toggleAudioPlayback(ChatMessageModel message) async {
+    final audioUrl = message.audioUrl?.trim();
+    if (audioUrl == null || audioUrl.isEmpty) {
+      return;
+    }
+
+    if (_currentAudioMessageId == message.id && _audioPlayer.playing) {
+      await _audioPlayer.pause();
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+      return;
+    }
+
+    if (_currentAudioMessageId == message.id && !_audioPlayer.playing) {
+      await _audioPlayer.play();
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _loadingAudioMessageId = message.id;
+      });
+    }
+
+    try {
+      await _audioPlayer.stop();
+      final bytes = await _readAuthenticatedAudioBytes(audioUrl);
+      await _audioPlayer.setAudioSource(
+        _InMemoryAudioSource(bytes, contentType: 'audio/wav'),
+      );
+      await _audioPlayer.play();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _currentAudioMessageId = message.id;
+        _loadingAudioMessageId = null;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loadingAudioMessageId = null;
+        _currentAudioMessageId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loadingAudioMessageId = null;
+        _currentAudioMessageId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.localizedText(
+              key: 'msgUnableToPlayVoiceMessage',
+              en: 'Unable to play this voice message right now.',
+              zhHans: '暂时无法播放这条语音消息。',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<Uint8List> _readAuthenticatedAudioBytes(String url) async {
+    final authToken = AppSessionScope.maybeOf(context)?.apiClient.authToken;
+    final response = await http.get(
+      Uri.parse(url),
+      headers: authToken == null || authToken.isEmpty
+          ? null
+          : <String, String>{'Authorization': 'Bearer $authToken'},
+    );
+    if (response.statusCode >= 400) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.reasonPhrase ?? 'Unable to load audio.',
+      );
+    }
+
+    return response.bodyBytes;
+  }
+
+  void _toggleTranscript(String messageId) {
+    setState(() {
+      if (_expandedTranscriptMessageIds.contains(messageId)) {
+        _expandedTranscriptMessageIds.remove(messageId);
+      } else {
+        _expandedTranscriptMessageIds.add(messageId);
+      }
+    });
+  }
+
+  bool _isTranscriptExpanded(String messageId) {
+    return _expandedTranscriptMessageIds.contains(messageId);
+  }
+
+  String _formatAudioDuration(int? durationMs) {
+    final duration = Duration(milliseconds: durationMs ?? 0);
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    if (duration.inHours > 0) {
+      return '${duration.inHours}:${_twoDigits(minutes)}:${_twoDigits(seconds)}';
+    }
+    return '${_twoDigits(minutes)}:${_twoDigits(seconds)}';
   }
 
   String _displayName(String value, {required String fallback}) {
@@ -2146,8 +2640,15 @@ class _ChatScreenState extends State<ChatScreen> {
                                       shareAnnouncement: _lastShareAnnouncement,
                                       composerController: _composerController,
                                       composerFocusNode: _composerFocusNode,
-                                      composerImagePath: _composerImagePath,
+                                      composerImageBytes: _composerImageBytes,
+                                      composerImageName: _composerImageName,
                                       composerHasDraft: _composerHasDraft,
+                                      isRecordingVoice: _isRecordingVoice,
+                                      voiceRecordingDurationLabel:
+                                          _formatAudioDuration(
+                                            _voiceRecordingDuration
+                                                .inMilliseconds,
+                                          ),
                                       messageScrollController:
                                           _messageScrollController,
                                       threadSearchController:
@@ -2158,9 +2659,10 @@ class _ChatScreenState extends State<ChatScreen> {
                                           _handleThreadSearchChange,
                                       onCloseThreadSearch: _closeThreadSearch,
                                       onComposerChanged: _handleComposerChanged,
-                                      onSubmitMessage: () => _sendThreadMessage(
-                                        selectedConversation,
-                                      ),
+                                      onSubmitMessage: () =>
+                                          _handleComposerSubmit(
+                                            selectedConversation,
+                                          ),
                                       onPickComposerImage: _pickComposerImage,
                                       onRemoveComposerImage:
                                           _removeComposerImage,
@@ -2169,6 +2671,17 @@ class _ChatScreenState extends State<ChatScreen> {
                                           _openComposerVoiceInput,
                                       onInsertComposerEmoji:
                                           _handleComposerEmojiTap,
+                                      onCancelRecording:
+                                          _cancelVoiceRecording,
+                                      onToggleAudioPlayback:
+                                          _toggleAudioPlayback,
+                                      activeAudioMessageId:
+                                          _currentAudioMessageId,
+                                      loadingAudioMessageId:
+                                          _loadingAudioMessageId,
+                                      isTranscriptExpanded:
+                                          _isTranscriptExpanded,
+                                      onToggleTranscript: _toggleTranscript,
                                       onMenuAction: _handleMenuAction,
                                       onQueueFollowRequest: _queueFollowRequest,
                                       isQueueFollowRequestPending:
@@ -2204,31 +2717,48 @@ class _ChatScreenState extends State<ChatScreen> {
                                   isSendingMessage: _isSendingMessage,
                                   messageLoadError: _messageLoadError,
                                   sendMessageError: _sendMessageError,
-                                  shareAnnouncement: _lastShareAnnouncement,
-                                  composerController: _composerController,
-                                  composerFocusNode: _composerFocusNode,
-                                  composerImagePath: _composerImagePath,
-                                  composerHasDraft: _composerHasDraft,
-                                  messageScrollController:
-                                      _messageScrollController,
-                                  threadSearchController:
+                                   shareAnnouncement: _lastShareAnnouncement,
+                                   composerController: _composerController,
+                                   composerFocusNode: _composerFocusNode,
+                                   composerImageBytes: _composerImageBytes,
+                                   composerImageName: _composerImageName,
+                                   composerHasDraft: _composerHasDraft,
+                                   isRecordingVoice: _isRecordingVoice,
+                                   voiceRecordingDurationLabel:
+                                       _formatAudioDuration(
+                                         _voiceRecordingDuration.inMilliseconds,
+                                       ),
+                                   messageScrollController:
+                                       _messageScrollController,
+                                   threadSearchController:
                                       _threadSearchController,
                                   threadSearchFocusNode: _threadSearchFocusNode,
                                   onThreadSearchChange:
                                       _handleThreadSearchChange,
-                                  onCloseThreadSearch: _closeThreadSearch,
-                                  onComposerChanged: _handleComposerChanged,
-                                  onSubmitMessage: () =>
-                                      _sendThreadMessage(selectedConversation),
-                                  onPickComposerImage: _pickComposerImage,
-                                  onRemoveComposerImage: _removeComposerImage,
-                                  onVoiceComposer: _openComposerVoiceInput,
-                                  onOpenImeVoiceInput: _openComposerVoiceInput,
-                                  onInsertComposerEmoji:
-                                      _handleComposerEmojiTap,
-                                  onMenuAction: _handleMenuAction,
-                                  onQueueFollowRequest: _queueFollowRequest,
-                                  isQueueFollowRequestPending:
+                                   onCloseThreadSearch: _closeThreadSearch,
+                                   onComposerChanged: _handleComposerChanged,
+                                   onSubmitMessage: () =>
+                                      _handleComposerSubmit(
+                                        selectedConversation,
+                                      ),
+                                   onPickComposerImage: _pickComposerImage,
+                                   onRemoveComposerImage: _removeComposerImage,
+                                   onVoiceComposer: _openComposerVoiceInput,
+                                   onOpenImeVoiceInput: _openComposerVoiceInput,
+                                   onInsertComposerEmoji:
+                                       _handleComposerEmojiTap,
+                                   onCancelRecording: _cancelVoiceRecording,
+                                   onToggleAudioPlayback:
+                                       _toggleAudioPlayback,
+                                   activeAudioMessageId: _currentAudioMessageId,
+                                   loadingAudioMessageId:
+                                       _loadingAudioMessageId,
+                                   isTranscriptExpanded:
+                                       _isTranscriptExpanded,
+                                   onToggleTranscript: _toggleTranscript,
+                                   onMenuAction: _handleMenuAction,
+                                   onQueueFollowRequest: _queueFollowRequest,
+                                   isQueueFollowRequestPending:
                                       _isFollowRequestPending(
                                         selectedConversation,
                                       ),
@@ -3510,8 +4040,11 @@ class _ThreadPanel extends StatelessWidget {
     required this.shareAnnouncement,
     required this.composerController,
     required this.composerFocusNode,
-    required this.composerImagePath,
+    required this.composerImageBytes,
+    required this.composerImageName,
     required this.composerHasDraft,
+    required this.isRecordingVoice,
+    required this.voiceRecordingDurationLabel,
     required this.messageScrollController,
     required this.threadSearchController,
     required this.threadSearchFocusNode,
@@ -3524,6 +4057,12 @@ class _ThreadPanel extends StatelessWidget {
     required this.onVoiceComposer,
     required this.onOpenImeVoiceInput,
     required this.onInsertComposerEmoji,
+    required this.onCancelRecording,
+    required this.onToggleAudioPlayback,
+    required this.activeAudioMessageId,
+    required this.loadingAudioMessageId,
+    required this.isTranscriptExpanded,
+    required this.onToggleTranscript,
     required this.onMenuAction,
     required this.onQueueFollowRequest,
     required this.isQueueFollowRequestPending,
@@ -3542,8 +4081,11 @@ class _ThreadPanel extends StatelessWidget {
   final String? shareAnnouncement;
   final TextEditingController composerController;
   final FocusNode composerFocusNode;
-  final String? composerImagePath;
+  final Uint8List? composerImageBytes;
+  final String? composerImageName;
   final bool composerHasDraft;
+  final bool isRecordingVoice;
+  final String voiceRecordingDurationLabel;
   final ScrollController messageScrollController;
   final TextEditingController threadSearchController;
   final FocusNode threadSearchFocusNode;
@@ -3556,6 +4098,12 @@ class _ThreadPanel extends StatelessWidget {
   final VoidCallback onVoiceComposer;
   final VoidCallback onOpenImeVoiceInput;
   final VoidCallback onInsertComposerEmoji;
+  final VoidCallback onCancelRecording;
+  final ValueChanged<ChatMessageModel> onToggleAudioPlayback;
+  final String? activeAudioMessageId;
+  final String? loadingAudioMessageId;
+  final bool Function(String messageId) isTranscriptExpanded;
+  final ValueChanged<String> onToggleTranscript;
   final ValueChanged<ChatThreadMenuAction> onMenuAction;
   final ValueChanged<ChatConversationModel> onQueueFollowRequest;
   final bool isQueueFollowRequestPending;
@@ -3829,6 +4377,11 @@ class _ThreadPanel extends StatelessWidget {
                         conversation: conversation,
                         messages: viewModel.visibleMessages,
                         scrollController: messageScrollController,
+                        activeAudioMessageId: activeAudioMessageId,
+                        loadingAudioMessageId: loadingAudioMessageId,
+                        isTranscriptExpanded: isTranscriptExpanded,
+                        onToggleAudioPlayback: onToggleAudioPlayback,
+                        onToggleTranscript: onToggleTranscript,
                         emptyLabel:
                             viewModel.isThreadSearchOpen &&
                                 viewModel.threadSearchQuery.trim().isNotEmpty
@@ -3861,9 +4414,12 @@ class _ThreadPanel extends StatelessWidget {
             _ThreadComposer(
               controller: composerController,
               focusNode: composerFocusNode,
-              selectedImagePath: composerImagePath,
+              selectedImageBytes: composerImageBytes,
+              selectedImageName: composerImageName,
               hasDraft: composerHasDraft,
               isSending: isSendingMessage,
+              isRecordingVoice: isRecordingVoice,
+              voiceRecordingDurationLabel: voiceRecordingDurationLabel,
               errorMessage: sendMessageError,
               onChanged: onComposerChanged,
               onSubmitted: onSubmitMessage,
@@ -3872,6 +4428,7 @@ class _ThreadPanel extends StatelessWidget {
               onVoiceTap: onVoiceComposer,
               onImeVoiceTap: onOpenImeVoiceInput,
               onEmojiTap: onInsertComposerEmoji,
+              onCancelRecording: onCancelRecording,
             ),
           ],
         ],
@@ -4178,6 +4735,11 @@ class _OpenThreadView extends StatelessWidget {
     required this.conversation,
     required this.messages,
     required this.scrollController,
+    required this.activeAudioMessageId,
+    required this.loadingAudioMessageId,
+    required this.isTranscriptExpanded,
+    required this.onToggleAudioPlayback,
+    required this.onToggleTranscript,
     required this.emptyLabel,
   });
 
@@ -4185,6 +4747,11 @@ class _OpenThreadView extends StatelessWidget {
   final ChatConversationModel conversation;
   final List<ChatMessageModel> messages;
   final ScrollController scrollController;
+  final String? activeAudioMessageId;
+  final String? loadingAudioMessageId;
+  final bool Function(String messageId) isTranscriptExpanded;
+  final ValueChanged<ChatMessageModel> onToggleAudioPlayback;
+  final ValueChanged<String> onToggleTranscript;
   final String emptyLabel;
 
   @override
@@ -4213,7 +4780,21 @@ class _OpenThreadView extends StatelessWidget {
                             index < messages.length;
                             index++
                           ) ...[
-                            _MessageBubble(message: messages[index]),
+                            _MessageBubble(
+                              message: messages[index],
+                              isAudioActive:
+                                  activeAudioMessageId == messages[index].id &&
+                                  loadingAudioMessageId != messages[index].id,
+                              isAudioLoading:
+                                  loadingAudioMessageId == messages[index].id,
+                              isTranscriptExpanded: isTranscriptExpanded(
+                                messages[index].id,
+                              ),
+                              onToggleAudioPlayback:
+                                  () => onToggleAudioPlayback(messages[index]),
+                              onToggleTranscript:
+                                  () => onToggleTranscript(messages[index].id),
+                            ),
                             if (index != messages.length - 1)
                               const SizedBox(height: AppSpacing.sm),
                           ],
@@ -4308,9 +4889,12 @@ class _ThreadComposer extends StatelessWidget {
   const _ThreadComposer({
     required this.controller,
     required this.focusNode,
-    required this.selectedImagePath,
+    required this.selectedImageBytes,
+    required this.selectedImageName,
     required this.hasDraft,
     required this.isSending,
+    required this.isRecordingVoice,
+    required this.voiceRecordingDurationLabel,
     required this.errorMessage,
     required this.onChanged,
     required this.onSubmitted,
@@ -4319,13 +4903,17 @@ class _ThreadComposer extends StatelessWidget {
     required this.onVoiceTap,
     required this.onImeVoiceTap,
     required this.onEmojiTap,
+    required this.onCancelRecording,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
-  final String? selectedImagePath;
+  final Uint8List? selectedImageBytes;
+  final String? selectedImageName;
   final bool hasDraft;
   final bool isSending;
+  final bool isRecordingVoice;
+  final String voiceRecordingDurationLabel;
   final String? errorMessage;
   final ValueChanged<String> onChanged;
   final VoidCallback onSubmitted;
@@ -4334,10 +4922,13 @@ class _ThreadComposer extends StatelessWidget {
   final VoidCallback onVoiceTap;
   final VoidCallback onImeVoiceTap;
   final VoidCallback onEmojiTap;
+  final VoidCallback onCancelRecording;
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = selectedImagePath != null && selectedImagePath!.isNotEmpty;
+    final hasImage =
+        selectedImageBytes != null && (selectedImageBytes?.isNotEmpty ?? false);
+    final canSendDraft = hasDraft && !isSending;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -4371,8 +4962,8 @@ class _ThreadComposer extends StatelessWidget {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.file(
-                        File(selectedImagePath!),
+                      child: Image.memory(
+                        selectedImageBytes!,
                         width: 44,
                         height: 44,
                         fit: BoxFit.cover,
@@ -4409,9 +5000,7 @@ class _ThreadComposer extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            selectedImagePath!
-                                .split(Platform.pathSeparator)
-                                .last,
+                            selectedImageName ?? 'image.jpg',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
@@ -4431,86 +5020,102 @@ class _ThreadComposer extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
             ],
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _ComposerActionButton(
-                  buttonKey: const Key('chat-composer-voice-button'),
-                  icon: Icons.volume_up_rounded,
-                  accentColor: AppColors.tertiary,
-                  onTap: onVoiceTap,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceHighest.withValues(alpha: 0.34),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.outline.withValues(alpha: 0.14),
-                      ),
-                    ),
-                    child: TextField(
-                      key: const Key('chat-composer-input'),
-                      controller: controller,
-                      focusNode: focusNode,
-                      enabled: !isSending,
-                      onChanged: onChanged,
-                      maxLines: 1,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => onSubmitted(),
-                      decoration: InputDecoration(
-                        hintText: null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: 14,
+            if (isRecordingVoice)
+              _RecordingComposerRow(
+                durationLabel: voiceRecordingDurationLabel,
+                isSending: isSending,
+                onCancel: onCancelRecording,
+                onSend: onSubmitted,
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _ComposerActionButton(
+                    buttonKey: const Key('chat-composer-voice-button'),
+                    icon: Icons.mic_rounded,
+                    accentColor: AppColors.tertiary,
+                    onTap: isSending ? () {} : onVoiceTap,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceHighest.withValues(alpha: 0.34),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.outline.withValues(alpha: 0.14),
                         ),
-                        suffixIcon: IconButton(
-                          key: const Key('chat-composer-ime-mic-button'),
-                          onPressed: onImeVoiceTap,
-                          icon: const Icon(Icons.keyboard_voice_rounded),
-                          color: AppColors.onSurfaceMuted,
-                          tooltip: context.localizedText(
-                            key: 'msgVoiceInputc0b2cee0',
-                            en: 'Voice input',
-                            zhHans: '语音输入',
+                      ),
+                      child: TextField(
+                        key: const Key('chat-composer-input'),
+                        controller: controller,
+                        focusNode: focusNode,
+                        enabled: !isSending,
+                        onChanged: onChanged,
+                        maxLines: 1,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => onSubmitted(),
+                        decoration: InputDecoration(
+                          hintText: context.localizedText(
+                            key: 'msgComposeDirectMessage',
+                            en: 'Type a message',
+                            zhHans: '输入消息',
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: 14,
+                          ),
+                          suffixIcon: IconButton(
+                            key: const Key('chat-composer-ime-mic-button'),
+                            onPressed: isSending ? null : onImeVoiceTap,
+                            icon: const Icon(Icons.keyboard_voice_rounded),
+                            color: AppColors.onSurfaceMuted,
+                            tooltip: context.localizedText(
+                              key: 'msgVoiceInputc0b2cee0',
+                              en: 'Voice input',
+                              zhHans: '语音输入',
+                            ),
                           ),
                         ),
-                      ),
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontSize: 15,
-                        height: 1.3,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontSize: 15,
+                          height: 1.3,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                _ComposerActionButton(
-                  buttonKey: const Key('chat-composer-emoji-button'),
-                  icon: Icons.sentiment_satisfied_alt_rounded,
-                  accentColor: AppColors.onSurfaceMuted,
-                  onTap: onEmojiTap,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                _ComposerActionButton(
-                  key: ValueKey<String>(
-                    hasDraft ? 'composer-send' : 'composer-plus',
+                  const SizedBox(width: AppSpacing.sm),
+                  _ComposerActionButton(
+                    buttonKey: const Key('chat-composer-emoji-button'),
+                    icon: Icons.sentiment_satisfied_alt_rounded,
+                    accentColor: AppColors.onSurfaceMuted,
+                    onTap: isSending ? () {} : onEmojiTap,
                   ),
-                  buttonKey: Key(
-                    hasDraft
-                        ? 'chat-composer-send-button'
-                        : 'chat-composer-plus-button',
+                  const SizedBox(width: AppSpacing.xs),
+                  _ComposerActionButton(
+                    key: ValueKey<String>(
+                      canSendDraft ? 'composer-send' : 'composer-plus',
+                    ),
+                    buttonKey: Key(
+                      canSendDraft
+                          ? 'chat-composer-send-button'
+                          : 'chat-composer-plus-button',
+                    ),
+                    icon: canSendDraft
+                        ? Icons.send_rounded
+                        : Icons.add_photo_alternate_rounded,
+                    accentColor: AppColors.primary,
+                    fillColor: AppColors.primary.withValues(
+                      alpha: canSendDraft ? 0.18 : 0.12,
+                    ),
+                    onTap: isSending
+                        ? () {}
+                        : (canSendDraft ? onSubmitted : onPickImage),
                   ),
-                  icon: hasDraft ? Icons.send_rounded : Icons.add_rounded,
-                  accentColor: AppColors.primary,
-                  fillColor: AppColors.primary.withValues(
-                    alpha: hasDraft ? 0.18 : 0.12,
-                  ),
-                  onTap: hasDraft ? onSubmitted : onPickImage,
-                ),
-              ],
-            ),
+                ],
+              ),
             if (errorMessage != null) ...[
               const SizedBox(height: AppSpacing.xs),
               Align(
@@ -4529,6 +5134,424 @@ class _ThreadComposer extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RecordingComposerRow extends StatelessWidget {
+  const _RecordingComposerRow({
+    required this.durationLabel,
+    required this.isSending,
+    required this.onCancel,
+    required this.onSend,
+  });
+
+  final String durationLabel;
+  final bool isSending;
+  final VoidCallback onCancel;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    const waveformHeights = <double>[8, 14, 18, 12, 20, 10, 16, 12, 18, 9];
+
+    return Container(
+      key: const Key('chat-composer-recording-row'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.tertiary.withValues(alpha: 0.18),
+            AppColors.primary.withValues(alpha: 0.12),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.tertiary.withValues(alpha: 0.16),
+              borderRadius: AppRadii.pill,
+            ),
+            child: const Icon(
+              Icons.mic_rounded,
+              color: AppColors.tertiarySoft,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.localizedText(
+                    key: 'msgRecordingVoiceNow',
+                    en: 'Recording voice',
+                    zhHans: '正在录音',
+                  ),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppColors.tertiarySoft,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.warning,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      durationLabel,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Row(
+                        children: waveformHeights
+                            .map(
+                              (height) => Expanded(
+                                child: Align(
+                                  alignment: Alignment.center,
+                                  child: Container(
+                                    width: 3,
+                                    height: height,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 1.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: height >= 16
+                                          ? AppColors.primaryFixed
+                                          : AppColors.tertiarySoft,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          _ComposerActionButton(
+            buttonKey: const Key('chat-composer-cancel-recording-button'),
+            icon: Icons.close_rounded,
+            accentColor: AppColors.onSurfaceMuted,
+            onTap: isSending ? () {} : onCancel,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          _ComposerActionButton(
+            buttonKey: const Key('chat-composer-send-recording-button'),
+            icon: isSending ? Icons.hourglass_top_rounded : Icons.send_rounded,
+            accentColor: AppColors.primary,
+            fillColor: AppColors.primary.withValues(alpha: 0.16),
+            onTap: isSending ? () {} : onSend,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AgentCantAudioCard extends StatelessWidget {
+  const _AgentCantAudioCard({
+    required this.message,
+    required this.accentColor,
+    required this.isPlaying,
+    required this.isLoading,
+    required this.isTranscriptExpanded,
+    required this.onTogglePlayback,
+    required this.onToggleTranscript,
+  });
+
+  final ChatMessageModel message;
+  final Color accentColor;
+  final bool isPlaying;
+  final bool isLoading;
+  final bool isTranscriptExpanded;
+  final VoidCallback onTogglePlayback;
+  final VoidCallback onToggleTranscript;
+
+  @override
+  Widget build(BuildContext context) {
+    final transcript = message.transcript?.trim();
+    final hasTranscript = transcript != null && transcript.isNotEmpty;
+    final sourceLabel = switch (message.voiceSource) {
+      'human_stt' => context.localizedText(
+        key: 'msgHumanVoiceRenderedAsCant',
+        en: 'Human voice -> Agent Cant',
+        zhHans: '人声已转为 Agent Cant',
+      ),
+      'agent_text' => context.localizedText(
+        key: 'msgAgentReplyRenderedAsCant',
+        en: 'Agent reply rendered as Agent Cant',
+        zhHans: 'Agent 回复已转为 Cant',
+      ),
+      _ => 'Agent Cant',
+    };
+
+    return Container(
+      key: Key('agent-cant-audio-${message.id}'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accentColor.withValues(alpha: 0.2),
+            AppColors.primary.withValues(alpha: 0.18),
+            AppColors.surfaceHighest.withValues(alpha: 0.85),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accentColor.withValues(alpha: 0.24)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [accentColor, AppColors.primary],
+                  ),
+                  borderRadius: AppRadii.pill,
+                  boxShadow: [
+                    BoxShadow(
+                      color: accentColor.withValues(alpha: 0.3),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  key: Key('chat-audio-play-${message.id}'),
+                  onPressed: isLoading ? null : onTogglePlayback,
+                  icon: isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                        ),
+                  color: AppColors.background,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 44,
+                    height: 44,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          'Agent Cant',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: AppColors.onSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: accentColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: accentColor.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.graphic_eq_rounded,
+                                  size: 12,
+                                  color: accentColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'CANT',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: accentColor,
+                                        letterSpacing: 0.6,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      sourceLabel,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.onSurfaceMuted.withValues(alpha: 0.92),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                _formatDurationLabel(message.audioDurationMs),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.primaryFixed,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: _cantWaveformBars(message.id)
+                .map(
+                  (height) => Expanded(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 4,
+                        height: height,
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        decoration: BoxDecoration(
+                          color: isPlaying
+                              ? accentColor
+                              : AppColors.primaryFixed.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+          if (hasTranscript) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: Key('chat-audio-transcript-toggle-${message.id}'),
+                onPressed: onToggleTranscript,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 0,
+                    vertical: 4,
+                  ),
+                  foregroundColor: accentColor,
+                ),
+                icon: Icon(
+                  isTranscriptExpanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                ),
+                label: Text(
+                  isTranscriptExpanded
+                      ? context.localizedText(
+                          key: 'msgHideTranscript',
+                          en: 'Hide transcript',
+                          zhHans: '隐藏原文',
+                        )
+                      : context.localizedText(
+                          key: 'msgViewTranscript',
+                          en: 'View transcript',
+                          zhHans: '查看原文',
+                        ),
+                ),
+              ),
+            ),
+            if (isTranscriptExpanded)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundFloor.withValues(alpha: 0.38),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.outline.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: _InlineAgentmojiText(
+                  text: transcript,
+                  selectable: true,
+                  keyPrefix: 'cant-transcript-${message.id}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.onSurface,
+                    height: 1.42,
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+List<double> _cantWaveformBars(String seed) {
+  final values = <double>[];
+  var hash = 17;
+  for (final codeUnit in seed.codeUnits) {
+    hash = 37 * hash + codeUnit;
+  }
+  for (var index = 0; index < 12; index += 1) {
+    final next = ((hash >> (index % 8)) & 0x1F) + index;
+    values.add(8 + (next % 18).toDouble());
+  }
+  return values;
+}
+
+String _formatDurationLabel(int? durationMs) {
+  final duration = Duration(milliseconds: durationMs ?? 0);
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
+  if (duration.inHours > 0) {
+    return '${duration.inHours}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 class _InlineAgentmojiText extends StatelessWidget {
@@ -4707,6 +5730,32 @@ class _ComposerActionButton extends StatelessWidget {
         iconSize: 22,
         constraints: const BoxConstraints.tightFor(width: 46, height: 46),
       ),
+    );
+  }
+}
+
+// ignore: experimental_member_use
+class _InMemoryAudioSource extends StreamAudioSource {
+  _InMemoryAudioSource(this.bytes, {required this.contentType});
+
+  final Uint8List bytes;
+  final String contentType;
+
+  @override
+  // ignore: experimental_member_use
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    final safeStart = math.max(0, start ?? 0);
+    final safeEnd = math.min(end ?? bytes.length, bytes.length);
+    final clampedStart = math.min(safeStart, safeEnd);
+    final chunk = bytes.sublist(clampedStart, safeEnd);
+
+    // ignore: experimental_member_use
+    return StreamAudioResponse(
+      sourceLength: bytes.length,
+      contentLength: chunk.length,
+      offset: clampedStart,
+      contentType: contentType,
+      stream: Stream<List<int>>.value(chunk),
     );
   }
 }
@@ -5182,9 +6231,21 @@ class _UnavailableThreadView extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.message,
+    required this.isAudioActive,
+    required this.isAudioLoading,
+    required this.isTranscriptExpanded,
+    required this.onToggleAudioPlayback,
+    required this.onToggleTranscript,
+  });
 
   final ChatMessageModel message;
+  final bool isAudioActive;
+  final bool isAudioLoading;
+  final bool isTranscriptExpanded;
+  final VoidCallback onToggleAudioPlayback;
+  final VoidCallback onToggleTranscript;
 
   @override
   Widget build(BuildContext context) {
@@ -5212,6 +6273,11 @@ class _MessageBubble extends StatelessWidget {
         accentColor: accentColor,
         bubbleColor: bubbleColor,
         bubbleRadius: bubbleRadius,
+        isAudioActive: isAudioActive,
+        isAudioLoading: isAudioLoading,
+        isTranscriptExpanded: isTranscriptExpanded,
+        onToggleAudioPlayback: onToggleAudioPlayback,
+        onToggleTranscript: onToggleTranscript,
       ),
     );
     final bubble = isAgent
@@ -5353,12 +6419,22 @@ class _MessageBubbleBody extends StatelessWidget {
     required this.accentColor,
     required this.bubbleColor,
     required this.bubbleRadius,
+    required this.isAudioActive,
+    required this.isAudioLoading,
+    required this.isTranscriptExpanded,
+    required this.onToggleAudioPlayback,
+    required this.onToggleTranscript,
   });
 
   final ChatMessageModel message;
   final Color accentColor;
   final Color bubbleColor;
   final BorderRadius bubbleRadius;
+  final bool isAudioActive;
+  final bool isAudioLoading;
+  final bool isTranscriptExpanded;
+  final VoidCallback onToggleAudioPlayback;
+  final VoidCallback onToggleTranscript;
 
   @override
   Widget build(BuildContext context) {
@@ -5368,6 +6444,8 @@ class _MessageBubbleBody extends StatelessWidget {
     final hasCaption = caption != null && caption.isNotEmpty;
     final showImage =
         message.isImage && (message.imageUrl?.trim().isNotEmpty ?? false);
+    final showAudio =
+        message.isAudio && (message.audioUrl?.trim().isNotEmpty ?? false);
     final authToken = AppSessionScope.maybeOf(context)?.apiClient.authToken;
     final imageHeaders = authToken == null || authToken.isEmpty
         ? null
@@ -5451,7 +6529,17 @@ class _MessageBubbleBody extends StatelessWidget {
                       ),
                       if (hasCaption) const SizedBox(height: 8),
                     ],
-                    if (!showImage || hasCaption)
+                    if (showAudio) ...[
+                      _AgentCantAudioCard(
+                        message: message,
+                        accentColor: accentColor,
+                        isPlaying: isAudioActive,
+                        isLoading: isAudioLoading,
+                        isTranscriptExpanded: isTranscriptExpanded,
+                        onTogglePlayback: onToggleAudioPlayback,
+                        onToggleTranscript: onToggleTranscript,
+                      ),
+                    ] else if (!showImage || hasCaption)
                       SizedBox(
                         width: double.infinity,
                         child: _InlineAgentmojiText(

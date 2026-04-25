@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,9 +16,13 @@ import 'package:agents_chat_app/core/theme/app_theme.dart';
 import 'package:agents_chat_app/features/chat/chat_screen.dart';
 import 'package:agents_chat_app/features/chat/chat_view_model.dart';
 
+import '../../test_support/audio_plugin_fakes.dart';
 import '../../test_support/session_fakes.dart';
 
 void main() {
+  setUpAll(installAudioPluginMocks);
+  tearDownAll(removeAudioPluginMocks);
+
   group('ChatViewModel', () {
     test('thread search only filters messages in the active conversation', () {
       final viewModel = ChatViewModel.signedInSample();
@@ -348,6 +353,117 @@ void main() {
       expect(repository.readRequests, [
         const _ReadRequest(threadId: 'thread-1', activeAgentId: 'agt-owned-1'),
       ]);
+    });
+
+    testWidgets('audio messages keep transcript collapsed until requested', (
+      WidgetTester tester,
+    ) async {
+      await authenticateWithMine(
+        mineResponse(
+          agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+        ),
+      );
+      final repository = _FakeChatRepository()
+        ..enqueueThreads((activeAgentId) async {
+          return ChatThreadsResponse(
+            activeAgentId: activeAgentId,
+            threads: const [
+              ChatThreadSummary(
+                threadId: 'thread-audio',
+                counterpart: ChatThreadCounterpart(
+                  type: 'agent',
+                  id: 'agt-remote-audio',
+                  displayName: 'Cant Singer',
+                  handle: 'cant-singer',
+                  avatarUrl: null,
+                  isOnline: true,
+                  viewerFollowsAgent: true,
+                  agentFollowsViewer: true,
+                ),
+                lastMessage: ChatThreadLastMessage(
+                  eventId: 'evt-audio-last',
+                  contentType: 'audio',
+                  preview: 'Voice message',
+                  occurredAt: '2026-04-25T12:00:00.000Z',
+                ),
+                unreadCount: 1,
+              ),
+            ],
+            nextCursor: null,
+          );
+        })
+        ..enqueueMessages(({required threadId, required activeAgentId}) async {
+          return const ChatMessagesResponse(
+            threadId: 'thread-audio',
+            activeAgentId: 'agt-owned-1',
+            messages: [
+              ChatMessageRecord(
+                eventId: 'evt-audio-1',
+                actor: ChatMessageActor(
+                  type: 'agent',
+                  id: 'agt-remote-audio',
+                  displayName: 'Cant Singer',
+                ),
+                contentType: 'audio',
+                content: 'Canonical transcript for the audio reply.',
+                asset: ChatMessageAsset(
+                  id: 'asset-audio-1',
+                  kind: 'audio',
+                  mimeType: 'audio/wav',
+                  byteSize: 2048,
+                  storageBucket: 'agents-chat-local',
+                  storageKey: 'audio/generated/evt-audio-1.wav',
+                  url: 'http://localhost/audio/generated/evt-audio-1.wav',
+                ),
+                metadata: {
+                  'voice': {
+                    'codec': 'agentscant',
+                    'payloadMode': 'lookup',
+                    'source': 'agent_text',
+                    'durationMs': 2310,
+                    'transcriptLanguage': 'en',
+                  },
+                },
+                occurredAt: '2026-04-25T12:00:00.000Z',
+              ),
+            ],
+            nextCursor: null,
+          );
+        })
+        ..enqueueMarkRead(({required threadId, required activeAgentId}) async {
+          return ChatReadResponse(threadId: threadId, unreadCount: 0);
+        });
+
+      await pumpChat(tester, chatRepository: repository);
+
+      final cardFinder = find.byKey(const Key('conversation-card-thread-audio'));
+      expect(cardFinder, findsOneWidget);
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Voice message')),
+        findsOneWidget,
+      );
+
+      await tester.tap(cardFinder);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('agent-cant-audio-evt-audio-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Canonical transcript for the audio reply.'),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('chat-audio-transcript-toggle-evt-audio-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Canonical transcript for the audio reply.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('owned-agent command threads stay out of the DM rail', (
@@ -1248,11 +1364,31 @@ class _FakeChatRepository extends ChatRepository {
           required String? contentType,
         })
       >();
+  final Queue<
+    Future<ChatThreadMessageResponse> Function({
+      required String threadId,
+      required String activeAgentId,
+      required Uint8List bytes,
+      required String fileName,
+      required String mimeType,
+    })
+  >
+  _voiceSendHandlers =
+      Queue<
+        Future<ChatThreadMessageResponse> Function({
+          required String threadId,
+          required String activeAgentId,
+          required Uint8List bytes,
+          required String fileName,
+          required String mimeType,
+        })
+      >();
 
   final List<String> threadRequests = <String>[];
   final List<_MessageRequest> messageRequests = <_MessageRequest>[];
   final List<_ReadRequest> readRequests = <_ReadRequest>[];
   final List<_SendRequest> sendRequests = <_SendRequest>[];
+  final List<_VoiceSendRequest> voiceSendRequests = <_VoiceSendRequest>[];
 
   void enqueueThreads(Future<ChatThreadsResponse> Function(String) handler) {
     _threadHandlers.add(handler);
@@ -1288,6 +1424,19 @@ class _FakeChatRepository extends ChatRepository {
     handler,
   ) {
     _sendHandlers.add(handler);
+  }
+
+  void enqueueVoiceSend(
+    Future<ChatThreadMessageResponse> Function({
+      required String threadId,
+      required String activeAgentId,
+      required Uint8List bytes,
+      required String fileName,
+      required String mimeType,
+    })
+    handler,
+  ) {
+    _voiceSendHandlers.add(handler);
   }
 
   @override
@@ -1337,6 +1486,8 @@ class _FakeChatRepository extends ChatRepository {
     required String activeAgentId,
     String? content,
     String? contentType,
+    String? caption,
+    String? assetId,
     Map<String, dynamic>? metadata,
   }) {
     sendRequests.add(
@@ -1352,6 +1503,34 @@ class _FakeChatRepository extends ChatRepository {
       activeAgentId: activeAgentId,
       content: content,
       contentType: contentType,
+    );
+  }
+
+  @override
+  Future<ChatThreadMessageResponse> sendThreadVoiceMessage({
+    required String threadId,
+    required String activeAgentId,
+    required Uint8List bytes,
+    required String fileName,
+    String mimeType = 'audio/wav',
+  }) {
+    voiceSendRequests.add(
+      _VoiceSendRequest(
+        threadId: threadId,
+        activeAgentId: activeAgentId,
+        fileName: fileName,
+        byteLength: bytes.length,
+      ),
+    );
+    if (_voiceSendHandlers.isEmpty) {
+      throw StateError('No voice send handler queued.');
+    }
+    return _voiceSendHandlers.removeFirst()(
+      threadId: threadId,
+      activeAgentId: activeAgentId,
+      bytes: bytes,
+      fileName: fileName,
+      mimeType: mimeType,
     );
   }
 }
@@ -1415,6 +1594,33 @@ class _SendRequest {
   @override
   int get hashCode =>
       Object.hash(threadId, activeAgentId, content, contentType);
+}
+
+class _VoiceSendRequest {
+  const _VoiceSendRequest({
+    required this.threadId,
+    required this.activeAgentId,
+    required this.fileName,
+    required this.byteLength,
+  });
+
+  final String threadId;
+  final String activeAgentId;
+  final String fileName;
+  final int byteLength;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _VoiceSendRequest &&
+        other.threadId == threadId &&
+        other.activeAgentId == activeAgentId &&
+        other.fileName == fileName &&
+        other.byteLength == byteLength;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(threadId, activeAgentId, fileName, byteLength);
 }
 
 class _FakeFollowRepository extends FollowRepository {

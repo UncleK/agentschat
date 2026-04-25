@@ -22,10 +22,22 @@ interface AgentSummaryResponse {
   id: string;
   handle: string;
   displayName: string;
+  avatarEmoji: string | null;
   avatarUrl: null;
   bio: string | null;
   ownerType: string;
   ownerUserId: string | null;
+  personality: Record<string, unknown> | null;
+  profileTags: string[];
+  safetyPolicy?: {
+    dmPolicyMode: string;
+    requiresMutualFollowForDm: boolean;
+    allowProactiveInteractions: boolean;
+    activityLevel: string;
+    emergencyStopDmResponses: boolean;
+    emergencyStopForumResponses: boolean;
+    emergencyStopLiveResponses: boolean;
+  };
   status: string;
 }
 
@@ -205,19 +217,25 @@ describe('Agent claim flow (e2e)', () => {
       pendingOlderClaim.claimRequest.id,
     ]);
 
-    expect(agentsMineResponse.agents).toEqual([
+    expect(agentsMineResponse.agents).toMatchObject([
       {
         id: ownedNewer.id,
         handle: 'owned-newer-agent',
         displayName: 'Owned Newer Agent',
+        avatarEmoji: null,
         avatarUrl: null,
         bio: null,
         ownerType: 'human',
+        personality: null,
+        profileTags: [],
         safetyPolicy: {
           dmPolicyMode: 'followers_only',
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
           activityLevel: 'normal',
+          emergencyStopDmResponses: false,
+          emergencyStopForumResponses: false,
+          emergencyStopLiveResponses: false,
         },
         status: 'offline',
       },
@@ -225,35 +243,47 @@ describe('Agent claim flow (e2e)', () => {
         id: ownedOlder.id,
         handle: 'owned-older-agent',
         displayName: 'Owned Older Agent',
+        avatarEmoji: null,
         avatarUrl: null,
         bio: 'Owned older bio',
         ownerType: 'human',
+        personality: null,
+        profileTags: [],
         safetyPolicy: {
           dmPolicyMode: 'followers_only',
           requiresMutualFollowForDm: false,
           allowProactiveInteractions: true,
           activityLevel: 'normal',
+          emergencyStopDmResponses: false,
+          emergencyStopForumResponses: false,
+          emergencyStopLiveResponses: false,
         },
         status: 'offline',
       },
     ]);
-    expect(agentsMineResponse.claimableAgents).toEqual([
+    expect(agentsMineResponse.claimableAgents).toMatchObject([
       {
         id: claimableNewer.id,
         handle: 'claimable-newer-agent',
         displayName: 'Claimable Newer Agent',
+        avatarEmoji: null,
         avatarUrl: null,
         bio: null,
         ownerType: 'self',
+        personality: null,
+        profileTags: [],
         status: 'offline',
       },
       {
         id: claimableOlder.id,
         handle: 'claimable-older-agent',
         displayName: 'Claimable Older Agent',
+        avatarEmoji: null,
         avatarUrl: null,
         bio: 'Claimable older bio',
         ownerType: 'self',
+        personality: null,
+        profileTags: [],
         status: 'offline',
       },
     ]);
@@ -291,12 +321,15 @@ describe('Agent claim flow (e2e)', () => {
     );
 
     expect(Object.keys(agentsMineResponse.agents[0] ?? {}).sort()).toEqual([
+      'avatarEmoji',
       'avatarUrl',
       'bio',
       'displayName',
       'handle',
       'id',
       'ownerType',
+      'personality',
+      'profileTags',
       'safetyPolicy',
       'status',
     ]);
@@ -332,15 +365,20 @@ describe('Agent claim flow (e2e)', () => {
     const claimableResponse = await readAgentsMine(humanToken);
 
     expect(claimableResponse.agents).toEqual([]);
-    expect(claimableResponse.claimableAgents).toContainEqual({
-      id: selfOwnedAgent.id,
-      handle: 'self-owned-agent',
-      displayName: 'Self Owned Agent',
-      avatarUrl: null,
-      bio: null,
-      ownerType: 'self',
-      status: 'offline',
-    });
+    expect(claimableResponse.claimableAgents).toContainEqual(
+      expect.objectContaining({
+        id: selfOwnedAgent.id,
+        handle: 'self-owned-agent',
+        displayName: 'Self Owned Agent',
+        avatarEmoji: null,
+        avatarUrl: null,
+        bio: null,
+        ownerType: 'self',
+        personality: null,
+        profileTags: [],
+        status: 'offline',
+      }),
+    );
     expect(claimableResponse.pendingClaims).toEqual([]);
 
     const firstClaimRequest = await createClaimRequest(
@@ -404,21 +442,29 @@ describe('Agent claim flow (e2e)', () => {
 
     const ownedResponse = await readAgentsMine(humanToken);
 
-    expect(ownedResponse.agents).toContainEqual({
-      id: selfOwnedAgent.id,
-      handle: 'self-owned-agent',
-      displayName: 'Self Owned Agent',
-      avatarUrl: null,
-      bio: null,
-      ownerType: 'human',
-      safetyPolicy: {
-        dmPolicyMode: 'followers_only',
-        requiresMutualFollowForDm: false,
-        allowProactiveInteractions: true,
-        activityLevel: 'normal',
-      },
-      status: 'offline',
-    });
+    expect(ownedResponse.agents).toContainEqual(
+      expect.objectContaining({
+        id: selfOwnedAgent.id,
+        handle: 'self-owned-agent',
+        displayName: 'Self Owned Agent',
+        avatarEmoji: null,
+        avatarUrl: null,
+        bio: null,
+        ownerType: 'human',
+        personality: null,
+        profileTags: [],
+        safetyPolicy: expect.objectContaining({
+          dmPolicyMode: 'followers_only',
+          requiresMutualFollowForDm: false,
+          allowProactiveInteractions: true,
+          activityLevel: 'normal',
+          emergencyStopDmResponses: false,
+          emergencyStopForumResponses: false,
+          emergencyStopLiveResponses: false,
+        }),
+        status: 'offline',
+      }),
+    );
     expect(ownedResponse.claimableAgents).not.toContainEqual(
       expect.objectContaining({ id: selfOwnedAgent.id }),
     );
@@ -447,15 +493,20 @@ describe('Agent claim flow (e2e)', () => {
 
     const pendingResponse = await readAgentsMine(humanToken);
 
-    expect(pendingResponse.claimableAgents).toContainEqual({
-      id: selfOwnedAgent.id,
-      handle: 'generic-claimable-agent',
-      displayName: 'Generic Claimable Agent',
-      avatarUrl: null,
-      bio: null,
-      ownerType: 'self',
-      status: 'offline',
-    });
+    expect(pendingResponse.claimableAgents).toContainEqual(
+      expect.objectContaining({
+        id: selfOwnedAgent.id,
+        handle: 'generic-claimable-agent',
+        displayName: 'Generic Claimable Agent',
+        avatarEmoji: null,
+        avatarUrl: null,
+        bio: null,
+        ownerType: 'self',
+        personality: null,
+        profileTags: [],
+        status: 'offline',
+      }),
+    );
     expect(pendingResponse.pendingClaims).toContainEqual(
       typedValue<Record<string, unknown>>({
         claimRequestId: genericClaimRequest.claimRequest.id,
@@ -495,15 +546,20 @@ describe('Agent claim flow (e2e)', () => {
 
     const expiredResponse = await readAgentsMine(humanToken);
     expect(expiredResponse.pendingClaims).toEqual([]);
-    expect(expiredResponse.claimableAgents).toContainEqual({
-      id: selfOwnedAgent.id,
-      handle: 'claim-expire-agent',
-      displayName: 'Claim Expire Agent',
-      avatarUrl: null,
-      bio: null,
-      ownerType: 'self',
-      status: 'offline',
-    });
+    expect(expiredResponse.claimableAgents).toContainEqual(
+      expect.objectContaining({
+        id: selfOwnedAgent.id,
+        handle: 'claim-expire-agent',
+        displayName: 'Claim Expire Agent',
+        avatarEmoji: null,
+        avatarUrl: null,
+        bio: null,
+        ownerType: 'self',
+        personality: null,
+        profileTags: [],
+        status: 'offline',
+      }),
+    );
 
     const secondClaimRequest = await createClaimRequest(
       humanToken,

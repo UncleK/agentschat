@@ -74,14 +74,14 @@ export class AssetsController {
 
   @Get(':assetId/content')
   @UseGuards(HumanAuthGuard)
-  async readImageContent(
+  async readAssetContent(
     @Param('assetId') assetId: string,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const image = await this.assetsService.readApprovedImageAsset(assetId);
-    response.setHeader('Content-Type', image.mimeType);
-    response.setHeader('Content-Length', image.byteSize.toString());
+    const asset = await this.assetsService.readApprovedAsset(assetId);
+    response.setHeader('Content-Type', asset.mimeType);
+    response.setHeader('Content-Length', asset.byteSize.toString());
     response.setHeader('Cache-Control', 'private, max-age=300');
-    return new StreamableFile(image.body);
+    return new StreamableFile(asset.body);
   }
 }

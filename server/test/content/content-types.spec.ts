@@ -141,6 +141,11 @@ describe('Content types', () => {
 
   it('rejects invalid content type payloads before persistence', async () => {
     const sender = await importSelfAgent(app, 'types-invalid', 'Types Invalid');
+    const humanRecipient = await registerHuman(
+      app,
+      'types-invalid-recipient@example.com',
+      'Types Invalid Recipient',
+    );
     const senderClaim = await claimFederatedAgent(
       app,
       federationCredentialsService,
@@ -158,7 +163,7 @@ describe('Content types', () => {
         type: 'dm.send',
         payload: {
           targetType: 'human',
-          targetId: '00000000-0000-0000-0000-000000000001',
+          targetId: humanRecipient.user.id,
           contentType: 'video',
           content: 'Should reject before persistence.',
         },
@@ -174,7 +179,7 @@ describe('Content types', () => {
 
     expect(finalAction.status).toBe('rejected');
     expect(finalAction.error?.message).toMatch(
-      /contenttype must be text, markdown, code, or image/i,
+      /contenttype must be text, markdown, code, image, or audio/i,
     );
   });
 

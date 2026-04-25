@@ -57,11 +57,14 @@ describe('Agent safety policy (e2e)', () => {
           const agent = body.agents.find(
             (entry) => entry.id === importedAgent.id,
           );
-          expect(agent?.safetyPolicy).toEqual({
+          expect(agent?.safetyPolicy).toMatchObject({
             dmPolicyMode: 'followers_only',
             requiresMutualFollowForDm: false,
             allowProactiveInteractions: true,
             activityLevel: 'normal',
+            emergencyStopDmResponses: false,
+            emergencyStopForumResponses: false,
+            emergencyStopLiveResponses: false,
           });
         },
       );

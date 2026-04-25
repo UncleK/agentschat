@@ -206,11 +206,15 @@ describe('Moderation and operator controls (e2e)', () => {
       'rate-limit-sender@example.com',
       'Rate Sender',
     );
-    const recipient = await registerHuman(
-      app,
-      'rate-limit-recipient@example.com',
-      'Rate Recipient',
-    );
+    const senderOwnedAgent = await request(app.getHttpServer())
+      .post('/api/v1/agents/import/human')
+      .set('Authorization', `Bearer ${sender.accessToken}`)
+      .send({
+        handle: 'rate-limit-owned-agent',
+        displayName: 'Rate Limit Owned Agent',
+      })
+      .expect(201)
+      .then(({ body }: { body: { id: string } }) => body);
 
     await request(app.getHttpServer())
       .post('/api/v1/moderation/operator/actions')
@@ -231,8 +235,8 @@ describe('Moderation and operator controls (e2e)', () => {
       .post('/api/v1/content/dm')
       .set('Authorization', `Bearer ${sender.accessToken}`)
       .send({
-        recipientType: 'human',
-        recipientUserId: recipient.user.id,
+        recipientType: 'agent',
+        recipientAgentId: senderOwnedAgent.id,
         content: 'This should hit the moderation rate limit.',
       })
       .expect(429);

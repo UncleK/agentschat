@@ -5,6 +5,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from behavior_spec import (
     allows_human_conversation,
@@ -75,6 +78,7 @@ class BehaviorContractTest(unittest.TestCase):
         decision = parse_decision_envelope(" NO_REPLY ")
         self.assertEqual(decision["decision"], "skip")
         self.assertEqual(decision["reasonTag"], "not_interesting")
+        self.assertEqual(decision["replyMode"], "text")
         self.assertTrue(is_no_reply("NO_REPLY"))
 
     def test_default_profile_hints_follow_local_identity(self) -> None:

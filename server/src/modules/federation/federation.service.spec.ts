@@ -17,12 +17,24 @@ describe('FederationService', () => {
     auth: {
       jwtSecret: 'test-secret',
       operatorToken: 'test-operator-token',
+      emailVerificationCodeTtlSeconds: 600,
+      passwordResetCodeTtlSeconds: 900,
+      emailCodeCooldownSeconds: 60,
+    },
+    mail: {
+      deliveryMode: 'log',
+      fromAddress: 'Agents Chat <test@example.com>',
+      resendApiKey: null,
     },
     database: {
       url: 'postgres://agents_chat:agents_chat@localhost:5432/agents_chat',
     },
     redis: {
       url: 'redis://localhost:6379',
+    },
+    presence: {
+      staleAfterSeconds: 180,
+      sweepIntervalSeconds: 30,
     },
     minio: {
       endpoint: 'localhost',
@@ -31,6 +43,18 @@ describe('FederationService', () => {
       accessKey: 'minioadmin',
       secretKey: 'minioadmin',
       bucket: 'agents-chat-local',
+    },
+    speech: {
+      agentCantSecret: 'dev-agent-cant-secret',
+      pythonBin: 'python',
+      modelSize: 'small',
+      device: 'cpu',
+      computeType: 'int8',
+      timeoutMs: 90000,
+      maxUploadBytes: 10 * 1024 * 1024,
+      maxDurationSeconds: 60,
+      ffmpegBin: 'ffmpeg',
+      modelDir: null,
     },
     transport: {
       appRealtime: {
@@ -46,6 +70,46 @@ describe('FederationService', () => {
       },
     },
   };
+
+  function createService(
+    federationActionRepository: Repository<FederationActionEntity>,
+    requestHash: string,
+  ) {
+    const agentRepository = {
+      findOneBy: jest.fn().mockResolvedValue({
+        id: 'agent-1',
+        status: 'online',
+      }),
+      save: jest.fn().mockImplementation(async (value: unknown) => value),
+    } as unknown as Repository<never>;
+    const agentConnectionRepository = {
+      findOneBy: jest.fn().mockResolvedValue({
+        id: 'connection-1',
+        agentId: 'agent-1',
+      }),
+      save: jest.fn().mockImplementation(async (value: unknown) => value),
+    } as unknown as Repository<never>;
+
+    return new FederationService(
+      testEnvironment,
+      {} as never,
+      agentRepository,
+      agentConnectionRepository,
+      federationActionRepository,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {
+        hashValue: jest.fn().mockReturnValue(requestHash),
+      } as never,
+      {} as never,
+    );
+  }
 
   it('returns the existing action when the idempotency insert loses a unique-key race', async () => {
     const existingAction = {
@@ -76,25 +140,7 @@ describe('FederationService', () => {
         }),
       ),
     } as unknown as Repository<FederationActionEntity>;
-    const service = new FederationService(
-      testEnvironment,
-      {} as never,
-      {} as never,
-      {} as never,
-      federationActionRepository,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {
-        hashValue: jest.fn().mockReturnValue('hash:dm'),
-      } as never,
-      {} as never,
-    );
+    const service = createService(federationActionRepository, 'hash:dm');
 
     await expect(
       service.submitAction(
@@ -133,25 +179,7 @@ describe('FederationService', () => {
         }),
       ),
     } as unknown as Repository<FederationActionEntity>;
-    const service = new FederationService(
-      testEnvironment,
-      {} as never,
-      {} as never,
-      {} as never,
-      federationActionRepository,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {
-        hashValue: jest.fn().mockReturnValue('hash:dm'),
-      } as never,
-      {} as never,
-    );
+    const service = createService(federationActionRepository, 'hash:dm');
 
     await expect(
       service.submitAction(

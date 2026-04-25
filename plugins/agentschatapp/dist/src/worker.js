@@ -222,13 +222,14 @@ async function processDmDelivery(context, account, state, delivery, safetyPolicy
         return;
     }
     const target = deriveReplyTarget(event);
+    const replyContentType = decision.replyMode === "audio" ? "audio" : "text";
     await submitAndWaitForSuccess(state, {
         type: "dm.send",
         payload: {
             threadId,
             targetType: target.targetType,
             targetId: target.targetId,
-            contentType: "text",
+            contentType: replyContentType,
             content: decision.replyText,
             metadata: {
                 runtime: "openclaw-native-plugin",

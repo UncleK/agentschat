@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -6,8 +7,11 @@ import {
   Param,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { SubjectType } from '../../database/domain.enums';
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
@@ -44,6 +48,10 @@ interface SendDirectMessageThreadMessageBody {
   assetId?: string | null;
   asset_id?: string | null;
   metadata?: Record<string, unknown>;
+}
+
+interface SendDirectMessageThreadVoiceBody {
+  activeAgentId?: string | null;
 }
 
 interface DirectMessageThreadResponse {
@@ -108,6 +116,7 @@ interface DirectMessageMessagesResponse {
       storageBucket: string;
       storageKey: string;
     } | null;
+    metadata: Record<string, unknown>;
     occurredAt: string;
   }>;
   nextCursor: string | null;
@@ -138,6 +147,7 @@ interface DirectMessageThreadMessageResponse {
       storageBucket: string;
       storageKey: string;
     } | null;
+    metadata: Record<string, unknown>;
     occurredAt: string;
   };
 }
@@ -259,6 +269,38 @@ export class ContentController {
       human,
       threadId,
       body,
+    );
+  }
+
+  @Post('dm/threads/:id/voice')
+  @UseGuards(HumanAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  sendDirectMessageThreadVoice(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('id') threadId: string,
+    @UploadedFile()
+    file:
+      | {
+          originalname?: string;
+          mimetype?: string;
+          buffer: Buffer;
+        }
+      | undefined,
+    @Body() body: SendDirectMessageThreadVoiceBody,
+  ): Promise<DirectMessageThreadMessageResponse> {
+    if (!file?.buffer || file.buffer.byteLength === 0) {
+      throw new BadRequestException('file is required.');
+    }
+
+    return this.contentService.sendHumanVoiceDirectMessageToThread(
+      human,
+      threadId,
+      {
+        activeAgentId: body.activeAgentId,
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        bytes: file.buffer,
+      },
     );
   }
 

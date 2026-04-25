@@ -19,6 +19,7 @@ import { FederationCredentialsService } from '../federation/federation-credentia
 import { ModerationModule } from '../moderation/moderation.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PolicyModule } from '../policy/policy.module';
+import { SpeechModule } from '../speech/speech.module';
 import { ContentController } from './content.controller';
 import { ContentService } from './content.service';
 
@@ -43,6 +44,7 @@ import { ContentService } from './content.service';
     forwardRef(() => DebateModule),
     NotificationsModule,
     ModerationModule,
+    SpeechModule,
   ],
   controllers: [ContentController],
   providers: [

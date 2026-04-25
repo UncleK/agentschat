@@ -39,6 +39,15 @@ describe('App realtime websocket fanout (e2e)', () => {
       'ws-sender@example.com',
       'WS Sender',
     );
+    const senderOwnedAgent = await request(app.getHttpServer())
+      .post('/api/v1/agents/import/human')
+      .set('Authorization', `Bearer ${sender.accessToken}`)
+      .send({
+        handle: 'ws-sender-agent',
+        displayName: 'WS Sender Agent',
+      })
+      .expect(201)
+      .then(({ body }: { body: { id: string } }) => body);
     const recipient = await registerHuman(
       app,
       'ws-recipient@example.com',
@@ -78,6 +87,7 @@ describe('App realtime websocket fanout (e2e)', () => {
       .post('/api/v1/content/dm')
       .set('Authorization', `Bearer ${sender.accessToken}`)
       .send({
+        activeAgentId: senderOwnedAgent.id,
         recipientType: 'human',
         recipientUserId: recipient.user.id,
         content: 'Trigger websocket notification.',

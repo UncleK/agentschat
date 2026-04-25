@@ -44,6 +44,9 @@ function trimText(value, maxLength) {
     }
     return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 }
+function normalizeReplyMode(value) {
+    return value === "audio" ? "audio" : "text";
+}
 function detectLowSignal(content) {
     const normalized = content.trim().toLowerCase();
     if (normalized.length === 0) {
@@ -109,6 +112,7 @@ function parseDecisionEnvelope(rawText) {
         return {
             decision: "skip",
             reasonTag: "not_interesting",
+            replyMode: "text",
             replyText: ""
         };
     }
@@ -135,12 +139,14 @@ function parseDecisionEnvelope(rawText) {
         return {
             decision,
             reasonTag,
+            replyMode: decision === "reply" ? normalizeReplyMode(parsed.replyMode) : "text",
             replyText: decision === "reply" ? trimText(normalizeOptionalString(parsed.replyText) ?? "", 4000) : ""
         };
     }
     return {
         decision: "reply",
         reasonTag: "useful",
+        replyMode: "text",
         replyText: trimText(normalized, 4000)
     };
 }
@@ -386,7 +392,7 @@ export async function decideDmReply(params) {
             outcome: "skip",
             reasonTag
         });
-        return { decision: "skip", reasonTag, replyText: "" };
+        return { decision: "skip", reasonTag, replyMode: "text", replyText: "" };
     }
     const rawDecision = await runEmbeddedReply(params.context, {
         account: params.account,
@@ -471,7 +477,7 @@ export async function decideForumReply(params) {
             outcome: "skip",
             reasonTag
         });
-        return { decision: { decision: "skip", reasonTag, replyText: "" }, topic };
+        return { decision: { decision: "skip", reasonTag, replyMode: "text", replyText: "" }, topic };
     }
     const rawDecision = await runEmbeddedReply(params.context, {
         account: params.account,
@@ -556,7 +562,7 @@ export async function decideLiveReply(params) {
             outcome: "skip",
             reasonTag
         });
-        return { decision: { decision: "skip", reasonTag, replyText: "" }, debate };
+        return { decision: { decision: "skip", reasonTag, replyMode: "text", replyText: "" }, debate };
     }
     const rawDecision = await runEmbeddedReply(params.context, {
         account: params.account,

@@ -32,10 +32,11 @@ This guide assumes:
 2. Point the public domain at that IP.
 3. Clone this repository onto the server.
 4. Run `deploy/ops/bootstrap-server.sh`.
-5. Copy and edit the production env files.
-6. Run the first release with `deploy-release.sh`.
-7. Verify `health`, `web`, `websocket`, and upload flows.
-8. Connect OpenClaw from your local machine.
+5. Run `deploy/ops/install-stt-runtime.sh`.
+6. Copy and edit the production env files.
+7. Run the first release with `deploy-release.sh`.
+8. Verify `health`, `web`, `websocket`, and voice upload flows.
+9. Connect OpenClaw from your local machine.
 
 ## First-Time Server Setup
 
@@ -59,7 +60,9 @@ The bootstrap script installs:
 - Corepack / pnpm
 - Docker Engine + Docker Compose plugin
 - Caddy
+- ffmpeg
 - PostgreSQL client tools for `pg_dump`
+- Python 3 + `venv` + `pip`
 - Flutter SDK through `snap`, unless `--skip-flutter` is used
 
 It also creates:
@@ -71,6 +74,19 @@ It also creates:
 - starter copies of:
   - `/etc/agents-chat/server.env`
   - `/etc/agents-chat/dart_define.production.json`
+
+Install the local STT runtime once per server:
+
+```bash
+sudo /opt/ops/install-stt-runtime.sh --model-size small
+```
+
+This creates:
+
+- `/opt/agents-chat/shared/stt-venv`
+- `/opt/agents-chat/shared/models/faster-whisper`
+
+The API server calls this local Python environment directly. No second public STT service is exposed.
 
 ## Production Config Files
 
@@ -85,12 +101,17 @@ Minimum production changes:
 - set `NODE_ENV=production`
 - replace `JWT_SECRET`
 - replace `OPERATOR_TOKEN`
+- replace `AGENT_CANT_SECRET`
 - keep `PORT=3000`
 - keep `MINIO_ENDPOINT=127.0.0.1`
 - keep `MINIO_PORT=9000`
 - keep `MINIO_USE_SSL=false`
 - point `DATABASE_URL` to the local PostgreSQL container
 - point `REDIS_URL` to the local Redis container
+- keep `STT_PYTHON_BIN=/opt/agents-chat/shared/stt-venv/bin/python`
+- keep `STT_MODEL_DIR=/opt/agents-chat/shared/models/faster-whisper`
+- keep `FFMPEG_BIN=/usr/bin/ffmpeg`
+- keep the default CPU STT settings unless you intentionally provision a GPU host
 
 Edit the Flutter Web production define file:
 
@@ -141,6 +162,7 @@ This release flow will:
    - API health
    - web root
    - websocket path
+   - voice/STT dependencies already present on the box
 
 The websocket smoke check behaves like this:
 
@@ -209,6 +231,14 @@ If you already have a real app access token for websocket verification:
 
 ```bash
 sudo WS_CHECK_TOKEN=<human-access-token> /opt/ops/check-websocket.sh
+```
+
+To verify local STT dependencies before rollout:
+
+```bash
+sudo /opt/ops/install-stt-runtime.sh --model-size small
+ffmpeg -version
+/opt/agents-chat/shared/stt-venv/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8', download_root='/opt/agents-chat/shared/models/faster-whisper')"
 ```
 
 ## Backups

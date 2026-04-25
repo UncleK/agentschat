@@ -1,4 +1,10 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:http/http.dart' as http;
+
 import '../network/api_client.dart';
+import 'api_exception.dart';
 
 class ChatThreadCounterpart {
   const ChatThreadCounterpart({
@@ -239,13 +245,40 @@ class ChatMessageAsset {
   }
 }
 
+class ChatVoiceMetadata {
+  const ChatVoiceMetadata({
+    required this.codec,
+    required this.payloadMode,
+    required this.source,
+    required this.durationMs,
+    required this.transcriptLanguage,
+  });
+
+  final String codec;
+  final String payloadMode;
+  final String source;
+  final int? durationMs;
+  final String? transcriptLanguage;
+
+  factory ChatVoiceMetadata.fromJson(Map<String, dynamic> json) {
+    return ChatVoiceMetadata(
+      codec: json['codec'] as String? ?? '',
+      payloadMode: json['payloadMode'] as String? ?? '',
+      source: json['source'] as String? ?? '',
+      durationMs: json['durationMs'] as int?,
+      transcriptLanguage: json['transcriptLanguage'] as String?,
+    );
+  }
+}
+
 class ChatMessageRecord {
   const ChatMessageRecord({
     required this.eventId,
     required this.actor,
     required this.contentType,
     required this.content,
-    required this.asset,
+    this.asset,
+    this.metadata = const {},
     required this.occurredAt,
   });
 
@@ -254,7 +287,16 @@ class ChatMessageRecord {
   final String contentType;
   final String? content;
   final ChatMessageAsset? asset;
+  final Map<String, dynamic> metadata;
   final String occurredAt;
+
+  ChatVoiceMetadata? get voice {
+    final rawVoice = metadata['voice'];
+    if (rawVoice is! Map<String, dynamic>) {
+      return null;
+    }
+    return ChatVoiceMetadata.fromJson(rawVoice);
+  }
 
   factory ChatMessageRecord.fromJson(
     Map<String, dynamic> json, {
@@ -273,6 +315,7 @@ class ChatMessageRecord {
               resolveUrl: resolveUrl,
             )
           : null,
+      metadata: json['metadata'] as Map<String, dynamic>? ?? const {},
       occurredAt: json['occurredAt'] as String? ?? '',
     );
   }
@@ -456,6 +499,49 @@ class ChatRepository {
     );
   }
 
+  Future<ChatThreadMessageResponse> sendThreadVoiceMessage({
+    required String threadId,
+    required String activeAgentId,
+    required Uint8List bytes,
+    required String fileName,
+    String mimeType = 'audio/wav',
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(apiClient.resolveUrl('/content/dm/threads/$threadId/voice')!),
+    );
+    final authToken = apiClient.authToken;
+    if (authToken != null && authToken.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $authToken';
+    }
+    request.fields['activeAgentId'] = activeAgentId;
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: fileName,
+      ),
+    );
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    final body = _decodeJson(response.body);
+    if (response.statusCode >= 400) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message:
+            (body['message'] as String?) ??
+            response.reasonPhrase ??
+            'Voice upload failed',
+        body: body,
+      );
+    }
+    return ChatThreadMessageResponse.fromJson(
+      body,
+      resolveUrl: apiClient.resolveUrl,
+    );
+  }
+
   /// Send a direct message on behalf of the authenticated human.
   ///
   /// [activeAgentId] is the ID of the human's currently activated agent.
@@ -498,4 +584,16 @@ String? _readOptionalString(Object? value) {
 String? _resolveUrl(Object? value, String? Function(String?)? resolveUrl) {
   final raw = value as String?;
   return resolveUrl?.call(raw) ?? raw;
+}
+
+Map<String, dynamic> _decodeJson(String body) {
+  if (body.trim().isEmpty) {
+    return <String, dynamic>{};
+  }
+  try {
+    final decoded = jsonDecode(body);
+    return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+  } catch (_) {
+    return <String, dynamic>{};
+  }
 }

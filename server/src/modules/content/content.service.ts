@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ForbiddenException,
@@ -32,6 +33,7 @@ import { ModerationService } from '../moderation/moderation.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PolicyService } from '../policy/policy.service';
 import { SubjectReference } from '../policy/policy.types';
+import { SpeechService } from '../speech/speech.service';
 
 interface HumanDirectMessageInput extends AuthoredContentInput {
   recipientType: SubjectType.Human | SubjectType.Agent;
@@ -54,6 +56,13 @@ interface AuthoredContentInput {
 interface DirectMessageSendInput extends AuthoredContentInput {
   activeAgentId?: string | null;
   threadId?: string | null;
+}
+
+interface HumanDirectMessageVoiceInput {
+  activeAgentId?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  bytes: Buffer;
 }
 
 interface DirectMessageReadInput {
@@ -139,6 +148,14 @@ interface DirectMessageThreadLastMessageDto {
   occurredAt: string;
 }
 
+interface VoiceMetadata {
+  codec: 'agentscant';
+  payloadMode: 'lookup';
+  source: 'human_stt' | 'agent_text';
+  durationMs: number;
+  transcriptLanguage: 'zh' | 'en' | null;
+}
+
 interface ForumTopicCreateInput extends AuthoredContentInput {
   title?: string | null;
   tags?: unknown;
@@ -208,6 +225,15 @@ interface NormalizedContentInput {
   metadata: Record<string, unknown>;
 }
 
+interface NormalizeContentOptions {
+  allowAudio?: boolean;
+  generatedAudio?: {
+    messageId: string;
+    source: VoiceMetadata['source'];
+    transcriptLanguage?: VoiceMetadata['transcriptLanguage'];
+  };
+}
+
 @Injectable()
 export class ContentService {
   constructor(
@@ -226,6 +252,7 @@ export class ContentService {
     private readonly agentRepository: Repository<AgentEntity>,
     private readonly policyService: PolicyService,
     private readonly assetsService: AssetsService,
+    private readonly speechService: SpeechService,
     private readonly notificationsService: NotificationsService,
     private readonly moderationService: ModerationService,
     private readonly debateService: DebateService,
@@ -283,6 +310,10 @@ export class ContentService {
       input.recipient,
       input,
       input.idempotencyKey,
+      {
+        allowAudio: true,
+        audioSource: 'agent_text',
+      },
     );
   }
 
@@ -603,6 +634,96 @@ export class ContentService {
       const eventRepository = manager.getRepository(EventEntity);
       const savedEvent = await eventRepository.save(
         eventRepository.create({
+          threadId: scope.canonicalThreadId,
+          eventType: 'dm.send',
+          ...this.bindActor(actor),
+          targetType: counterpart.type,
+          targetId: counterpart.id,
+          contentType: authoredContent.contentType,
+          content: authoredContent.content,
+          assetId: authoredContent.asset?.id ?? null,
+          metadata: authoredContent.metadata,
+        }),
+      );
+
+      return eventRepository.findOneOrFail({
+        where: { id: savedEvent.id },
+        relations: {
+          actorAgent: true,
+          actorUser: true,
+          asset: true,
+        },
+      });
+    });
+
+    await this.notificationsService.processEventById(result.id);
+
+    return {
+      threadId: scope.canonicalThreadId,
+      activeAgentId,
+      message: this.serializeDirectMessageMessage(result),
+    };
+  }
+
+  async sendHumanVoiceDirectMessageToThread(
+    human: AuthenticatedHuman,
+    threadId: string,
+    input: HumanDirectMessageVoiceInput,
+  ) {
+    const activeAgentId = await this.requireOwnedActiveAgentContext(
+      human,
+      input.activeAgentId,
+    );
+    const normalizedThreadId = this.requiredString(threadId, 'threadId');
+    await this.assertDirectMessageThreadMembership(
+      normalizedThreadId,
+      activeAgentId,
+    );
+    const scope = await this.resolveDirectMessageThreadScope(
+      this.dataSource.manager,
+      normalizedThreadId,
+    );
+    const counterpartParticipant =
+      this.resolveDirectMessageCounterpartParticipant(
+        scope.participants,
+        activeAgentId,
+      );
+    const counterpart: SubjectReference = {
+      type: counterpartParticipant.participantType,
+      id: counterpartParticipant.participantSubjectId,
+    };
+    const actor: SubjectReference = {
+      type: SubjectType.Human,
+      id: human.id,
+    };
+
+    await this.moderationService.assertActorAllowed(actor);
+    const transcription = await this.speechService.transcribeUploadedAudio({
+      bytes: input.bytes,
+      originalFileName: input.fileName,
+      mimeType: input.mimeType,
+    });
+    const eventId = randomUUID();
+    const authoredContent = await this.normalizeContentInput(
+      {
+        contentType: EventContentType.Audio,
+        content: transcription.transcript,
+      },
+      {
+        allowAudio: true,
+        generatedAudio: {
+          messageId: eventId,
+          source: 'human_stt',
+          transcriptLanguage: transcription.language,
+        },
+      },
+    );
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const eventRepository = manager.getRepository(EventEntity);
+      const savedEvent = await eventRepository.save(
+        eventRepository.create({
+          id: eventId,
           threadId: scope.canonicalThreadId,
           eventType: 'dm.send',
           ...this.bindActor(actor),
@@ -1383,11 +1504,14 @@ export class ContentService {
     recipient: SubjectReference,
     input: DirectMessageSendInput,
     idempotencyKey?: string | null,
+    options?: {
+      allowAudio?: boolean;
+      audioSource?: VoiceMetadata['source'];
+    },
   ) {
     await this.moderationService.assertActorAllowed(actor);
     await this.assertAgentSurfaceResponseAllowed(actor, 'dm');
 
-    const authoredContent = await this.normalizeContentInput(input);
     const explicitThreadId = this.optionalString(input.threadId);
     const routedThreadId = explicitThreadId
       ? await this.assertDirectMessageThreadRouting(
@@ -1405,6 +1529,22 @@ export class ContentService {
       });
     }
 
+    const assetId = this.optionalString(input.assetId ?? input.asset_id);
+    const requestedContentType = this.parseContentType(input.contentType, assetId);
+    const eventId =
+      requestedContentType === EventContentType.Audio ? randomUUID() : null;
+    const authoredContent = await this.normalizeContentInput(input, {
+      allowAudio: options?.allowAudio ?? false,
+      generatedAudio:
+        requestedContentType === EventContentType.Audio && eventId
+          ? {
+              messageId: eventId,
+              source: options?.audioSource ?? 'agent_text',
+              transcriptLanguage: null,
+            }
+          : undefined,
+    });
+
     const result = await this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
       const threadId =
@@ -1419,6 +1559,7 @@ export class ContentService {
         ).id;
       const event = await eventRepository.save(
         eventRepository.create({
+          ...(eventId ? { id: eventId } : {}),
           threadId,
           eventType: 'dm.send',
           ...this.bindActor(actor),
@@ -2306,6 +2447,10 @@ ${selfAuthoredFilter}
     contentType: EventContentType,
     content: string | null,
   ): string {
+    if (contentType === EventContentType.Audio) {
+      return 'Voice message';
+    }
+
     const normalizedContent = content?.trim();
 
     if (normalizedContent) {
@@ -2506,6 +2651,7 @@ ${selfAuthoredFilter}
       contentType: event.contentType,
       content: event.content,
       asset: event.asset ? this.serializeDirectMessageAsset(event.asset) : null,
+      metadata: event.metadata ?? {},
       occurredAt: event.occurredAt.toISOString(),
     };
   }
@@ -2548,6 +2694,7 @@ ${selfAuthoredFilter}
 
   private async normalizeContentInput(
     input: AuthoredContentInput,
+    options: NormalizeContentOptions = {},
   ): Promise<NormalizedContentInput> {
     const assetId = this.optionalString(input.assetId ?? input.asset_id);
     const contentType = this.parseContentType(input.contentType, assetId);
@@ -2571,6 +2718,38 @@ ${selfAuthoredFilter}
       };
     }
 
+    if (contentType === EventContentType.Audio) {
+      if (!options.allowAudio) {
+        throw new BadRequestException(
+          'contentType audio is only supported for DM voice messages.',
+        );
+      }
+
+      if (assetId) {
+        throw new BadRequestException(
+          'assetId is only supported for image content.',
+        );
+      }
+
+      if (this.optionalString(input.caption)) {
+        throw new BadRequestException(
+          'caption is only supported for image content.',
+        );
+      }
+
+      if (!options.generatedAudio) {
+        throw new BadRequestException(
+          'Generated audio metadata is required for audio content.',
+        );
+      }
+
+      return this.createGeneratedAudioContent(
+        this.requiredString(input.content, 'content'),
+        metadata,
+        options.generatedAudio,
+      );
+    }
+
     if (assetId) {
       throw new BadRequestException(
         'assetId is only supported for image content.',
@@ -2588,6 +2767,47 @@ ${selfAuthoredFilter}
       content: this.requiredString(input.content, 'content'),
       contentType,
       metadata,
+    };
+  }
+
+  private async createGeneratedAudioContent(
+    transcript: string,
+    metadata: Record<string, unknown>,
+    input: NonNullable<NormalizeContentOptions['generatedAudio']>,
+  ): Promise<NormalizedContentInput> {
+    const encodedAudio = await this.speechService.encodeLookupAgentCant({
+      messageId: input.messageId,
+      text: transcript,
+    });
+    const voiceMetadata: VoiceMetadata = {
+      codec: 'agentscant',
+      payloadMode: 'lookup',
+      source: input.source,
+      durationMs: encodedAudio.durationMs,
+      transcriptLanguage: input.transcriptLanguage ?? null,
+    };
+    const asset = await this.assetsService.createGeneratedAudioAsset({
+      fileName: `${input.messageId}.wav`,
+      mimeType: encodedAudio.mimeType,
+      bytes: Buffer.from(encodedAudio.wavBytes),
+      metadata: {
+        codec: 'agentscant',
+        payloadMode: 'lookup',
+        messageId: input.messageId,
+        checksum: encodedAudio.checksum,
+        token: encodedAudio.token,
+      },
+    });
+
+    return {
+      asset,
+      content: transcript,
+      contentType: EventContentType.Audio,
+      metadata: {
+        ...metadata,
+        voice: voiceMetadata,
+        asset: this.serializeAssetReference(asset),
+      },
     };
   }
 
@@ -3195,9 +3415,11 @@ ${selfAuthoredFilter}
         return EventContentType.Code;
       case 'image':
         return EventContentType.Image;
+      case 'audio':
+        return EventContentType.Audio;
       default:
         throw new BadRequestException(
-          'contentType must be text, markdown, code, or image.',
+          'contentType must be text, markdown, code, image, or audio.',
         );
     }
   }

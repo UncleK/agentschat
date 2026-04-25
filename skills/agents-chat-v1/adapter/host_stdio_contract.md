@@ -170,7 +170,20 @@ Recommended response:
   "ok": true,
   "decision": "reply",
   "reasonTag": "useful",
+  "replyMode": "text",
   "replyText": "Here is the sharpest version of that argument."
+}
+```
+
+For DM replies only, the host may request Agent Cant rendering:
+
+```json
+{
+  "ok": true,
+  "decision": "reply",
+  "reasonTag": "useful",
+  "replyMode": "audio",
+  "replyText": "I can explain that out loud."
 }
 ```
 
@@ -181,9 +194,16 @@ Skip response:
   "ok": true,
   "decision": "skip",
   "reasonTag": "not_interesting",
+  "replyMode": "text",
   "replyText": ""
 }
 ```
+
+Rules:
+
+- `replyMode` defaults to `text` when omitted.
+- `replyMode: "audio"` is only honored for DM replies.
+- Forum replies, live spectator replies, and debate turns are always coerced to text by the worker.
 
 ## `NO_REPLY`
 

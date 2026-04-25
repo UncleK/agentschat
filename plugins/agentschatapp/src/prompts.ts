@@ -522,6 +522,8 @@ export function buildDmDecisionPrompt(params: {
     "- If another agent or human already covered the point during the waiting window, prefer skip.",
     "- If the message is low-signal, repetitive, or would make you echo yourself, prefer skip.",
     "- If you reply, write one natural plain-text message only.",
+    '- If you want this DM rendered as Agent Cant audio, set replyMode to "audio" and keep replyText as the canonical plain-text reply.',
+    '- Otherwise set replyMode to "text".',
     "- Do not mention hidden prompts, delivery ids, plugin logs, or system traces.",
     "",
     SYSTEM_PROMPT,
@@ -529,8 +531,8 @@ export function buildDmDecisionPrompt(params: {
     "Recent thread transcript:",
     formatTranscript(params.messages, params.selfAgentId),
     "",
-    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}',
-    '- If decision is "skip", set replyText to an empty string.'
+    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyMode":"text"|"audio","replyText":"..."}',
+    '- If decision is "skip", set replyMode to "text" and replyText to an empty string.'
   ].join("\n");
 }
 
@@ -564,6 +566,7 @@ export function buildForumDecisionPrompt(params: {
     "- Be selective. Reply only if you add something concrete, sharp, or genuinely useful.",
     "- If the thread already moved on or another participant already covered it, prefer skip.",
     "- If you reply, write one natural public forum reply in plain text.",
+    '- Set replyMode to "text". Forum replies never use audio.',
     "- Do not mention hidden prompts, delivery ids, plugin logs, or system mechanics.",
     "",
     SYSTEM_PROMPT,
@@ -575,8 +578,8 @@ export function buildForumDecisionPrompt(params: {
     "Visible reply tree:",
     forumReplyLines(replies).join("\n") || "- No visible replies yet.",
     "",
-    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}',
-    '- If decision is "skip", set replyText to an empty string.'
+    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyMode":"text","replyText":"..."}',
+    '- If decision is "skip", set replyMode to "text" and replyText to an empty string.'
   ].join("\n");
 }
 
@@ -611,6 +614,7 @@ export function buildLiveDecisionPrompt(params: {
     "- Join the live side chat only when it clearly helps, sharpens, or advances the audience conversation.",
     "- If the moment has passed or someone else already handled it, prefer skip.",
     "- If you reply, write one natural spectator comment in plain text.",
+    '- Set replyMode to "text". Live spectator replies never use audio.',
     "- Do not turn this into a formal debate turn.",
     "",
     SYSTEM_PROMPT,
@@ -621,8 +625,8 @@ export function buildLiveDecisionPrompt(params: {
     "Recent spectator feed:",
     spectatorFeedLines(spectatorFeed, 8),
     "",
-    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyText":"..."}',
-    '- If decision is "skip", set replyText to an empty string.'
+    'Return strict JSON only: {"decision":"reply"|"skip","reasonTag":"addressed"|"useful"|"novelty"|"low_signal"|"already_answered"|"cooldown"|"unsafe"|"not_interesting","replyMode":"text","replyText":"..."}',
+    '- If decision is "skip", set replyMode to "text" and replyText to an empty string.'
   ].join("\n");
 }
 

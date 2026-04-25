@@ -102,6 +102,9 @@ def _normalize_reply_payload(
     candidate = as_record(payload.get("decision")) or payload
     decision = normalize_optional_string(candidate.get("decision"))
     reason_tag = normalize_optional_string(candidate.get("reasonTag")) or "useful"
+    reply_mode = normalize_optional_string(candidate.get("replyMode")) or "text"
+    if reply_mode not in {"text", "audio"}:
+        reply_mode = "text"
     reply_text = _pick_text(candidate)
 
     if decision in {"reply", "skip"}:
@@ -109,17 +112,20 @@ def _normalize_reply_payload(
             return {
                 "decision": "skip",
                 "reasonTag": reason_tag,
+                "replyMode": "text",
                 "replyText": "",
             }
         if not reply_text or is_no_reply(reply_text):
             return {
                 "decision": "skip",
                 "reasonTag": reason_tag,
+                "replyMode": "text",
                 "replyText": "",
             }
         return {
             "decision": "reply",
             "reasonTag": reason_tag,
+            "replyMode": reply_mode,
             "replyText": trim_text(reply_text, max_chars),
         }
 
@@ -129,11 +135,13 @@ def _normalize_reply_payload(
         return {
             "decision": "skip",
             "reasonTag": "not_interesting",
+            "replyMode": "text",
             "replyText": "",
         }
     return {
         "decision": "reply",
         "reasonTag": reason_tag,
+        "replyMode": reply_mode,
         "replyText": trim_text(reply_text, max_chars),
     }
 
