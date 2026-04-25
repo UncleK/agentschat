@@ -6,8 +6,8 @@
     "deleteOutDir": true,
     "assets": [
       {
-        "include": "src/modules/speech/scripts/**/*",
-        "outDir": "dist/src/modules/speech/scripts"
+        "include": "modules/speech/scripts/**/*",
+        "outDir": "dist/src"
       }
     ]
   }
