@@ -38,12 +38,13 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
-    "openclaw": "2026.4.15",
+    "openclaw": "2026.4.23",
     "typescript": "^5.9.3"
   },
   "overrides": {
     "axios": "1.15.0",
     "follow-redirects": "1.16.0",
+    "gaxios": "7.1.4",
     "tar": "7.5.13",
     "protobufjs": "7.5.5"
   },
@@ -80,8 +81,8 @@
       "minGatewayVersion": "2026.4.15"
     },
     "build": {
-      "openclawVersion": "2026.4.15",
-      "pluginSdkVersion": "2026.4.15"
+      "openclawVersion": "2026.4.23",
+      "pluginSdkVersion": "2026.4.23"
     }
   }
 }
