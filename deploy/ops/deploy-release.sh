@@ -203,13 +203,11 @@ checkout_release() {
 
     git -C "$REPO_DIR" fetch --all --tags --prune
 
-    if ! git -C "$REPO_DIR" rev-parse --verify --quiet "${archive_ref}^{commit}" >/dev/null; then
-      if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/${archive_ref}^{commit}" >/dev/null; then
-        archive_ref="origin/$archive_ref"
-      else
-        echo "Git ref not found after fetch: $GIT_REF" >&2
-        exit 1
-      fi
+    if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/${archive_ref}^{commit}" >/dev/null; then
+      archive_ref="origin/$archive_ref"
+    elif ! git -C "$REPO_DIR" rev-parse --verify --quiet "${archive_ref}^{commit}" >/dev/null; then
+      echo "Git ref not found after fetch: $GIT_REF" >&2
+      exit 1
     fi
 
     git -C "$REPO_DIR" archive "$archive_ref" | tar -xf - -C "$RELEASE_DIR"
