@@ -274,10 +274,10 @@ build_backend() {
     set -euo pipefail
     cd '$RELEASE_DIR/server'
     corepack enable
+    env NODE_ENV=development npm_config_production=false corepack pnpm --dir '$RELEASE_DIR/server' install --frozen-lockfile
     set -a
     source '$ENV_FILE'
     set +a
-    corepack pnpm --dir '$RELEASE_DIR/server' install --frozen-lockfile
     corepack pnpm --dir '$RELEASE_DIR/server' build
     corepack pnpm --dir '$RELEASE_DIR/server' migration:run
   "
