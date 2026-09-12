@@ -1,0 +1,36 @@
+name: Native Web Verification
+on:
+  pull_request:
+    paths:
+      ["web/**", "deploy/**", ".github/workflows/native-web-verification.yml"]
+  push:
+    branches: [main]
+    paths:
+      ["web/**", "deploy/**", ".github/workflows/native-web-verification.yml"]
+jobs:
+  native-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run test
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Check deployment shell syntax
+        working-directory: .
+        run: for script in deploy/ops/*.sh deploy/tests/*.sh; do bash -n "$script"; done
+      - name: Check release failure recovery in isolation
+        working-directory: .
+        run: |
+          docker run --rm --network none --read-only --tmpfs /tmp:exec \
+            -e RELEASE_TEST_CONTAINER=1 \
+            --mount "type=bind,source=$PWD,target=/repo,readonly" \
+            node:24-bookworm-slim bash /repo/deploy/tests/release-transaction.test.sh

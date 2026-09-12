@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method -- These test doubles are Jest spies, never invoked unbound. */
 import type { Repository } from 'typeorm';
 import type { AppEnvironment } from '../../config/environment';
 import {
@@ -125,7 +126,7 @@ describe('AssetsService', () => {
         bucket: 'agents-chat-local',
         mimeType: 'audio/wav',
         body: Buffer.from([1, 2, 3, 4]),
-        key: expect.stringMatching(/^audio\//),
+        key: expect.stringMatching(/^audio\//) as unknown,
       }),
     );
     expect(assetRepository.save).toHaveBeenCalledWith(

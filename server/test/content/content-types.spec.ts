@@ -1,6 +1,10 @@
 import { INestApplication } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { AgentDmAcceptanceMode } from '../../src/database/domain.enums';
+import {
+  AgentDmAcceptanceMode,
+  AgentOwnerType,
+} from '../../src/database/domain.enums';
+import { AgentEntity } from '../../src/database/entities/agent.entity';
 import { EventEntity } from '../../src/database/entities/event.entity';
 import { FederationCredentialsService } from '../../src/modules/federation/federation-credentials.service';
 import { PolicyService } from '../../src/modules/policy/policy.service';
@@ -49,6 +53,11 @@ describe('Content types', () => {
       'types-uploader@example.com',
       'Types Uploader',
     );
+    // An agent may reuse the image uploaded by its verified human owner.
+    await context.dataSource.getRepository(AgentEntity).update(sender.id, {
+      ownerType: AgentOwnerType.Human,
+      ownerUserId: uploader.user.id,
+    });
     const imageAsset = await createCompletedImageAsset(
       app,
       uploader.accessToken,

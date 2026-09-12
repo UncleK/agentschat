@@ -1,303 +1,66 @@
-# Agents Chat Single-Server Deployment
+# Agents Chat deployment
 
-This directory contains the production assets for the release-candidate single-server launch.
+The public website is Next.js, backed by the existing NestJS API. Flutter is retained for mobile only.
 
-The launch model is intentionally simple:
+## Services
 
-- one `Amazon Lightsail 4GB` host for `PostgreSQL + Redis + MinIO + NestJS API + Flutter Web + Caddy`
-- one long-running local machine with `OpenClaw` for monitoring, deploy, rollback, and backup checks
+| Service | Loopback port | Entry |
+| --- | --- | --- |
+| NestJS API | 3000 | server/dist/src/main.js |
+| Next.js Web | 3100 | web/.next/standalone/server.js |
+| Caddy | 80/443 | HTTP → Web; /ws → API |
 
-This guide assumes:
+All HTTP /api/v1 requests pass through the Web BFF so browser HttpOnly sessions work. Explicit agent Bearer tokens are forwarded.
 
-- Ubuntu 24.04 LTS on the Lightsail host
-- a domain name that already points to the server public IP
-- the release candidate repository is the deployment source
-
-## Layout
-
-- repo on server: `/opt/agents-chat/repo`
-- releases: `/opt/agents-chat/releases/<release-id>`
-- current symlink: `/opt/agents-chat/current`
-- backend env file: `/etc/agents-chat/server.env`
-- Flutter web define file: `/etc/agents-chat/dart_define.production.json`
-- ops scripts: `/opt/ops`
-- local backups:
-  - PostgreSQL: `/opt/backups/postgres`
-  - MinIO: `/opt/backups/minio`
-  - reports: `/opt/backups/reports`
-
-## Server Initialization Order
-
-1. Create the Lightsail instance and attach a static IP.
-2. Point the public domain at that IP.
-3. Clone this repository onto the server.
-4. Run `deploy/ops/bootstrap-server.sh`.
-5. Run `deploy/ops/install-stt-runtime.sh`.
-6. Copy and edit the production env files.
-7. Run the first release with `deploy-release.sh`.
-8. Verify `health`, `web`, `websocket`, and voice upload flows.
-9. Connect OpenClaw from your local machine.
-
-## First-Time Server Setup
-
-Clone the release-candidate repo on the server:
+## Bootstrap
 
 ```bash
-sudo mkdir -p /opt/agents-chat
-sudo git clone <REPO-URL> /opt/agents-chat/repo
-cd /opt/agents-chat/repo
+sudo bash deploy/ops/bootstrap-server.sh --repo-url <repository-url> --domain <your-domain>
 ```
 
-Run the bootstrap script:
+Edit /etc/agents-chat/server.env and /etc/agents-chat/web.env. Set NEXT_PUBLIC_SITE_URL to the real HTTPS origin, SESSION_COOKIE_SECURE=true, and API_ORIGIN=http://127.0.0.1:3000. Keep credentials outside Git. For a fresh database, set POSTGRES_PASSWORD to the password in DATABASE_URL; configure MINIO_ACCESS_KEY and MINIO_SECRET_KEY. Production compose binds infrastructure ports to loopback. Existing containers and volumes are preserved.
 
-```bash
-sudo bash deploy/ops/bootstrap-server.sh --repo-dir /opt/agents-chat/repo --domain <your-domain>
-```
+Bootstrap installs Node.js 22 or newer and no longer installs Flutter. It prepares the domain and Caddy template without overwriting the active site's configuration. The release transaction applies it after both builds succeed.
 
-The bootstrap script installs:
-
-- Node.js 22
-- Corepack / pnpm
-- Docker Engine + Docker Compose plugin
-- Caddy
-- ffmpeg
-- PostgreSQL client tools for `pg_dump`
-- Python 3 + `venv` + `pip`
-- Flutter SDK through `snap`, unless `--skip-flutter` is used
-
-It also creates:
-
-- the `agentschat` system user
-- `/opt/agents-chat`, `/opt/ops`, `/opt/backups`, `/etc/agents-chat`
-- systemd unit files
-- an initial `/etc/caddy/Caddyfile`
-- starter copies of:
-  - `/etc/agents-chat/server.env`
-  - `/etc/agents-chat/dart_define.production.json`
-
-Install the local STT runtime once per server:
-
-```bash
-sudo /opt/ops/install-stt-runtime.sh --model-size small
-```
-
-This creates:
-
-- `/opt/agents-chat/shared/stt-venv`
-- `/opt/agents-chat/shared/models/faster-whisper`
-
-The API server calls this local Python environment directly. No second public STT service is exposed.
-
-## Production Config Files
-
-Edit the backend env file before the first deploy:
-
-```bash
-sudoedit /etc/agents-chat/server.env
-```
-
-Minimum production changes:
-
-- set `NODE_ENV=production`
-- replace `JWT_SECRET`
-- replace `OPERATOR_TOKEN`
-- replace `AGENT_CANT_SECRET`
-- keep `PORT=3000`
-- keep `MINIO_ENDPOINT=127.0.0.1`
-- keep `MINIO_PORT=9000`
-- keep `MINIO_USE_SSL=false`
-- point `DATABASE_URL` to the local PostgreSQL container
-- point `REDIS_URL` to the local Redis container
-- keep `STT_PYTHON_BIN=/opt/agents-chat/shared/stt-venv/bin/python`
-- keep `STT_MODEL_DIR=/opt/agents-chat/shared/models/faster-whisper`
-- keep `FFMPEG_BIN=/usr/bin/ffmpeg`
-- keep the default CPU STT settings unless you intentionally provision a GPU host
-
-Edit the Flutter Web production define file:
-
-```bash
-sudoedit /etc/agents-chat/dart_define.production.json
-```
-
-Set:
-
-- `APP_FLAVOR` to `production`
-- `API_BASE_URL` to `https://<your-domain>/api/v1`
-- `REALTIME_WS_URL` to `wss://<your-domain>/ws`
-
-## Domain And HTTPS
-
-`deploy/caddy/Caddyfile.example` is the canonical reverse-proxy template.
-
-It serves:
-
-- `/` from Flutter Web build output
-- `/api/*` from the NestJS API on `127.0.0.1:3000`
-- `/ws*` from the NestJS realtime endpoint on `127.0.0.1:3000`
-
-Caddy will automatically obtain and renew HTTPS certificates once:
-
-- the domain resolves to the server public IP
-- ports `80` and `443` are open
-
-## First Release
-
-Run the first deployment from the server:
+## Release
 
 ```bash
 sudo /opt/ops/deploy-release.sh --git-ref main
 ```
 
-This release flow will:
+The script serializes releases with a lock, installs locked server and Web dependencies, builds both, then runs migrations. It saves the active Caddy configuration, systemd units, and operation scripts; installs the new service configuration; atomically replaces the current symlink; restarts API and Web; and checks API readiness, HTML, BFF, OpenAPI, and WebSocket routes. A failed switch or smoke check restores the previous application and configuration. Successful releases record .previous-release and .release-ready; failed releases are excluded from rollback.
 
-1. fetch the requested git ref from `/opt/agents-chat/repo`
-2. unpack it into a new release directory
-3. start `postgres`, `redis`, and `minio` with Docker Compose
-4. install backend dependencies and build the NestJS server
-5. run database migrations
-6. build Flutter Web with `/etc/agents-chat/dart_define.production.json`
-7. switch `/opt/agents-chat/current`
-8. restart `agents-chat-api`
-9. run smoke checks for:
-   - API health
-   - web root
-   - websocket path
-   - voice/STT dependencies already present on the box
+The server and Web environment files use dotenv parsing, not shell execution. Values such as a display name containing spaces are supported. NEXT_PUBLIC variables are fixed during the Web build.
 
-The websocket smoke check behaves like this:
-
-- if `WS_CHECK_TOKEN` is set, it expects a successful `101 Switching Protocols`
-- if no token is set, it verifies that the route is reachable and returns the expected auth failure
-
-That means the first deployment can still verify that `/ws` is wired up even before you provide a real human token.
-
-## Incremental Releases
-
-Deploy a later git ref:
+For a prebuilt release, prepare the artifact on the same OS, architecture and Node.js major version as the target using the target public URLs:
 
 ```bash
-sudo /opt/ops/deploy-release.sh --git-ref <branch-or-tag>
+bash deploy/ops/prepare-web-artifact.sh /path/to/source/web /path/to/web.env
+sudo /opt/ops/deploy-release.sh --source-dir /path/to/source --use-prebuilt-web
 ```
 
-Deploy from a local source tree already present on the server:
-
-```bash
-sudo /opt/ops/deploy-release.sh --source-dir /path/to/source --release-id manual-test
-```
-
-By default, `deploy-release.sh` always rebuilds Flutter Web for the release so a stale `app/build/web` directory in the source tree cannot accidentally ship an old landing page or app shell.
-
-When `--source-dir` is used, the release archive also drops local generated directories like `app/build`, `.dart_tool`, `server/node_modules`, `server/dist`, and `output` so the release stays clean and reproducible.
-
-Only reuse an existing `app/build/web` on purpose:
-
-```bash
-sudo /opt/ops/deploy-release.sh --source-dir /path/to/source --release-id manual-test --use-prebuilt-web
-```
-
-That flag copies only `app/build/web` into the release and still excludes the rest of the local build caches.
+The helper creates web/.next/deploy-build.json. The release script validates that manifest and packages standalone, static assets and public files. A Windows standalone artifact is rejected on Linux. The ordinary server build is the default.
 
 ## Rollback
 
-Rollback to the previous release:
-
 ```bash
 sudo /opt/ops/rollback-release.sh
+# Or choose a verified existing release:
+sudo /opt/ops/rollback-release.sh --release-id <existing-release-id>
 ```
 
-Rollback to a specific release id:
+The default follows the recorded previous release, rather than directory timestamps. Rollback switches API, Web and Caddy together. A failed rollback restores the release and configuration active before that attempt. Returning to a legacy Flutter release needs the matching saved Caddy configuration, or an explicit LEGACY_CADDY_FILE. Database migrations are not reversed; schema changes must remain compatible with the previous release.
+
+Backup operations remain in deploy/ops/run-backups.sh and systemd timers. Source commits and mock checks are not production deployment evidence.
+
+## Local transaction checks
+
+The following exercises build failure, failure after cutover, failed rollback recovery, rollback target selection and platform mismatch. It uses only temporary files and mocked services inside a disposable container, with no network or Docker socket:
 
 ```bash
-sudo /opt/ops/rollback-release.sh --release-id <release-id>
+for script in deploy/ops/*.sh deploy/tests/*.sh; do bash -n "$script"; done
+docker run --rm --network none --read-only --tmpfs /tmp:exec \
+  -e RELEASE_TEST_CONTAINER=1 \
+  --mount "type=bind,source=$PWD,target=/repo,readonly" \
+  node:24-bookworm-slim bash /repo/deploy/tests/release-transaction.test.sh
 ```
-
-Rollback only switches the app code back to a previous release and restarts the API.
-
-It does **not** undo database migrations automatically.
-If a release contains a non-backward-compatible migration, that migration must be treated as a manual release gate.
-
-## Logs And Health Checks
-
-Useful commands:
-
-```bash
-sudo /opt/ops/check-health.sh
-sudo /opt/ops/check-websocket.sh
-sudo /opt/ops/show-logs.sh
-sudo /opt/ops/restart-api.sh
-```
-
-If you already have a real app access token for websocket verification:
-
-```bash
-sudo WS_CHECK_TOKEN=<human-access-token> /opt/ops/check-websocket.sh
-```
-
-To verify local STT dependencies before rollout:
-
-```bash
-sudo /opt/ops/install-stt-runtime.sh --model-size small
-ffmpeg -version
-/opt/agents-chat/shared/stt-venv/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8', download_root='/opt/agents-chat/shared/models/faster-whisper')"
-```
-
-## Backups
-
-Run a manual backup:
-
-```bash
-sudo /opt/ops/run-backups.sh
-```
-
-Check backup freshness:
-
-```bash
-sudo /opt/ops/check-backups.sh
-```
-
-Backup outputs:
-
-- PostgreSQL dump files in `/opt/backups/postgres`
-- MinIO tar archives in `/opt/backups/minio`
-
-If the bootstrap script installed the backup timer, the server will run backups automatically once per day.
-
-Lightsail snapshots are still managed outside the repo.
-For full snapshot status checks, configure one of these:
-
-- install `aws` CLI and export `AWS_REGION` + `LIGHTSAIL_INSTANCE_NAME`
-- or write the latest snapshot result to `/opt/backups/reports/lightsail-snapshot-status.txt`
-
-Recommended recovery order:
-
-1. restore PostgreSQL
-2. restore MinIO data
-3. restore app code and `/etc/agents-chat/*` config files
-4. restart the API and re-run smoke checks
-
-## OpenClaw Integration
-
-OpenClaw runs on your local machine, not on the production host.
-
-The production host exposes only fixed operation entry points through `/opt/ops/*.sh`.
-OpenClaw should not run arbitrary shell commands against production.
-
-Recommended agents:
-
-- `watcher-agent`
-  - check `/api/v1/health`
-  - check `/ws`
-  - check disk, memory, and API service status
-  - only alert, never mutate
-- `operator-agent`
-  - allowed to run:
-    - `/opt/ops/deploy-release.sh`
-    - `/opt/ops/rollback-release.sh`
-    - `/opt/ops/restart-api.sh`
-    - `/opt/ops/show-logs.sh`
-- `backup-agent`
-  - allowed to run:
-    - `/opt/ops/run-backups.sh`
-    - `/opt/ops/check-backups.sh`
-
-More detailed role notes live in [openclaw/README.md](./openclaw/README.md).

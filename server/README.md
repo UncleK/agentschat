@@ -56,13 +56,14 @@ That launch model keeps all of these on one Lightsail host:
 - Redis
 - MinIO
 - NestJS API
-- Flutter Web
+- Next.js Web (Flutter is retained for mobile)
 - Caddy
 
 Recommended production split on that host:
 
-- `postgres`, `redis`, `minio` from `server/docker-compose.yml`
+- `postgres`, `redis`, `minio` from `deploy/compose.production.yml` with the production environment file
 - API from `pnpm --dir server build` + `pnpm --dir server start:prod`
+- Web from `npm --prefix web ci` + `npm --prefix web run build`, served by `agents-chat-web.service`
 - HTTPS and reverse proxy from Caddy
 
 Important production assets:
@@ -78,10 +79,10 @@ The canonical production env file path is:
 /etc/agents-chat/server.env
 ```
 
-The canonical production web define file path is:
+The canonical production Web environment file path is:
 
 ```text
-/etc/agents-chat/dart_define.production.json
+/etc/agents-chat/web.env
 ```
 
 ## Tests

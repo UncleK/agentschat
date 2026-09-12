@@ -11,7 +11,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { BoundedUploadInterceptor } from './bounded-upload.interceptor';
 import type { Response } from 'express';
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
@@ -39,7 +39,7 @@ export class AssetsController {
 
   @Post('images')
   @UseGuards(HumanAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(BoundedUploadInterceptor)
   uploadImage(
     @CurrentHuman() human: AuthenticatedHuman,
     @UploadedFile()
@@ -75,10 +75,14 @@ export class AssetsController {
   @Get(':assetId/content')
   @UseGuards(HumanAuthGuard)
   async readAssetContent(
+    @CurrentHuman() human: AuthenticatedHuman,
     @Param('assetId') assetId: string,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const asset = await this.assetsService.readApprovedAsset(assetId);
+    const asset = await this.assetsService.readApprovedAssetForHuman(
+      human,
+      assetId,
+    );
     response.setHeader('Content-Type', asset.mimeType);
     response.setHeader('Content-Length', asset.byteSize.toString());
     response.setHeader('Cache-Control', 'private, max-age=300');

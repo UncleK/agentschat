@@ -11,11 +11,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
+  AgentOwnerType,
   AssetKind,
+  SubjectType,
+  ThreadVisibility,
   AssetModerationStatus,
   AssetUploadStatus,
 } from '../../database/domain.enums';
 import { AssetEntity } from '../../database/entities/asset.entity';
+import { AgentEntity } from '../../database/entities/agent.entity';
+import { EventEntity } from '../../database/entities/event.entity';
+import { ThreadParticipantEntity } from '../../database/entities/thread-participant.entity';
+import { visibleMetadataSql } from '../moderation/content-visibility';
+import { SubjectReference } from '../policy/policy.types';
 import { AuthenticatedHuman } from '../auth/auth.types';
 import { AssetStorageService } from './asset-storage.service';
 import { ImageModerationService } from './image-moderation.service';
@@ -206,6 +214,58 @@ export class AssetsService {
 
   createReadUrl(asset: AssetEntity): string {
     return `/${this.environment.apiPrefix}/assets/${asset.id}/content`;
+  }
+
+  async assertAssetReadable(asset: AssetEntity, actor: SubjectReference) {
+    let ownerUserId = actor.type === SubjectType.Human ? actor.id : null;
+    if (actor.type === SubjectType.Agent) {
+      const agent = await this.assetRepository.manager
+        .getRepository(AgentEntity)
+        .findOneBy({ id: actor.id, ownerType: AgentOwnerType.Human });
+      ownerUserId = agent?.ownerUserId ?? null;
+    }
+    if (ownerUserId && asset.createdByUserId === ownerUserId) {
+      return;
+    }
+
+    const readable = await this.assetRepository.manager
+      .getRepository(EventEntity)
+      .createQueryBuilder('event')
+      .innerJoin('event.thread', 'thread')
+      .leftJoin(
+        ThreadParticipantEntity,
+        'participant',
+        'participant.threadId = thread.id',
+      )
+      .leftJoin('participant.agent', 'participantAgent')
+      .where('event.assetId = :assetId', { assetId: asset.id })
+      .andWhere(visibleMetadataSql('event.metadata'))
+      .andWhere(visibleMetadataSql('thread.metadata'))
+      .andWhere(
+        `(thread.visibility = :publicVisibility OR
+          (participant.participantType = :actorType AND participant.participantSubjectId = :actorId) OR
+          (:actorType = :humanType AND participantAgent.ownerType = :humanOwnerType AND participantAgent.ownerUserId = :actorId))`,
+        {
+          publicVisibility: ThreadVisibility.Public,
+          actorType: actor.type,
+          actorId: actor.id,
+          humanType: SubjectType.Human,
+          humanOwnerType: AgentOwnerType.Human,
+        },
+      )
+      .getExists();
+    if (!readable) {
+      throw new NotFoundException(`Asset ${asset.id} was not found.`);
+    }
+  }
+
+  async readApprovedAssetForHuman(human: AuthenticatedHuman, assetId: string) {
+    const asset = await this.requireApprovedAsset(assetId);
+    await this.assertAssetReadable(asset, {
+      type: SubjectType.Human,
+      id: human.id,
+    });
+    return this.readApprovedAsset(assetId);
   }
 
   async readApprovedAsset(

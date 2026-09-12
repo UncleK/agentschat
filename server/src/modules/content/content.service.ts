@@ -30,6 +30,10 @@ import { AssetsService } from '../assets/assets.service';
 import { DebateService } from '../debate/debate.service';
 import { AuthenticatedFederatedAgent } from '../federation/federation.types';
 import { ModerationService } from '../moderation/moderation.service';
+import {
+  visibleMetadata,
+  visibleMetadataSql,
+} from '../moderation/content-visibility';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PolicyService } from '../policy/policy.service';
 import { SubjectReference } from '../policy/policy.types';
@@ -226,6 +230,7 @@ interface NormalizedContentInput {
 }
 
 interface NormalizeContentOptions {
+  actor?: SubjectReference;
   allowAudio?: boolean;
   generatedAudio?: {
     messageId: string;
@@ -279,20 +284,22 @@ export class ContentService {
     if (!activeAgentId) {
       await this.assertHumanCommandChatRecipient(human.id, recipient);
     }
-    const actor = activeAgentId
-      ? {
-          type: SubjectType.Agent,
-          id: activeAgentId,
-        }
-      : {
-          type: SubjectType.Human,
-          id: human.id,
-        };
-
-    return this.sendDirectMessage(actor, recipient, {
-      ...input,
-      activeAgentId,
-    });
+    const actor: SubjectReference = { type: SubjectType.Human, id: human.id };
+    return this.sendDirectMessage(
+      actor,
+      recipient,
+      {
+        ...input,
+        activeAgentId,
+      },
+      undefined,
+      {
+        // The owned agent determines routing and network policy, never authorship.
+        policyActor: activeAgentId
+          ? { type: SubjectType.Agent, id: activeAgentId }
+          : actor,
+      },
+    );
   }
 
   async sendAgentDirectMessage(
@@ -628,7 +635,7 @@ export class ContentService {
     };
 
     await this.moderationService.assertActorAllowed(actor);
-    const authoredContent = await this.normalizeContentInput(input);
+    const authoredContent = await this.normalizeContentInput(input, { actor });
 
     const result = await this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
@@ -904,14 +911,42 @@ export class ContentService {
   ) {
     const normalizedQuery = this.optionalString(input.query)?.toLowerCase();
     const limit = this.parseLimit(input.limit, 20, 50);
-    const fetchLimit = normalizedQuery ? Math.min(limit * 3, 50) : limit;
 
-    const topicViews = await this.forumTopicViewRepository.find({
-      order: {
-        lastActivityAt: 'DESC',
-      },
-      take: fetchLimit,
-    });
+    const topicQuery = this.forumTopicViewRepository
+      .createQueryBuilder('topicView')
+      .innerJoin('topicView.thread', 'thread')
+      .innerJoin(
+        EventEntity,
+        'rootEvent',
+        'rootEvent.id = topicView.rootEventId AND rootEvent.threadId = topicView.threadId',
+      )
+      .where('thread.contextType = :contextType', {
+        contextType: ThreadContextType.ForumTopic,
+      })
+      .andWhere('thread.visibility = :visibility', {
+        visibility: ThreadVisibility.Public,
+      })
+      .andWhere('rootEvent.eventType = :eventType', {
+        eventType: 'forum.topic.create',
+      })
+      .andWhere(visibleMetadataSql('thread.metadata'))
+      .andWhere(visibleMetadataSql('rootEvent.metadata'));
+    if (normalizedQuery) {
+      topicQuery
+        .leftJoin('rootEvent.actorAgent', 'authorAgent')
+        .leftJoin('rootEvent.actorUser', 'authorUser')
+        .andWhere(
+          `(POSITION(:query IN LOWER(topicView.title)) > 0 OR
+            POSITION(:query IN LOWER(COALESCE(rootEvent.content, ''))) > 0 OR
+            POSITION(:query IN LOWER(ARRAY_TO_STRING(topicView.tags, ' '))) > 0 OR
+            POSITION(:query IN LOWER(COALESCE(authorAgent.displayName, authorUser.displayName, ''))) > 0)`,
+          { query: normalizedQuery },
+        );
+    }
+    const topicViews = await topicQuery
+      .orderBy('topicView.lastActivityAt', 'DESC')
+      .limit(limit)
+      .getMany();
 
     if (topicViews.length === 0) {
       return {
@@ -979,16 +1014,9 @@ export class ContentService {
         );
       })
       .filter((topic): topic is ForumTopicDto => topic !== null);
-    const filteredTopics =
-      normalizedQuery == null
-        ? topics
-        : topics.filter((topic) =>
-            this.matchesForumTopicQuery(topic, normalizedQuery),
-          );
-
     return {
       activeAgentId,
-      topics: filteredTopics.slice(0, limit),
+      topics,
     };
   }
 
@@ -997,8 +1025,15 @@ export class ContentService {
     activeAgentId: string | null,
     viewerLikeActor: SubjectReference | null,
   ) {
-    const topicView = await this.forumTopicViewRepository.findOneBy({
-      threadId,
+    const topicView = await this.forumTopicViewRepository.findOne({
+      where: {
+        threadId,
+        thread: {
+          contextType: ThreadContextType.ForumTopic,
+          visibility: ThreadVisibility.Public,
+          metadata: visibleMetadata(),
+        },
+      },
     });
 
     if (!topicView) {
@@ -1010,6 +1045,7 @@ export class ContentService {
         where: {
           threadId,
           eventType: In(['forum.topic.create', 'forum.reply.create']),
+          metadata: visibleMetadata(),
         },
         relations: {
           actorAgent: true,
@@ -1036,8 +1072,11 @@ export class ContentService {
         : Promise.resolve(false),
     ]);
 
-    const rootEvent =
-      events.find((event) => event.id === topicView.rootEventId) ?? events[0];
+    const rootEvent = events.find(
+      (event) =>
+        event.id === topicView.rootEventId &&
+        event.eventType === 'forum.topic.create',
+    );
 
     if (!rootEvent) {
       throw new NotFoundException(
@@ -1130,7 +1169,7 @@ export class ContentService {
 
     const title = this.requiredString(input.title, 'title');
     const tags = this.normalizeTags(input.tags);
-    const authoredContent = await this.normalizeContentInput(input);
+    const authoredContent = await this.normalizeContentInput(input, { actor });
 
     return this.dataSource.transaction(async (manager) => {
       const threadRepository = manager.getRepository(ThreadEntity);
@@ -1210,8 +1249,15 @@ export class ContentService {
 
     await this.moderationService.assertThreadWritable(threadId);
 
-    const topicView = await this.forumTopicViewRepository.findOneBy({
-      threadId,
+    const topicView = await this.forumTopicViewRepository.findOne({
+      where: {
+        threadId,
+        thread: {
+          contextType: ThreadContextType.ForumTopic,
+          visibility: ThreadVisibility.Public,
+          metadata: visibleMetadata(),
+        },
+      },
     });
 
     if (!topicView) {
@@ -1239,7 +1285,7 @@ export class ContentService {
       parentEvent,
     );
 
-    const authoredContent = await this.normalizeContentInput(input);
+    const authoredContent = await this.normalizeContentInput(input, { actor });
 
     const result = await this.dataSource.transaction(async (manager) => {
       const topicViewRepository = manager.getRepository(ForumTopicViewEntity);
@@ -1364,7 +1410,9 @@ export class ContentService {
     await this.debateService.sweepDebateSession(debateSessionId);
     await this.moderationService.assertDebateWritable(debateSessionId);
 
-    const authoredContent = await this.normalizeContentInput(input);
+    const authoredContent = await this.normalizeContentInput(input, {
+      actor: { type: SubjectType.Agent, id: actorAgentId },
+    });
 
     const result = await this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
@@ -1461,7 +1509,7 @@ export class ContentService {
         debateSessionId,
       );
 
-    const authoredContent = await this.normalizeContentInput(input);
+    const authoredContent = await this.normalizeContentInput(input, { actor });
 
     const result = await this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
@@ -1507,10 +1555,15 @@ export class ContentService {
     options?: {
       allowAudio?: boolean;
       audioSource?: VoiceMetadata['source'];
+      policyActor?: SubjectReference;
     },
   ) {
     await this.moderationService.assertActorAllowed(actor);
-    await this.assertAgentSurfaceResponseAllowed(actor, 'dm');
+    const policyActor = options?.policyActor ?? actor;
+    if (policyActor.type !== actor.type || policyActor.id !== actor.id) {
+      await this.moderationService.assertActorAllowed(policyActor);
+    }
+    await this.assertAgentSurfaceResponseAllowed(policyActor, 'dm');
 
     const explicitThreadId = this.optionalString(input.threadId);
     const routedThreadId = explicitThreadId
@@ -1524,16 +1577,20 @@ export class ContentService {
 
     if (!explicitThreadId) {
       await this.policyService.assertDirectMessageAllowed({
-        actor,
+        actor: policyActor,
         recipient,
       });
     }
 
     const assetId = this.optionalString(input.assetId ?? input.asset_id);
-    const requestedContentType = this.parseContentType(input.contentType, assetId);
+    const requestedContentType = this.parseContentType(
+      input.contentType,
+      assetId,
+    );
     const eventId =
       requestedContentType === EventContentType.Audio ? randomUUID() : null;
     const authoredContent = await this.normalizeContentInput(input, {
+      actor,
       allowAudio: options?.allowAudio ?? false,
       generatedAudio:
         requestedContentType === EventContentType.Audio && eventId
@@ -1687,8 +1744,15 @@ export class ContentService {
     threadId: string,
     parentEventId: string,
   ): Promise<void> {
-    const topicView = await this.forumTopicViewRepository.findOneBy({
-      threadId,
+    const topicView = await this.forumTopicViewRepository.findOne({
+      where: {
+        threadId,
+        thread: {
+          contextType: ThreadContextType.ForumTopic,
+          visibility: ThreadVisibility.Public,
+          metadata: visibleMetadata(),
+        },
+      },
     });
 
     if (!topicView) {
@@ -2328,24 +2392,6 @@ ${selfAuthoredFilter}
     );
   }
 
-  private matchesForumTopicQuery(
-    topic: ForumTopicDto,
-    normalizedQuery: string,
-  ): boolean {
-    if (
-      topic.title.toLowerCase().includes(normalizedQuery) ||
-      topic.summary.toLowerCase().includes(normalizedQuery) ||
-      topic.rootBody.toLowerCase().includes(normalizedQuery) ||
-      topic.authorName.toLowerCase().includes(normalizedQuery)
-    ) {
-      return true;
-    }
-
-    return topic.tags.some((tag) =>
-      tag.toLowerCase().includes(normalizedQuery),
-    );
-  }
-
   private parseLimit(
     value: string | null | undefined,
     defaultValue: number,
@@ -2706,6 +2752,12 @@ ${selfAuthoredFilter}
       }
 
       const asset = await this.assetsService.requireApprovedImageAsset(assetId);
+      if (!options.actor) {
+        throw new ForbiddenException(
+          'An authenticated asset author is required.',
+        );
+      }
+      await this.assetsService.assertAssetReadable(asset, options.actor);
 
       return {
         asset,

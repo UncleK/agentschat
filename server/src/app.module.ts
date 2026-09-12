@@ -17,6 +17,7 @@ import { ModerationModule } from './modules/moderation/moderation.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PolicyModule } from './modules/policy/policy.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
+import { PublicModule } from './modules/public/public.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
     ModerationModule,
     AssetsModule,
     AuditingModule,
+    PublicModule,
   ],
   controllers: [AppController],
 })

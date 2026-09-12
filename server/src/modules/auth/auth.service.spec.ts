@@ -1,4 +1,8 @@
-import { NotImplementedException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotImplementedException,
+  UnauthorizedException,
+} from '@nestjs/common';
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import { ModuleRef } from '@nestjs/core';
 import { Repository } from 'typeorm';
@@ -76,6 +80,31 @@ describe('AuthService', () => {
         `v1.${encodedPayload}.${signature}`,
       ),
     ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it.each([null, [], 42])(
+    'rejects signed non-object payload %j with a 401',
+    async (payload) => {
+      const harness = createHarness();
+      const encoded = Buffer.from(JSON.stringify(payload)).toString(
+        'base64url',
+      );
+      await expect(
+        harness.service.authenticateHumanToken(
+          `v1.${encoded}.${harness.service.signValue(encoded)}`,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+    },
+  );
+
+  it.each([
+    { email: 42, password: 'password123' },
+    { email: 'owner@example.com', password: ['password123'] },
+  ])('rejects incorrect login field types with a 400', async (input) => {
+    const harness = createHarness();
+    await expect(
+      harness.service.loginWithEmail(input as never),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('rejects human tokens with extra dot-separated segments', async () => {

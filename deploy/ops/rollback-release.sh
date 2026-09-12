@@ -1,83 +1,67 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-APP_ROOT="${APP_ROOT:-/opt/agents-chat}"
-RELEASES_DIR="${RELEASES_DIR:-$APP_ROOT/releases}"
-CURRENT_LINK="${CURRENT_LINK:-$APP_ROOT/current}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/release-common.sh"
+release_init
 TARGET_RELEASE=""
-
-usage() {
-  cat <<'EOF'
-Usage:
-  rollback-release.sh [--release-id <release-id>]
-EOF
-}
-
-while [[ $# -gt 0 ]]; do
+while (( $# )); do
   case "$1" in
-    --release-id)
-      TARGET_RELEASE="$2"
-      shift 2
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      usage >&2
-      exit 1
-      ;;
+    --release-id) (( $# >= 2 )) || { echo 'Missing release id.' >&2; exit 1; }; TARGET_RELEASE="$2"; shift 2;;
+    -h|--help) echo 'Usage: rollback-release.sh [--release-id ID]'; exit 0;;
+    *) echo "Unknown argument: $1" >&2; exit 1;;
   esac
 done
-
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "Run this script as root." >&2
-  exit 1
-fi
-
-if [[ ! -L "$CURRENT_LINK" ]]; then
-  echo "Current release symlink not found: $CURRENT_LINK" >&2
-  exit 1
-fi
-
-current_release="$(basename "$(readlink -f "$CURRENT_LINK")")"
-
+[[ "$(id -u)" == 0 ]] || { echo 'Run as root.' >&2; exit 1; }
+release_lock
+[[ -L "$CURRENT_LINK" ]] || { echo 'Current release symlink is missing.' >&2; exit 1; }
+CURRENT_RELEASE="$(readlink -f "$CURRENT_LINK")"
 if [[ -z "$TARGET_RELEASE" ]]; then
-  mapfile -t release_ids < <(
-    find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' |
-      sort -n |
-      awk '{print $2}'
-  )
-
-  previous_release=""
-  for release_id in "${release_ids[@]}"; do
-    if [[ "$release_id" == "$current_release" ]]; then
-      break
-    fi
-    previous_release="$release_id"
-  done
-
-  if [[ -z "$previous_release" ]]; then
-    echo "No previous release found to roll back to." >&2
-    exit 1
-  fi
-
-  TARGET_RELEASE="$previous_release"
+  require_file "$CURRENT_RELEASE/.previous-release"
+  previous="$(cat "$CURRENT_RELEASE/.previous-release")"
+  [[ -n "$previous" && -d "$previous" ]] || { echo 'No recorded previous release; specify a verified release id.' >&2; exit 1; }
+  [[ "$(dirname "$(realpath "$previous")")" == "$(realpath "$RELEASES_DIR")" ]] || { echo "Recorded previous release is outside RELEASES_DIR." >&2; exit 1; }
+  TARGET_RELEASE="$(basename "$previous")"
 fi
-
-target_dir="$RELEASES_DIR/$TARGET_RELEASE"
-if [[ ! -d "$target_dir" ]]; then
-  echo "Target release not found: $target_dir" >&2
-  exit 1
-fi
-
-ln -sfn "$target_dir" "$CURRENT_LINK"
-systemctl restart agents-chat-api.service
-/opt/ops/check-health.sh
-
-cat <<EOF
-Rollback complete.
-Current release: $TARGET_RELEASE
-Note: database migrations were not rolled back automatically.
-EOF
+validate_release_id "$TARGET_RELEASE"
+TARGET_DIR="$RELEASES_DIR/$TARGET_RELEASE"
+[[ -d "$TARGET_DIR" && ! -L "$TARGET_DIR" && "$TARGET_DIR" != "$CURRENT_RELEASE" ]] || { echo 'Target must be an existing different release directory.' >&2; exit 1; }
+[[ ! -f "$TARGET_DIR/.release-failed" ]] || { echo 'Refusing to roll back to a failed deployment.' >&2; exit 1; }
+require_file "$TARGET_DIR/server/dist/src/main.js"
+RECOVERY_DIR="$APP_ROOT/shared/rollback-$(date +%Y%m%d%H%M%S)-$$"
+mkdir -p "$RECOVERY_DIR"
+if [[ -f "$TARGET_DIR/web/.next/standalone/server.js" ]]; then
+  if [[ -f "$TARGET_DIR/Caddyfile.deployed" ]]; then cp -a "$TARGET_DIR/Caddyfile.deployed" "$RECOVERY_DIR/Caddyfile.target"
+  else prepare_caddy "$TARGET_DIR" "$RECOVERY_DIR/Caddyfile.target"; fi
+elif [[ -f "$TARGET_DIR/app/build/web/index.html" ]]; then
+  if [[ -n "${LEGACY_CADDY_FILE:-}" ]]; then require_file "$LEGACY_CADDY_FILE"; cp -a "$LEGACY_CADDY_FILE" "$RECOVERY_DIR/Caddyfile.target"
+  elif [[ -f "$CURRENT_RELEASE/.previous-release" && "$(cat "$CURRENT_RELEASE/.previous-release")" == "$TARGET_DIR" && -f "$CURRENT_RELEASE/.deployment-before/Caddyfile" ]]; then cp -a "$CURRENT_RELEASE/.deployment-before/Caddyfile" "$RECOVERY_DIR/Caddyfile.target"
+  elif [[ -f "$TARGET_DIR/Caddyfile.deployed" ]]; then cp -a "$TARGET_DIR/Caddyfile.deployed" "$RECOVERY_DIR/Caddyfile.target"
+  else echo 'Provide LEGACY_CADDY_FILE for this legacy rollback; no verified matching configuration is available.' >&2; exit 1; fi
+else echo 'Target has neither a complete native Web nor legacy Flutter Web build.' >&2; exit 1; fi
+caddy validate --config "$RECOVERY_DIR/Caddyfile.target" --adapter caddyfile
+snapshot_configuration "$RECOVERY_DIR/before" "$TARGET_DIR"
+CONFIG_CHANGED=false
+CURRENT_CHANGED=false
+recover_failed_rollback() {
+  local result="$?" failed=0
+  (( result != 0 )) || return 0
+  trap - EXIT
+  set +e
+  if [[ "$CURRENT_CHANGED" == true ]]; then atomic_switch "$CURRENT_RELEASE" || failed=1; fi
+  if [[ "$CONFIG_CHANGED" == true ]]; then restore_configuration "$RECOVERY_DIR/before" || failed=1; fi
+  if [[ "$CURRENT_CHANGED" == true ]]; then restart_application "$CURRENT_RELEASE" || failed=1; fi
+  if (( failed )); then echo 'Rollback failed and recovery is incomplete; inspect services immediately.' >&2
+  else echo 'Rollback failed; restored the release and configuration that were active before this attempt.' >&2; fi
+  exit "$result"
+}
+trap recover_failed_rollback EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+CONFIG_CHANGED=true
+install_release_configuration "$TARGET_DIR" "$RECOVERY_DIR/Caddyfile.target"
+CURRENT_CHANGED=true
+atomic_switch "$TARGET_DIR"
+restart_application "$TARGET_DIR"
+smoke_application "$TARGET_DIR"
+trap - EXIT INT TERM
+echo "Rollback complete: $TARGET_RELEASE. Database migrations were not reversed."

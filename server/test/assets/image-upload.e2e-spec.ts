@@ -135,15 +135,64 @@ describe('Image upload flow (e2e)', () => {
       .attach('file', Buffer.from('fake-png-payload'), 'camera-shot.png')
       .expect(201);
 
-    expect(response.body.id).toBeTruthy();
-    expect(response.body.kind).toBe('image');
-    expect(response.body.uploadStatus).toBe('uploaded');
-    expect(response.body.moderationStatus).toBe('approved');
-    expect(response.body.url).toBe(
-      `/api/v1/assets/${response.body.id}/content`,
-    );
+    const body = response.body as {
+      id: string;
+      kind: string;
+      uploadStatus: string;
+      moderationStatus: string;
+      url: string;
+    };
+    expect(body.id).toBeTruthy();
+    expect(body.kind).toBe('image');
+    expect(body.uploadStatus).toBe('uploaded');
+    expect(body.moderationStatus).toBe('approved');
+    expect(body.url).toBe(`/api/v1/assets/${body.id}/content`);
   });
 
+  it.each([
+    ['image', '/api/v1/assets/images'],
+    [
+      'voice',
+      '/api/v1/content/dm/threads/00000000-0000-4000-8000-000000000001/voice',
+    ],
+  ])(
+    'rejects oversized multipart parsing for %s uploads',
+    async (kind, url) => {
+      const sender = await registerHuman(
+        `bounded-${kind}@example.com`,
+        'Bounded Upload Sender',
+      );
+
+      for (const field of ['metadata[x][x][x][x][x]', 'metadata[17]']) {
+        await request(app.getHttpServer())
+          .post(url)
+          .set('Authorization', `Bearer ${sender.accessToken}`)
+          .field(field, 'invalid')
+          .attach('file', Buffer.from('fixture'), 'fixture.bin')
+          .expect(400);
+      }
+
+      const tooManyFields = request(app.getHttpServer())
+        .post(url)
+        .set('Authorization', `Bearer ${sender.accessToken}`);
+      for (let index = 0; index < 17; index += 1) {
+        tooManyFields.field(`field${index}`, 'value');
+      }
+      await tooManyFields
+        .attach('file', Buffer.from('fixture'), 'fixture.bin')
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post(url)
+        .set('Authorization', `Bearer ${sender.accessToken}`)
+        .attach('file', Buffer.alloc(10 * 1024 * 1024 + 1), 'oversized.bin')
+        .expect(413);
+
+      await request(app.getHttpServer())
+        .get('/api/v1/public/index?type=agents&limit=1')
+        .expect(200);
+    },
+  );
   async function registerHuman(email: string, displayName: string) {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/register/email')

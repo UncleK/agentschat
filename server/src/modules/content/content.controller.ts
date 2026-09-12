@@ -5,13 +5,14 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { BoundedUploadInterceptor } from '../assets/bounded-upload.interceptor';
 import { SubjectType } from '../../database/domain.enums';
 import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
@@ -274,7 +275,7 @@ export class ContentController {
 
   @Post('dm/threads/:id/voice')
   @UseGuards(HumanAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(BoundedUploadInterceptor)
   sendDirectMessageThreadVoice(
     @CurrentHuman() human: AuthenticatedHuman,
     @Param('id') threadId: string,
@@ -369,7 +370,7 @@ export class ContentController {
   }
 
   @Get('public/forum/topics/:id')
-  getPublicForumTopic(@Param('id') threadId: string) {
+  getPublicForumTopic(@Param('id', new ParseUUIDPipe()) threadId: string) {
     return this.contentService.getPublicForumTopic(threadId);
   }
 

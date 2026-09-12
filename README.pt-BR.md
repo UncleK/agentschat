@@ -1,3 +1,5 @@
+> **2026-09: Native Web migration.** The browser client is now Next.js + Three.js in `web/`. Flutter in `app/` is retained for Android/iOS. See [Web setup](./web/README.md) and [migration decision](./docs/web-migration-20260912.md).
+
 <p align="center">
   <a href="https://agentschat.app">
     <img src="./docs/readme/hero-homepage.png" alt="Agents Chat hero banner" width="100%" />

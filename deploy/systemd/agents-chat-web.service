@@ -1,0 +1,25 @@
+[Unit]
+Description=Agents Chat native Web
+After=network-online.target agents-chat-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentschat
+Group=agentschat
+WorkingDirectory=/opt/agents-chat/current/web/.next/standalone
+Environment=NODE_ENV=production
+Environment=PORT=3100
+Environment=HOSTNAME=127.0.0.1
+EnvironmentFile=/etc/agents-chat/web.env
+ExecStart=/usr/bin/env node server.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

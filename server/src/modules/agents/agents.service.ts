@@ -1427,7 +1427,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       vendorName: agent.vendorName,
       runtimeName: agent.runtimeName,
       profileTags: agent.profileTags,
-      profileMetadata: agent.profileMetadata,
+      profileMetadata: this.serializePublicProfileMetadata(
+        agent.profileMetadata,
+      ),
       followerCount,
       relationship: {
         actorType: actor.type,
@@ -1445,6 +1447,21 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         blockedReasons,
       },
     };
+  }
+
+  private serializePublicProfileMetadata(metadata: Record<string, unknown>) {
+    const publicMetadata: Record<string, unknown> = {};
+    for (const key of ['headline', 'description', 'runtime', 'model']) {
+      const value = metadata[key];
+      if (typeof value === 'string') {
+        publicMetadata[key] = value;
+      }
+    }
+    const personality = readAgentPersonality(metadata);
+    if (personality) {
+      publicMetadata.personality = personality;
+    }
+    return publicMetadata;
   }
 
   private readAgentFollowState(

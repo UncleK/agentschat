@@ -29,6 +29,10 @@ import { ThreadParticipantEntity } from '../../database/entities/thread-particip
 import { ThreadEntity } from '../../database/entities/thread.entity';
 import type { AuthenticatedHuman } from '../auth/auth.types';
 import { ModerationService } from '../moderation/moderation.service';
+import {
+  isContentHidden,
+  visibleMetadata,
+} from '../moderation/content-visibility';
 import { NotificationsService } from '../notifications/notifications.service';
 
 interface DebateActor {
@@ -150,6 +154,12 @@ export class DebateService {
 
   async listDebates(limit = 12) {
     const sessions = await this.debateSessionRepository.find({
+      where: {
+        thread: {
+          visibility: ThreadVisibility.Public,
+          metadata: visibleMetadata(),
+        },
+      },
       order: {
         createdAt: 'DESC',
       },
@@ -164,6 +174,7 @@ export class DebateService {
   }
 
   async getDebate(debateSessionId: string) {
+    await this.assertDebatePubliclyReadable(debateSessionId);
     await this.sweepDebateSession(debateSessionId);
 
     const debateSession = await this.debateSessionRepository.findOne({
@@ -204,6 +215,7 @@ export class DebateService {
         where: {
           threadId: debateSession.threadId,
           eventType: 'debate.spectator.post',
+          metadata: visibleMetadata(),
         },
         relations: {
           actorAgent: true,
@@ -241,6 +253,7 @@ export class DebateService {
   }
 
   async getDebateArchive(debateSessionId: string) {
+    await this.assertDebatePubliclyReadable(debateSessionId);
     const debateSession = await this.debateSessionRepository.findOneBy({
       id: debateSessionId,
     });
@@ -257,7 +270,24 @@ export class DebateService {
       });
     }
 
-    return this.moderationService.readDebateArchive(debateSessionId);
+    return this.moderationService.readDebateArchive(debateSessionId, true);
+  }
+
+  private async assertDebatePubliclyReadable(debateSessionId: string) {
+    const exists = await this.debateSessionRepository.exists({
+      where: {
+        id: debateSessionId,
+        thread: {
+          visibility: ThreadVisibility.Public,
+          metadata: visibleMetadata(),
+        },
+      },
+    });
+    if (!exists) {
+      throw new NotFoundException(
+        `Debate session ${debateSessionId} was not found.`,
+      );
+    }
   }
 
   async startDebate(actor: DebateActor, debateSessionId: string) {
@@ -1907,7 +1937,10 @@ export class DebateService {
       deadlineAt: turn.deadlineAt?.toISOString() ?? null,
       submittedAt: turn.submittedAt?.toISOString() ?? null,
       metadata: turn.metadata,
-      event: turn.event ? this.serializeEvent(turn.event) : null,
+      event:
+        turn.event && !isContentHidden(turn.event.metadata)
+          ? this.serializeEvent(turn.event)
+          : null,
     };
   }
 
