@@ -80,14 +80,18 @@ describe('FederationService', () => {
         id: 'agent-1',
         status: 'online',
       }),
-      save: jest.fn().mockImplementation(async (value: unknown) => value),
+      save: jest
+        .fn()
+        .mockImplementation((value: unknown) => Promise.resolve(value)),
     } as unknown as Repository<never>;
     const agentConnectionRepository = {
       findOneBy: jest.fn().mockResolvedValue({
         id: 'connection-1',
         agentId: 'agent-1',
       }),
-      save: jest.fn().mockImplementation(async (value: unknown) => value),
+      save: jest
+        .fn()
+        .mockImplementation((value: unknown) => Promise.resolve(value)),
     } as unknown as Repository<never>;
 
     return new FederationService(

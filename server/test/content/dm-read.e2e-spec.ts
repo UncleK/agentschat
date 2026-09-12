@@ -186,9 +186,9 @@ describe('DM read models (e2e)', () => {
             lastMessage: {
               eventId: latestAlphaThread.eventId,
               actor: {
-                type: 'agent',
-                id: activeAlpha.id,
-                displayName: activeAlpha.displayName,
+                type: 'human',
+                id: owner.user.id,
+                displayName: owner.user.displayName,
               },
               contentType: 'text',
               preview: 'Alpha thread two.',
@@ -695,9 +695,9 @@ describe('DM read models (e2e)', () => {
         messages: [
           {
             actor: {
-              type: 'agent',
-              id: remoteAgent.id,
-              displayName: remoteAgent.displayName,
+              type: 'human',
+              id: remoteOwner.user.id,
+              displayName: remoteOwner.user.displayName,
             },
             contentType: 'text',
             content: 'Middle message.',
@@ -707,9 +707,9 @@ describe('DM read models (e2e)', () => {
           {
             eventId: newestMessage.eventId,
             actor: {
-              type: 'agent',
-              id: activeAgent.id,
-              displayName: activeAgent.displayName,
+              type: 'human',
+              id: owner.user.id,
+              displayName: owner.user.displayName,
             },
             contentType: 'text',
             content: 'Newest message.',
@@ -739,9 +739,9 @@ describe('DM read models (e2e)', () => {
           {
             eventId: oldestMessage.eventId,
             actor: {
-              type: 'agent',
-              id: activeAgent.id,
-              displayName: activeAgent.displayName,
+              type: 'human',
+              id: owner.user.id,
+              displayName: owner.user.displayName,
             },
             contentType: 'text',
             content: 'Oldest message.',
@@ -851,9 +851,9 @@ describe('DM read models (e2e)', () => {
               {
                 eventId: visibleMessage.eventId,
                 actor: {
-                  type: 'agent',
-                  id: activeAgent.id,
-                  displayName: activeAgent.displayName,
+                  type: 'human',
+                  id: owner.user.id,
+                  displayName: owner.user.displayName,
                 },
                 contentType: 'text',
                 content: 'Visible opener that should stay in history.',
@@ -1064,7 +1064,7 @@ describe('DM read models (e2e)', () => {
       activeAgentId: activeAgent.id,
       recipientType: 'agent',
       recipientAgentId: remoteAgent.id,
-      content: 'Initial agent-authored opener.',
+      content: 'Initial human-authored opener.',
     });
 
     const postResponse = await request(app.getHttpServer())
@@ -1109,12 +1109,12 @@ describe('DM read models (e2e)', () => {
         messages: [
           {
             actor: {
-              type: 'agent',
-              id: activeAgent.id,
-              displayName: activeAgent.displayName,
+              type: 'human',
+              id: owner.user.id,
+              displayName: owner.user.displayName,
             },
             contentType: 'text',
-            content: 'Initial agent-authored opener.',
+            content: 'Initial human-authored opener.',
           },
           {
             actor: {

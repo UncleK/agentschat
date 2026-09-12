@@ -1,398 +1,121 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-APP_USER="${APP_USER:-agentschat}"
-APP_ROOT="${APP_ROOT:-/opt/agents-chat}"
-RELEASES_DIR="${RELEASES_DIR:-$APP_ROOT/releases}"
-CURRENT_LINK="${CURRENT_LINK:-$APP_ROOT/current}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/release-common.sh"
+release_init
 REPO_DIR="${REPO_DIR:-$APP_ROOT/repo}"
-ENV_FILE="${ENV_FILE:-/etc/agents-chat/server.env}"
-DART_DEFINE_FILE="${DART_DEFINE_FILE:-/etc/agents-chat/dart_define.production.json}"
-OPS_DIR="${OPS_DIR:-/opt/ops}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-agents-chat}"
-SMOKE_RETRIES="${SMOKE_RETRIES:-15}"
-SMOKE_DELAY_SECONDS="${SMOKE_DELAY_SECONDS:-2}"
-PUBLIC_EDGE_WS_RETRIES="${PUBLIC_EDGE_WS_RETRIES:-3}"
-PUBLIC_EDGE_WS_DELAY_SECONDS="${PUBLIC_EDGE_WS_DELAY_SECONDS:-3}"
-PUBLIC_EDGE_WS_REQUIRED="${PUBLIC_EDGE_WS_REQUIRED:-false}"
-USE_PREBUILT_WEB="${USE_PREBUILT_WEB:-false}"
-GIT_REF=""
-SOURCE_DIR=""
-RELEASE_ID=""
-
-discover_caddy_domain() {
-  if [[ ! -f /etc/caddy/Caddyfile ]]; then
-    return
-  fi
-
-  awk '
-    /^[[:space:]]*#/ { next }
-    /^[[:space:]]*$/ { next }
-    /\{/ {
-      candidate=$1
-      sub(/,+$/, "", candidate)
-      if (candidate != "" && candidate != "{") {
-        print candidate
-        exit
-      }
-    }
-  ' /etc/caddy/Caddyfile
-}
-
-usage() {
-  cat <<'EOF'
-Usage:
-  deploy-release.sh --git-ref <ref>
-  deploy-release.sh --source-dir <path> [--release-id <id>]
-  deploy-release.sh [--git-ref <ref> | --source-dir <path>] [--release-id <id>] [--use-prebuilt-web]
-EOF
-}
-
-while [[ $# -gt 0 ]]; do
+USE_PREBUILT_WEB="false"
+GIT_REF="" SOURCE_DIR="" RELEASE_ID=""
+usage() { echo 'Usage: deploy-release.sh (--git-ref REF | --source-dir PATH) [--release-id ID] [--use-prebuilt-web]'; }
+while (( $# )); do
   case "$1" in
-    --git-ref)
-      GIT_REF="$2"
-      shift 2
-      ;;
-    --source-dir)
-      SOURCE_DIR="$2"
-      shift 2
-      ;;
-    --release-id)
-      RELEASE_ID="$2"
-      shift 2
-      ;;
-    --use-prebuilt-web)
-      USE_PREBUILT_WEB="true"
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      usage >&2
-      exit 1
-      ;;
+    --git-ref|--source-dir|--release-id)
+      (( $# >= 2 )) || { usage >&2; exit 1; }
+      case "$1" in --git-ref) GIT_REF="$2";; --source-dir) SOURCE_DIR="$2";; --release-id) RELEASE_ID="$2";; esac
+      shift 2;;
+    --use-prebuilt-web) USE_PREBUILT_WEB=true; shift;;
+    -h|--help) usage; exit 0;;
+    *) usage >&2; exit 1;;
   esac
 done
-
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "Run this script as root." >&2
-  exit 1
-fi
-
-if [[ -n "$GIT_REF" && -n "$SOURCE_DIR" ]]; then
-  echo "Choose either --git-ref or --source-dir, not both." >&2
-  exit 1
-fi
-
-if [[ -z "$GIT_REF" && -z "$SOURCE_DIR" ]]; then
-  echo "One of --git-ref or --source-dir is required." >&2
-  exit 1
-fi
-
-timestamp="$(date +%Y%m%d%H%M%S)"
-if [[ -n "$GIT_REF" ]]; then
-  safe_ref="$(echo "$GIT_REF" | tr '/:@' '---')"
-  RELEASE_ID="${RELEASE_ID:-$timestamp-$safe_ref}"
-else
-  RELEASE_ID="${RELEASE_ID:-$timestamp-manual}"
-fi
-
+[[ "$(id -u)" == 0 ]] || { echo 'Run as root.' >&2; exit 1; }
+[[ -n "$GIT_REF" && -z "$SOURCE_DIR" || -z "$GIT_REF" && -n "$SOURCE_DIR" ]] || { usage >&2; exit 1; }
+[[ "$USE_PREBUILT_WEB" != true || -n "$SOURCE_DIR" ]] || { echo 'Prebuilt Web requires --source-dir.' >&2; exit 1; }
+release_lock
+require_file "$ENV_FILE"
+require_file "$WEB_ENV_FILE"
+RELEASE_ID="${RELEASE_ID:-$(date +%Y%m%d%H%M%S)-release}"
+validate_release_id "$RELEASE_ID"
 RELEASE_DIR="$RELEASES_DIR/$RELEASE_ID"
-
-require_file() {
-  local path="$1"
-
-  if [[ ! -f "$path" ]]; then
-    echo "Required file missing: $path" >&2
-    exit 1
+[[ ! -e "$RELEASE_DIR" && ! -L "$RELEASE_DIR" ]] || { echo 'Release already exists.' >&2; exit 1; }
+PREVIOUS_RELEASE="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
+CONFIG_CHANGED=false
+CURRENT_CHANGED=false
+RECOVERY_DIR="$RELEASE_DIR/.deployment-before"
+recover_failed_release() {
+  local result="$?" recovery_failed=0
+  (( result != 0 )) || return 0
+  trap - EXIT
+  set +e
+  [[ ! -d "$RELEASE_DIR" ]] || touch "$RELEASE_DIR/.release-failed"
+  if [[ "$CURRENT_CHANGED" == true ]]; then
+    if [[ -n "$PREVIOUS_RELEASE" ]]; then atomic_switch "$PREVIOUS_RELEASE" || recovery_failed=1
+    elif [[ "$(readlink -f "$CURRENT_LINK" 2>/dev/null)" == "$RELEASE_DIR" ]]; then rm -f -- "$CURRENT_LINK"; fi
   fi
+  if [[ "$CONFIG_CHANGED" == true ]]; then restore_configuration "$RECOVERY_DIR" || recovery_failed=1; fi
+  if [[ "$CURRENT_CHANGED" == true ]]; then
+    if [[ -n "$PREVIOUS_RELEASE" ]]; then restart_application "$PREVIOUS_RELEASE" || recovery_failed=1
+    else systemctl stop agents-chat-web.service agents-chat-api.service || recovery_failed=1; systemctl reload caddy || recovery_failed=1; fi
+  elif [[ "$CONFIG_CHANGED" == true && -f "$CADDY_FILE" ]]; then systemctl reload caddy || recovery_failed=1; fi
+  if (( recovery_failed )); then echo 'Release failed; automatic recovery was incomplete. Inspect systemd and Caddy before retrying.' >&2
+  else echo 'Release failed; previous application/configuration restored. Database migrations were not reversed.' >&2; fi
+  exit "$result"
 }
-
-retry_command() {
-  local attempts="$1"
-  local delay_seconds="$2"
-  local description="$3"
-  shift 3
-
-  local attempt=1
-  local exit_code=0
-  while true; do
-    set +e
-    "$@"
-    exit_code=$?
-    set -e
-
-    if (( exit_code == 0 )); then
-      return 0
-    fi
-
-    if (( attempt >= attempts )); then
-      echo "$description failed after $attempt attempts." >&2
-      return "$exit_code"
-    fi
-
-    echo "$description failed (attempt $attempt/$attempts). Retrying in ${delay_seconds}s..." >&2
-    sleep "$delay_seconds"
-    attempt=$((attempt + 1))
-  done
-}
-
-run_local_static_web_smoke() {
-  local caddy_domain="${1:-}"
-  local root_response=""
-  local app_response=""
-  local expected_title='<title>Agents Chat | Social Network for Agents</title>'
-
-  if [[ -n "$caddy_domain" ]]; then
-    root_response="$(curl -fsS --resolve "$caddy_domain:443:127.0.0.1" "https://$caddy_domain/")"
-    app_response="$(curl -fsS --resolve "$caddy_domain:443:127.0.0.1" "https://$caddy_domain/app")"
-  else
-    root_response="$(curl -fsS http://127.0.0.1/)"
-    app_response="$(curl -fsS http://127.0.0.1/app)"
-  fi
-
-  if [[ "$root_response" != *"$expected_title"* ]]; then
-    echo "Static web smoke check failed: root route is not serving the expected landing page shell." >&2
-    return 1
-  fi
-
-  if [[ "$app_response" != *"$expected_title"* ]]; then
-    echo "Static web smoke check failed: /app route is not serving the expected Flutter web shell." >&2
-    return 1
-  fi
-}
-
-run_local_websocket_smoke() {
-  local caddy_domain="${1:-}"
-
-  if [[ -n "$caddy_domain" ]]; then
-    env \
-      WS_CHECK_URL="wss://$caddy_domain/ws" \
-      WS_CHECK_CONNECT_HOST="127.0.0.1" \
-      WS_CHECK_CONNECT_PORT="443" \
-      WS_CHECK_HOST_HEADER="$caddy_domain" \
-      "$OPS_DIR/check-websocket.sh"
-    return
-  fi
-
-  env \
-    WS_CHECK_URL="ws://127.0.0.1:3000/ws" \
-    "$OPS_DIR/check-websocket.sh"
-}
-
-run_public_edge_websocket_smoke() {
-  local caddy_domain="$1"
-
-  env \
-    WS_CHECK_URL="wss://$caddy_domain/ws" \
-    "$OPS_DIR/check-websocket.sh"
-}
-
-checkout_release() {
-  if [[ -n "$GIT_REF" ]]; then
-    local archive_ref="$GIT_REF"
-
-    if [[ ! -d "$REPO_DIR/.git" ]]; then
-      echo "Git repository not found at $REPO_DIR" >&2
-      exit 1
-    fi
-
-    git -C "$REPO_DIR" fetch --all --tags --prune
-
-    if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/${archive_ref}^{commit}" >/dev/null; then
-      archive_ref="origin/$archive_ref"
-    elif ! git -C "$REPO_DIR" rev-parse --verify --quiet "${archive_ref}^{commit}" >/dev/null; then
-      echo "Git ref not found after fetch: $GIT_REF" >&2
-      exit 1
-    fi
-
-    git -C "$REPO_DIR" archive "$archive_ref" | tar -xf - -C "$RELEASE_DIR"
-  else
-    if [[ ! -d "$SOURCE_DIR" ]]; then
-      echo "Source directory not found: $SOURCE_DIR" >&2
-      exit 1
-    fi
-
-    tar \
-      --exclude=.git \
-      --exclude=.playwright-cli \
-      --exclude=.sisyphus \
-      --exclude=output \
-      --exclude=app/.dart_tool \
-      --exclude=app/.flutter-plugins-dependencies \
-      --exclude=app/build \
-      --exclude=server/node_modules \
-      --exclude=server/dist \
-      --exclude=server/coverage \
-      -cf - -C "$SOURCE_DIR" . | tar -xf - -C "$RELEASE_DIR"
-
-    if [[ "$USE_PREBUILT_WEB" == "true" && -d "$SOURCE_DIR/app/build/web" ]]; then
-      install -d "$RELEASE_DIR/app/build"
-      cp -a "$SOURCE_DIR/app/build/web" "$RELEASE_DIR/app/build/web"
-    fi
-  fi
-
-  chown -R "$APP_USER:$APP_USER" "$RELEASE_DIR"
-}
-
-install_release_assets() {
-  install -m 0755 "$RELEASE_DIR/deploy/ops/"*.sh "$OPS_DIR/"
-  install -m 0644 "$RELEASE_DIR/deploy/systemd/agents-chat-api.service" /etc/systemd/system/agents-chat-api.service
-  install -m 0644 "$RELEASE_DIR/deploy/systemd/agents-chat-backup.service" /etc/systemd/system/agents-chat-backup.service
-  install -m 0644 "$RELEASE_DIR/deploy/systemd/agents-chat-backup.timer" /etc/systemd/system/agents-chat-backup.timer
-  systemctl daemon-reload
-  systemctl enable agents-chat-api.service agents-chat-backup.timer >/dev/null
-}
-
-start_infra() {
-  local existing_infra=(
-    agents-chat-postgres
-    agents-chat-redis
-    agents-chat-minio
-  )
-
-  if docker inspect "${existing_infra[@]}" >/dev/null 2>&1; then
-    echo "Reusing existing infra containers."
-    docker start "${existing_infra[@]}" >/dev/null 2>&1 || true
-    return
-  fi
-
-  docker compose \
-    --project-name "$COMPOSE_PROJECT_NAME" \
-    -f "$RELEASE_DIR/server/docker-compose.yml" \
-    up -d postgres redis minio
-}
-
-build_backend() {
-  sudo -u "$APP_USER" bash -lc "
-    set -euo pipefail
-    cd '$RELEASE_DIR/server'
-    corepack enable
-    env NODE_ENV=development npm_config_production=false corepack pnpm --dir '$RELEASE_DIR/server' install --frozen-lockfile
-    set -a
-    source '$ENV_FILE'
-    set +a
-    corepack pnpm --dir '$RELEASE_DIR/server' build
-    corepack pnpm --dir '$RELEASE_DIR/server' migration:run
-  "
-}
-
-build_web() {
-  if [[ "$USE_PREBUILT_WEB" == "true" && -d "$RELEASE_DIR/app/build/web" ]]; then
-    echo "Using prebuilt Flutter web assets from source."
-    return
-  fi
-
-  sudo -u "$APP_USER" bash -lc "
-    set -euo pipefail
-    export PATH=\"\$PATH:/snap/bin\"
-    if ! command -v flutter >/dev/null 2>&1; then
-      echo 'Flutter is not installed and no prebuilt web assets were provided.' >&2
-      exit 1
-    fi
-    cd '$RELEASE_DIR/app'
-    rm -rf '$RELEASE_DIR/app/build/web'
-    flutter config --enable-web >/dev/null
-    flutter pub get
-    flutter build web --release --dart-define-from-file='$DART_DEFINE_FILE'
-  "
-}
-
-switch_current() {
-  ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
-  chown -h "$APP_USER:$APP_USER" "$CURRENT_LINK"
-}
-
-restart_services() {
-  systemctl restart agents-chat-api.service
-  retry_command \
-    "$SMOKE_RETRIES" \
-    1 \
-    "Waiting for agents-chat-api.service to become active" \
-    systemctl is-active --quiet agents-chat-api.service
-
-  systemctl reload caddy >/dev/null 2>&1 || systemctl restart caddy
-  retry_command \
-    "$SMOKE_RETRIES" \
-    1 \
-    "Waiting for caddy to become active" \
-    systemctl is-active --quiet caddy
-}
-
-smoke_checks() {
-  local caddy_domain
-
-  retry_command \
-    "$SMOKE_RETRIES" \
-    "$SMOKE_DELAY_SECONDS" \
-    "API health check" \
-    "$OPS_DIR/check-health.sh"
-
-  caddy_domain="$(discover_caddy_domain || true)"
-  if [[ -n "$caddy_domain" ]]; then
-    retry_command \
-      "$SMOKE_RETRIES" \
-      "$SMOKE_DELAY_SECONDS" \
-      "Static web smoke check via local Caddy" \
-      run_local_static_web_smoke \
-      "$caddy_domain"
-    echo "Static web smoke check passed."
-
-    retry_command \
-      "$SMOKE_RETRIES" \
-      "$SMOKE_DELAY_SECONDS" \
-      "WebSocket route check via local Caddy" \
-      run_local_websocket_smoke \
-      "$caddy_domain"
-
-    if ! retry_command \
-      "$PUBLIC_EDGE_WS_RETRIES" \
-      "$PUBLIC_EDGE_WS_DELAY_SECONDS" \
-      "Public edge WebSocket smoke check" \
-      run_public_edge_websocket_smoke \
-      "$caddy_domain"; then
-      if [[ "$PUBLIC_EDGE_WS_REQUIRED" == "true" ]]; then
-        echo "Public edge WebSocket smoke check failed." >&2
-        exit 1
-      fi
-
-      echo "Warning: public edge WebSocket smoke check failed, but local Caddy and API checks passed." >&2
-    fi
-    return
-  fi
-
-  retry_command \
-    "$SMOKE_RETRIES" \
-    "$SMOKE_DELAY_SECONDS" \
-    "Static web smoke check" \
-    run_local_static_web_smoke
-  echo "Static web smoke check passed."
-
-  retry_command \
-    "$SMOKE_RETRIES" \
-    "$SMOKE_DELAY_SECONDS" \
-    "WebSocket route check" \
-    run_local_websocket_smoke
-}
-
-main() {
-  require_file "$ENV_FILE"
-  require_file "$DART_DEFINE_FILE"
-  install -d -o "$APP_USER" -g "$APP_USER" "$RELEASES_DIR"
-  install -d -o "$APP_USER" -g "$APP_USER" "$RELEASE_DIR"
-  checkout_release
-  start_infra
-  build_backend
-  build_web
-  install_release_assets
-  switch_current
-  restart_services
-  smoke_checks
-  echo "Release deployed: $RELEASE_ID"
-}
-
-main "$@"
+trap recover_failed_release EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+install -d -o "$APP_USER" -g "$APP_USER" "$RELEASES_DIR" "$RELEASE_DIR"
+if [[ -n "$GIT_REF" ]]; then
+  git -C "$REPO_DIR" fetch --all --tags --prune
+  archive_ref="$GIT_REF"
+  if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/${GIT_REF}^{commit}" >/dev/null; then archive_ref="origin/$GIT_REF"; fi
+  git -C "$REPO_DIR" rev-parse --verify "${archive_ref}^{commit}" > "$RELEASE_DIR/.source-commit"
+  git -C "$REPO_DIR" archive "$archive_ref" | tar -xf - -C "$RELEASE_DIR"
+else
+  [[ -d "$SOURCE_DIR" ]] || { echo 'Source directory not found.' >&2; exit 1; }
+  SOURCE_DIR="$(realpath "$SOURCE_DIR")"
+  [[ "$RELEASE_DIR/" != "$SOURCE_DIR/"* ]] || { echo 'Release directory cannot be inside the source directory.' >&2; exit 1; }
+  tar --exclude=.release-ready --exclude=.release-failed --exclude=.deployment-before --exclude=.previous-release --exclude=.git --exclude=.playwright-cli --exclude=.sisyphus --exclude=output --exclude=.local-archive \
+    --exclude=app/.dart_tool --exclude=app/.flutter-plugins-dependencies --exclude=app/build \
+    --exclude=web/node_modules --exclude=web/.next --exclude='*/.env' --exclude='*/.env.*' \
+    --exclude=server/node_modules --exclude=server/dist --exclude=server/coverage -cf - -C "$SOURCE_DIR" . | tar -xf - -C "$RELEASE_DIR"
+  if [[ "$USE_PREBUILT_WEB" == true ]]; then require_file "$SOURCE_DIR/web/.next/deploy-build.json"; cp -a "$SOURCE_DIR/web/.next" "$RELEASE_DIR/web/.next"; fi
+fi
+require_file "$RELEASE_DIR/web/package-lock.json"
+chown -R "$APP_USER:$APP_USER" "$RELEASE_DIR"
+prepare_caddy "$RELEASE_DIR" "$RELEASE_DIR/Caddyfile.next"
+# Finish both builds before touching the live schema, service definitions, or release pointer.
+sudo -u "$APP_USER" bash -se -- "$RELEASE_DIR" <<'BUILD'
+cd "$1/server"
+env NODE_ENV=development npm_config_production=false corepack pnpm install --frozen-lockfile
+corepack pnpm build
+BUILD
+if [[ "$USE_PREBUILT_WEB" == true ]]; then
+  node --env-file="$WEB_ENV_FILE" - "$RELEASE_DIR/web/.next/deploy-build.json" <<'VERIFY'
+const fs=require('node:fs'),manifest=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+const expected={platform:process.platform,arch:process.arch,nodeMajor:process.versions.node.split('.')[0],siteUrl:process.env.NEXT_PUBLIC_SITE_URL||'',agentOrigin:process.env.NEXT_PUBLIC_AGENT_SERVER_ORIGIN||''};
+for(const [key,value] of Object.entries(expected))if(manifest[key]!==value)throw new Error('Prebuilt Web '+key+' mismatch; build on the target platform with its public URLs.');
+VERIFY
+else
+  sudo -u "$APP_USER" bash "$RELEASE_DIR/deploy/ops/prepare-web-artifact.sh" "$RELEASE_DIR/web" "$WEB_ENV_FILE"
+fi
+require_file "$RELEASE_DIR/server/dist/src/main.js"
+require_file "$RELEASE_DIR/web/.next/standalone/server.js"
+install -d "$RELEASE_DIR/web/.next/standalone/.next/static" "$RELEASE_DIR/web/.next/standalone/public"
+cp -a "$RELEASE_DIR/web/.next/static/." "$RELEASE_DIR/web/.next/standalone/.next/static/"
+cp -a "$RELEASE_DIR/web/public/." "$RELEASE_DIR/web/.next/standalone/public/"
+chown -R "$APP_USER:$APP_USER" "$RELEASE_DIR/web/.next"
+# Existing containers are preserved. Fresh/partial installations use the explicit production compose file.
+if docker inspect agents-chat-postgres agents-chat-redis agents-chat-minio >/dev/null 2>&1; then
+  docker start agents-chat-postgres agents-chat-redis agents-chat-minio >/dev/null
+else
+  docker compose --env-file "$ENV_FILE" --project-name "$COMPOSE_PROJECT_NAME" -f "$RELEASE_DIR/deploy/compose.production.yml" up -d postgres redis minio
+fi
+sudo -u "$APP_USER" bash -se -- "$RELEASE_DIR" "$ENV_FILE" <<'MIGRATE'
+cd "$1/server"
+node --env-file="$2" --require ts-node/register --require tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/database/typeorm.data-source.ts
+MIGRATE
+printf '%s\n' "$PREVIOUS_RELEASE" > "$RELEASE_DIR/.previous-release"
+snapshot_configuration "$RECOVERY_DIR" "$RELEASE_DIR"
+CONFIG_CHANGED=true
+install_release_configuration "$RELEASE_DIR" "$RELEASE_DIR/Caddyfile.next"
+CURRENT_CHANGED=true
+atomic_switch "$RELEASE_DIR"
+restart_application "$RELEASE_DIR"
+smoke_application "$RELEASE_DIR"
+systemctl enable agents-chat-api.service agents-chat-web.service agents-chat-backup.timer >/dev/null
+cp -a "$CADDY_FILE" "$RELEASE_DIR/Caddyfile.deployed"
+date -u +%FT%TZ > "$RELEASE_DIR/.release-ready"
+trap - EXIT INT TERM
+echo "Release deployed: $RELEASE_ID"

@@ -19,7 +19,7 @@ Options:
   --repo-dir PATH    Server-side repository path. Default: /opt/agents-chat/repo
   --repo-url URL     Optional git URL to clone if the repo does not exist yet.
   --domain DOMAIN    Public domain to inject into the Caddyfile.
-  --skip-flutter     Skip installing Flutter on the server.
+  --skip-flutter     Deprecated compatibility flag; Web no longer requires Flutter.
 EOF
 }
 
@@ -74,17 +74,18 @@ install_base_packages() {
     python3-pip \
     python3-venv \
     software-properties-common \
-    snapd \
     tar \
-    unzip
+    unzip \
+    util-linux
 }
 
 install_node() {
-  if ! command -v node >/dev/null 2>&1; then
+  if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)'; then
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
   fi
 
+  if ! command -v corepack >/dev/null 2>&1; then npm install -g corepack; fi
   corepack enable
 }
 
@@ -116,18 +117,6 @@ install_caddy() {
   fi
 
   systemctl enable --now caddy
-}
-
-install_flutter() {
-  if [[ "$SKIP_FLUTTER" == "true" ]]; then
-    return
-  fi
-
-  if command -v flutter >/dev/null 2>&1; then
-    return
-  fi
-
-  snap install flutter --classic
 }
 
 ensure_users_and_dirs() {
@@ -165,30 +154,43 @@ ensure_repo() {
 install_templates() {
   local deploy_dir="$REPO_DIR/deploy"
 
+  if [[ ! -L "$APP_ROOT/current" ]]; then
   install -m 0644 "$deploy_dir/systemd/agents-chat-api.service" /etc/systemd/system/agents-chat-api.service
   install -m 0644 "$deploy_dir/systemd/agents-chat-backup.service" /etc/systemd/system/agents-chat-backup.service
   install -m 0644 "$deploy_dir/systemd/agents-chat-backup.timer" /etc/systemd/system/agents-chat-backup.timer
+  fi
   install -m 0755 "$deploy_dir/ops/"*.sh "$OPS_DIR/"
 
   if [[ ! -f "$ENV_DIR/server.env" ]]; then
     install -m 0640 -o root -g "$APP_USER" "$REPO_DIR/server/.env.example" "$ENV_DIR/server.env"
     sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' "$ENV_DIR/server.env"
     sed -i 's/^MINIO_ENDPOINT=.*/MINIO_ENDPOINT=127.0.0.1/' "$ENV_DIR/server.env"
+    printf '
+# Fresh production database: set this to the password in DATABASE_URL.
+POSTGRES_PASSWORD=
+' >> "$ENV_DIR/server.env"
   fi
 
-  if [[ ! -f "$ENV_DIR/dart_define.production.json" ]]; then
-    install -m 0640 -o root -g "$APP_USER" "$REPO_DIR/app/tool/dart_define.production.example.json" "$ENV_DIR/dart_define.production.json"
-  fi
 
   if [[ -n "$APP_DOMAIN" ]]; then
-    sed "s/__APP_DOMAIN__/$APP_DOMAIN/g" "$deploy_dir/caddy/Caddyfile.example" > /etc/caddy/Caddyfile
+    [[ "$APP_DOMAIN" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] || { echo 'Invalid DNS hostname.' >&2; exit 1; }
+    printf '%s\n' "$APP_DOMAIN" > "$ENV_DIR/domain"
+    sed "s/__APP_DOMAIN__/$APP_DOMAIN/g" "$deploy_dir/caddy/Caddyfile.example" > "$ENV_DIR/Caddyfile.pending"
+    caddy validate --config "$ENV_DIR/Caddyfile.pending" --adapter caddyfile
   fi
 
+  if [[ ! -L "$APP_ROOT/current" ]]; then install -m 0644 "$deploy_dir/systemd/agents-chat-web.service" /etc/systemd/system/agents-chat-web.service; fi
+  if [[ ! -f "$ENV_DIR/web.env" ]]; then
+    install -m 0640 -o root -g "$APP_USER" "$deploy_dir/web.env.example" "$ENV_DIR/web.env"
+    if [[ -n "$APP_DOMAIN" ]]; then
+      sed -i "s|^NEXT_PUBLIC_SITE_URL=.*|NEXT_PUBLIC_SITE_URL=https://$APP_DOMAIN|" "$ENV_DIR/web.env"
+    fi
+  fi
   systemctl daemon-reload
   systemctl enable agents-chat-backup.timer
 
   if [[ -n "$APP_DOMAIN" ]]; then
-    systemctl restart caddy
+    echo "Caddy configuration prepared at $ENV_DIR/Caddyfile.pending; it will be applied by deploy-release.sh after both builds pass."
   elif [[ ! -f /etc/caddy/Caddyfile ]]; then
     echo "No domain provided, so /etc/caddy/Caddyfile was not generated yet." >&2
     echo "Set the domain and install the Caddy template before exposing the server publicly." >&2
@@ -200,7 +202,6 @@ main() {
   install_node
   install_docker
   install_caddy
-  install_flutter
   ensure_users_and_dirs
   ensure_repo
   install_templates

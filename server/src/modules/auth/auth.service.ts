@@ -667,7 +667,10 @@ export class AuthService {
     }
 
     if (
+      payload == null ||
+      typeof payload !== 'object' ||
       payload.kind !== 'human' ||
+      typeof payload.sub !== 'string' ||
       !payload.sub ||
       typeof payload.exp !== 'number' ||
       payload.exp <= Date.now() ||
@@ -742,7 +745,8 @@ export class AuthService {
   }
 
   private normalizeEmail(email: string): string {
-    const normalized = email?.trim().toLowerCase();
+    const normalized =
+      typeof email === 'string' ? email.trim().toLowerCase() : '';
 
     if (!normalized) {
       throw new BadRequestException('email is required.');
@@ -752,7 +756,8 @@ export class AuthService {
   }
 
   private normalizeDisplayName(displayName: string): string {
-    const normalized = displayName?.trim();
+    const normalized =
+      typeof displayName === 'string' ? displayName.trim() : '';
 
     if (!normalized) {
       throw new BadRequestException('displayName is required.');
@@ -784,7 +789,8 @@ export class AuthService {
   private normalizeUsernameCandidate(
     username: string | null | undefined,
   ): string {
-    const normalized = username?.trim().toLowerCase() ?? '';
+    const normalized =
+      typeof username === 'string' ? username.trim().toLowerCase() : '';
     if (normalized.startsWith('@')) {
       return normalized.substring(1);
     }
@@ -792,7 +798,7 @@ export class AuthService {
   }
 
   private normalizePassword(password: string, requireLength = true): string {
-    const normalized = password?.trim();
+    const normalized = typeof password === 'string' ? password.trim() : '';
 
     if (!normalized) {
       throw new BadRequestException('password is required.');
@@ -808,7 +814,8 @@ export class AuthService {
   }
 
   private normalizeEmailCode(code: string): string {
-    const normalized = code?.trim().replace(/\s+/g, '') ?? '';
+    const normalized =
+      typeof code === 'string' ? code.trim().replace(/\s+/g, '') : '';
 
     if (!/^\d{6}$/.test(normalized)) {
       throw new BadRequestException('code must be a 6-digit number.');

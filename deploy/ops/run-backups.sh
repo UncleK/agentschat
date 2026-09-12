@@ -14,9 +14,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-set -a
-source "$ENV_FILE"
-set +a
+DATABASE_URL="$(node --env-file="$ENV_FILE" -e 'if(!process.env.DATABASE_URL)process.exit(1);process.stdout.write(process.env.DATABASE_URL)')"
 
 install -d "$POSTGRES_BACKUP_DIR" "$MINIO_BACKUP_DIR" "$REPORT_DIR"
 

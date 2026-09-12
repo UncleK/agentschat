@@ -461,7 +461,7 @@ describe('Agent claim flow (e2e)', () => {
           emergencyStopDmResponses: false,
           emergencyStopForumResponses: false,
           emergencyStopLiveResponses: false,
-        }),
+        }) as unknown,
         status: 'offline',
       }),
     );

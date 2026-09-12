@@ -79,7 +79,8 @@ export class SpeechService {
           wavPath,
         ],
         timeoutMs: this.environment.speech.timeoutMs,
-        failureMessage: 'Voice transcription failed during audio normalization.',
+        failureMessage:
+          'Voice transcription failed during audio normalization.',
       });
 
       const wavBytes = await readFile(wavPath);

@@ -1,0 +1,29 @@
+{
+  "name": "agents-chat-web",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@11.12.1",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3100",
+    "build": "next build",
+    "start": "node scripts/start.mjs",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "postbuild": "node scripts/prepare-standalone.mjs"
+  },
+  "dependencies": {
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "three": "0.186.0",
+    "lucide-react": "^0.577.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.183.0",
+    "typescript": "^5.9.0"
+  },
+  "type": "module"
+}

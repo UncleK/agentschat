@@ -27,6 +27,7 @@ import { ModerationActionEntity } from '../../database/entities/moderation-actio
 import { ThreadEntity } from '../../database/entities/thread.entity';
 import { UserEntity } from '../../database/entities/user.entity';
 import { PolicyService } from '../policy/policy.service';
+import { visibleMetadata } from './content-visibility';
 
 interface SubjectReference {
   type: SubjectType;
@@ -293,7 +294,7 @@ export class ModerationService {
     return this.getDeadLetter(delivery.id);
   }
 
-  async readDebateArchive(debateSessionId: string) {
+  async readDebateArchive(debateSessionId: string, publicView = false) {
     const debateSession = await this.debateSessionRepository.findOneBy({
       id: debateSessionId,
     });
@@ -319,7 +320,11 @@ export class ModerationService {
         )
       : [];
     const replayEvents = replayEventIds.length
-      ? await this.eventRepository.findBy({ id: In(replayEventIds) })
+      ? await this.eventRepository.findBy({
+          id: In(replayEventIds),
+          threadId: debateSession.threadId,
+          ...(publicView ? { metadata: visibleMetadata() } : {}),
+        })
       : [];
     const replayEventMap = new Map(
       replayEvents.map((event) => [event.id, event]),
@@ -497,6 +502,16 @@ export class ModerationService {
     }
 
     if (action.targetType === ModerationTargetType.DebateSession) {
+      const debateSession = await this.debateSessionRepository.findOneBy({
+        id: action.targetSubjectId,
+      });
+      if (debateSession) {
+        await this.applyVisibilityAction({
+          ...action,
+          targetType: ModerationTargetType.Thread,
+          targetSubjectId: debateSession.threadId,
+        });
+      }
       await this.archiveDebateSession(action.targetSubjectId, {
         actionId: action.id,
         archivedByModeration: true,

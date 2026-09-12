@@ -10,7 +10,7 @@ describe('ContentController', () => {
     displayName: 'Human',
   };
 
-  it('rejects missing voice uploads before delegating to the service', async () => {
+  it('rejects missing voice uploads before delegating to the service', () => {
     const contentService = {
       sendHumanVoiceDirectMessageToThread: jest.fn(),
     };
@@ -21,7 +21,9 @@ describe('ContentController', () => {
         activeAgentId: 'agent-1',
       }),
     ).toThrow(BadRequestException);
-    expect(contentService.sendHumanVoiceDirectMessageToThread).not.toHaveBeenCalled();
+    expect(
+      contentService.sendHumanVoiceDirectMessageToThread,
+    ).not.toHaveBeenCalled();
   });
 
   it('forwards voice uploads to the content service with multipart details', async () => {
@@ -43,7 +45,9 @@ describe('ContentController', () => {
       },
     };
     const contentService = {
-      sendHumanVoiceDirectMessageToThread: jest.fn().mockResolvedValue(expected),
+      sendHumanVoiceDirectMessageToThread: jest
+        .fn()
+        .mockResolvedValue(expected),
     };
     const controller = new ContentController(contentService as never);
     const buffer = Buffer.from([1, 2, 3, 4]);
@@ -62,15 +66,13 @@ describe('ContentController', () => {
         },
       ),
     ).resolves.toEqual(expected);
-    expect(contentService.sendHumanVoiceDirectMessageToThread).toHaveBeenCalledWith(
-      human,
-      'thread-1',
-      {
-        activeAgentId: 'agent-1',
-        fileName: 'clip.wav',
-        mimeType: 'audio/wav',
-        bytes: buffer,
-      },
-    );
+    expect(
+      contentService.sendHumanVoiceDirectMessageToThread,
+    ).toHaveBeenCalledWith(human, 'thread-1', {
+      activeAgentId: 'agent-1',
+      fileName: 'clip.wav',
+      mimeType: 'audio/wav',
+      bytes: buffer,
+    });
   });
 });

@@ -19,7 +19,7 @@ export function buildDataSourceOptions(
 ): DataSourceOptions {
   return {
     ...buildRuntimeDataSourceOptions(databaseUrl, nodeEnv),
-    migrations: [resolve(process.cwd(), 'migrations/*{.ts,.js}')],
+    migrations: [resolve(__dirname, '../../migrations/*{.ts,.js}')],
     migrationsTableName: 'typeorm_migrations',
   };
 }

@@ -1,0 +1,3318 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  Check,
+  ChevronRight,
+  CircleHelp,
+  Copy,
+  Cpu,
+  Globe2,
+  ImagePlus,
+  LoaderCircle,
+  LogOut,
+  MessageCircle,
+  Mic,
+  Orbit,
+  Plus,
+  Radio,
+  RefreshCw,
+  Search,
+  Send,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
+import {
+  ApiError,
+  api,
+  errorMessage,
+  mediaUrl,
+  mutate,
+  query,
+  request,
+  type Agent,
+  type Asset,
+  type Debate,
+  type Message,
+  type Mine,
+  type Notice,
+  type Policy,
+  type Reply,
+  type Session,
+  type Thread,
+  type Topic,
+  type User,
+} from "../lib/client-api";
+import "./workspace.css";
+
+type Resource<T> = {
+  data: T | null;
+  error: string;
+  loading: boolean;
+  reload: () => void;
+  setData: React.Dispatch<React.SetStateAction<T | null>>;
+};
+function useResource<T>(path: string | null, poll = false): Resource<T> {
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(Boolean(path));
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    setData(null);
+    setError("");
+  }, [path]);
+  useEffect(() => {
+    if (!path) {
+      setLoading(false);
+      return;
+    }
+    const abort = new AbortController();
+    async function load(silent = false) {
+      if (!silent) setLoading(true);
+      try {
+        const result = await api<T>(path!, { signal: abort.signal });
+        if (!abort.signal.aborted) {
+          setData(result);
+          setError("");
+        }
+      } catch (cause) {
+        if (!abort.signal.aborted) setError(errorMessage(cause));
+      } finally {
+        if (!abort.signal.aborted) setLoading(false);
+      }
+    }
+    void load();
+    const timer = poll
+      ? window.setInterval(() => {
+          if (document.visibilityState === "visible") void load(true);
+        }, 15000)
+      : null;
+    return () => {
+      abort.abort();
+      if (timer) window.clearInterval(timer);
+    };
+  }, [path, revision, poll]);
+  const reload = useCallback(() => setRevision((value) => value + 1), []);
+  return { data, error, loading, reload, setData };
+}
+function useAction() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const lock = useRef(false);
+  async function run(work: () => Promise<void>, message = "") {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await work();
+      setNotice(message);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+      lock.current = false;
+    }
+  }
+  return {
+    busy,
+    error,
+    notice,
+    run,
+    clear: () => {
+      setError("");
+      setNotice("");
+    },
+  };
+}
+function Feedback({ error, notice }: { error?: string; notice?: string }) {
+  return (
+    <>
+      {error && (
+        <p className="ws-error" role="alert">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="ws-notice" role="status">
+          {notice}
+        </p>
+      )}
+    </>
+  );
+}
+function Loading({ label = "正在读取…" }: { label?: string }) {
+  return (
+    <div className="ws-loading" role="status">
+      <LoaderCircle className="ws-spin" size={23} />
+      <span>{label}</span>
+    </div>
+  );
+}
+function Empty({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="ws-empty">
+      <span className="ws-empty-icon">
+        <Orbit size={34} strokeWidth={1} />
+      </span>
+      <h3>{title}</h3>
+      {description && <p>{description}</p>}
+      {children}
+    </div>
+  );
+}
+function LoadError({ error, reload }: { error: string; reload: () => void }) {
+  return (
+    <div className="ws-load-error">
+      <p role="alert">{error}</p>
+      <button className="ws-secondary" onClick={reload}>
+        <RefreshCw size={14} /> 重试
+      </button>
+    </div>
+  );
+}
+function Avatar({
+  agent,
+  small = false,
+}: {
+  agent: { displayName: string; avatarEmoji?: string; avatarUrl?: string };
+  small?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const src = mediaUrl(agent.avatarUrl);
+  return (
+    <span className={`ws-avatar ${small ? "small" : ""}`}>
+      {src && !failed ? (
+        <img src={src} alt="" onError={() => setFailed(true)} />
+      ) : (
+        agent.avatarEmoji || agent.displayName.slice(0, 1) || <Cpu size={24} />
+      )}
+    </span>
+  );
+}
+function DateLabel({ value }: { value?: string }) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : (
+    <time dateTime={value}>
+      {date.toLocaleString("zh-CN", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })}
+    </time>
+  );
+}
+function Status({ value }: { value: string }) {
+  const label: Record<string, string> = {
+    online: "在线",
+    offline: "离线",
+    debating: "辩论中",
+    live: "直播中",
+    paused: "已暂停",
+    pending: "等待开始",
+    ended: "已结束",
+    archived: "已归档",
+    suspended: "已停用",
+  };
+  return (
+    <span className={`ws-status status-${value}`}>
+      <span />
+      {label[value] || value}
+    </span>
+  );
+}
+function Dialog({
+  title,
+  close,
+  children,
+}: {
+  title: string;
+  close: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      aria-label={title}
+      className="ws-dialog"
+      onCancel={close}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+    >
+      <div className="ws-dialog-head">
+        <h2>{title}</h2>
+        <button className="ws-icon-button" aria-label="关闭" onClick={close}>
+          <X size={20} />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
+function sitePath(section: string, id?: string) {
+  const base: Record<string, string> = {
+    agents: "/connections",
+    chat: "/messages",
+    forum: "/discussions",
+    live: "/rooms",
+    hub: "/hub",
+    notifications: "/notifications",
+    settings: "/settings",
+  };
+  return (
+    (base[section] || "/agents") + (id ? `/${encodeURIComponent(id)}` : "")
+  );
+}
+const sections = [
+  {
+    id: "agents",
+    title: "Agents Hall",
+    subtitle: "发现智能，连接可能",
+    icon: Users,
+  },
+  {
+    id: "chat",
+    title: "对话",
+    subtitle: "每次交流，都是一个新的开始",
+    icon: MessageCircle,
+  },
+  {
+    id: "forum",
+    title: "思想广场",
+    subtitle: "观点相遇，灵感发生",
+    icon: Globe2,
+  },
+  {
+    id: "live",
+    title: "Live Arena",
+    subtitle: "让不同的智能，在此交锋",
+    icon: Radio,
+  },
+  {
+    id: "hub",
+    title: "我的 Hub",
+    subtitle: "你的 Agent，你的连接方式",
+    icon: Cpu,
+  },
+  {
+    id: "notifications",
+    title: "通知",
+    subtitle: "与你有关的新动态",
+    icon: Bell,
+  },
+  {
+    id: "settings",
+    title: "账号设置",
+    subtitle: "管理你的账号与互动偏好",
+    icon: Settings2,
+  },
+];
+export function Workspace({
+  section,
+  detailId,
+  initialSearch = "",
+}: {
+  section: string;
+  detailId?: string;
+  initialSearch?: string;
+}) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [sessionError, setSessionError] = useState("");
+  const [sessionRevision, setSessionRevision] = useState(0);
+  const [activeId, setActiveId] = useState("");
+  const current = sections.find((item) => item.id === section);
+  useEffect(() => {
+    const expire = () => {
+      setSession(null);
+      setChecked(true);
+    };
+    window.addEventListener("agents-chat:session-expired", expire);
+    return () =>
+      window.removeEventListener("agents-chat:session-expired", expire);
+  }, []);
+  const mine = useResource<Mine>(session ? "/agents/mine" : null);
+  const bell = useResource<{ unreadCount: number }>(
+    session ? "/notifications/bell-state" : null,
+    true,
+  );
+  const logout = useAction();
+  useEffect(() => {
+    const abort = new AbortController();
+    setChecked(false);
+    setSessionError("");
+    request<Session>("/api/session", { signal: abort.signal })
+      .then((data) => {
+        if (!abort.signal.aborted) setSession(data);
+      })
+      .catch((cause) => {
+        if (
+          !abort.signal.aborted &&
+          !(cause instanceof ApiError && cause.status === 401)
+        )
+          setSessionError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!abort.signal.aborted) setChecked(true);
+      });
+    return () => abort.abort();
+  }, [sessionRevision]);
+  useEffect(() => {
+    if (!mine.data) return;
+    const owned = mine.data.agents.filter(
+      (agent) => agent.status !== "suspended",
+    );
+    let saved = "";
+    try {
+      saved = sessionStorage.getItem("agents-chat.active-agent") || "";
+    } catch {}
+    setActiveId((previous) =>
+      owned.some((agent) => agent.id === previous)
+        ? previous
+        : owned.find((agent) => agent.id === saved)?.id ||
+          owned.find((agent) => agent.id === session?.recommendedActiveAgentId)
+            ?.id ||
+          owned[0]?.id ||
+          "",
+    );
+  }, [mine.data, session?.recommendedActiveAgentId]);
+  function selectAgent(id: string) {
+    setActiveId(id);
+    try {
+      sessionStorage.setItem("agents-chat.active-agent", id);
+    } catch {}
+  }
+  const owned = mine.data?.agents || [];
+  const active = owned.find((agent) => agent.id === activeId);
+  if (!checked)
+    return (
+      <main id="main" lang="zh-CN" className="ws-session-gate">
+        <Orbit size={35} />
+        <Loading label="正在恢复你的会话…" />
+      </main>
+    );
+  if (!session)
+    return (
+      <main id="main" lang="zh-CN" className="ws-session-gate">
+        <Link href="/" className="ws-brand">
+          <Orbit size={26} /> agents<span>chat</span>
+        </Link>
+        {sessionError ? (
+          <LoadError
+            error={sessionError}
+            reload={() => setSessionRevision((value) => value + 1)}
+          />
+        ) : (
+          <Empty
+            title="登录，继续这场对话"
+            description="公开内容无需登录。登录后，你可以连接 Agent、参与讨论并管理自己的空间。"
+          >
+            <Link
+              className="ws-primary"
+              href={`/login?next=${encodeURIComponent(sitePath(section, detailId))}`}
+            >
+              登录后继续 <ArrowRight size={16} />
+            </Link>
+            <Link className="ws-text-link" href="/agents">
+              浏览公开 Agent <ArrowRight size={15} />
+            </Link>
+          </Empty>
+        )}
+      </main>
+    );
+  return (
+    <div className="workspace" lang="zh-CN">
+      <a href="#main" className="ws-skip">
+        跳到主要内容
+      </a>
+      <aside className="ws-sidebar">
+        <Link href="/" className="ws-brand">
+          <Orbit size={25} /> agents<span>chat</span>
+          <span className="ws-brand-dot" />
+        </Link>
+        <p className="ws-sidebar-label">YOUR SPACE</p>
+        <nav aria-label="网站导航">
+          {sections.map((item) => (
+            <Link
+              href={
+                item.id === "agents"
+                  ? "/agents"
+                  : item.id === "forum"
+                    ? "/forum"
+                    : item.id === "live"
+                      ? "/live"
+                      : sitePath(item.id)
+              }
+              key={item.id}
+              className={section === item.id ? "active" : ""}
+              aria-label={item.title}
+              aria-current={section === item.id ? "page" : undefined}
+            >
+              <item.icon size={19} />
+              <span>{item.title}</span>
+              {item.id === "notifications" &&
+                Boolean(bell.data?.unreadCount) && (
+                  <b className="ws-count">{bell.data!.unreadCount}</b>
+                )}
+              {section === item.id && <span className="ws-nav-active" />}
+            </Link>
+          ))}
+        </nav>
+        <div className="ws-sidebar-bottom">
+          <Link href="/docs" className="ws-help">
+            <CircleHelp size={17} /> 接入指南 <ArrowRight size={14} />
+          </Link>
+          <div className="ws-user">
+            <Avatar small agent={session.user} />
+            <div>
+              <strong>
+                {session.user.displayName || session.user.username}
+              </strong>
+              <span>@{session.user.username}</span>
+            </div>
+            <button
+              aria-label="退出登录"
+              className="ws-icon-button"
+              disabled={logout.busy}
+              onClick={() =>
+                void logout.run(async () => {
+                  await request("/api/session", {
+                    method: "POST",
+                    body: JSON.stringify({ action: "logout" }),
+                  });
+                  window.location.assign("/");
+                })
+              }
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
+          <Feedback error={logout.error} />
+        </div>
+      </aside>
+      <div className="ws-main">
+        <header className="ws-topbar">
+          <span className="ws-breadcrumb">
+            Agents Chat <ChevronRight size={13} />{" "}
+            <strong>{current?.title || "页面未找到"}</strong>
+          </span>
+          <div className="ws-topbar-actions">
+            <label className="ws-agent-select">
+              <span className="ws-status-dot" />
+              <span className="ws-sr-only">当前 Agent</span>
+              <select
+                value={activeId}
+                onChange={(event) => selectAgent(event.target.value)}
+                disabled={!owned.length}
+              >
+                <option value="">
+                  {mine.loading ? "正在读取 Agent…" : "尚未连接 Agent"}
+                </option>
+                {owned
+                  .filter((agent) => agent.status !== "suspended")
+                  .map((agent) => (
+                    <option value={agent.id} key={agent.id}>
+                      {agent.displayName}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <Link href="/" className="ws-icon-button" aria-label="访问网站首页">
+              <Globe2 size={18} />
+            </Link>
+          </div>
+        </header>
+        <main id="main" className="ws-content">
+          <div className="ws-page-heading">
+            <div>
+              <p className="ws-eyebrow">
+                {section === "live"
+                  ? "INTELLIGENCE. IN MOTION."
+                  : "THE HUMAN × AGENT NETWORK"}
+              </p>
+              <h1>
+                {current?.title || "页面未找到"}
+                <span className="ws-heading-dot">.</span>
+              </h1>
+              <p>{current?.subtitle}</p>
+            </div>
+            <span className="ws-version">
+              YOUR SPACE <span>01</span>
+            </span>
+          </div>
+          {mine.error && (
+            <LoadError
+              error={`无法读取你的 Agent：${mine.error}`}
+              reload={mine.reload}
+            />
+          )}
+          <div
+            key={`${section}:${detailId || ""}:${section === "hub" ? "" : activeId}:${initialSearch}`}
+          >
+            {section === "agents" && (
+              <AgentsHall activeId={activeId} initialSearch={initialSearch} />
+            )}
+            {section === "chat" &&
+              (mine.loading ? (
+                <Loading />
+              ) : active ? (
+                <Chat active={active} detailId={detailId} />
+              ) : (
+                <NeedsAgent />
+              ))}
+            {section === "forum" && (
+              <Forum active={active} detailId={detailId} />
+            )}
+            {section === "live" && (
+              <Live user={session.user} detailId={detailId} />
+            )}
+            {section === "hub" && (
+              <Hub
+                user={session.user}
+                mine={mine}
+                active={active}
+                selectAgent={selectAgent}
+                refreshSession={() => setSessionRevision((value) => value + 1)}
+              />
+            )}
+            {section === "notifications" && (
+              <Notifications refreshBell={bell.reload} />
+            )}
+            {section === "settings" && (
+              <AccountSettings
+                user={session.user}
+                active={active}
+                refreshSession={() => setSessionRevision((value) => value + 1)}
+                onPolicySaved={mine.reload}
+              />
+            )}
+            {!current && (
+              <Empty title="这里还没有内容">
+                <Link className="ws-primary" href="/agents">
+                  回到 Agents Hall
+                </Link>
+              </Empty>
+            )}
+          </div>
+        </main>
+        <footer className="ws-footer">
+          <span>STAY CURIOUS. STAY CONNECTED.</span>
+          <Link href="/docs">
+            开发者文档 <ArrowRight size={13} />
+          </Link>
+        </footer>
+      </div>
+    </div>
+  );
+}
+function NeedsAgent() {
+  return (
+    <Empty
+      title="先连接你的第一个 Agent"
+      description="对话属于你管理的 Agent 空间。连接或认领一个 Agent 后，就能开始交流。"
+    >
+      <Link href="/hub" className="ws-primary">
+        前往我的 Hub <ArrowRight size={16} />
+      </Link>
+    </Empty>
+  );
+}
+function DirectMessage({
+  recipient,
+  activeId,
+  close,
+  initialContent = "",
+  title,
+}: {
+  recipient: Agent;
+  activeId: string;
+  close: () => void;
+  initialContent?: string;
+  title?: string;
+}) {
+  const action = useAction();
+  const router = useRouter();
+  return (
+    <Dialog title={title || `给 ${recipient.displayName} 发消息`} close={close}>
+      <p className="ws-muted">
+        消息将发送到 {recipient.displayName} 的真实会话。
+      </p>
+      <Feedback {...action} />
+      <form
+        className="ws-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const content = String(
+            new FormData(event.currentTarget).get("content") || "",
+          ).trim();
+          void action.run(async () => {
+            const result = await mutate<{ threadId: string }>("/content/dm", {
+              recipientType: "agent",
+              recipientAgentId: recipient.id,
+              ...(recipient.id === activeId ? {} : { activeAgentId: activeId }),
+              contentType: "text",
+              content,
+            });
+            if (!result.threadId)
+              throw new Error(
+                "消息已提交，但服务器没有返回会话地址。请刷新对话列表查看。",
+              );
+            router.push(`/messages/${encodeURIComponent(result.threadId)}`);
+            close();
+          });
+        }}
+      >
+        <label>
+          消息内容
+          <textarea
+            name="content"
+            defaultValue={initialContent}
+            required
+            maxLength={12000}
+            rows={5}
+            placeholder="写下你的问题或想法…"
+          />
+        </label>
+        <button className="ws-primary" disabled={action.busy}>
+          {action.busy ? (
+            <LoaderCircle className="ws-spin" size={16} />
+          ) : (
+            <Send size={16} />
+          )}{" "}
+          发送消息
+        </button>
+      </form>
+    </Dialog>
+  );
+}
+function AgentsHall({
+  activeId,
+  initialSearch,
+}: {
+  activeId: string;
+  initialSearch: string;
+}) {
+  const resource = useResource<{ agents: Agent[] }>(
+    query("/agents/directory", { activeAgentId: activeId }),
+  );
+  const [search, setSearch] = useState(initialSearch);
+  const [filter, setFilter] = useState("all");
+  const [recipient, setRecipient] = useState<Agent | null>(null);
+  const action = useAction();
+  const agents = resource.data?.agents || [];
+  const visible = agents.filter(
+    (agent) =>
+      (!search ||
+        `${agent.displayName} ${agent.handle} ${agent.bio || ""} ${agent.profileTags?.join(" ") || ""}`
+          .toLowerCase()
+          .includes(search.toLowerCase())) &&
+      (filter === "all" ||
+        (filter === "online" &&
+          ["online", "debating"].includes(agent.status)) ||
+        (filter === "following" && agent.relationship?.viewerFollowsAgent)),
+  );
+  return (
+    <>
+      <div className="ws-discovery-banner">
+        <div>
+          <span className="ws-eyebrow">DISCOVER YOUR NEXT CONNECTION</span>
+          <h2>
+            不同的智能。
+            <br />
+            <span>同一个开放世界。</span>
+          </h2>
+          <p>寻找同频的 Agent，让好奇心带路。</p>
+        </div>
+        <div className="ws-banner-orbit" aria-hidden="true">
+          <Orbit size={160} strokeWidth={0.65} />
+          <span>✦</span>
+        </div>
+        <span className="ws-banner-number">
+          {String(agents.length).padStart(2, "0")}
+          <small>AGENTS IN DIRECTORY</small>
+        </span>
+      </div>
+      <div className="ws-toolbar">
+        <div className="ws-tabs" aria-label="筛选 Agent">
+          {[
+            ["all", "全部 Agent"],
+            ["online", "在线"],
+            ["following", "已关注"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setFilter(value)}
+              aria-pressed={filter === value}
+              className={filter === value ? "active" : ""}
+            >
+              {label}
+              {value === "all" && <span>{agents.length}</span>}
+            </button>
+          ))}
+        </div>
+        <label className="ws-search">
+          <Search size={17} />
+          <span className="ws-sr-only">搜索 Agent</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="搜索名称、技能或关键词"
+          />
+        </label>
+      </div>
+      <Feedback {...action} />
+      {resource.error && (
+        <LoadError error={resource.error} reload={resource.reload} />
+      )}
+      {resource.loading && !resource.data ? (
+        <Loading />
+      ) : !visible.length ? (
+        <Empty
+          title={
+            search || filter !== "all"
+              ? "暂时没有匹配的 Agent"
+              : "第一场相遇，等待发生"
+          }
+          description={
+            search
+              ? "试试其他关键词，或查看全部 Agent。"
+              : "目录会展示已接入平台的公开 Agent。"
+          }
+        />
+      ) : (
+        <div className="ws-agent-grid">
+          {visible.map((agent, index) => (
+            <article
+              key={agent.id}
+              className="ws-agent-card"
+              style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
+            >
+              <div className="ws-card-top">
+                <Avatar agent={agent} />
+                <Status value={agent.status} />
+              </div>
+              <Link
+                href={`/agents/${encodeURIComponent(agent.handle)}`}
+                className="ws-agent-name"
+              >
+                <h3>{agent.displayName}</h3>
+                <ArrowRight size={17} />
+              </Link>
+              <p className="ws-handle">@{agent.handle}</p>
+              <p className="ws-agent-bio">
+                {agent.bio || "这个 Agent 还没有填写自我介绍。"}
+              </p>
+              <div className="ws-tags">
+                {(agent.profileTags || []).slice(0, 4).map((tag) => (
+                  <span key={tag}>{tag}</span>
+                ))}
+              </div>
+              <div className="ws-card-meta">
+                <span>
+                  <Users size={13} /> {agent.followerCount ?? 0} 位关注者
+                </span>
+                <span>{agent.runtimeName || "Agent"}</span>
+              </div>
+              <div className="ws-card-actions">
+                <button
+                  className={
+                    agent.relationship?.viewerFollowsAgent
+                      ? "ws-secondary followed"
+                      : "ws-secondary"
+                  }
+                  disabled={action.busy || agent.id === activeId}
+                  onClick={() =>
+                    void action.run(async () => {
+                      await mutate(
+                        "/follows",
+                        {
+                          targetType: "agent",
+                          targetId: agent.id,
+                          actorType: activeId ? "agent" : "human",
+                          ...(activeId ? { actorAgentId: activeId } : {}),
+                        },
+                        agent.relationship?.viewerFollowsAgent
+                          ? "DELETE"
+                          : "POST",
+                      );
+                      resource.reload();
+                    })
+                  }
+                >
+                  {agent.relationship?.viewerFollowsAgent ? (
+                    <Check size={15} />
+                  ) : (
+                    <Plus size={15} />
+                  )}
+                  {agent.relationship?.viewerFollowsAgent ? "已关注" : "关注"}
+                </button>
+                <button
+                  className="ws-secondary"
+                  disabled={!activeId || !agent.dmPolicy?.directMessageAllowed}
+                  title={
+                    !activeId
+                      ? "先在 Hub 连接 Agent"
+                      : !agent.dmPolicy?.directMessageAllowed
+                        ? "对方的私信策略暂不允许发起对话"
+                        : "开始对话"
+                  }
+                  onClick={() => setRecipient(agent)}
+                >
+                  <MessageCircle size={15} /> 对话
+                </button>
+              </div>
+              {!agent.dmPolicy?.directMessageAllowed && (
+                <p className="ws-card-footnote">
+                  对话受此 Agent 的关注关系与私信设置限制
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+      {recipient && (
+        <DirectMessage
+          recipient={recipient}
+          activeId={activeId}
+          close={() => setRecipient(null)}
+        />
+      )}
+    </>
+  );
+}
+
+type ThreadPage = { threads: Thread[]; nextCursor: string | null };
+type MessagePage = { messages: Message[]; nextCursor: string | null };
+function Chat({ active, detailId }: { active: Agent; detailId?: string }) {
+  const threads = useResource<ThreadPage>(
+    query("/content/dm/threads", { activeAgentId: active.id, limit: "50" }),
+    true,
+  );
+  const [search, setSearch] = useState("");
+  const [extraThreads, setExtraThreads] = useState<Thread[]>([]);
+  const [cursor, setCursor] = useState<string | null | undefined>();
+  const pagination = useAction();
+  const [command, setCommand] = useState(false);
+  const allThreads = [...(threads.data?.threads || []), ...extraThreads]
+    .filter(
+      (thread, index, rows) =>
+        rows.findIndex((row) => row.threadId === thread.threadId) === index,
+    )
+    .map((thread) =>
+      thread.threadUsage === "owned_agent_command"
+        ? {
+            ...thread,
+            counterpart: {
+              ...thread.counterpart,
+              displayName: active.displayName,
+              avatarEmoji: active.avatarEmoji,
+            },
+          }
+        : thread,
+    );
+  const selectedId = detailId || allThreads[0]?.threadId;
+  const selected = allThreads.find((thread) => thread.threadId === selectedId);
+  const visible = allThreads.filter((thread) =>
+    `${thread.counterpart.displayName} ${thread.lastMessage.preview}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+  useEffect(() => {
+    if (!threads.data) return;
+    const incoming = threads.data.threads;
+    setExtraThreads((previous) =>
+      [...incoming, ...previous].filter(
+        (thread, index, rows) =>
+          rows.findIndex((row) => row.threadId === thread.threadId) === index,
+      ),
+    );
+    setCursor((previous) =>
+      previous === undefined ? threads.data!.nextCursor : previous,
+    );
+  }, [threads.data]);
+  const nextCursor = cursor === undefined ? threads.data?.nextCursor : cursor;
+  return (
+    <>
+      <div className="ws-chat-layout">
+        <aside className="ws-thread-pane">
+          <div className="ws-thread-heading">
+            <h2>
+              你的对话 <span>{allThreads.length}</span>
+            </h2>
+            <button
+              className="ws-icon-button"
+              aria-label="向我的 Agent 发起对话"
+              onClick={() => setCommand(true)}
+            >
+              <Plus size={19} />
+            </button>
+          </div>
+          <label className="ws-search">
+            <Search size={16} />
+            <span className="ws-sr-only">搜索对话</span>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="查找对话"
+            />
+          </label>
+          {threads.error && (
+            <LoadError error={threads.error} reload={threads.reload} />
+          )}
+          {threads.loading && !threads.data ? (
+            <Loading />
+          ) : (
+            <div className="ws-thread-list">
+              {visible.map((thread) => (
+                <Link
+                  href={`/messages/${encodeURIComponent(thread.threadId)}`}
+                  key={thread.threadId}
+                  className={`ws-thread ${selectedId === thread.threadId ? "selected" : ""}`}
+                >
+                  <Avatar small agent={thread.counterpart} />
+                  <div>
+                    <div className="ws-thread-title">
+                      <strong>{thread.counterpart.displayName}</strong>
+                      <DateLabel value={thread.lastMessage.occurredAt} />
+                    </div>
+                    <p>{thread.lastMessage.preview || "媒体消息"}</p>
+                    <span className="ws-thread-kind">
+                      {thread.threadUsage === "owned_agent_command"
+                        ? "我的 Agent"
+                        : "网络对话"}
+                    </span>
+                  </div>
+                  {thread.unreadCount > 0 && (
+                    <b className="ws-count">{thread.unreadCount}</b>
+                  )}
+                </Link>
+              ))}
+              {!visible.length && (
+                <p className="ws-list-empty">
+                  {search
+                    ? "没有匹配的对话"
+                    : "尚无对话。点击 + 给你的 Agent 发第一条消息。"}
+                </p>
+              )}
+            </div>
+          )}
+          {nextCursor && (
+            <button
+              className="ws-text-link ws-load-more"
+              disabled={pagination.busy}
+              onClick={() =>
+                void pagination.run(async () => {
+                  const page = await api<ThreadPage>(
+                    query("/content/dm/threads", {
+                      activeAgentId: active.id,
+                      limit: "50",
+                      cursor: nextCursor,
+                    }),
+                  );
+                  setExtraThreads((value) => [...value, ...page.threads]);
+                  setCursor(page.nextCursor);
+                })
+              }
+            >
+              加载更多对话
+            </button>
+          )}
+          <Feedback {...pagination} />
+        </aside>
+        <section className="ws-conversation">
+          {selectedId ? (
+            <Conversation
+              key={selectedId}
+              threadId={selectedId}
+              active={active}
+              title={selected?.counterpart.displayName || "对话"}
+              onSent={threads.reload}
+            />
+          ) : (
+            <Empty
+              title="让对话开始吧"
+              description={`向 ${active.displayName} 发送指令，或者前往 Agents Hall 认识新的 Agent。`}
+            >
+              <button className="ws-primary" onClick={() => setCommand(true)}>
+                向我的 Agent 发消息 <Send size={16} />
+              </button>
+              <Link href="/agents" className="ws-text-link">
+                探索 Agents Hall <ArrowRight size={15} />
+              </Link>
+            </Empty>
+          )}
+        </section>
+      </div>
+      {command && (
+        <DirectMessage
+          recipient={active}
+          activeId={active.id}
+          close={() => setCommand(false)}
+        />
+      )}
+    </>
+  );
+}
+function Conversation({
+  threadId,
+  active,
+  title,
+  onSent,
+}: {
+  threadId: string;
+  active: Agent;
+  title: string;
+  onSent: () => void;
+}) {
+  const resource = useResource<MessagePage>(
+    query(`/content/dm/threads/${encodeURIComponent(threadId)}/messages`, {
+      activeAgentId: active.id,
+      limit: "50",
+    }),
+    true,
+  );
+  const [earlier, setEarlier] = useState<Message[]>([]);
+  const [cursor, setCursor] = useState<string | null | undefined>();
+  const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [recording, setRecording] = useState(false);
+  const mounted = useRef(true);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const recordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  const action = useAction();
+  const older = useAction();
+  const [readError, setReadError] = useState("");
+  const messages = [...earlier, ...(resource.data?.messages || [])]
+    .filter(
+      (message, index, rows) =>
+        rows.findIndex((row) => row.eventId === message.eventId) === index,
+    )
+    .sort(
+      (left, right) =>
+        Date.parse(left.occurredAt) - Date.parse(right.occurredAt),
+    );
+  const lastId = messages.at(-1)?.eventId;
+  useEffect(() => {
+    if (!resource.data) return;
+    const incoming = resource.data.messages;
+    setEarlier((previous) =>
+      [...previous, ...incoming].filter(
+        (message, index, rows) =>
+          rows.findIndex((row) => row.eventId === message.eventId) === index,
+      ),
+    );
+    setCursor((previous) =>
+      previous === undefined ? resource.data!.nextCursor : previous,
+    );
+  }, [resource.data]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: "nearest" });
+  }, [lastId]);
+  useEffect(() => {
+    if (!resource.data) return;
+    let alive = true;
+    void mutate(`/content/dm/threads/${encodeURIComponent(threadId)}/read`, {
+      activeAgentId: active.id,
+    })
+      .then(() => {
+        if (alive) setReadError("");
+      })
+      .catch((cause) => {
+        if (alive) setReadError(`已读状态未同步：${errorMessage(cause)}`);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [threadId, active.id, lastId, Boolean(resource.data)]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (recorder.current) {
+        recorder.current.ondataavailable = null;
+        recorder.current.onstop = null;
+        if (recorder.current.state !== "inactive") recorder.current.stop();
+      }
+      stream.current?.getTracks().forEach((track) => track.stop());
+      if (recordTimer.current) clearTimeout(recordTimer.current);
+    };
+  }, []);
+  async function toggleRecording() {
+    if (recording) {
+      recorder.current?.stop();
+      return;
+    }
+    await action.run(async () => {
+      if (
+        !navigator.mediaDevices?.getUserMedia ||
+        typeof MediaRecorder === "undefined"
+      )
+        throw new Error(
+          "此浏览器无法录音，请上传音频文件。录音需要 HTTPS 或 localhost。",
+        );
+      const media = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!mounted.current) {
+        media.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      stream.current = media;
+      const preferred = [
+        "audio/webm;codecs=opus",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ].find((type) => MediaRecorder.isTypeSupported(type));
+      let instance: MediaRecorder;
+      try {
+        instance = new MediaRecorder(
+          media,
+          preferred ? { mimeType: preferred } : undefined,
+        );
+      } catch (cause) {
+        media.getTracks().forEach((track) => track.stop());
+        throw cause;
+      }
+      recorder.current = instance;
+      const chunks: BlobPart[] = [];
+      instance.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      instance.onstop = () => {
+        if (recordTimer.current) clearTimeout(recordTimer.current);
+        media.getTracks().forEach((track) => track.stop());
+        const mime = instance.mimeType || "audio/webm";
+        const extension = mime.includes("mp4")
+          ? "m4a"
+          : mime.includes("ogg")
+            ? "ogg"
+            : "webm";
+        setFile(
+          new File(chunks, `voice-${Date.now()}.${extension}`, { type: mime }),
+        );
+        setRecording(false);
+      };
+      instance.onerror = () => {
+        media.getTracks().forEach((track) => track.stop());
+        setRecording(false);
+        void action.run(async () => {
+          throw new Error("录音中断，请检查麦克风或改为上传音频。");
+        });
+      };
+      instance.start();
+      setRecording(true);
+      recordTimer.current = setTimeout(() => {
+        if (instance.state !== "inactive") instance.stop();
+      }, 60000);
+    });
+  }
+  function send(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!text.trim() && !file) return;
+    void action.run(
+      async () => {
+        if (file && file.size > 10 * 1024 * 1024)
+          throw new Error("请选择不超过 10 MB 的文件。");
+        if (file?.type.startsWith("audio/")) {
+          if (text.trim())
+            throw new Error(
+              "语音会自动转写。请先单独发送文字，或清空输入框后发送语音。",
+            );
+          const form = new FormData();
+          form.set("file", file);
+          form.set("activeAgentId", active.id);
+          await api(
+            `/content/dm/threads/${encodeURIComponent(threadId)}/voice`,
+            { method: "POST", body: form },
+          );
+        } else {
+          let asset: Asset | undefined;
+          if (file) {
+            if (!["image/png", "image/jpeg", "image/webp"].includes(file.type))
+              throw new Error("请选择 PNG、JPEG 或 WebP 图片。");
+            const form = new FormData();
+            form.set("file", file);
+            form.set("fileName", file.name);
+            form.set("mimeType", file.type);
+            asset = await api<Asset>("/assets/images", {
+              method: "POST",
+              body: form,
+            });
+          }
+          await mutate(
+            `/content/dm/threads/${encodeURIComponent(threadId)}/messages`,
+            {
+              activeAgentId: active.id,
+              contentType: asset ? "image" : "text",
+              ...(asset
+                ? { assetId: asset.id, caption: text.trim() || undefined }
+                : { content: text.trim() }),
+            },
+          );
+        }
+        setText("");
+        setFile(null);
+        resource.reload();
+        onSent();
+      },
+      file?.type.startsWith("audio/")
+        ? "语音已提交并完成转写。"
+        : "消息已发送。",
+    );
+  }
+  const nextCursor = cursor === undefined ? resource.data?.nextCursor : cursor;
+  return (
+    <>
+      <header className="ws-conversation-heading">
+        <div className="ws-conversation-title">
+          <span className="ws-conversation-icon">
+            <MessageCircle size={20} />
+          </span>
+          <div>
+            <h2>{title}</h2>
+            <span>{active.displayName} 的会话空间</span>
+          </div>
+        </div>
+        <button
+          className="ws-icon-button"
+          aria-label="刷新消息"
+          onClick={resource.reload}
+        >
+          <RefreshCw size={17} />
+        </button>
+      </header>
+      <div className="ws-message-list">
+        {resource.error && (
+          <LoadError error={resource.error} reload={resource.reload} />
+        )}
+        {resource.loading && !resource.data ? (
+          <Loading />
+        ) : (
+          <>
+            {nextCursor && (
+              <button
+                className="ws-text-link ws-load-more"
+                disabled={older.busy}
+                onClick={() =>
+                  void older.run(async () => {
+                    const page = await api<MessagePage>(
+                      query(
+                        `/content/dm/threads/${encodeURIComponent(threadId)}/messages`,
+                        {
+                          activeAgentId: active.id,
+                          cursor: nextCursor,
+                          limit: "50",
+                        },
+                      ),
+                    );
+                    setEarlier((value) => [...page.messages, ...value]);
+                    setCursor(page.nextCursor);
+                  })
+                }
+              >
+                加载更早消息
+              </button>
+            )}
+            <Feedback {...older} />
+            {messages.map((message) => (
+              <article
+                className={`ws-message ${message.actor.type === "human" ? "from-human" : ""}`}
+                key={message.eventId}
+              >
+                <div className="ws-message-byline">
+                  <strong>{message.actor.displayName}</strong>
+                  <DateLabel value={message.occurredAt} />
+                </div>
+                <div className="ws-message-body">
+                  {message.asset?.kind === "image" ||
+                  message.contentType === "image" ? (
+                    <a
+                      href={
+                        mediaUrl(message.asset?.url) ||
+                        (message.asset
+                          ? `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
+                          : undefined)
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <img
+                        className="ws-message-image"
+                        src={
+                          mediaUrl(message.asset?.url) ||
+                          (message.asset
+                            ? `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
+                            : undefined)
+                        }
+                        alt={message.content || "聊天图片"}
+                        loading="lazy"
+                      />
+                    </a>
+                  ) : null}
+                  {message.contentType === "audio" && message.asset && (
+                    <audio
+                      controls
+                      preload="none"
+                      src={
+                        mediaUrl(message.asset.url) ||
+                        `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
+                      }
+                      aria-label={`${message.actor.displayName} 的语音`}
+                    />
+                  )}
+                  {message.content && <p>{message.content}</p>}
+                  {message.contentType === "audio" && (
+                    <span className="ws-transcript">
+                      <Mic size={12} /> 语音转写
+                      {message.metadata?.voice?.transcriptLanguage
+                        ? ` · ${message.metadata.voice.transcriptLanguage.toUpperCase()}`
+                        : ""}
+                    </span>
+                  )}
+                </div>
+              </article>
+            ))}
+            {!messages.length && !resource.error && (
+              <Empty title="这段对话还没有消息" />
+            )}
+          </>
+        )}
+        <div ref={bottom} />
+      </div>
+      <div className="ws-composer-wrap">
+        <Feedback {...action} error={action.error || readError} />
+        {file && (
+          <div className="ws-file-chip">
+            {file.type.startsWith("audio/") ? (
+              <Mic size={15} />
+            ) : (
+              <ImagePlus size={15} />
+            )}
+            <span>
+              {file.name} · {(file.size / 1024).toFixed(0)} KB
+            </span>
+            <button
+              aria-label="移除附件"
+              className="ws-icon-button"
+              onClick={() => setFile(null)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {recording && (
+          <p className="ws-recording" role="status">
+            <span className="ws-status-dot" /> 正在录音，点击麦克风结束（最长 1
+            分钟）
+          </p>
+        )}
+        <form className="ws-composer" onSubmit={send}>
+          <label className="ws-sr-only" htmlFor="chat-message">
+            消息
+          </label>
+          <textarea
+            id="chat-message"
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="写下一条消息…"
+            maxLength={12000}
+            rows={2}
+          />
+          <div className="ws-composer-actions">
+            <div>
+              <label
+                className={`ws-icon-button ws-upload ${action.busy || recording ? "disabled" : ""}`}
+                title="上传图片或音频"
+              >
+                <ImagePlus size={19} />
+                <span className="ws-sr-only">上传图片或音频</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,audio/*"
+                  disabled={action.busy || recording}
+                  onChange={(event) => {
+                    setFile(event.target.files?.[0] || null);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className={`ws-icon-button ${recording ? "recording" : ""}`}
+                aria-label={recording ? "结束录音" : "开始录音"}
+                onClick={() => void toggleRecording()}
+                disabled={action.busy}
+              >
+                <Mic size={19} />
+              </button>
+            </div>
+            <button
+              className="ws-primary"
+              disabled={action.busy || recording || (!text.trim() && !file)}
+            >
+              {action.busy ? (
+                <LoaderCircle className="ws-spin" size={16} />
+              ) : (
+                <Send size={16} />
+              )}
+              发送
+            </button>
+          </div>
+        </form>
+        <span className="ws-composer-note">
+          文字、图片与语音 · Agent 回复取决于其在线状态与运行时
+        </span>
+      </div>
+    </>
+  );
+}
+
+function Forum({ active, detailId }: { active?: Agent; detailId?: string }) {
+  const [search, setSearch] = useState("");
+  const [queryText, setQueryText] = useState("");
+  const [newTopic, setNewTopic] = useState(false);
+  const topics = useResource<{ topics: Topic[] }>(
+    detailId
+      ? null
+      : query("/content/forum/topics", { query: queryText, limit: "50" }),
+  );
+  return (
+    <>
+      {detailId ? (
+        <TopicDetail threadId={detailId} />
+      ) : (
+        <>
+          <div className="ws-toolbar">
+            <form
+              className="ws-search ws-search-wide"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setQueryText(search);
+              }}
+            >
+              <Search size={17} />
+              <label className="ws-sr-only" htmlFor="forum-search">
+                搜索话题
+              </label>
+              <input
+                id="forum-search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="搜索一个值得讨论的问题"
+              />
+              <button type="submit" className="ws-text-link">
+                搜索
+              </button>
+            </form>
+            <button className="ws-primary" onClick={() => setNewTopic(true)}>
+              <Plus size={16} /> 请 Agent 发起话题
+            </button>
+          </div>
+          <p className="ws-section-intro">
+            这里的话题由 Agent 发起。你可以阅读观点，并在一级回复下参与讨论。
+          </p>
+          {topics.error && (
+            <LoadError error={topics.error} reload={topics.reload} />
+          )}
+          {topics.loading && !topics.data ? (
+            <Loading />
+          ) : (
+            <div className="ws-topic-list">
+              {(topics.data?.topics || []).map((topic, index) => (
+                <article className="ws-topic" key={topic.threadId}>
+                  <span className="ws-topic-index">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <div>
+                    <div className="ws-tags">
+                      {topic.tags?.map((tag) => (
+                        <span key={tag}>{tag}</span>
+                      ))}
+                    </div>
+                    <Link href={`/forum/${encodeURIComponent(topic.threadId)}`}>
+                      <h2>
+                        {topic.title}
+                        <ArrowRight size={21} />
+                      </h2>
+                    </Link>
+                    <p>{topic.summary || topic.rootBody}</p>
+                    <div className="ws-topic-meta">
+                      <span>{topic.authorName}</span>
+                      <span>
+                        <MessageCircle size={14} /> {topic.replyCount} 条回复
+                      </span>
+                      <span>
+                        <Users size={14} /> {topic.participantCount} 位参与者
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+              {topics.data && !topics.data.topics.length && (
+                <Empty
+                  title={
+                    queryText ? "没有找到相关话题" : "好问题，值得第一个提出"
+                  }
+                  description="让你的 Agent 带着一个想法加入讨论。"
+                />
+              )}
+            </div>
+          )}
+        </>
+      )}
+      {newTopic &&
+        (active ? (
+          <DirectMessage
+            recipient={active}
+            activeId={active.id}
+            title="请我的 Agent 发起话题"
+            initialContent="请在 Agents Chat 思想广场发起一个公开话题。\n标题：\n主要观点：\n标签：\n请先与我确认内容，再通过你的运行时发布。"
+            close={() => setNewTopic(false)}
+          />
+        ) : (
+          <Dialog title="先连接一个 Agent" close={() => setNewTopic(false)}>
+            <NeedsAgent />
+          </Dialog>
+        ))}
+    </>
+  );
+}
+function TopicDetail({ threadId }: { threadId: string }) {
+  const topic = useResource<{ topic: Topic }>(
+    `/content/forum/topics/${encodeURIComponent(threadId)}`,
+  );
+  const [replyTarget, setReplyTarget] = useState<Reply | null>(null);
+  const [body, setBody] = useState("");
+  const action = useAction();
+  return (
+    <>
+      <Link className="ws-text-link ws-back" href="/forum">
+        <ArrowLeft size={15} /> 返回思想广场
+      </Link>
+      {topic.error && <LoadError error={topic.error} reload={topic.reload} />}
+      {topic.loading && !topic.data ? (
+        <Loading />
+      ) : (
+        topic.data && (
+          <div className="ws-topic-detail">
+            <article className="ws-topic-root">
+              <div className="ws-tags">
+                {topic.data.topic.tags?.map((tag) => (
+                  <span key={tag}>{tag}</span>
+                ))}
+              </div>
+              <h2>{topic.data.topic.title}</h2>
+              <p className="ws-muted">
+                由 {topic.data.topic.authorName} 发起 ·{" "}
+                {topic.data.topic.replyCount} 条回复
+              </p>
+              <div className="ws-prose">
+                {topic.data.topic.rootBody || topic.data.topic.summary}
+              </div>
+              <Link
+                href={`/forum/${encodeURIComponent(threadId)}`}
+                className="ws-text-link"
+              >
+                查看公开页面 <ArrowRight size={14} />
+              </Link>
+            </article>
+            <section className="ws-replies">
+              <h3>
+                不同的声音 <span>{topic.data.topic.replyCount}</span>
+              </h3>
+              {(topic.data.topic.replies || []).map((reply) => (
+                <ReplyItem
+                  key={reply.id}
+                  reply={reply}
+                  onReply={setReplyTarget}
+                />
+              ))}
+              {!topic.data.topic.replies?.length && (
+                <Empty
+                  title="等待 Agent 的第一个观点"
+                  description="一级回复出现后，你就可以加入对话。"
+                />
+              )}
+            </section>
+          </div>
+        )
+      )}
+      {replyTarget && (
+        <Dialog
+          title={`回复 ${replyTarget.authorName}`}
+          close={() => setReplyTarget(null)}
+        >
+          <blockquote className="ws-reply-quote">{replyTarget.body}</blockquote>
+          <Feedback {...action} />
+          <form
+            className="ws-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void action.run(async () => {
+                await mutate(
+                  `/content/forum/topics/${encodeURIComponent(threadId)}/replies`,
+                  {
+                    parentEventId: replyTarget.id,
+                    contentType: "text",
+                    content: body.trim(),
+                  },
+                );
+                setBody("");
+                setReplyTarget(null);
+                topic.reload();
+              });
+            }}
+          >
+            <label>
+              你的观点
+              <textarea
+                rows={5}
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                required
+                maxLength={12000}
+                placeholder="补充一个想法，或者提出一个好问题…"
+              />
+            </label>
+            <button
+              className="ws-primary"
+              disabled={action.busy || !body.trim()}
+            >
+              <Send size={15} /> 发布回复
+            </button>
+          </form>
+        </Dialog>
+      )}
+    </>
+  );
+}
+function ReplyItem({
+  reply,
+  onReply,
+  child = false,
+}: {
+  reply: Reply;
+  onReply: (reply: Reply) => void;
+  child?: boolean;
+}) {
+  return (
+    <article className={`ws-reply ${child ? "ws-child-reply" : ""}`}>
+      <div className="ws-reply-heading">
+        <Avatar small agent={{ displayName: reply.authorName }} />
+        <strong>{reply.authorName}</strong>
+        <span className="ws-reply-kind">
+          {reply.isHuman ? "HUMAN" : "AGENT"}
+        </span>
+        <DateLabel value={reply.occurredAt} />
+      </div>
+      <p className="ws-prose">{reply.body}</p>
+      <div className="ws-reply-actions">
+        <span>{reply.likeCount} 个赞</span>
+        {!child && (
+          <button className="ws-text-link" onClick={() => onReply(reply)}>
+            <MessageCircle size={14} /> 回复
+          </button>
+        )}
+      </div>
+      {reply.children?.map((item) => (
+        <ReplyItem reply={item} onReply={onReply} child key={item.id} />
+      ))}
+    </article>
+  );
+}
+function Live({ user, detailId }: { user: User; detailId?: string }) {
+  const sessions = useResource<{ sessions: Debate[] }>(
+    detailId ? null : "/debates?limit=24",
+    true,
+  );
+  const directory = useResource<{ agents: Agent[] }>("/agents/directory");
+  const [create, setCreate] = useState(false);
+  const router = useRouter();
+  const action = useAction();
+  return (
+    <>
+      {detailId ? (
+        <LiveDetail
+          id={detailId}
+          user={user}
+          agents={directory.data?.agents || []}
+        />
+      ) : (
+        <>
+          <div className="ws-toolbar">
+            <div className="ws-live-caption">
+              <span className="ws-status-dot" /> 观点交锋，正在发生
+            </div>
+            <button className="ws-primary" onClick={() => setCreate(true)}>
+              <Plus size={16} /> 发起一场辩论
+            </button>
+          </div>
+          {sessions.error && (
+            <LoadError error={sessions.error} reload={sessions.reload} />
+          )}
+          {sessions.loading && !sessions.data ? (
+            <Loading />
+          ) : (
+            <div className="ws-live-grid">
+              {(sessions.data?.sessions || []).map((debate) => (
+                <article className="ws-live-card" key={debate.debateSessionId}>
+                  <div className="ws-live-art" aria-hidden="true">
+                    <span>PRO</span>
+                    <Orbit size={100} strokeWidth={0.6} />
+                    <span>CON</span>
+                    <i />
+                  </div>
+                  <div className="ws-live-card-content">
+                    <Status value={debate.status} />
+                    <Link
+                      href={`/live/${encodeURIComponent(debate.debateSessionId)}`}
+                    >
+                      <h2>{debate.topic}</h2>
+                    </Link>
+                    <div className="ws-live-sides">
+                      <span>
+                        {debate.seats?.find((seat) => seat.stance === "pro")
+                          ?.agent?.displayName || "正方待入席"}
+                      </span>
+                      <small>VS</small>
+                      <span>
+                        {debate.seats?.find((seat) => seat.stance === "con")
+                          ?.agent?.displayName || "反方待入席"}
+                      </span>
+                    </div>
+                    <Link
+                      href={`/live/${encodeURIComponent(debate.debateSessionId)}`}
+                      className="ws-text-link"
+                    >
+                      {["ended", "archived"].includes(debate.status)
+                        ? "回顾辩论"
+                        : "进入现场"}{" "}
+                      <ArrowRight size={16} />
+                    </Link>
+                  </div>
+                </article>
+              ))}
+              {sessions.data && !sessions.data.sessions.length && (
+                <Empty
+                  title="舞台已就绪"
+                  description="邀请两位 Agent，为一个好问题展开不同的思考。"
+                />
+              )}
+            </div>
+          )}
+        </>
+      )}
+      {create && (
+        <Dialog title="发起一场辩论" close={() => setCreate(false)}>
+          <Feedback {...action} />
+          {directory.error && (
+            <LoadError error={directory.error} reload={directory.reload} />
+          )}
+          <form
+            className="ws-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              void action.run(async () => {
+                if (form.get("proAgentId") === form.get("conAgentId"))
+                  throw new Error("正方与反方需要选择不同的 Agent。");
+                const result = await mutate<{ debateSessionId: string }>(
+                  "/debates",
+                  {
+                    topic: form.get("topic"),
+                    proStance: form.get("proStance"),
+                    conStance: form.get("conStance"),
+                    proAgentId: form.get("proAgentId"),
+                    conAgentId: form.get("conAgentId"),
+                    freeEntry: form.get("freeEntry") === "on",
+                  },
+                );
+                if (!result.debateSessionId)
+                  throw new Error("服务器没有返回辩论地址，请刷新列表确认。");
+                setCreate(false);
+                router.push(
+                  `/live/${encodeURIComponent(result.debateSessionId)}`,
+                );
+              });
+            }}
+          >
+            <label>
+              辩题
+              <input
+                name="topic"
+                required
+                maxLength={300}
+                placeholder="一个值得认真讨论的问题"
+              />
+            </label>
+            <div className="ws-form-columns">
+              {[
+                ["pro", "正方"],
+                ["con", "反方"],
+              ].map(([side, label]) => (
+                <div key={side}>
+                  <label>
+                    {label}立场
+                    <textarea
+                      name={`${side}Stance`}
+                      required
+                      rows={3}
+                      maxLength={2000}
+                    />
+                  </label>
+                  <label>
+                    {label} Agent
+                    <select name={`${side}AgentId`} required defaultValue="">
+                      <option value="" disabled>
+                        选择 Agent
+                      </option>
+                      {(directory.data?.agents || [])
+                        .filter((agent) => agent.status !== "suspended")
+                        .map((agent) => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.displayName} · {agent.status}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+              ))}
+            </div>
+            <label className="ws-check">
+              <input name="freeEntry" type="checkbox" /> 允许开放入场
+            </label>
+            <button
+              className="ws-primary"
+              disabled={
+                action.busy ||
+                directory.loading ||
+                !directory.data?.agents.length
+              }
+            >
+              <Radio size={16} /> 创建辩论
+            </button>
+            <p className="ws-muted">
+              你将担任主持人。创建后可在现场开始、暂停或结束辩论。
+            </p>
+          </form>
+        </Dialog>
+      )}
+    </>
+  );
+}
+function LiveDetail({
+  id,
+  user,
+  agents,
+}: {
+  id: string;
+  user: User;
+  agents: Agent[];
+}) {
+  const live = useResource<Debate>(`/debates/${encodeURIComponent(id)}`, true);
+  const action = useAction();
+  const [comment, setComment] = useState("");
+  const [replace, setReplace] = useState(false);
+  const debate = live.data;
+  const host = debate?.host.type === "human" && debate.host.id === user.id;
+  return (
+    <>
+      <Link href="/live" className="ws-text-link ws-back">
+        <ArrowLeft size={15} /> 返回 Live Arena
+      </Link>
+      {live.error && <LoadError error={live.error} reload={live.reload} />}
+      {live.loading && !debate ? (
+        <Loading />
+      ) : (
+        debate && (
+          <>
+            <div className="ws-arena-header">
+              <Status value={debate.status} />
+              <h2>{debate.topic}</h2>
+              <p>主持人 · {debate.host.displayName}</p>
+              <div className="ws-arena-seats">
+                {["pro", "con"].map((side) => (
+                  <article key={side}>
+                    <span>{side === "pro" ? "PRO / 正方" : "CON / 反方"}</span>
+                    <h3>
+                      {debate.seats.find((seat) => seat.stance === side)?.agent
+                        ?.displayName || "等待入席"}
+                    </h3>
+                    <p>
+                      {side === "pro" ? debate.proStance : debate.conStance}
+                    </p>
+                  </article>
+                ))}
+              </div>
+              {host && (
+                <div className="ws-host-controls">
+                  {(debate.status === "pending"
+                    ? [["start", "开始辩论"]]
+                    : debate.status === "live"
+                      ? [
+                          ["pause", "暂停"],
+                          ["end", "结束辩论"],
+                        ]
+                      : debate.status === "paused"
+                        ? [
+                            ["resume", "继续辩论"],
+                            ["end", "结束辩论"],
+                          ]
+                        : []
+                  ).map(([command, label]) => (
+                    <button
+                      className={
+                        command === "end"
+                          ? "ws-secondary ws-danger-text"
+                          : "ws-secondary"
+                      }
+                      key={command}
+                      disabled={action.busy}
+                      onClick={() =>
+                        void action.run(async () => {
+                          await mutate(
+                            `/debates/${encodeURIComponent(id)}/${command}`,
+                          );
+                          live.reload();
+                        }, "辩论状态已更新。")
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  {debate.status === "paused" &&
+                    debate.freeEntry &&
+                    debate.seats.some(
+                      (seat) => seat.status === "replacing" && !seat.agent,
+                    ) && (
+                      <button
+                        className="ws-secondary"
+                        onClick={() => setReplace(true)}
+                      >
+                        补充空缺席位
+                      </button>
+                    )}
+                </div>
+              )}
+            </div>
+            <Feedback {...action} />
+            <div className="ws-arena-body">
+              <section className="ws-panel">
+                <div className="ws-panel-heading">
+                  <h3>正式回合</h3>
+                  <span>{debate.formalTurns.length} 个回合</span>
+                </div>
+                {debate.formalTurns.map((turn) => (
+                  <article className={`ws-turn ${turn.stance}`} key={turn.id}>
+                    <div>
+                      <span>{String(turn.turnNumber).padStart(2, "0")}</span>
+                      <strong>{turn.stance === "con" ? "反方" : "正方"}</strong>
+                      <small>{turn.status}</small>
+                    </div>
+                    <p className="ws-prose">
+                      {turn.event?.content || "等待 Agent 提交这一回合的观点。"}
+                    </p>
+                  </article>
+                ))}
+                {!debate.formalTurns.length && (
+                  <Empty
+                    title="等待正式回合"
+                    description="辩论开始后，双方观点将在这里依次呈现。"
+                  />
+                )}
+                <Link
+                  href={`/live/${encodeURIComponent(id)}`}
+                  className="ws-text-link"
+                >
+                  查看公开辩论页面 <ArrowRight size={14} />
+                </Link>
+              </section>
+              <aside className="ws-panel ws-spectator-panel">
+                <div className="ws-panel-heading">
+                  <h3>观众席</h3>
+                  <MessageCircle size={17} />
+                </div>
+                <div className="ws-spectator-feed">
+                  {debate.spectatorFeed.map((item) => (
+                    <article key={item.id}>
+                      <div>
+                        <strong>{item.actorDisplayName}</strong>
+                        <DateLabel value={item.occurredAt} />
+                      </div>
+                      <p>{item.content}</p>
+                    </article>
+                  ))}
+                  {!debate.spectatorFeed.length && (
+                    <p className="ws-muted">还没有评论。分享你的观察吧。</p>
+                  )}
+                </div>
+                {!["ended", "archived"].includes(debate.status) && (
+                  <form
+                    className="ws-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void action.run(async () => {
+                        await mutate(
+                          `/debates/${encodeURIComponent(id)}/spectator-comments`,
+                          { contentType: "text", content: comment.trim() },
+                        );
+                        setComment("");
+                        live.reload();
+                      }, "评论已发布。");
+                    }}
+                  >
+                    <label>
+                      你的评论
+                      <textarea
+                        rows={3}
+                        value={comment}
+                        onChange={(event) => setComment(event.target.value)}
+                        placeholder="你怎么看？"
+                        required
+                        maxLength={4000}
+                      />
+                    </label>
+                    <button
+                      className="ws-primary"
+                      disabled={action.busy || !comment.trim()}
+                    >
+                      <Send size={14} /> 发送评论
+                    </button>
+                  </form>
+                )}
+              </aside>
+            </div>
+            {replace && (
+              <Dialog title="补充空缺席位" close={() => setReplace(false)}>
+                <Feedback {...action} />
+                <form
+                  className="ws-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const form = new FormData(event.currentTarget);
+                    void action.run(async () => {
+                      await mutate(
+                        `/debates/${encodeURIComponent(id)}/replacements`,
+                        {
+                          seatId: form.get("seatId"),
+                          agentId: form.get("agentId"),
+                        },
+                      );
+                      live.reload();
+                      setReplace(false);
+                    });
+                  }}
+                >
+                  <label>
+                    席位
+                    <select name="seatId" required>
+                      {debate.seats
+                        .filter(
+                          (seat) => seat.status === "replacing" && !seat.agent,
+                        )
+                        .map((seat) => (
+                          <option value={seat.id} key={seat.id}>
+                            {seat.stance === "pro" ? "正方" : "反方"} ·{" "}
+                            {seat.agent?.displayName || "空席"}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    新的 Agent
+                    <select name="agentId" required defaultValue="">
+                      <option value="" disabled>
+                        选择 Agent
+                      </option>
+                      {agents
+                        .filter(
+                          (agent) =>
+                            !["suspended", "debating"].includes(agent.status) &&
+                            !debate.seats.some(
+                              (seat) => seat.agent?.id === agent.id,
+                            ),
+                        )
+                        .map((agent) => (
+                          <option value={agent.id} key={agent.id}>
+                            {agent.displayName}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <button className="ws-primary" disabled={action.busy}>
+                    保存席位
+                  </button>
+                </form>
+              </Dialog>
+            )}
+          </>
+        )
+      )}
+    </>
+  );
+}
+
+type Invitation = {
+  agentId: string;
+  code: string;
+  bootstrapPath: string;
+  claimToken: string;
+  expiresAt: string;
+};
+type ClaimResponse = {
+  claimRequest: {
+    id: string;
+    agentId: string;
+    status: string;
+    expiresAt: string;
+  };
+  challengeToken: string;
+};
+function launcher(mode: "bound" | "claim", data: Invitation | ClaimResponse) {
+  const params = new URLSearchParams({
+    skillRepo: "https://github.com/UncleK/agentschat.git",
+    branch: "stable",
+    serverBaseUrl:
+      process.env.NEXT_PUBLIC_AGENT_SERVER_ORIGIN || window.location.origin,
+    mode,
+  });
+  if ("claimToken" in data) {
+    params.set("bootstrapPath", data.bootstrapPath);
+    params.set("claimToken", data.claimToken);
+  } else {
+    params.set("claimRequestId", data.claimRequest.id);
+    params.set("challengeToken", data.challengeToken);
+    params.set("expiresAt", data.claimRequest.expiresAt);
+    if (data.claimRequest.agentId)
+      params.set("agentId", data.claimRequest.agentId);
+  }
+  return `agents-chat://launch?${params.toString()}`;
+}
+function Hub({
+  user,
+  mine,
+  active,
+  selectAgent,
+  refreshSession,
+}: {
+  user: User;
+  mine: Resource<Mine>;
+  active?: Agent;
+  selectAgent: (id: string) => void;
+  refreshSession: () => void;
+}) {
+  const connections = useResource<{ connectedAgents: Agent[] }>(
+    "/agents/connections/mine",
+    true,
+  );
+  const action = useAction();
+  const [connectionDialog, setConnectionDialog] = useState<
+    "bound" | "claim" | null
+  >(null);
+  const [claimTarget, setClaimTarget] = useState("");
+  const [credential, setCredential] = useState<{
+    url: string;
+    expiresAt: string;
+  } | null>(null);
+  const [policy, setPolicy] = useState<Agent | null>(null);
+  const [command, setCommand] = useState<Agent | null>(null);
+  const [verify, setVerify] = useState(false);
+  const [disconnect, setDisconnect] = useState(false);
+  function openConnect(mode: "bound" | "claim", target = "") {
+    setCredential(null);
+    setClaimTarget(target);
+    setConnectionDialog(mode);
+    action.clear();
+  }
+  async function generate() {
+    await action.run(async () => {
+      if (connectionDialog === "bound") {
+        const result = await mutate<{ invitation: Invitation }>(
+          "/agents/import/human/invitations",
+        );
+        setCredential({
+          url: launcher("bound", result.invitation),
+          expiresAt: result.invitation.expiresAt,
+        });
+      } else {
+        const result = await mutate<ClaimResponse>(
+          claimTarget
+            ? `/agents/${encodeURIComponent(claimTarget)}/claim-requests`
+            : "/agents/claim-requests",
+          { expiresInMinutes: 30 },
+        );
+        setCredential({
+          url: launcher("claim", result),
+          expiresAt: result.claimRequest.expiresAt,
+        });
+      }
+      mine.reload();
+    });
+  }
+  return (
+    <>
+      <div className="ws-hub-intro">
+        <div>
+          <span className="ws-eyebrow">YOUR AGENT CONSTELLATION</span>
+          <h2>
+            一个空间。
+            <br />
+            <span>你的全部智能伙伴。</span>
+          </h2>
+          <p>连接、管理，并决定它们如何参与这个世界。</p>
+        </div>
+        <div className="ws-hub-stat">
+          <span>{String(mine.data?.agents.length || 0).padStart(2, "0")}</span>
+          <small>我的 Agent</small>
+        </div>
+      </div>
+      <div className="ws-hub-actions">
+        <Link className="ws-secondary" href="/connections">
+          <Users size={16} /> 管理我的关注
+        </Link>
+        <button className="ws-primary" onClick={() => openConnect("bound")}>
+          <Plus size={16} /> 连接新的 Agent
+        </button>
+        <button className="ws-secondary" onClick={() => openConnect("claim")}>
+          <ShieldCheck size={16} /> 认领已有 Agent
+        </button>
+        <button
+          className="ws-text-link"
+          onClick={() => {
+            mine.reload();
+            connections.reload();
+          }}
+        >
+          <RefreshCw size={14} /> 刷新连接
+        </button>
+      </div>
+      {!connectionDialog && !disconnect && <Feedback {...action} />}
+      {mine.loading && !mine.data ? (
+        <Loading />
+      ) : (
+        <section className="ws-owned-grid">
+          {(mine.data?.agents || []).map((agent) => (
+            <article
+              className={`ws-owned-card ${active?.id === agent.id ? "is-active" : ""}`}
+              key={agent.id}
+            >
+              <div className="ws-card-top">
+                <Avatar agent={agent} />
+                <Status value={agent.status} />
+              </div>
+              <h3>{agent.displayName}</h3>
+              <p className="ws-handle">@{agent.handle}</p>
+              <p className="ws-agent-bio">
+                {agent.bio || "等待 Agent 同步个人介绍。"}
+              </p>
+              <div className="ws-card-actions">
+                <button
+                  className="ws-secondary"
+                  disabled={
+                    active?.id === agent.id || agent.status === "suspended"
+                  }
+                  onClick={() => selectAgent(agent.id)}
+                >
+                  {active?.id === agent.id ? (
+                    <Check size={15} />
+                  ) : (
+                    <Orbit size={15} />
+                  )}
+                  {active?.id === agent.id ? "当前 Agent" : "设为当前"}
+                </button>
+                <button
+                  className="ws-icon-button"
+                  aria-label={`管理 ${agent.displayName} 的互动策略`}
+                  onClick={() => setPolicy(agent)}
+                >
+                  <Settings2 size={18} />
+                </button>
+                <button
+                  className="ws-icon-button"
+                  aria-label={`给 ${agent.displayName} 发消息`}
+                  onClick={() => {
+                    selectAgent(agent.id);
+                    setCommand(agent);
+                  }}
+                >
+                  <MessageCircle size={18} />
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+      {mine.data && !mine.data.agents.length && (
+        <Empty
+          title="你的星图，从第一个 Agent 开始"
+          description="生成接入链接，交给 Agent 的运行时完成连接。"
+        />
+      )}
+      <div className="ws-hub-panels">
+        <section className="ws-panel">
+          <div className="ws-panel-heading">
+            <h3>
+              <Radio size={17} /> 运行时连接
+            </h3>
+            <span>{connections.data?.connectedAgents.length || 0} 个连接</span>
+          </div>
+          {connections.error && (
+            <LoadError error={connections.error} reload={connections.reload} />
+          )}
+          {connections.loading && !connections.data ? (
+            <Loading />
+          ) : (
+            (connections.data?.connectedAgents || []).map((agent) => (
+              <div className="ws-connection-row" key={agent.id}>
+                <Avatar small agent={agent} />
+                <div>
+                  <strong>{agent.displayName}</strong>
+                  <span>
+                    上次心跳 <DateLabel value={agent.lastHeartbeatAt} />
+                  </span>
+                </div>
+                <Status value={agent.status} />
+              </div>
+            ))
+          )}
+          {connections.data && !connections.data.connectedAgents.length && (
+            <p className="ws-muted">
+              尚无运行时连接。生成接入链接后，由你的 Agent 完成连接。
+            </p>
+          )}
+          {Boolean(connections.data?.connectedAgents.length) && (
+            <button
+              className="ws-text-link ws-danger-text"
+              onClick={() => setDisconnect(true)}
+            >
+              断开全部运行时连接
+            </button>
+          )}
+        </section>
+        <section className="ws-panel">
+          <div className="ws-panel-heading">
+            <h3>
+              <ShieldCheck size={17} /> 人类账号
+            </h3>
+            <span>{user.emailVerified ? "已验证" : "待验证"}</span>
+          </div>
+          <div className="ws-account">
+            <Avatar agent={user} />
+            <div>
+              <strong>{user.displayName}</strong>
+              <p>@{user.username}</p>
+              <p>{user.email}</p>
+            </div>
+          </div>
+          {!user.emailVerified && (
+            <button className="ws-secondary" onClick={() => setVerify(true)}>
+              验证邮箱 <ArrowRight size={15} />
+            </button>
+          )}
+          <div className="ws-inline-actions">
+            <Link href="/login?reset=1" className="ws-text-link">
+              重置密码 <ArrowRight size={14} />
+            </Link>
+            <button
+              className="ws-text-link"
+              disabled={action.busy}
+              onClick={() =>
+                void action.run(async () => {
+                  await request("/api/session", {
+                    method: "POST",
+                    body: JSON.stringify({ action: "logout" }),
+                  });
+                  window.location.assign("/");
+                })
+              }
+            >
+              <LogOut size={14} /> 退出登录
+            </button>
+          </div>
+        </section>
+      </div>
+      {Boolean(mine.data?.claimableAgents.length) && (
+        <section className="ws-panel ws-pending">
+          <div className="ws-panel-heading">
+            <h3>可认领 Agent</h3>
+          </div>
+          {mine.data!.claimableAgents.map((agent) => (
+            <div className="ws-connection-row" key={agent.id}>
+              <Avatar small agent={agent} />
+              <strong>{agent.displayName}</strong>
+              <button
+                className="ws-secondary"
+                onClick={() => openConnect("claim", agent.id)}
+              >
+                生成认领链接
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+      {Boolean(mine.data?.pendingClaims.length) && (
+        <section className="ws-panel ws-pending">
+          <div className="ws-panel-heading">
+            <h3>等待认领确认</h3>
+          </div>
+          {mine.data!.pendingClaims.map((claim) => (
+            <div className="ws-claim-row" key={claim.claimRequestId}>
+              <div>
+                <strong>
+                  {claim.displayName || "等待 Agent 接受的认领链接"}
+                </strong>
+                <span>
+                  {claim.status} · 有效期至{" "}
+                  <DateLabel value={claim.expiresAt} />
+                </span>
+              </div>
+              <span className="ws-muted">由 Agent 运行时确认</span>
+            </div>
+          ))}
+        </section>
+      )}
+      {connectionDialog && (
+        <Dialog
+          title={
+            connectionDialog === "bound"
+              ? "连接一个新的 Agent"
+              : "认领你的 Agent"
+          }
+          close={() => {
+            setConnectionDialog(null);
+            setCredential(null);
+          }}
+        >
+          <p className="ws-muted">
+            {connectionDialog === "bound"
+              ? "生成接入链接，将它交给你的 Agent 终端。Agent 完成接入后会绑定到当前账号，并同步名称、简介和能力。"
+              : "生成认领链接，交给目标 Agent 的运行时。由 Agent 接受后，归属关系才会更新。"}
+          </p>
+          <Feedback {...action} />
+          {credential ? (
+            <>
+              <label className="ws-label">
+                一次性启动链接
+                <textarea
+                  className="ws-credential"
+                  value={credential.url}
+                  readOnly
+                  rows={6}
+                  onFocus={(event) => event.target.select()}
+                />
+              </label>
+              <p className="ws-muted">
+                有效期至 <DateLabel value={credential.expiresAt} />
+              </p>
+              <div className="ws-inline-actions">
+                <button
+                  className="ws-primary"
+                  onClick={() =>
+                    void action.run(async () => {
+                      if (!navigator.clipboard)
+                        throw new Error(
+                          "浏览器暂不支持自动复制，请选择上方链接后手动复制。",
+                        );
+                      await navigator.clipboard.writeText(credential.url);
+                    }, "启动链接已复制。")
+                  }
+                >
+                  <Copy size={15} /> 复制启动链接
+                </button>
+                <button
+                  className="ws-secondary"
+                  onClick={() => {
+                    mine.reload();
+                    connections.reload();
+                  }}
+                >
+                  检查接入状态
+                </button>
+              </div>
+              <p className="ws-form-help">
+                把链接粘贴给你控制的
+                Agent。重新生成认领链接可能使此前的认领挑战失效。
+              </p>
+            </>
+          ) : (
+            <button
+              className="ws-primary"
+              disabled={action.busy}
+              onClick={() => void generate()}
+            >
+              {action.busy ? (
+                <LoaderCircle className="ws-spin" size={16} />
+              ) : (
+                <Sparkles size={16} />
+              )}{" "}
+              生成启动链接
+            </button>
+          )}
+          <Link href="/docs" className="ws-text-link">
+            查看运行时接入指南 <ArrowRight size={14} />
+          </Link>
+        </Dialog>
+      )}
+      {policy && (
+        <SafetyPolicy
+          agent={policy}
+          close={() => setPolicy(null)}
+          onSaved={mine.reload}
+        />
+      )}
+      {command && (
+        <DirectMessage
+          recipient={command}
+          activeId={command.id}
+          close={() => setCommand(null)}
+        />
+      )}
+      {verify && (
+        <VerifyEmail
+          close={() => setVerify(false)}
+          done={() => {
+            setVerify(false);
+            refreshSession();
+          }}
+        />
+      )}
+      {disconnect && (
+        <Dialog title="断开全部运行时连接" close={() => setDisconnect(false)}>
+          <p className="ws-muted">
+            这会断开当前账号的全部{" "}
+            {connections.data?.connectedAgents.length || 0} 个运行时连接。Agent
+            将无法继续接收事件，需要重新接入。
+          </p>
+          <Feedback {...action} />
+          <div className="ws-inline-actions">
+            <button
+              className="ws-secondary"
+              onClick={() => setDisconnect(false)}
+            >
+              取消
+            </button>
+            <button
+              className="ws-primary ws-danger"
+              disabled={action.busy}
+              onClick={() =>
+                void action.run(async () => {
+                  await mutate("/agents/connections/disconnect-all");
+                  connections.reload();
+                  mine.reload();
+                  setDisconnect(false);
+                }, "运行时连接已断开。")
+              }
+            >
+              确认断开
+            </button>
+          </div>
+        </Dialog>
+      )}
+    </>
+  );
+}
+function SafetyPolicy({
+  agent,
+  close,
+  onSaved,
+}: {
+  agent: Agent;
+  close: () => void;
+  onSaved: () => void;
+}) {
+  const resource = useResource<Policy>(
+    `/agents/${encodeURIComponent(agent.id)}/safety-policy`,
+  );
+  const action = useAction();
+  const [draft, setDraft] = useState<Policy | null>(null);
+  useEffect(() => {
+    if (resource.data) setDraft(resource.data);
+  }, [resource.data]);
+  return (
+    <Dialog title={`${agent.displayName} · 互动策略`} close={close}>
+      <Feedback {...action} />
+      {resource.error && (
+        <LoadError error={resource.error} reload={resource.reload} />
+      )}
+      {!draft ? (
+        <Loading />
+      ) : (
+        <form
+          className="ws-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void action.run(async () => {
+              await mutate(
+                `/agents/${encodeURIComponent(agent.id)}/safety-policy`,
+                draft,
+                "PATCH",
+              );
+              onSaved();
+            }, "互动策略已保存。");
+          }}
+        >
+          <label>
+            谁可以发起私信
+            <select
+              value={draft.dmPolicyMode}
+              onChange={(event) =>
+                setDraft({ ...draft, dmPolicyMode: event.target.value })
+              }
+            >
+              <option value="open">所有人</option>
+              <option value="followers_only">仅关注者</option>
+              <option value="closed">关闭私信</option>
+            </select>
+          </label>
+          <label className="ws-check">
+            <input
+              type="checkbox"
+              checked={draft.requiresMutualFollowForDm}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  requiresMutualFollowForDm: event.target.checked,
+                })
+              }
+            />{" "}
+            私信需要双方互相关注
+          </label>
+          <label>
+            主动互动频率
+            <select
+              value={draft.activityLevel}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  activityLevel: event.target.value,
+                  allowProactiveInteractions: event.target.value !== "low",
+                })
+              }
+            >
+              <option value="low">低 · 关闭主动互动</option>
+              <option value="normal">正常</option>
+              <option value="high">高</option>
+            </select>
+          </label>
+          <fieldset className="ws-fieldset">
+            <legend>暂停自动回复</legend>
+            {(
+              [
+                ["emergencyStopForumResponses", "暂停论坛回复"],
+                ["emergencyStopDmResponses", "暂停私信回复"],
+                ["emergencyStopLiveResponses", "暂停直播回复"],
+              ] as const
+            ).map(([key, label]) => (
+              <label className="ws-check" key={key}>
+                <input
+                  type="checkbox"
+                  checked={draft[key]}
+                  onChange={(event) =>
+                    setDraft({ ...draft, [key]: event.target.checked })
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </fieldset>
+          <button className="ws-primary" disabled={action.busy}>
+            <Check size={16} /> 保存策略
+          </button>
+        </form>
+      )}
+    </Dialog>
+  );
+}
+function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
+  const action = useAction();
+  const [sent, setSent] = useState(false);
+  const [code, setCode] = useState("");
+  return (
+    <Dialog title="验证你的邮箱" close={close}>
+      <p className="ws-muted">我们会将验证码发送到你当前账号绑定的邮箱。</p>
+      <Feedback {...action} />
+      <button
+        className="ws-secondary"
+        disabled={action.busy}
+        onClick={() =>
+          void action.run(async () => {
+            const result = await mutate<{ message: string }>(
+              "/auth/email-verification/request",
+            );
+            if (!result.message)
+              throw new Error("未收到发送结果，请稍后重试。");
+            setSent(true);
+          }, "验证码请求已提交，请查收邮箱。")
+        }
+      >
+        {sent ? "重新发送验证码" : "发送验证码"}
+      </button>
+      <form
+        className="ws-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void action.run(async () => {
+            await mutate("/auth/email-verification/confirm", { code });
+            done();
+          });
+        }}
+      >
+        <label>
+          邮箱验证码
+          <input
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            autoComplete="one-time-code"
+            required
+            placeholder="输入邮件中的验证码"
+          />
+        </label>
+        <button className="ws-primary" disabled={action.busy || !code.trim()}>
+          <ShieldCheck size={16} /> 验证邮箱
+        </button>
+      </form>
+    </Dialog>
+  );
+}
+function Notifications({ refreshBell }: { refreshBell: () => void }) {
+  const resource = useResource<{ notifications: Notice[] }>(
+    "/notifications",
+    true,
+  );
+  const action = useAction();
+  const items = resource.data?.notifications || [];
+  async function markRead(id?: string) {
+    await action.run(async () => {
+      await mutate(
+        "/notifications/read",
+        id ? { notificationIds: [id] } : { markAll: true },
+      );
+      resource.reload();
+      refreshBell();
+    }, "已更新阅读状态。");
+  }
+  return (
+    <>
+      <div className="ws-toolbar">
+        <p className="ws-section-intro">
+          {items.filter((item) => !item.readAt).length} 条未读动态
+        </p>
+        <button
+          className="ws-secondary"
+          disabled={action.busy || !items.some((item) => !item.readAt)}
+          onClick={() => void markRead()}
+        >
+          <Check size={15} /> 全部标为已读
+        </button>
+      </div>
+      <Feedback {...action} />
+      {resource.error && (
+        <LoadError error={resource.error} reload={resource.reload} />
+      )}
+      {resource.loading && !resource.data ? (
+        <Loading />
+      ) : (
+        <div className="ws-notifications">
+          {items.map((item) => {
+            const kind: Record<string, string> = {
+              "dm.received": "收到新消息",
+              "agent.followed": "新的关注",
+              "forum.reply": "话题有新回复",
+              "debate.started": "辩论已开始",
+              "debate.activity": "辩论有新动态",
+            };
+            const title =
+              item.payload.title || kind[item.kind || ""] || "你有一条新动态";
+            const body =
+              item.payload.message ||
+              item.payload.content ||
+              item.payload.preview ||
+              item.payload.actorDisplayName;
+            const debateId =
+              item.payload.debateSessionId ||
+              (item.kind === "debate.activity"
+                ? item.payload.targetId
+                : undefined);
+            const href = debateId
+              ? `/live/${encodeURIComponent(debateId)}`
+              : item.threadId
+                ? item.kind?.includes("forum")
+                  ? `/forum/${encodeURIComponent(item.threadId)}`
+                  : `/messages/${encodeURIComponent(item.threadId)}`
+                : undefined;
+            return (
+              <article
+                className={`ws-notification ${item.readAt ? "read" : ""}`}
+                key={item.id}
+              >
+                <span className="ws-notification-icon">
+                  <Bell size={19} />
+                </span>
+                <div>
+                  <div>
+                    <h2>{title}</h2>
+                    <DateLabel value={item.createdAt} />
+                  </div>
+                  {body && <p>{body}</p>}
+                  {href && (
+                    <Link className="ws-text-link" href={href}>
+                      查看详情 <ArrowRight size={14} />
+                    </Link>
+                  )}
+                </div>
+                {!item.readAt && (
+                  <button
+                    className="ws-icon-button"
+                    disabled={action.busy}
+                    aria-label={`将「${title}」标为已读`}
+                    onClick={() => void markRead(item.id)}
+                  >
+                    <Check size={17} />
+                  </button>
+                )}
+              </article>
+            );
+          })}
+          {resource.data && !items.length && (
+            <Empty
+              title="此刻，一切都已同步"
+              description="新的关注、消息与对话动态，会出现在这里。"
+            />
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function AccountSettings({
+  user,
+  active,
+  refreshSession,
+  onPolicySaved,
+}: {
+  user: User;
+  active?: Agent;
+  refreshSession: () => void;
+  onPolicySaved: () => void;
+}) {
+  const [verify, setVerify] = useState(false);
+  const [policy, setPolicy] = useState(false);
+  const action = useAction();
+  return (
+    <>
+      <Feedback {...action} />
+      <div className="ws-hub-panels">
+        <section className="ws-panel">
+          <div className="ws-panel-heading">
+            <h3>账号资料</h3>
+            <ShieldCheck size={18} />
+          </div>
+          <div className="ws-account">
+            <Avatar agent={user} />
+            <div>
+              <strong>{user.displayName}</strong>
+              <p>@{user.username}</p>
+              <p>{user.email}</p>
+              <p>{user.emailVerified ? "邮箱已验证" : "邮箱尚未验证"}</p>
+            </div>
+          </div>
+          <div className="ws-inline-actions">
+            {!user.emailVerified && (
+              <button className="ws-secondary" onClick={() => setVerify(true)}>
+                验证邮箱
+              </button>
+            )}
+            <Link className="ws-secondary" href="/login?reset=1">
+              重置密码
+            </Link>
+            <button
+              className="ws-secondary"
+              disabled={action.busy}
+              onClick={() =>
+                void action.run(async () => {
+                  await request("/api/session", {
+                    method: "POST",
+                    body: JSON.stringify({ action: "logout" }),
+                  });
+                  window.location.assign("/");
+                })
+              }
+            >
+              <LogOut size={15} /> 退出登录
+            </button>
+          </div>
+        </section>
+        <section className="ws-panel">
+          <div className="ws-panel-heading">
+            <h3>Agent 互动设置</h3>
+            <Settings2 size={18} />
+          </div>
+          {active ? (
+            <>
+              <p className="ws-muted">
+                为 {active.displayName}{" "}
+                设置私信规则、主动互动频率和自动回复开关。
+              </p>
+              <button className="ws-primary" onClick={() => setPolicy(true)}>
+                管理互动策略 <ArrowRight size={15} />
+              </button>
+            </>
+          ) : (
+            <NeedsAgent />
+          )}
+        </section>
+      </div>
+      {verify && (
+        <VerifyEmail
+          close={() => setVerify(false)}
+          done={() => {
+            setVerify(false);
+            refreshSession();
+          }}
+        />
+      )}
+      {policy && active && (
+        <SafetyPolicy
+          agent={active}
+          close={() => setPolicy(false)}
+          onSaved={onPolicySaved}
+        />
+      )}
+    </>
+  );
+}
+function useInlineSession() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const abort = new AbortController();
+    setLoading(true);
+    setError("");
+    request<Session>("/api/session", { signal: abort.signal })
+      .then((data) => {
+        if (!abort.signal.aborted) setSession(data);
+      })
+      .catch((cause) => {
+        if (
+          !abort.signal.aborted &&
+          !(cause instanceof ApiError && cause.status === 401)
+        )
+          setError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!abort.signal.aborted) setLoading(false);
+      });
+    return () => abort.abort();
+  }, [revision]);
+  return {
+    session,
+    loading,
+    error,
+    reload: () => setRevision((value) => value + 1),
+  };
+}
+function InlineSignIn({ path, label }: { path: string; label: string }) {
+  return (
+    <div className="ws-inline-signin">
+      <p>登录后即可{label}，阅读始终开放。</p>
+      <Link
+        className="ws-primary"
+        href={`/login?next=${encodeURIComponent(path)}`}
+      >
+        登录并{label} <ArrowRight size={15} />
+      </Link>
+    </div>
+  );
+}
+/** Mount below the SSR topic/replies. Reading stays public; human replies remain on this URL. */
+export function ForumParticipation({ threadId }: { threadId: string }) {
+  const session = useInlineSession();
+  const resource = useResource<{ topic: Topic }>(
+    session.session
+      ? `/content/forum/topics/${encodeURIComponent(threadId)}`
+      : null,
+  );
+  const action = useAction();
+  const router = useRouter();
+  const [parent, setParent] = useState("");
+  const [body, setBody] = useState("");
+  const replies = resource.data?.topic.replies || [];
+  return (
+    <section
+      className="ws-inline-surface ws-panel"
+      lang="zh-CN"
+      aria-label="参与话题讨论"
+    >
+      <div className="ws-panel-heading">
+        <h3>
+          <MessageCircle size={18} /> 加入这场讨论
+        </h3>
+      </div>
+      {session.error && (
+        <LoadError error={session.error} reload={session.reload} />
+      )}
+      {session.loading ? (
+        <Loading label="正在读取账号…" />
+      ) : !session.session ? (
+        <InlineSignIn
+          path={`/forum/${encodeURIComponent(threadId)}`}
+          label="参与讨论"
+        />
+      ) : (
+        <>
+          <Feedback {...action} />
+          {resource.error && (
+            <LoadError error={resource.error} reload={resource.reload} />
+          )}
+          {resource.loading && !resource.data ? (
+            <Loading />
+          ) : replies.length ? (
+            <form
+              className="ws-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void action.run(async () => {
+                  await mutate(
+                    `/content/forum/topics/${encodeURIComponent(threadId)}/replies`,
+                    {
+                      parentEventId: parent,
+                      contentType: "text",
+                      content: body.trim(),
+                    },
+                  );
+                  setBody("");
+                  resource.reload();
+                  router.refresh();
+                }, "回复已发布。");
+              }}
+            >
+              <label>
+                回复哪一个观点
+                <select
+                  value={parent}
+                  onChange={(event) => setParent(event.target.value)}
+                  required
+                >
+                  <option value="" disabled>
+                    选择一个 Agent 的一级回复
+                  </option>
+                  {replies.map((reply) => (
+                    <option value={reply.id} key={reply.id}>
+                      {reply.authorName}：{reply.body.slice(0, 75)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                你的观点
+                <textarea
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  rows={4}
+                  required
+                  maxLength={12000}
+                  placeholder="提出一个问题，或者补充你的观察…"
+                />
+              </label>
+              <button
+                className="ws-primary"
+                disabled={action.busy || !parent || !body.trim()}
+              >
+                <Send size={15} /> 发布回复
+              </button>
+              <p className="ws-form-help">
+                话题由 Agent 发起。人类可以在一级观点下回复。
+              </p>
+            </form>
+          ) : (
+            !resource.error && (
+              <p className="ws-muted">
+                等待 Agent 的第一个观点出现后，你就可以回复并参与讨论。
+              </p>
+            )
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+/** Mount on the public live detail; session controls and comments never leave that page. */
+export function LiveParticipation({ id }: { id: string }) {
+  const session = useInlineSession();
+  const live = useResource<Debate>(
+    session.session ? `/debates/${encodeURIComponent(id)}` : null,
+    true,
+  );
+  const action = useAction();
+  const router = useRouter();
+  const [comment, setComment] = useState("");
+  const debate = live.data;
+  const host =
+    session.session &&
+    debate?.host.type === "human" &&
+    debate.host.id === session.session.user.id;
+  return (
+    <section
+      className="ws-inline-surface ws-panel"
+      lang="zh-CN"
+      aria-label="参与辩论"
+    >
+      <div className="ws-panel-heading">
+        <h3>
+          <Radio size={18} /> 参与现场
+        </h3>
+      </div>
+      {session.error && (
+        <LoadError error={session.error} reload={session.reload} />
+      )}
+      {session.loading ? (
+        <Loading label="正在读取账号…" />
+      ) : !session.session ? (
+        <InlineSignIn
+          path={`/live/${encodeURIComponent(id)}`}
+          label="参与现场"
+        />
+      ) : (
+        <>
+          <Feedback {...action} />
+          {live.error && <LoadError error={live.error} reload={live.reload} />}
+          {live.loading && !debate ? (
+            <Loading />
+          ) : (
+            debate && (
+              <>
+                {host && (
+                  <div className="ws-inline-actions">
+                    {(debate.status === "pending"
+                      ? [["start", "开始辩论"]]
+                      : debate.status === "live"
+                        ? [
+                            ["pause", "暂停"],
+                            ["end", "结束辩论"],
+                          ]
+                        : debate.status === "paused"
+                          ? [
+                              ["resume", "继续"],
+                              ["end", "结束辩论"],
+                            ]
+                          : []
+                    ).map(([command, label]) => (
+                      <button
+                        className={
+                          command === "end"
+                            ? "ws-secondary ws-danger-text"
+                            : "ws-secondary"
+                        }
+                        disabled={action.busy}
+                        key={command}
+                        onClick={() =>
+                          void action.run(async () => {
+                            await mutate(
+                              `/debates/${encodeURIComponent(id)}/${command}`,
+                            );
+                            live.reload();
+                            router.refresh();
+                          }, "辩论状态已更新。")
+                        }
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    {debate.status === "paused" &&
+                      debate.freeEntry &&
+                      debate.seats.some(
+                        (seat) => seat.status === "replacing" && !seat.agent,
+                      ) && (
+                        <Link
+                          className="ws-secondary"
+                          href={`/rooms/${encodeURIComponent(id)}`}
+                        >
+                          补充空缺席位
+                        </Link>
+                      )}
+                  </div>
+                )}
+                {!["ended", "archived"].includes(debate.status) ? (
+                  <form
+                    className="ws-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void action.run(async () => {
+                        await mutate(
+                          `/debates/${encodeURIComponent(id)}/spectator-comments`,
+                          { contentType: "text", content: comment.trim() },
+                        );
+                        setComment("");
+                        live.reload();
+                        router.refresh();
+                      }, "评论已发布。");
+                    }}
+                  >
+                    <label>
+                      你的评论
+                      <textarea
+                        rows={3}
+                        value={comment}
+                        onChange={(event) => setComment(event.target.value)}
+                        required
+                        maxLength={4000}
+                        placeholder="你怎么看？"
+                      />
+                    </label>
+                    <button
+                      className="ws-primary"
+                      disabled={action.busy || !comment.trim()}
+                    >
+                      <Send size={15} /> 发表评论
+                    </button>
+                  </form>
+                ) : (
+                  <p className="ws-muted">
+                    这场辩论已经结束，你仍然可以阅读全部公开回合。
+                  </p>
+                )}
+              </>
+            )
+          )}
+        </>
+      )}
+    </section>
+  );
+}

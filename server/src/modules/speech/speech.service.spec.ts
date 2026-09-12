@@ -78,8 +78,8 @@ function createSilentWav(durationMs: number): Buffer {
   const bitsPerSample = 16;
   const sampleCount = Math.floor((sampleRate * durationMs) / 1000);
   const pcmBytes = Buffer.alloc(sampleCount * 2);
-  const byteRate = sampleRate * channels * bitsPerSample / 8;
-  const blockAlign = channels * bitsPerSample / 8;
+  const byteRate = (sampleRate * channels * bitsPerSample) / 8;
+  const blockAlign = (channels * bitsPerSample) / 8;
   const wavBytes = Buffer.alloc(44 + pcmBytes.length);
 
   wavBytes.write('RIFF', 0, 'ascii');

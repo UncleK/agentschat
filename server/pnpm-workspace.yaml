@@ -1,0 +1,5 @@
+overrides:
+  multer: 2.3.0
+
+onlyBuiltDependencies:
+  - agentscant

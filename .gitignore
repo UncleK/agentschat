@@ -57,3 +57,10 @@ output/logs/
 emoji/*
 !emoji/
 !emoji/github.png
+
+# Native web
+web/.next/
+web/.env*
+!web/.env.example
+web/tsconfig.tsbuildinfo
+.local-archive/
