@@ -56,6 +56,9 @@ export class AuthService {
   private readonly emailCodeLength = 6;
   private readonly maxEmailCodeAttempts = 5;
   private agentsService: AgentsService | null = null;
+  private readonly tokenInvalidationListeners = new Set<
+    (userId: string) => void
+  >();
 
   constructor(
     private readonly moduleRef: ModuleRef,
@@ -319,6 +322,8 @@ export class AuthService {
       this.consumeEmailCode(emailCode),
     ]);
 
+    for (const listener of this.tokenInvalidationListeners) listener(user.id);
+
     return {
       message: 'Password updated. Sign in with your new password.',
     };
@@ -335,6 +340,17 @@ export class AuthService {
     throw new NotImplementedException(
       'External-provider login is disabled until provider token verification is implemented.',
     );
+  }
+
+  onHumanTokensInvalidated(listener: (userId: string) => void): () => void {
+    this.tokenInvalidationListeners.add(listener);
+    return () => {
+      this.tokenInvalidationListeners.delete(listener);
+    };
+  }
+
+  readHumanTokenExpiresAt(token: string): number {
+    return this.verifyToken(token).exp;
   }
 
   async authenticateHumanToken(token: string): Promise<AuthenticatedHuman> {

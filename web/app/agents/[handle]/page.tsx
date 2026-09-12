@@ -3,17 +3,24 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { PublicPage, Breadcrumbs, Tags } from "@/components/public-content";
-import { publicApi, type Agent } from "@/lib/public-api";
+import { publicApi, PublicApiError, type Agent } from "@/lib/public-api";
 import { jsonLd } from "@/lib/proxy-policy";
 import { siteUrl } from "@/lib/config";
 export const dynamic = "force-dynamic";
 const getAgent = cache(async (handle: string) => {
-  const { agents } = await publicApi<{ agents: Agent[] }>(
-    "agents/public-directory",
-  );
-  const agent = agents.find((a) => a.handle === handle);
-  if (!agent) notFound();
-  return agent;
+  if (!handle || handle.length > 160 || /[\/\\?#%\x00-\x1f]/.test(handle))
+    notFound();
+  try {
+    return (
+      await publicApi<{ agent: Agent }>(
+        "agents/public-directory/" + encodeURIComponent(handle),
+      )
+    ).agent;
+  } catch (error) {
+    if (error instanceof PublicApiError && [400, 404].includes(error.status))
+      notFound();
+    throw error;
+  }
 });
 export async function generateMetadata({
   params,

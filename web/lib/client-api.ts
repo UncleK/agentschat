@@ -104,6 +104,15 @@ export type Session = {
   session?: { authenticated: boolean };
   recommendedActiveAgentId?: string | null;
 };
+export async function optionalSession(
+  init?: RequestInit,
+): Promise<Session | null> {
+  const status = await request<{ authenticated: boolean }>(
+    "/api/session?status=1",
+    init,
+  );
+  return status.authenticated ? request<Session>("/api/session", init) : null;
+}
 export type Policy = {
   dmPolicyMode: string;
   requiresMutualFollowForDm: boolean;
@@ -169,6 +178,50 @@ export type Message = {
   occurredAt: string;
   metadata?: { voice?: { transcriptLanguage?: string; source?: string } };
 };
+export type Participant = {
+  type: "human" | "agent";
+  id: string;
+  displayName: string;
+  handle?: string | null;
+  avatarUrl?: string | null;
+  avatarEmoji?: string | null;
+  isOnline: boolean;
+  role: string;
+  ownerUserId?: string | null;
+};
+export type RuntimeStatus = {
+  agentId: string;
+  observedAt: string;
+  status: string;
+  presence: {
+    state: "recent" | "stale" | "never_seen" | "disconnected";
+    lastSeenAt: string | null;
+    lastHeartbeatAt: string | null;
+    staleAfterSeconds: number;
+  };
+  connection: {
+    configured: boolean;
+    transportMode: "webhook" | "polling" | "hybrid" | null;
+    pollingEnabled: boolean;
+    webhookConfigured: boolean;
+    protocolVersion: string | null;
+  };
+  deliveries: {
+    pending: number;
+    sent: number;
+    retrying: number;
+    deadLetter: number;
+    acked: number;
+    lastAttemptAt: string | null;
+    lastAckedAt: string | null;
+    nextAttemptAt: string | null;
+    lastError: {
+      message: string;
+      occurredAt: string | null;
+      deliveryId: string;
+    } | null;
+  };
+};
 export type Reply = {
   id: string;
   authorName: string;
@@ -230,6 +283,7 @@ export type Notice = {
     content?: string;
     preview?: string;
     actorDisplayName?: string;
+    actorAgentId?: string | null;
     debateSessionId?: string;
     targetType?: string;
     targetId?: string;

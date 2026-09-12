@@ -1,3 +1,4 @@
+import { recordAgentActivity } from './agent-activity';
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
@@ -524,134 +525,146 @@ export class FederationService {
   }
 
   private async handleAgentProfileUpdate(action: FederationActionEntity) {
-    const agent = await this.agentRepository.findOneBy({ id: action.agentId });
-
-    if (!agent) {
-      throw new FederationActionRejectionError(
-        'agent_not_found',
-        `Agent ${action.agentId} was not found.`,
-      );
-    }
-
-    const handle = this.optionalString(action.payload.handle);
-
-    if (handle && handle !== agent.handle) {
-      if (!this.canClaimInitialHandle(agent)) {
-        throw new FederationActionRejectionError(
-          'handle_immutable',
-          'Agent handle is immutable.',
-        );
-      }
-
-      const normalizedHandle = this.normalizeMutableHandle(handle);
-      const existingHandleOwner = await this.agentRepository.findOne({
-        select: { id: true },
-        where: { handle: normalizedHandle },
+    return this.dataSource.transaction(async (manager) => {
+      const agentRepository = manager.getRepository(AgentEntity);
+      const agent = await agentRepository.findOne({
+        where: { id: action.agentId },
+        lock: { mode: 'pessimistic_write' },
       });
-      if (existingHandleOwner) {
+
+      if (!agent) {
         throw new FederationActionRejectionError(
-          'handle_taken',
-          'Agent handle is already in use.',
+          'agent_not_found',
+          `Agent ${action.agentId} was not found.`,
         );
       }
 
-      agent.handle = normalizedHandle;
-      agent.profileMetadata = {
-        ...agent.profileMetadata,
-        [FederationService.allowInitialHandleClaimKey]: false,
-      };
-    }
+      const handle = this.optionalString(action.payload.handle);
 
-    const displayName = this.optionalString(action.payload.displayName);
-    const avatarUrl = this.optionalNullableString(action.payload.avatarUrl);
-    const avatarEmoji = this.optionalNullableString(action.payload.avatarEmoji);
-    const bio = this.optionalNullableString(action.payload.bio);
-    const vendorName = this.optionalNullableString(action.payload.vendorName);
-    const runtimeName = this.optionalNullableString(action.payload.runtimeName);
-    const isPublic = this.optionalBoolean(action.payload.isPublic);
-    const profileTags = this.optionalStringArray(action.payload.tags);
-    const profileMetadata = this.optionalRecord(action.payload.profileMetadata);
-    const personality = normalizeAgentPersonality(action.payload.personality);
+      if (handle && handle !== agent.handle) {
+        if (!this.canClaimInitialHandle(agent)) {
+          throw new FederationActionRejectionError(
+            'handle_immutable',
+            'Agent handle is immutable.',
+          );
+        }
 
-    if (displayName) {
-      agent.displayName = displayName;
-    }
+        const normalizedHandle = this.normalizeMutableHandle(handle);
+        const existingHandleOwner = await agentRepository.findOne({
+          select: { id: true },
+          where: { handle: normalizedHandle },
+        });
+        if (existingHandleOwner) {
+          throw new FederationActionRejectionError(
+            'handle_taken',
+            'Agent handle is already in use.',
+          );
+        }
 
-    if (avatarUrl !== undefined) {
-      agent.avatarUrl = avatarUrl;
-      if (avatarUrl === null) {
-        agent.profileMetadata = this.clearStoredAvatarMetadata(
+        agent.handle = normalizedHandle;
+        agent.profileMetadata = {
+          ...agent.profileMetadata,
+          [FederationService.allowInitialHandleClaimKey]: false,
+        };
+      }
+
+      const displayName = this.optionalString(action.payload.displayName);
+      const avatarUrl = this.optionalNullableString(action.payload.avatarUrl);
+      const avatarEmoji = this.optionalNullableString(
+        action.payload.avatarEmoji,
+      );
+      const bio = this.optionalNullableString(action.payload.bio);
+      const vendorName = this.optionalNullableString(action.payload.vendorName);
+      const runtimeName = this.optionalNullableString(
+        action.payload.runtimeName,
+      );
+      const isPublic = this.optionalBoolean(action.payload.isPublic);
+      const profileTags = this.optionalStringArray(action.payload.tags);
+      const profileMetadata = this.optionalRecord(
+        action.payload.profileMetadata,
+      );
+      const personality = normalizeAgentPersonality(action.payload.personality);
+
+      if (displayName) {
+        agent.displayName = displayName;
+      }
+
+      if (avatarUrl !== undefined) {
+        agent.avatarUrl = avatarUrl;
+        if (avatarUrl === null) {
+          agent.profileMetadata = this.clearStoredAvatarMetadata(
+            agent.profileMetadata,
+          );
+        }
+      }
+
+      if (bio !== undefined) {
+        agent.bio = bio;
+      }
+
+      if (avatarEmoji !== undefined) {
+        agent.profileMetadata = this.setOptionalStringMetadata(
           agent.profileMetadata,
+          FederationService.avatarEmojiMetadataKey,
+          avatarEmoji,
         );
       }
-    }
 
-    if (bio !== undefined) {
-      agent.bio = bio;
-    }
+      if (vendorName !== undefined) {
+        agent.vendorName = vendorName;
+      }
 
-    if (avatarEmoji !== undefined) {
-      agent.profileMetadata = this.setOptionalStringMetadata(
-        agent.profileMetadata,
-        FederationService.avatarEmojiMetadataKey,
-        avatarEmoji,
-      );
-    }
+      if (runtimeName !== undefined) {
+        agent.runtimeName = runtimeName;
+      }
 
-    if (vendorName !== undefined) {
-      agent.vendorName = vendorName;
-    }
+      if (typeof isPublic === 'boolean') {
+        agent.isPublic = isPublic;
+      }
 
-    if (runtimeName !== undefined) {
-      agent.runtimeName = runtimeName;
-    }
+      if (profileTags !== undefined) {
+        agent.profileTags = profileTags;
+      }
 
-    if (typeof isPublic === 'boolean') {
-      agent.isPublic = isPublic;
-    }
+      if (profileMetadata) {
+        agent.profileMetadata = {
+          ...agent.profileMetadata,
+          ...profileMetadata,
+        };
+      }
 
-    if (profileTags !== undefined) {
-      agent.profileTags = profileTags;
-    }
+      if (personality) {
+        agent.profileMetadata = mergeAgentPersonalityMetadata(
+          agent.profileMetadata,
+          personality,
+        );
+      }
 
-    if (profileMetadata) {
-      agent.profileMetadata = {
-        ...agent.profileMetadata,
-        ...profileMetadata,
-      };
-    }
+      agent.lastSeenAt = new Date();
+      await agentRepository.save(agent);
 
-    if (personality) {
-      agent.profileMetadata = mergeAgentPersonalityMetadata(
-        agent.profileMetadata,
-        personality,
-      );
-    }
-
-    agent.lastSeenAt = new Date();
-    await this.agentRepository.save(agent);
-
-    return {
-      resultPayload: {
-        agent: {
-          id: agent.id,
-          handle: agent.handle,
-          displayName: agent.displayName,
-          avatarUrl: agent.avatarUrl,
-          avatarEmoji:
-            this.optionalString(
-              agent.profileMetadata[FederationService.avatarEmojiMetadataKey],
-            ) ?? null,
-          bio: agent.bio,
-          vendorName: agent.vendorName,
-          runtimeName: agent.runtimeName,
-          isPublic: agent.isPublic,
-          tags: agent.profileTags,
-          personality: readAgentPersonality(agent.profileMetadata),
-          profileMetadata: agent.profileMetadata,
+      return {
+        resultPayload: {
+          agent: {
+            id: agent.id,
+            handle: agent.handle,
+            displayName: agent.displayName,
+            avatarUrl: agent.avatarUrl,
+            avatarEmoji:
+              this.optionalString(
+                agent.profileMetadata[FederationService.avatarEmojiMetadataKey],
+              ) ?? null,
+            bio: agent.bio,
+            vendorName: agent.vendorName,
+            runtimeName: agent.runtimeName,
+            isPublic: agent.isPublic,
+            tags: agent.profileTags,
+            personality: readAgentPersonality(agent.profileMetadata),
+            profileMetadata: agent.profileMetadata,
+          },
         },
-      },
-    };
+      };
+    });
   }
 
   private async handleFollowMutation(
@@ -699,37 +712,13 @@ export class FederationService {
       connectionTokenHash?: string;
     },
   ): Promise<void> {
-    const now = new Date();
-    const [connection, persistedAgent] = await Promise.all([
-      this.agentConnectionRepository.findOneBy({
-        id: agent.connectionId,
-        agentId: agent.id,
-      }),
-      this.agentRepository.findOneBy({
-        id: agent.id,
-      }),
-    ]);
-
-    if (connection) {
-      connection.lastSeenAt = now;
-      if (heartbeat) {
-        connection.lastHeartbeatAt = now;
-      }
-      if (options?.connectionTokenHash) {
-        connection.tokenHash = options.connectionTokenHash;
-      }
-      await this.agentConnectionRepository.save(connection);
-    }
-
-    if (!persistedAgent) {
-      return;
-    }
-
-    persistedAgent.lastSeenAt = now;
-    if (persistedAgent.status === AgentStatus.Offline) {
-      persistedAgent.status = AgentStatus.Online;
-    }
-    await this.agentRepository.save(persistedAgent);
+    await recordAgentActivity(
+      this.agentRepository,
+      this.agentConnectionRepository,
+      agent,
+      heartbeat,
+      options?.connectionTokenHash,
+    );
   }
 
   private async handleDirectMessage(action: FederationActionEntity) {

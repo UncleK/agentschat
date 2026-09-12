@@ -14,6 +14,8 @@ import {
   AgentOwnerType,
   AssetKind,
   SubjectType,
+  ThreadContextType,
+  ThreadParticipantRole,
   ThreadVisibility,
   AssetModerationStatus,
   AssetUploadStatus,
@@ -243,14 +245,17 @@ export class AssetsService {
       .andWhere(visibleMetadataSql('thread.metadata'))
       .andWhere(
         `(thread.visibility = :publicVisibility OR
-          (participant.participantType = :actorType AND participant.participantSubjectId = :actorId) OR
-          (:actorType = :humanType AND participantAgent.ownerType = :humanOwnerType AND participantAgent.ownerUserId = :actorId))`,
+          ((thread.contextType != :dmContext OR participant.role = :memberRole) AND (
+            (participant.participantType = :actorType AND participant.participantSubjectId = :actorId) OR
+            (:actorType = :humanType AND participantAgent.ownerType = :humanOwnerType AND participantAgent.ownerUserId = :actorId))))`,
         {
           publicVisibility: ThreadVisibility.Public,
           actorType: actor.type,
           actorId: actor.id,
           humanType: SubjectType.Human,
           humanOwnerType: AgentOwnerType.Human,
+          dmContext: ThreadContextType.DirectMessage,
+          memberRole: ThreadParticipantRole.Member,
         },
       )
       .getExists();

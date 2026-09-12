@@ -37,6 +37,11 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 import { PolicyService } from '../policy/policy.service';
 import { SubjectReference } from '../policy/policy.types';
+import {
+  encodePublicListCursor,
+  parsePublicListCursor,
+  publicCursorTimeSql,
+} from '../public/public-list-cursor';
 import { SpeechService } from '../speech/speech.service';
 
 interface HumanDirectMessageInput extends AuthoredContentInput {
@@ -122,6 +127,7 @@ interface DirectMessageThreadParticipantDto {
   avatarEmoji: string | null;
   isOnline: boolean;
   role: ThreadParticipantRole;
+  ownerUserId: string | null;
 }
 
 type DirectMessageThreadUsage = 'network_dm' | 'owned_agent_command';
@@ -179,6 +185,7 @@ interface ForumTopicsReadInput {
   activeAgentId?: string | null;
   query?: string | null;
   limit?: string | null;
+  cursor?: string | null;
 }
 
 export interface ForumReplyDto {
@@ -208,6 +215,7 @@ export interface ForumTopicDto {
   participantCount: number;
   isFollowed: boolean;
   isHot: boolean;
+  createdAt: string;
   lastActivityAt: string;
   replies: ForumReplyDto[];
 }
@@ -588,6 +596,9 @@ export class ContentService {
     return {
       threadId: scope.canonicalThreadId,
       activeAgentId,
+      participants: scope.participants.map((participant) =>
+        this.serializeDirectMessageParticipant(participant),
+      ),
       messages: pageEvents
         .slice()
         .reverse()
@@ -847,7 +858,9 @@ export class ContentService {
     return this.listForumTopicsForViewer(activeAgentId, input);
   }
 
-  listPublicForumTopics(input: Pick<ForumTopicsReadInput, 'query' | 'limit'>) {
+  listPublicForumTopics(
+    input: Pick<ForumTopicsReadInput, 'query' | 'limit' | 'cursor'>,
+  ) {
     return this.listForumTopicsForViewer(null, input);
   }
 
@@ -886,7 +899,7 @@ export class ContentService {
 
   async listAgentForumTopics(
     agent: AuthenticatedFederatedAgent,
-    input: Pick<ForumTopicsReadInput, 'query' | 'limit'>,
+    input: Pick<ForumTopicsReadInput, 'query' | 'limit' | 'cursor'>,
   ) {
     return this.listForumTopicsForViewer(agent.id, input);
   }
@@ -907,10 +920,12 @@ export class ContentService {
 
   private async listForumTopicsForViewer(
     activeAgentId: string | null,
-    input: Pick<ForumTopicsReadInput, 'query' | 'limit'>,
+    input: Pick<ForumTopicsReadInput, 'query' | 'limit' | 'cursor'>,
   ) {
     const normalizedQuery = this.optionalString(input.query)?.toLowerCase();
     const limit = this.parseLimit(input.limit, 20, 50);
+    const cursorScope = `forum:${normalizedQuery ?? ''}`;
+    const cursor = parsePublicListCursor(input.cursor, cursorScope);
 
     const topicQuery = this.forumTopicViewRepository
       .createQueryBuilder('topicView')
@@ -943,15 +958,37 @@ export class ContentService {
           { query: normalizedQuery },
         );
     }
-    const topicViews = await topicQuery
+    if (cursor) {
+      topicQuery.andWhere(
+        '(topicView.lastActivityAt < :cursorTime OR (topicView.lastActivityAt = :cursorTime AND topicView.threadId < :cursorId))',
+        { cursorTime: cursor.time, cursorId: cursor.id },
+      );
+    }
+    const page = await topicQuery
+      .addSelect(publicCursorTimeSql('topicView.lastActivityAt'), 'cursorTime')
+      .addSelect('CAST(topicView.threadId AS text)', 'cursorId')
       .orderBy('topicView.lastActivityAt', 'DESC')
-      .limit(limit)
-      .getMany();
+      .addOrderBy('topicView.threadId', 'DESC')
+      .limit(limit + 1)
+      .getRawAndEntities<{ cursorTime: string; cursorId: string }>();
+    const topicViews = page.entities.slice(0, limit);
+    const boundary = page.raw.find(
+      (row) => row.cursorId === topicViews.at(-1)?.threadId,
+    );
+    const nextCursor =
+      page.entities.length > limit && boundary
+        ? encodePublicListCursor(
+            cursorScope,
+            boundary.cursorTime,
+            boundary.cursorId,
+          )
+        : null;
 
     if (topicViews.length === 0) {
       return {
         activeAgentId,
         topics: [] as ForumTopicDto[],
+        nextCursor: null,
       };
     }
 
@@ -1017,6 +1054,7 @@ export class ContentService {
     return {
       activeAgentId,
       topics,
+      nextCursor,
     };
   }
 
@@ -1514,6 +1552,11 @@ export class ContentService {
     const result = await this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
 
+      await this.debateService.assertSpectatorCommentAllowed(
+        actor,
+        debateSessionId,
+        manager,
+      );
       await this.ensureParticipant(
         manager,
         debateSession.threadId,
@@ -2111,9 +2154,14 @@ ${selfAuthoredFilter}
       );
     }
 
-    const recipientParticipant = await this.findDirectMessageParticipant(
+    const scope = await this.resolveDirectMessageThreadScope(
+      this.dataSource.manager,
       threadId,
-      recipient,
+    );
+    const recipientParticipant = scope.participants.find(
+      (participant) =>
+        participant.participantType === recipient.type &&
+        participant.participantSubjectId === recipient.id,
     );
 
     if (!recipientParticipant) {
@@ -2121,11 +2169,6 @@ ${selfAuthoredFilter}
         `Direct message recipient ${recipient.type}:${recipient.id} was not found in thread ${threadId}.`,
       );
     }
-
-    const scope = await this.resolveDirectMessageThreadScope(
-      this.dataSource.manager,
-      threadId,
-    );
 
     return scope.canonicalThreadId;
   }
@@ -2136,7 +2179,7 @@ ${selfAuthoredFilter}
   ): SubjectReference {
     const normalizedActiveAgentId = this.optionalString(activeAgentId);
 
-    if (normalizedActiveAgentId) {
+    if (actor.type === SubjectType.Human && normalizedActiveAgentId) {
       return {
         type: SubjectType.Agent,
         id: normalizedActiveAgentId,
@@ -2209,6 +2252,7 @@ ${selfAuthoredFilter}
       participantCount,
       isFollowed,
       isHot: hotScore >= 60 || topicView.replyCount >= 3,
+      createdAt: rootEvent.occurredAt.toISOString(),
       lastActivityAt: topicView.lastActivityAt.toISOString(),
       replies,
     };
@@ -2662,6 +2706,10 @@ ${selfAuthoredFilter}
           participant.agent?.status === AgentStatus.Online ||
           participant.agent?.status === AgentStatus.Debating,
         role: participant.role,
+        ownerUserId:
+          participant.agent?.ownerType === AgentOwnerType.Human
+            ? participant.agent.ownerUserId
+            : null,
       };
     }
 
@@ -2674,6 +2722,7 @@ ${selfAuthoredFilter}
       avatarEmoji: null,
       isOnline: false,
       role: participant.role,
+      ownerUserId: null,
     };
   }
 
@@ -2940,7 +2989,7 @@ ${selfAuthoredFilter}
           threadId: In(threadIds),
         },
         relations: {
-          agent: true,
+          agent: { ownerUser: true },
           user: true,
         },
       });
@@ -2953,7 +3002,52 @@ ${selfAuthoredFilter}
       participantsByThreadId.set(participant.threadId, threadParticipants);
     }
 
+    for (const [threadId, threadParticipants] of participantsByThreadId) {
+      participantsByThreadId.set(
+        threadId,
+        this.currentDirectMessageParticipants(threadParticipants),
+      );
+    }
+
     return participantsByThreadId;
+  }
+
+  private currentDirectMessageParticipants(
+    participants: ThreadParticipantEntity[],
+  ): ThreadParticipantEntity[] {
+    const members = participants.filter(
+      (participant) => participant.role === ThreadParticipantRole.Member,
+    );
+    const owners = members.flatMap((participant) => {
+      const agent = participant.agent;
+      return agent?.ownerType === AgentOwnerType.Human && agent.ownerUser
+        ? [agent.ownerUser]
+        : [];
+    });
+    const current = [...members];
+    for (const owner of owners) {
+      if (
+        current.some(
+          (participant) =>
+            participant.participantType === SubjectType.Human &&
+            participant.participantSubjectId === owner.id,
+        )
+      )
+        continue;
+      // Spectators reflect ownership now. Historical participant rows and
+      // message authors remain stored, but never grant a former owner access.
+      current.push(
+        Object.assign(new ThreadParticipantEntity(), {
+          threadId: members[0].threadId,
+          participantType: SubjectType.Human,
+          participantSubjectId: owner.id,
+          userId: owner.id,
+          user: owner,
+          role: ThreadParticipantRole.Spectator,
+        }),
+      );
+    }
+    return current;
   }
 
   private resolveNetworkDirectMessageMemberAgentIds(
@@ -3222,9 +3316,10 @@ ${selfAuthoredFilter}
 
     // Replace the human actor with the active agent as the primary thread semantic driver.
     // The human (as owner) will naturally be joined as a Spectator down below.
-    const threadActor = activeAgentId
-      ? { type: SubjectType.Agent, id: activeAgentId }
-      : actor;
+    const threadActor = this.resolveDirectMessageThreadActor(
+      actor,
+      activeAgentId,
+    );
 
     addMember(threadActor);
     addMember(recipient);
@@ -3235,6 +3330,12 @@ ${selfAuthoredFilter}
     const threadRepository = manager.getRepository(ThreadEntity);
 
     if (networkMemberAgentIds) {
+      // Serialize creation for this pair, including opposite-direction sends.
+      // Existing historical duplicates are still read through the canonical scope.
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [this.buildNetworkDirectMessageLogicalKey(networkMemberAgentIds)],
+      );
       const canonicalScope = await this.findCanonicalNetworkDirectMessageScope(
         manager,
         networkMemberAgentIds,

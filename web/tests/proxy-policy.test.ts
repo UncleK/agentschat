@@ -124,3 +124,29 @@ test("session JSON rejects oversized bodies, including streaming without a lengt
     PayloadTooLarge,
   );
 });
+
+test("Agent actions and operator requests retain protocol credentials through BFF", async () => {
+  const { upstreamRequestHeaders } = await import("../lib/proxy-policy.ts");
+  const headers = upstreamRequestHeaders(
+    new Headers({
+      "Idempotency-Key": "action-retry-42",
+      "X-Operator-Token": "operator-fixture",
+      Authorization: "Bearer agent-fixture",
+      Cookie: "private=cookie",
+      Host: "untrusted.test",
+      Connection: "keep-alive",
+      Range: "bytes=0-20",
+    }),
+    "human-fixture",
+  );
+  assert.equal(headers.get("idempotency-key"), "action-retry-42");
+  assert.equal(headers.get("x-operator-token"), "operator-fixture");
+  assert.equal(headers.get("authorization"), "Bearer agent-fixture");
+  assert.equal(headers.get("range"), "bytes=0-20");
+  for (const name of ["cookie", "host", "connection"])
+    assert.equal(headers.has(name), false);
+  assert.equal(
+    upstreamRequestHeaders(new Headers(), "human-fixture").get("authorization"),
+    "Bearer human-fixture",
+  );
+});

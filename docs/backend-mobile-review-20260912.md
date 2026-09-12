@@ -115,3 +115,29 @@ Google/GitHub OAuth 登录接口有意返回 501：现有代码尚未实现 prov
 - 构建：`flutter build apk --debug --no-pub`，exit 0；首次 Gradle 构建约 1521.8 秒。
 
 当前未连接 Android 真机，没有做相机、麦克风权限或后台行为的真机验收；Windows 环境不能证明 iOS 签名和上架能力。Android 仍使用 `com.example.agents_chat_app`，release 配置仍引用 debug signing。正式移动端发布前需要确定生产包名、配置签名并完成真机与 iOS 构建验收。没有把 debug APK 成功等同于已可上架。
+
+
+## 第二轮修复与运行诊断（2026-09-12）
+
+本轮仅使用临时 PostgreSQL 55439 与 MinIO 59009，测试各自创建随机数据库并在结束后删除；3131 浏览器验收库独立保留。
+
+- 密码重置立即关闭本进程该用户全部 WebSocket；到期定时关闭；每次推送前重新检查数据库 tokenVersion，跨进程吊销后不再推送私密内容。关闭码 1008。跨进程空闲连接在下次推送时关闭，没有新增跨节点广播基础设施。
+- ACK、投递尝试、成功/失败、重连绑定和死信更新使用匹配状态/尝试次数的条件更新，避免旧实体覆盖已确认状态。真实 HTTP 接收器先 ACK，再返回 200、503 或断开连接，三种情况均保持 acked，且无重复投递。请求超时为生产 10 秒、测试 200 毫秒；同一进程不再重叠扫描。保留按 recipient 顺序投递及有限重试规则。
+- 私信通知动态加入 Agent Member 的现任 Human owner，不信任旧 spectator；独立 Human Member 保留。历史私信通知和未读数也按当前关系过滤。真实 WebSocket 验证新 owner 尚无 participant 行仍收到消息，旧 owner 不收到且看不到历史通知预览。
+- TypeORM save 返回实体的 eventId/threadId 因已初始化 nullable relation 字段变空，而数据库关联正确。通知保存后重读实体，恢复实时通知的详情关联；回归明确检查实际事件 ID。
+- 目录关注数及双向关系改为批量读取。新增 `GET /api/v1/agents/public-directory/:handle` 直接查询公开 profile；私有、停用、不存在均 404，复用脱敏序列化。查询回归确认 follows 计数和关系只需两次批量查询，不随目录条数增长。
+
+`GET /api/v1/agents/:agentId/runtime-status` 仅 owner 可读：匿名 401，非 owner/不存在 404，非法 UUID 400。提供 Agent 状态、最近通讯/heartbeat、新鲜度阈值、连接方式、各投递状态行数、最近尝试/确认/下次重试时间及脱敏最后错误。不返回 token、签名 secret、webhook URL、capabilities 或消息内容。
+
+`presence.state` 中 disconnected 表示无连接记录；never_seen 表示有连接但没有通讯时间；recent/stale 按服务端阈值计算。计数是保留在数据库中的全部行的当前状态：pending/sent/retrying 为积压，acked/deadLetter 含保留历史。acked 只证明对端确认收取，不证明 Agent 执行或成功回复。lastError 为最近仍有错误的投递记录；null 只表示无未清除错误记录。
+
+验证：新增 runtime-boundaries **10/10**；受影响原有 auth、notifications、agent-read、public-bootstrap、agent-safety-policy、realtime-fanout 与 federation/delivery **18/18**；unit **27/27**；typecheck、改动范围 ESLint 和 `pnpm build` 均通过。回归使用真实 WebSocket、本地 HTTP Webhook 与 PostgreSQL；浏览器验收由主报告补充。
+
+
+### 最终真实动作复核
+
+通过 Web 代理连续提交资料更新、同键重放和冲突请求时，实测动作结果为 succeeded 且结果 bio 正确，数据库 Agent.bio 却回到 null。根因为动作和轮询记录活跃时间时保存了整份旧 Agent/connection 实体。
+
+新增 `agent-activity.ts` 将两条路径统一为精确列更新，通讯时间使用 GREATEST，只有 offline 可转 online；不写资料、所有权或原连接凭据，不恢复已删除连接。资料更新事务取得 Agent 行锁。回归模拟旧读取与资料更新、封禁、token rotation 交错，并执行真实动作重放与轮询。
+
+最终 runtime-boundaries **13/13**；额外重跑受影响 delivery/agent-read/public-bootstrap **5/5**（属于前述既有回归的子集）。最终服务端完整 lint、typecheck、build 通过。经 3100 BFF 的完整 HTTP 探针最终确认 succeeded 后资料持久化正确，8组验收全部通过。

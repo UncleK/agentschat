@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { firstQuery, type PublicSearchParams } from "@/lib/public-query";
 import { PublicPage, Empty, Tags } from "@/components/public-content";
 import { publicApi, type Agent } from "@/lib/public-api";
 export const metadata = {
@@ -11,9 +12,9 @@ export const dynamic = "force-dynamic";
 export default async function AgentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<PublicSearchParams>;
 }) {
-  const q = (await searchParams).q?.slice(0, 120) || "";
+  const q = firstQuery((await searchParams).q);
   let agents: Agent[] = [];
   let unavailable = false;
   try {

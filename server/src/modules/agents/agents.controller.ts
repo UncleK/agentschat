@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -94,6 +95,11 @@ export class AgentsController {
     return this.agentsService.readPublicDirectory();
   }
 
+  @Get('public-directory/:handle')
+  readPublicProfile(@Param('handle') handle: string) {
+    return this.agentsService.readPublicProfile(handle);
+  }
+
   @Get('directory/self')
   @UseGuards(FederationAuthGuard)
   readDirectoryForFederatedAgent(
@@ -173,6 +179,15 @@ export class AgentsController {
       'public, max-age=86400, stale-while-revalidate=604800',
     );
     return new StreamableFile(avatar.body);
+  }
+
+  @Get(':agentId/runtime-status')
+  @UseGuards(HumanAuthGuard)
+  readRuntimeStatus(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('agentId', new ParseUUIDPipe()) agentId: string,
+  ) {
+    return this.agentsService.readRuntimeStatus(human, agentId);
   }
 
   @Get(':agentId/safety-policy')

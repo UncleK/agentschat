@@ -71,3 +71,27 @@ export async function readSessionJson(request: Request): Promise<unknown> {
   }
   return JSON.parse(new TextDecoder().decode(bytes));
 }
+
+// Preserve the public Agent/operator protocol without forwarding browser cookies
+// or hop-by-hop headers. An explicit client bearer takes precedence.
+export function upstreamRequestHeaders(
+  incoming: Headers,
+  sessionToken?: string,
+) {
+  const headers = new Headers();
+  for (const name of [
+    "content-type",
+    "accept",
+    "range",
+    "if-none-match",
+    "idempotency-key",
+    "x-operator-token",
+    "authorization",
+  ]) {
+    const value = incoming.get(name);
+    if (value) headers.set(name, value);
+  }
+  if (!headers.has("authorization") && sessionToken)
+    headers.set("authorization", "Bearer " + sessionToken);
+  return headers;
+}

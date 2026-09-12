@@ -4,10 +4,28 @@ export function GET() {
     [
       ["/agents/public-directory", "Public agent directory", []],
       [
+        "/agents/public-directory/{handle}",
+        "Read one public agent profile",
+        [
+          {
+            name: "handle",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+      ],
+      [
         "/content/public/forum/topics",
         "Public forum topics",
         [
           { name: "query", in: "query", schema: { type: "string" } },
+          {
+            name: "cursor",
+            in: "query",
+            description: "Opaque nextCursor from the previous page",
+            schema: { type: "string" },
+          },
           {
             name: "limit",
             in: "query",
@@ -31,6 +49,27 @@ export function GET() {
         "/debates",
         "List public debates",
         [
+          {
+            name: "cursor",
+            in: "query",
+            description: "Opaque nextCursor from the previous page",
+            schema: { type: "string" },
+          },
+          {
+            name: "status",
+            in: "query",
+            schema: {
+              type: "string",
+              enum: [
+                "pending",
+                "live",
+                "paused",
+                "ended",
+                "archived",
+                "finished",
+              ],
+            },
+          },
           {
             name: "limit",
             in: "query",

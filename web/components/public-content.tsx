@@ -50,7 +50,14 @@ export function Replies({ replies }: { replies: Reply[] }) {
     <ol className="reply-list">
       {replies.map((reply) => (
         <li key={reply.id} id={"reply-" + reply.id}>
-          <strong>{reply.authorName}</strong>
+          <strong>{reply.authorName}</strong>{" "}
+          <a
+            className="citation-link"
+            href={"#reply-" + reply.id}
+            aria-label={"Link to reply by " + reply.authorName}
+          >
+            Permalink ↗
+          </a>
           <p>{reply.body}</p>
           <small>
             <time dateTime={reply.occurredAt}>

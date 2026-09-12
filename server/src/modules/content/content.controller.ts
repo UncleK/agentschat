@@ -100,6 +100,17 @@ interface DirectMessageThreadResponse {
 interface DirectMessageMessagesResponse {
   threadId: string;
   activeAgentId: string;
+  participants: Array<{
+    type: SubjectType;
+    id: string;
+    displayName: string;
+    handle: string | null;
+    avatarUrl: string | null;
+    avatarEmoji: string | null;
+    isOnline: boolean;
+    role: string;
+    ownerUserId: string | null;
+  }>;
   messages: Array<{
     eventId: string;
     actor: {
@@ -325,11 +336,13 @@ export class ContentController {
     @Query('activeAgentId') activeAgentId?: string,
     @Query('query') query?: string,
     @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
   ) {
     return this.contentService.listForumTopics(human, {
       activeAgentId,
       query,
       limit,
+      cursor,
     });
   }
 
@@ -337,10 +350,12 @@ export class ContentController {
   listPublicForumTopics(
     @Query('query') query?: string,
     @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
   ) {
     return this.contentService.listPublicForumTopics({
       query,
       limit,
+      cursor,
     });
   }
 
@@ -350,10 +365,12 @@ export class ContentController {
     @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
     @Query('query') query?: string,
     @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
   ) {
     return this.contentService.listAgentForumTopics(agent, {
       query,
       limit,
+      cursor,
     });
   }
 

@@ -14,6 +14,10 @@ import { Inject } from '@nestjs/common';
 interface HumanSocketSession {
   socket: Socket;
   userId: string;
+  token: string;
+  expiresAt: number;
+  expiryTimer: NodeJS.Timeout;
+  sendQueue: Promise<void>;
 }
 
 interface UpgradeRequest {
@@ -40,6 +44,7 @@ export class RealtimeService
   private readonly sessionsByUserId = new Map<string, Set<Socket>>();
   private readonly sessionBySocket = new Map<Socket, HumanSocketSession>();
   private httpServer?: UpgradeCapableServer;
+  private unsubscribeInvalidation?: () => void;
 
   constructor(
     private readonly httpAdapterHost: HttpAdapterHost,
@@ -49,6 +54,13 @@ export class RealtimeService
   ) {}
 
   onApplicationBootstrap(): void {
+    this.unsubscribeInvalidation = this.authService.onHumanTokensInvalidated(
+      (userId) => {
+        for (const socket of this.sessionsByUserId.get(userId) ?? []) {
+          this.closeUnauthorizedSocket(socket);
+        }
+      },
+    );
     const httpServer =
       this.httpAdapterHost.httpAdapter?.getHttpServer() as unknown;
 
@@ -62,8 +74,10 @@ export class RealtimeService
 
   onModuleDestroy(): void {
     this.httpServer?.off?.('upgrade', this.handleUpgradeListener);
+    this.unsubscribeInvalidation?.();
 
     for (const session of this.sessionBySocket.values()) {
+      clearTimeout(session.expiryTimer);
       session.socket.destroy();
     }
 
@@ -86,7 +100,22 @@ export class RealtimeService
         continue;
       }
 
-      socket.write(frame);
+      const session = this.sessionBySocket.get(socket);
+      if (!session) continue;
+      session.sendQueue = session.sendQueue.then(async () => {
+        if (this.sessionBySocket.get(socket) !== session) return;
+        try {
+          await this.authService.authenticateHumanToken(session.token);
+          if (this.sessionBySocket.get(socket) !== session) return;
+          if (session.expiresAt <= Date.now()) {
+            this.closeUnauthorizedSocket(socket);
+            return;
+          }
+          socket.write(frame);
+        } catch {
+          this.closeUnauthorizedSocket(socket);
+        }
+      });
     }
   }
 
@@ -144,7 +173,12 @@ export class RealtimeService
       socket.on('close', () => this.unregisterSocket(socket));
       socket.on('error', () => this.unregisterSocket(socket));
 
-      this.registerSocket(authenticatedHuman.id, socket);
+      this.registerSocket(
+        authenticatedHuman.id,
+        socket,
+        token,
+        this.authService.readHumanTokenExpiresAt(token),
+      );
 
       if (head.length > 0) {
         this.handleSocketData(socket, head);
@@ -200,14 +234,34 @@ export class RealtimeService
     }
   }
 
-  private registerSocket(userId: string, socket: Socket): void {
+  private registerSocket(
+    userId: string,
+    socket: Socket,
+    token: string,
+    expiresAt: number,
+  ): void {
     const sessions = this.sessionsByUserId.get(userId) ?? new Set<Socket>();
     sessions.add(socket);
     this.sessionsByUserId.set(userId, sessions);
     this.sessionBySocket.set(socket, {
       socket,
       userId,
+      token,
+      expiresAt,
+      expiryTimer: setTimeout(
+        () => this.closeUnauthorizedSocket(socket),
+        Math.max(0, expiresAt - Date.now()),
+      ),
+      sendQueue: Promise.resolve(),
     });
+  }
+
+  private closeUnauthorizedSocket(socket: Socket): void {
+    this.unregisterSocket(socket);
+    if (!socket.destroyed) {
+      // 1008 = policy violation. Stop fanout before initiating the close handshake.
+      socket.end(this.encodeFrame(Buffer.from([0x03, 0xf0]), 0x8));
+    }
   }
 
   private unregisterSocket(socket: Socket): void {
@@ -217,6 +271,7 @@ export class RealtimeService
       return;
     }
 
+    clearTimeout(session.expiryTimer);
     const sessions = this.sessionsByUserId.get(session.userId);
     sessions?.delete(socket);
 

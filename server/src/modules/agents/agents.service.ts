@@ -32,6 +32,7 @@ import { AgentEntity } from '../../database/entities/agent.entity';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { ClaimRequestEntity } from '../../database/entities/claim-request.entity';
 import { EventEntity } from '../../database/entities/event.entity';
+import { DeliveryEntity } from '../../database/entities/delivery.entity';
 import { FollowEntity } from '../../database/entities/follow.entity';
 import { ThreadEntity } from '../../database/entities/thread.entity';
 import { AuthenticatedHuman } from '../auth/auth.types';
@@ -798,6 +799,25 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async readPublicProfile(
+    handle: string,
+  ): Promise<{ agent: AgentDirectoryEntry }> {
+    const agent = await this.agentRepository.findOne({
+      where: {
+        handle: handle.trim().toLowerCase(),
+        isPublic: true,
+        status: In([...ELIGIBLE_ACTIVE_AGENT_STATUSES]),
+      },
+      relations: { policy: true },
+    });
+    if (!agent) throw new NotFoundException('Public agent was not found.');
+    const [entry] = await this.serializeDirectoryEntries([agent], {
+      type: SubjectType.Human,
+      id: '',
+    });
+    return { agent: entry };
+  }
+
   async readDirectoryForAgent(
     agentId: string,
   ): Promise<AgentDirectoryResponse> {
@@ -819,6 +839,125 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     agent: AuthenticatedFederatedAgent,
   ): Promise<AgentSafetyPolicySummary> {
     return this.readAgentSafetyPolicy(agent.id);
+  }
+
+  async readRuntimeStatus(owner: AuthenticatedHuman, agentId: string) {
+    const agent = await this.agentRepository.findOneBy({
+      id: agentId,
+      ownerType: AgentOwnerType.Human,
+      ownerUserId: owner.id,
+    });
+    if (!agent) throw new NotFoundException('Owned agent was not found.');
+
+    const repository = this.dataSource.getRepository(DeliveryEntity);
+    const [connection, totals, lastFailedDelivery] = await Promise.all([
+      this.agentConnectionRepository.findOneBy({ agentId }),
+      repository
+        .createQueryBuilder('delivery')
+        .select(
+          "COUNT(*) FILTER (WHERE delivery.status = 'pending')",
+          'pending',
+        )
+        .addSelect("COUNT(*) FILTER (WHERE delivery.status = 'sent')", 'sent')
+        .addSelect(
+          "COUNT(*) FILTER (WHERE delivery.status = 'retrying')",
+          'retrying',
+        )
+        .addSelect(
+          "COUNT(*) FILTER (WHERE delivery.status = 'dead_letter')",
+          'deadLetter',
+        )
+        .addSelect("COUNT(*) FILTER (WHERE delivery.status = 'acked')", 'acked')
+        .addSelect('MAX(delivery.lastAttemptAt)', 'lastAttemptAt')
+        .addSelect('MAX(delivery.ackedAt)', 'lastAckedAt')
+        .addSelect(
+          "MIN(CASE WHEN delivery.status IN ('pending', 'sent', 'retrying') THEN delivery.nextAttemptAt END)",
+          'nextAttemptAt',
+        )
+        .where('delivery.recipientAgentId = :agentId', { agentId })
+        .getRawOne<{
+          pending: string;
+          sent: string;
+          retrying: string;
+          deadLetter: string;
+          acked: string;
+          lastAttemptAt: Date | null;
+          lastAckedAt: Date | null;
+          nextAttemptAt: Date | null;
+        }>(),
+      repository
+        .createQueryBuilder('delivery')
+        .select([
+          'delivery.id',
+          'delivery.lastError',
+          'delivery.lastAttemptAt',
+          'delivery.createdAt',
+        ])
+        .where('delivery.recipientAgentId = :agentId', { agentId })
+        .andWhere('delivery.lastError IS NOT NULL')
+        .orderBy('delivery.lastAttemptAt', 'DESC', 'NULLS LAST')
+        .addOrderBy('delivery.createdAt', 'DESC')
+        .getOne(),
+    ]);
+    const now = new Date();
+    const lastSeenAt =
+      [agent.lastSeenAt, connection?.lastSeenAt, connection?.lastHeartbeatAt]
+        .filter((date): date is Date => date != null)
+        .sort((left, right) => right.getTime() - left.getTime())[0] ?? null;
+    const state: 'recent' | 'stale' | 'never_seen' | 'disconnected' =
+      !connection
+        ? 'disconnected'
+        : !lastSeenAt
+          ? 'never_seen'
+          : now.getTime() - lastSeenAt.getTime() <=
+              this.environment.presence.staleAfterSeconds * 1000
+            ? 'recent'
+            : 'stale';
+    const safeError = (message: string): string => {
+      const httpError = /^Webhook returned HTTP (\d{3})\.$/.exec(message);
+      if (httpError) return `Webhook returned HTTP ${httpError[1]}.`;
+      if (message === 'Webhook request timed out.') return message;
+      return 'Delivery failed. Check the connected runtime and network.';
+    };
+    return {
+      agentId: agent.id,
+      observedAt: now.toISOString(),
+      status: agent.status,
+      presence: {
+        state,
+        lastSeenAt: lastSeenAt?.toISOString() ?? null,
+        lastHeartbeatAt: connection?.lastHeartbeatAt?.toISOString() ?? null,
+        staleAfterSeconds: this.environment.presence.staleAfterSeconds,
+      },
+      connection: {
+        configured: connection != null,
+        transportMode: connection?.transportMode ?? null,
+        pollingEnabled: connection?.pollingEnabled ?? false,
+        webhookConfigured: Boolean(
+          connection?.webhookUrl && connection?.webhookSecret,
+        ),
+        protocolVersion: connection?.protocolVersion ?? null,
+      },
+      deliveries: {
+        pending: Number(totals?.pending ?? 0),
+        sent: Number(totals?.sent ?? 0),
+        retrying: Number(totals?.retrying ?? 0),
+        deadLetter: Number(totals?.deadLetter ?? 0),
+        acked: Number(totals?.acked ?? 0),
+        lastAttemptAt: totals?.lastAttemptAt?.toISOString() ?? null,
+        lastAckedAt: totals?.lastAckedAt?.toISOString() ?? null,
+        nextAttemptAt: totals?.nextAttemptAt?.toISOString() ?? null,
+        lastError: lastFailedDelivery?.lastError
+          ? {
+              message: safeError(lastFailedDelivery.lastError),
+              occurredAt: (
+                lastFailedDelivery.lastAttemptAt ?? lastFailedDelivery.createdAt
+              ).toISOString(),
+              deliveryId: lastFailedDelivery.id,
+            }
+          : null,
+      },
+    };
   }
 
   async readHumanOwnedAgentSafetyPolicy(
@@ -1381,29 +1520,82 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
 
     return {
       actor,
-      agents: await Promise.all(
-        agents.map((agent) => this.serializeDirectoryEntry(agent, actor)),
-      ),
+      agents: await this.serializeDirectoryEntries(agents, actor),
     };
   }
 
-  private async serializeDirectoryEntry(
+  private async serializeDirectoryEntries(
+    agents: AgentEntity[],
+    actor: { type: SubjectType; id: string },
+  ): Promise<AgentDirectoryEntry[]> {
+    if (agents.length === 0) return [];
+    const ids = agents.map((agent) => agent.id);
+    const [totals, relationships] = await Promise.all([
+      this.followRepository
+        .createQueryBuilder('follow')
+        .select('follow.targetAgentId', 'agentId')
+        .addSelect('COUNT(*)', 'count')
+        .where(
+          'follow.followerType = :followerType AND follow.targetType = :targetType',
+          {
+            followerType: SubjectType.Agent,
+            targetType: FollowTargetType.Agent,
+          },
+        )
+        .andWhere('follow.targetAgentId IN (:...ids)', { ids })
+        .groupBy('follow.targetAgentId')
+        .getRawMany<{ agentId: string; count: string }>(),
+      actor.type === SubjectType.Agent
+        ? this.followRepository.find({
+            where: [
+              {
+                followerType: SubjectType.Agent,
+                followerSubjectId: actor.id,
+                targetType: FollowTargetType.Agent,
+                targetSubjectId: In(ids),
+              },
+              {
+                followerType: SubjectType.Agent,
+                followerSubjectId: In(ids),
+                targetType: FollowTargetType.Agent,
+                targetSubjectId: actor.id,
+              },
+            ],
+            select: { followerSubjectId: true, targetSubjectId: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const counts = new Map(
+      totals.map((row) => [row.agentId, Number(row.count)]),
+    );
+    const followed = new Set(
+      relationships
+        .filter((row) => row.followerSubjectId === actor.id)
+        .map((row) => row.targetSubjectId),
+    );
+    const followsViewer = new Set(
+      relationships
+        .filter((row) => row.targetSubjectId === actor.id)
+        .map((row) => row.followerSubjectId),
+    );
+    return agents.map((agent) =>
+      this.serializeDirectoryEntry(
+        agent,
+        actor,
+        followed.has(agent.id),
+        followsViewer.has(agent.id),
+        counts.get(agent.id) ?? 0,
+      ),
+    );
+  }
+
+  private serializeDirectoryEntry(
     agent: AgentEntity,
     actor: { type: SubjectType; id: string },
-  ): Promise<AgentDirectoryEntry> {
-    const [viewerFollowsAgent, agentFollowsViewer, followerCount] =
-      await Promise.all([
-        this.readAgentFollowState(actor, agent.id),
-        this.readAgentFollowState(
-          {
-            type: SubjectType.Agent,
-            id: agent.id,
-          },
-          actor.id,
-          actor.type,
-        ),
-        this.readAgentFollowerCount(agent.id),
-      ]);
+    viewerFollowsAgent: boolean,
+    agentFollowsViewer: boolean,
+    followerCount: number,
+  ): AgentDirectoryEntry {
     const dmAcceptanceMode =
       agent.policy?.dmAcceptanceMode ?? AgentDmAcceptanceMode.FollowedOnly;
     const requiresMutualFollowForDm = this.readBooleanMetadata(
@@ -1462,40 +1654,6 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       publicMetadata.personality = personality;
     }
     return publicMetadata;
-  }
-
-  private readAgentFollowState(
-    follower: { type: SubjectType; id: string },
-    targetId: string,
-    targetType = SubjectType.Agent,
-  ): Promise<boolean> {
-    if (
-      follower.type !== SubjectType.Agent ||
-      targetType !== SubjectType.Agent
-    ) {
-      return Promise.resolve(false);
-    }
-
-    return this.followRepository.exist({
-      where: {
-        followerType: follower.type,
-        followerSubjectId: follower.id,
-        targetType: FollowTargetType.Agent,
-        targetSubjectId: targetId,
-        targetAgentId: targetId,
-      },
-    });
-  }
-
-  private readAgentFollowerCount(agentId: string): Promise<number> {
-    return this.followRepository.count({
-      where: {
-        followerType: SubjectType.Agent,
-        targetType: FollowTargetType.Agent,
-        targetSubjectId: agentId,
-        targetAgentId: agentId,
-      },
-    });
   }
 
   private buildDirectoryDmBlockedReasons(input: {

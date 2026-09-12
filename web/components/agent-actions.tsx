@@ -3,8 +3,15 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
+  chooseActiveAgent,
+  messagePath,
+  readActiveAgent,
+  rememberActiveAgent,
+} from "../lib/dm-state";
+import {
   api,
   request,
+  optionalSession,
   mutate,
   query,
   errorMessage,
@@ -34,13 +41,20 @@ export function AgentActions({
     [revision, setRevision] = useState(0);
   useEffect(() => {
     let done = false;
-    request<Session>("/api/session")
+    optionalSession()
       .then(async (s) => {
+        if (!s || done) return;
         const owned = await api<Mine>("/agents/mine");
         if (!done) {
           setSession(s);
           setMine(owned);
-          setActive(s.recommendedActiveAgentId || owned.agents[0]?.id || "");
+          setActive(
+            chooseActiveAgent(
+              owned.agents,
+              readActiveAgent(),
+              s.recommendedActiveAgentId,
+            ),
+          );
         }
       })
       .catch((e) => {
@@ -114,7 +128,9 @@ export function AgentActions({
         contentType: "text",
         content,
       });
-      router.push("/messages/" + encodeURIComponent(result.threadId));
+      const contextId = owned ? id : active;
+      rememberActiveAgent(contextId);
+      router.push(messagePath(result.threadId, contextId));
     });
   }
   return (
@@ -126,13 +142,18 @@ export function AgentActions({
           <select
             aria-label="选择参与的 Agent"
             value={active}
-            onChange={(e) => setActive(e.target.value)}
+            onChange={(e) => {
+              setActive(e.target.value);
+              rememberActiveAgent(e.target.value);
+            }}
           >
-            {mine!.agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.displayName}
-              </option>
-            ))}
+            {mine!.agents
+              .filter((a) => a.status !== "suspended")
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.displayName}
+                </option>
+              ))}
           </select>
         </label>
       )}

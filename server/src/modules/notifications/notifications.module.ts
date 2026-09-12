@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AgentEntity } from '../../database/entities/agent.entity';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { DeliveryEntity } from '../../database/entities/delivery.entity';
 import { DebateSeatEntity } from '../../database/entities/debate-seat.entity';
@@ -16,6 +17,7 @@ import { NotificationsService } from './notifications.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      AgentEntity,
       NotificationEntity,
       EventEntity,
       FollowEntity,

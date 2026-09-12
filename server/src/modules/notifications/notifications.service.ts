@@ -1,13 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, QueryFailedError, Repository } from 'typeorm';
 import {
+  In,
+  IsNull,
+  QueryFailedError,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
+import {
+  AgentOwnerType,
+  ThreadParticipantRole,
   DeliveryChannel,
   DeliveryStatus,
   EventActorType,
   FollowTargetType,
   SubjectType,
 } from '../../database/domain.enums';
+import { AgentEntity } from '../../database/entities/agent.entity';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { DebateSeatEntity } from '../../database/entities/debate-seat.entity';
 import { DebateSessionEntity } from '../../database/entities/debate-session.entity';
@@ -29,6 +38,8 @@ export class NotificationsService {
   private readonly replayWindowMs = 15 * 60 * 1000;
 
   constructor(
+    @InjectRepository(AgentEntity)
+    private readonly agentRepository: Repository<AgentEntity>,
     @InjectRepository(NotificationEntity)
     private readonly notificationRepository: Repository<NotificationEntity>,
     @InjectRepository(EventEntity)
@@ -103,15 +114,17 @@ export class NotificationsService {
   }
 
   async listForHuman(userId: string) {
-    const notifications = await this.notificationRepository.find({
-      where: {
-        recipientType: SubjectType.Human,
-        recipientSubjectId: userId,
-      },
-      order: {
-        createdAt: 'DESC',
-      },
-    });
+    const notifications = await this.constrainCurrentDmAccess(
+      this.notificationRepository
+        .createQueryBuilder('notification')
+        .where('notification.recipient_type = :recipientType', {
+          recipientType: SubjectType.Human,
+        })
+        .andWhere('notification.recipient_subject_id = :userId', { userId }),
+      userId,
+    )
+      .orderBy('notification.created_at', 'DESC')
+      .getMany();
 
     return {
       notifications: notifications.map((notification) =>
@@ -121,16 +134,16 @@ export class NotificationsService {
   }
 
   async readBellState(userId: string) {
-    const unreadCount = await this.notificationRepository
-      .createQueryBuilder('notification')
-      .where('notification.recipient_type = :recipientType', {
-        recipientType: SubjectType.Human,
-      })
-      .andWhere('notification.recipient_subject_id = :recipientSubjectId', {
-        recipientSubjectId: userId,
-      })
-      .andWhere('notification.read_at IS NULL')
-      .getCount();
+    const unreadCount = await this.constrainCurrentDmAccess(
+      this.notificationRepository
+        .createQueryBuilder('notification')
+        .where('notification.recipient_type = :recipientType', {
+          recipientType: SubjectType.Human,
+        })
+        .andWhere('notification.recipient_subject_id = :userId', { userId })
+        .andWhere('notification.read_at IS NULL'),
+      userId,
+    ).getCount();
 
     return {
       hasUnread: unreadCount > 0,
@@ -235,11 +248,59 @@ export class NotificationsService {
       threadId: event.threadId,
     });
 
-    return participants.map((participant) => ({
-      type: participant.participantType,
-      id: participant.participantSubjectId,
-      kind: 'dm.received',
-    }));
+    const members = participants.filter(
+      (participant) => participant.role === ThreadParticipantRole.Member,
+    );
+    const agentIds = members
+      .filter(
+        (participant) => participant.participantType === SubjectType.Agent,
+      )
+      .map((participant) => participant.participantSubjectId);
+    const ownedAgents =
+      agentIds.length === 0
+        ? []
+        : await this.agentRepository.findBy({
+            id: In(agentIds),
+            ownerType: AgentOwnerType.Human,
+          });
+    return [
+      ...members.map((participant) => ({
+        type: participant.participantType,
+        id: participant.participantSubjectId,
+        kind: 'dm.received',
+      })),
+      ...ownedAgents
+        .filter((agent) => agent.ownerUserId != null)
+        .map((agent) => ({
+          type: SubjectType.Human,
+          id: agent.ownerUserId!,
+          kind: 'dm.received',
+        })),
+    ];
+  }
+
+  private constrainCurrentDmAccess(
+    query: SelectQueryBuilder<NotificationEntity>,
+    userId: string,
+  ): SelectQueryBuilder<NotificationEntity> {
+    return query.andWhere(
+      `(
+      notification.kind <> 'dm.received'
+      OR EXISTS (
+        SELECT 1 FROM thread_participants member
+        WHERE member.thread_id = notification.thread_id AND member.role = 'member'
+          AND member.participant_type = 'human' AND member.participant_subject_id = :dmViewerId
+      )
+      OR EXISTS (
+        SELECT 1 FROM thread_participants member
+        JOIN agents agent ON agent.id = member.participant_subject_id
+        WHERE member.thread_id = notification.thread_id AND member.role = 'member'
+          AND member.participant_type = 'agent' AND agent.owner_type = 'human'
+          AND agent.owner_user_id = :dmViewerId
+      )
+    )`,
+      { dmViewerId: userId },
+    );
   }
 
   private async collectForumReplyRecipients(
@@ -349,7 +410,7 @@ export class NotificationsService {
       return existing;
     }
 
-    return this.notificationRepository.save(
+    const saved = await this.notificationRepository.save(
       this.notificationRepository.create({
         recipientType: recipient.type,
         recipientSubjectId: recipient.id,
@@ -374,6 +435,9 @@ export class NotificationsService {
         },
       }),
     );
+    // Reload scalar foreign keys: initialized nullable relation fields can clear
+    // them on the entity returned by save even though the stored row is correct.
+    return this.notificationRepository.findOneByOrFail({ id: saved.id });
   }
 
   private async enqueueEventForAgent(

@@ -45,6 +45,7 @@ import {
   mutate,
   query,
   request,
+  optionalSession,
   type Agent,
   type Asset,
   type Debate,
@@ -57,7 +58,21 @@ import {
   type Thread,
   type Topic,
   type User,
+  type RuntimeStatus,
+  type Participant,
 } from "../lib/client-api";
+import {
+  bridgeMessageGap,
+  chooseActiveAgent,
+  mergeMessages,
+  messagePath,
+  nextThreadCursor,
+  readActiveAgent,
+  rememberActiveAgent,
+  resolveThreadAgent,
+  type HistoryPage,
+} from "../lib/dm-state";
+import { participantRole, messageRole } from "../lib/dm-roles";
 import "./workspace.css";
 
 type Resource<T> = {
@@ -67,7 +82,11 @@ type Resource<T> = {
   reload: () => void;
   setData: React.Dispatch<React.SetStateAction<T | null>>;
 };
-function useResource<T>(path: string | null, poll = false): Resource<T> {
+function useResource<T>(
+  path: string | null,
+  poll = false,
+  pausePolling?: Readonly<{ current: boolean }>,
+): Resource<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(Boolean(path));
@@ -82,7 +101,10 @@ function useResource<T>(path: string | null, poll = false): Resource<T> {
       return;
     }
     const abort = new AbortController();
+    let inFlight = false;
     async function load(silent = false) {
+      if (inFlight) return;
+      inFlight = true;
       if (!silent) setLoading(true);
       try {
         const result = await api<T>(path!, { signal: abort.signal });
@@ -93,20 +115,22 @@ function useResource<T>(path: string | null, poll = false): Resource<T> {
       } catch (cause) {
         if (!abort.signal.aborted) setError(errorMessage(cause));
       } finally {
+        inFlight = false;
         if (!abort.signal.aborted) setLoading(false);
       }
     }
     void load();
     const timer = poll
       ? window.setInterval(() => {
-          if (document.visibilityState === "visible") void load(true);
+          if (document.visibilityState === "visible" && !pausePolling?.current)
+            void load(true);
         }, 15000)
       : null;
     return () => {
       abort.abort();
       if (timer) window.clearInterval(timer);
     };
-  }, [path, revision, poll]);
+  }, [path, revision, poll, pausePolling]);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
   return { data, error, loading, reload, setData };
 }
@@ -345,16 +369,21 @@ export function Workspace({
   section,
   detailId,
   initialSearch = "",
+  initialAgentId = "",
 }: {
   section: string;
   detailId?: string;
   initialSearch?: string;
+  initialAgentId?: string;
 }) {
+  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [checked, setChecked] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const [sessionRevision, setSessionRevision] = useState(0);
   const [activeId, setActiveId] = useState("");
+  const [threadContext, setThreadContext] = useState({ key: "", error: "" });
+  const [contextRevision, setContextRevision] = useState(0);
   const current = sections.find((item) => item.id === section);
   useEffect(() => {
     const expire = () => {
@@ -396,25 +425,70 @@ export function Workspace({
     const owned = mine.data.agents.filter(
       (agent) => agent.status !== "suspended",
     );
-    let saved = "";
-    try {
-      saved = sessionStorage.getItem("agents-chat.active-agent") || "";
-    } catch {}
     setActiveId((previous) =>
-      owned.some((agent) => agent.id === previous)
-        ? previous
-        : owned.find((agent) => agent.id === saved)?.id ||
-          owned.find((agent) => agent.id === session?.recommendedActiveAgentId)
-            ?.id ||
-          owned[0]?.id ||
-          "",
+      chooseActiveAgent(
+        owned,
+        initialAgentId,
+        previous,
+        readActiveAgent(),
+        session?.recommendedActiveAgentId,
+      ),
     );
-  }, [mine.data, session?.recommendedActiveAgentId]);
+  }, [mine.data, session?.recommendedActiveAgentId, initialAgentId]);
+  const availableIds = (mine.data?.agents || [])
+    .filter((agent) => agent.status !== "suspended")
+    .map((agent) => agent.id)
+    .join(",");
+  const contextKey = `${detailId || ""}:${initialAgentId}:${availableIds}`;
+  useEffect(() => {
+    if (section !== "chat" || !detailId || !availableIds) return;
+    const abort = new AbortController();
+    setThreadContext({ key: "", error: "" });
+    const ids = availableIds.split(",");
+    const preferred = chooseActiveAgent(
+      ids.map((id) => ({ id })),
+      initialAgentId,
+      readActiveAgent(),
+      session?.recommendedActiveAgentId,
+    );
+    void resolveThreadAgent(
+      [preferred, ...ids.filter((id) => id !== preferred)],
+      (id) =>
+        api(
+          query(
+            `/content/dm/threads/${encodeURIComponent(detailId)}/messages`,
+            { activeAgentId: id, limit: "1" },
+          ),
+          { signal: abort.signal },
+        ),
+    )
+      .then((id) => {
+        if (!abort.signal.aborted) {
+          setActiveId(id);
+          rememberActiveAgent(id);
+          setThreadContext({ key: contextKey, error: "" });
+          if (initialAgentId !== id)
+            router.replace(messagePath(detailId, id), { scroll: false });
+        }
+      })
+      .catch((cause) => {
+        if (!abort.signal.aborted)
+          setThreadContext({ key: contextKey, error: errorMessage(cause) });
+      });
+    return () => abort.abort();
+  }, [
+    section,
+    detailId,
+    initialAgentId,
+    availableIds,
+    contextKey,
+    contextRevision,
+    session?.recommendedActiveAgentId,
+  ]);
   function selectAgent(id: string) {
     setActiveId(id);
-    try {
-      sessionStorage.setItem("agents-chat.active-agent", id);
-    } catch {}
+    rememberActiveAgent(id);
+    if (section === "chat") router.push(messagePath(undefined, id));
   }
   const owned = mine.data?.agents || [];
   const active = owned.find((agent) => agent.id === activeId);
@@ -443,7 +517,7 @@ export function Workspace({
           >
             <Link
               className="ws-primary"
-              href={`/login?next=${encodeURIComponent(sitePath(section, detailId))}`}
+              href={`/login?next=${encodeURIComponent(section === "chat" ? messagePath(detailId, initialAgentId || activeId) : sitePath(section, detailId))}`}
             >
               登录后继续 <ArrowRight size={16} />
             </Link>
@@ -589,8 +663,15 @@ export function Workspace({
             {section === "chat" &&
               (mine.loading ? (
                 <Loading />
+              ) : active && detailId && threadContext.key !== contextKey ? (
+                <Loading label="正在确认对话所属 Agent…" />
+              ) : active && detailId && threadContext.error ? (
+                <LoadError
+                  error={threadContext.error}
+                  reload={() => setContextRevision((value) => value + 1)}
+                />
               ) : active ? (
-                <Chat active={active} detailId={detailId} />
+                <Chat active={active} user={session.user} detailId={detailId} />
               ) : (
                 <NeedsAgent />
               ))}
@@ -610,7 +691,7 @@ export function Workspace({
               />
             )}
             {section === "notifications" && (
-              <Notifications refreshBell={bell.reload} />
+              <Notifications refreshBell={bell.reload} agents={owned} />
             )}
             {section === "settings" && (
               <AccountSettings
@@ -691,7 +772,10 @@ function DirectMessage({
               throw new Error(
                 "消息已提交，但服务器没有返回会话地址。请刷新对话列表查看。",
               );
-            router.push(`/messages/${encodeURIComponent(result.threadId)}`);
+            const contextId =
+              recipient.id === activeId ? recipient.id : activeId;
+            rememberActiveAgent(contextId);
+            router.push(messagePath(result.threadId, contextId));
             close();
           });
         }}
@@ -916,14 +1000,28 @@ function AgentsHall({
 }
 
 type ThreadPage = { threads: Thread[]; nextCursor: string | null };
-type MessagePage = { messages: Message[]; nextCursor: string | null };
-function Chat({ active, detailId }: { active: Agent; detailId?: string }) {
+type MessagePage = {
+  messages: Message[];
+  nextCursor: string | null;
+  participants?: Participant[];
+};
+function Chat({
+  active,
+  detailId,
+  user,
+}: {
+  active: Agent;
+  detailId?: string;
+  user: User;
+}) {
   const threads = useResource<ThreadPage>(
     query("/content/dm/threads", { activeAgentId: active.id, limit: "50" }),
     true,
   );
   const [search, setSearch] = useState("");
   const [extraThreads, setExtraThreads] = useState<Thread[]>([]);
+  const extraThreadsRef = useRef(extraThreads);
+  extraThreadsRef.current = extraThreads;
   const [cursor, setCursor] = useState<string | null | undefined>();
   const pagination = useAction();
   const [command, setCommand] = useState(false);
@@ -943,6 +1041,11 @@ function Chat({ active, detailId }: { active: Agent; detailId?: string }) {
             },
           }
         : thread,
+    )
+    .sort(
+      (left, right) =>
+        Date.parse(right.lastMessage.occurredAt) -
+        Date.parse(left.lastMessage.occurredAt),
     );
   const selectedId = detailId || allThreads[0]?.threadId;
   const selected = allThreads.find((thread) => thread.threadId === selectedId);
@@ -954,6 +1057,7 @@ function Chat({ active, detailId }: { active: Agent; detailId?: string }) {
   useEffect(() => {
     if (!threads.data) return;
     const incoming = threads.data.threads;
+    const previousThreads = extraThreadsRef.current;
     setExtraThreads((previous) =>
       [...incoming, ...previous].filter(
         (thread, index, rows) =>
@@ -961,7 +1065,12 @@ function Chat({ active, detailId }: { active: Agent; detailId?: string }) {
       ),
     );
     setCursor((previous) =>
-      previous === undefined ? threads.data!.nextCursor : previous,
+      nextThreadCursor(
+        previousThreads,
+        incoming,
+        previous,
+        threads.data!.nextCursor,
+      ),
     );
   }, [threads.data]);
   const nextCursor = cursor === undefined ? threads.data?.nextCursor : cursor;
@@ -999,7 +1108,7 @@ function Chat({ active, detailId }: { active: Agent; detailId?: string }) {
             <div className="ws-thread-list">
               {visible.map((thread) => (
                 <Link
-                  href={`/messages/${encodeURIComponent(thread.threadId)}`}
+                  href={messagePath(thread.threadId, active.id)}
                   key={thread.threadId}
                   className={`ws-thread ${selectedId === thread.threadId ? "selected" : ""}`}
                 >
@@ -1059,6 +1168,7 @@ function Chat({ active, detailId }: { active: Agent; detailId?: string }) {
               key={selectedId}
               threadId={selectedId}
               active={active}
+              user={user}
               title={selected?.counterpart.displayName || "对话"}
               onSent={threads.reload}
             />
@@ -1092,21 +1202,31 @@ function Conversation({
   active,
   title,
   onSent,
+  user,
 }: {
   threadId: string;
   active: Agent;
   title: string;
   onSent: () => void;
+  user: User;
 }) {
+  const pausePolling = useRef(false);
   const resource = useResource<MessagePage>(
     query(`/content/dm/threads/${encodeURIComponent(threadId)}/messages`, {
       activeAgentId: active.id,
       limit: "50",
     }),
     true,
+    pausePolling,
   );
-  const [earlier, setEarlier] = useState<Message[]>([]);
-  const [cursor, setCursor] = useState<string | null | undefined>();
+  const [history, setHistory] = useState<HistoryPage<Message>>({
+    messages: [],
+    nextCursor: null,
+  });
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const [syncingHistory, setSyncingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
@@ -1118,28 +1238,48 @@ function Conversation({
   const action = useAction();
   const older = useAction();
   const [readError, setReadError] = useState("");
-  const messages = [...earlier, ...(resource.data?.messages || [])]
-    .filter(
-      (message, index, rows) =>
-        rows.findIndex((row) => row.eventId === message.eventId) === index,
-    )
-    .sort(
-      (left, right) =>
-        Date.parse(left.occurredAt) - Date.parse(right.occurredAt),
-    );
+  const messages = history.messages;
+  const participants = resource.data?.participants || [];
   const lastId = messages.at(-1)?.eventId;
   useEffect(() => {
     if (!resource.data) return;
-    const incoming = resource.data.messages;
-    setEarlier((previous) =>
-      [...previous, ...incoming].filter(
-        (message, index, rows) =>
-          rows.findIndex((row) => row.eventId === message.eventId) === index,
+    const abort = new AbortController();
+    const previous = historyRef.current;
+    pausePolling.current = true;
+    setSyncingHistory(true);
+    setHistoryError("");
+    void bridgeMessageGap(previous.messages, resource.data, (cursor) =>
+      api<MessagePage>(
+        query(`/content/dm/threads/${encodeURIComponent(threadId)}/messages`, {
+          activeAgentId: active.id,
+          cursor,
+          limit: "50",
+        }),
+        { signal: abort.signal },
       ),
-    );
-    setCursor((previous) =>
-      previous === undefined ? resource.data!.nextCursor : previous,
-    );
+    )
+      .then((page) => {
+        if (!abort.signal.aborted)
+          setHistory((current) => ({
+            messages: mergeMessages(current.messages, page.messages),
+            nextCursor: previous.messages.length
+              ? current.nextCursor
+              : page.nextCursor,
+          }));
+      })
+      .catch((cause) => {
+        if (!abort.signal.aborted) setHistoryError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!abort.signal.aborted) {
+          pausePolling.current = false;
+          setSyncingHistory(false);
+        }
+      });
+    return () => {
+      abort.abort();
+      pausePolling.current = false;
+    };
   }, [resource.data]);
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "nearest" });
@@ -1167,6 +1307,7 @@ function Conversation({
       if (recorder.current) {
         recorder.current.ondataavailable = null;
         recorder.current.onstop = null;
+        recorder.current.onerror = null;
         if (recorder.current.state !== "inactive") recorder.current.stop();
       }
       stream.current?.getTracks().forEach((track) => track.stop());
@@ -1233,7 +1374,14 @@ function Conversation({
           throw new Error("录音中断，请检查麦克风或改为上传音频。");
         });
       };
-      instance.start();
+      try {
+        instance.start();
+      } catch (cause) {
+        instance.onstop = null;
+        instance.onerror = null;
+        media.getTracks().forEach((track) => track.stop());
+        throw cause;
+      }
       setRecording(true);
       recordTimer.current = setTimeout(() => {
         if (instance.state !== "inactive") instance.stop();
@@ -1294,7 +1442,7 @@ function Conversation({
         : "消息已发送。",
     );
   }
-  const nextCursor = cursor === undefined ? resource.data?.nextCursor : cursor;
+  const nextCursor = history.nextCursor;
   return (
     <>
       <header className="ws-conversation-heading">
@@ -1304,7 +1452,12 @@ function Conversation({
           </span>
           <div>
             <h2>{title}</h2>
-            <span>{active.displayName} 的会话空间</span>
+            <span>
+              {participants.filter((member) => member.type === "agent").length >
+              1
+                ? "Agent 之间的交流 · 人类以本人身份参与"
+                : `${active.displayName} 的指令会话`}
+            </span>
           </div>
         </div>
         <button
@@ -1315,9 +1468,51 @@ function Conversation({
           <RefreshCw size={17} />
         </button>
       </header>
+      {participants.length > 0 && (
+        <ul className="ws-participants" aria-label="这段对话的实际参与者">
+          {participants.map((member) => {
+            const role = participantRole(
+              member,
+              participants,
+              active.id,
+              user.id,
+            );
+            return (
+              <li
+                key={`${member.type}:${member.id}`}
+                className={`role-${role.key}`}
+              >
+                <span className="ws-participant-role">{role.label}</span>
+                <strong>{member.displayName}</strong>
+                {member.type === "agent" && (
+                  <span
+                    className={
+                      member.isOnline ? "ws-participant-online" : "ws-muted"
+                    }
+                  >
+                    {member.isOnline ? "在线" : "当前不在线"}
+                    {!member.ownerUserId ? " · 未认领" : ""}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
       <div className="ws-message-list">
         {resource.error && (
           <LoadError error={resource.error} reload={resource.reload} />
+        )}
+        {historyError && (
+          <LoadError
+            error={`消息历史未补齐：${historyError}`}
+            reload={resource.reload}
+          />
+        )}
+        {syncingHistory && messages.length > 0 && (
+          <p className="ws-history-state" role="status">
+            正在同步并补齐消息…
+          </p>
         )}
         {resource.loading && !resource.data ? (
           <Loading />
@@ -1326,7 +1521,7 @@ function Conversation({
             {nextCursor && (
               <button
                 className="ws-text-link ws-load-more"
-                disabled={older.busy}
+                disabled={older.busy || syncingHistory}
                 onClick={() =>
                   void older.run(async () => {
                     const page = await api<MessagePage>(
@@ -1339,8 +1534,10 @@ function Conversation({
                         },
                       ),
                     );
-                    setEarlier((value) => [...page.messages, ...value]);
-                    setCursor(page.nextCursor);
+                    setHistory((value) => ({
+                      messages: mergeMessages(value.messages, page.messages),
+                      nextCursor: page.nextCursor,
+                    }));
                   })
                 }
               >
@@ -1348,67 +1545,77 @@ function Conversation({
               </button>
             )}
             <Feedback {...older} />
-            {messages.map((message) => (
-              <article
-                className={`ws-message ${message.actor.type === "human" ? "from-human" : ""}`}
-                key={message.eventId}
-              >
-                <div className="ws-message-byline">
-                  <strong>{message.actor.displayName}</strong>
-                  <DateLabel value={message.occurredAt} />
-                </div>
-                <div className="ws-message-body">
-                  {message.asset?.kind === "image" ||
-                  message.contentType === "image" ? (
-                    <a
-                      href={
-                        mediaUrl(message.asset?.url) ||
-                        (message.asset
-                          ? `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
-                          : undefined)
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <img
-                        className="ws-message-image"
-                        src={
+            {messages.map((message) => {
+              const role = messageRole(
+                message.actor,
+                participants,
+                active.id,
+                user.id,
+              );
+              return (
+                <article
+                  className={`ws-message role-${role.key} ${message.actor.type === "human" ? "from-human" : ""}`}
+                  key={message.eventId}
+                >
+                  <div className="ws-message-byline">
+                    <strong>{message.actor.displayName}</strong>
+                    <span className="ws-message-role">{role.label}</span>
+                    <DateLabel value={message.occurredAt} />
+                  </div>
+                  <div className="ws-message-body">
+                    {message.asset?.kind === "image" ||
+                    message.contentType === "image" ? (
+                      <a
+                        href={
                           mediaUrl(message.asset?.url) ||
                           (message.asset
                             ? `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
                             : undefined)
                         }
-                        alt={message.content || "聊天图片"}
-                        loading="lazy"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <img
+                          className="ws-message-image"
+                          src={
+                            mediaUrl(message.asset?.url) ||
+                            (message.asset
+                              ? `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
+                              : undefined)
+                          }
+                          alt={message.content || "聊天图片"}
+                          loading="lazy"
+                        />
+                      </a>
+                    ) : null}
+                    {message.contentType === "audio" && message.asset && (
+                      <audio
+                        controls
+                        preload="none"
+                        src={
+                          mediaUrl(message.asset.url) ||
+                          `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
+                        }
+                        aria-label={`${message.actor.displayName} 的语音`}
                       />
-                    </a>
-                  ) : null}
-                  {message.contentType === "audio" && message.asset && (
-                    <audio
-                      controls
-                      preload="none"
-                      src={
-                        mediaUrl(message.asset.url) ||
-                        `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
-                      }
-                      aria-label={`${message.actor.displayName} 的语音`}
-                    />
-                  )}
-                  {message.content && <p>{message.content}</p>}
-                  {message.contentType === "audio" && (
-                    <span className="ws-transcript">
-                      <Mic size={12} /> 语音转写
-                      {message.metadata?.voice?.transcriptLanguage
-                        ? ` · ${message.metadata.voice.transcriptLanguage.toUpperCase()}`
-                        : ""}
-                    </span>
-                  )}
-                </div>
-              </article>
-            ))}
-            {!messages.length && !resource.error && (
-              <Empty title="这段对话还没有消息" />
-            )}
+                    )}
+                    {message.content && <p>{message.content}</p>}
+                    {message.contentType === "audio" && (
+                      <span className="ws-transcript">
+                        <Mic size={12} /> 语音转写
+                        {message.metadata?.voice?.transcriptLanguage
+                          ? ` · ${message.metadata.voice.transcriptLanguage.toUpperCase()}`
+                          : ""}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+            {!messages.length &&
+              !resource.error &&
+              !historyError &&
+              !syncingHistory && <Empty title="这段对话还没有消息" />}
           </>
         )}
         <div ref={bottom} />
@@ -1494,7 +1701,7 @@ function Conversation({
           </div>
         </form>
         <span className="ws-composer-note">
-          文字、图片与语音 · Agent 回复取决于其在线状态与运行时
+          以 {user.displayName} 本人身份发言 · Agent 回复取决于其运行时
         </span>
       </div>
     </>
@@ -2222,6 +2429,152 @@ function launcher(mode: "bound" | "claim", data: Invitation | ClaimResponse) {
   }
   return `agents-chat://launch?${params.toString()}`;
 }
+function AgentRuntimeStatus({ agent }: { agent: Agent }) {
+  const resource = useResource<RuntimeStatus>(
+    `/agents/${encodeURIComponent(agent.id)}/runtime-status`,
+    true,
+  );
+  const status = resource.data;
+  const presenceLabels: Record<RuntimeStatus["presence"]["state"], string> = {
+    recent: "近期有通讯",
+    stale: "通讯已超时",
+    never_seen: "等待首次通讯",
+    disconnected: "未配置连接",
+  };
+  return (
+    <section
+      className="ws-panel ws-runtime-panel"
+      aria-label={`${agent.displayName} 的运行状态`}
+    >
+      <div className="ws-panel-heading">
+        <h3>
+          <Cpu size={18} /> {agent.displayName} · 运行状态
+        </h3>
+        <button
+          className="ws-text-link"
+          onClick={resource.reload}
+          disabled={resource.loading}
+        >
+          <RefreshCw size={14} /> 刷新状态
+        </button>
+      </div>
+      {resource.error && (
+        <LoadError error={resource.error} reload={resource.reload} />
+      )}
+      {resource.loading && !status && <Loading label="正在读取运行状态…" />}
+      {status && (
+        <>
+          {resource.error && (
+            <p className="ws-muted">
+              以下为上次成功读取的状态，当前连接情况尚未确认。
+            </p>
+          )}
+          <div className="ws-runtime-summary">
+            <span
+              className={`ws-runtime-presence state-${status.presence.state}`}
+            >
+              {presenceLabels[status.presence.state]}
+            </span>
+            <span>
+              Agent 状态 <Status value={status.status} />
+            </span>
+            <span>
+              读取于 <DateLabel value={status.observedAt} />
+            </span>
+          </div>
+          <dl className="ws-runtime-facts">
+            <div>
+              <dt>连接方式</dt>
+              <dd>
+                {status.connection.configured
+                  ? {
+                      webhook: "Webhook",
+                      polling: "轮询",
+                      hybrid: "Webhook + 轮询",
+                      "": "未知",
+                    }[status.connection.transportMode || ""]
+                  : "未配置"}
+              </dd>
+            </div>
+            <div>
+              <dt>最后通讯</dt>
+              <dd>
+                <DateLabel value={status.presence.lastSeenAt || undefined} />
+              </dd>
+            </div>
+            <div>
+              <dt>最后心跳</dt>
+              <dd>
+                <DateLabel
+                  value={status.presence.lastHeartbeatAt || undefined}
+                />
+              </dd>
+            </div>
+            <div>
+              <dt>通讯超时阈值</dt>
+              <dd>{status.presence.staleAfterSeconds} 秒</dd>
+            </div>
+          </dl>
+          <h4 className="ws-runtime-subtitle">事件投递</h4>
+          <dl className="ws-runtime-counts">
+            {[
+              ["待发送", status.deliveries.pending],
+              ["已发送，待收取确认", status.deliveries.sent],
+              ["重试中", status.deliveries.retrying],
+              ["停止重试，待处理", status.deliveries.deadLetter],
+              ["已确认收取", status.deliveries.acked],
+            ].map(([label, count]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{count}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="ws-runtime-note">
+            “已确认收取”仅表示运行时确认收到，不代表 Agent
+            已执行或回复。计数覆盖仍保留的投递记录；已确认和停止重试项包含历史记录。
+          </p>
+          <dl className="ws-runtime-facts">
+            <div>
+              <dt>最后投递尝试</dt>
+              <dd>
+                <DateLabel
+                  value={status.deliveries.lastAttemptAt || undefined}
+                />
+              </dd>
+            </div>
+            <div>
+              <dt>最后收取确认</dt>
+              <dd>
+                <DateLabel value={status.deliveries.lastAckedAt || undefined} />
+              </dd>
+            </div>
+            <div>
+              <dt>下次重试</dt>
+              <dd>
+                <DateLabel
+                  value={status.deliveries.nextAttemptAt || undefined}
+                />
+              </dd>
+            </div>
+          </dl>
+          {status.deliveries.lastError ? (
+            <div className="ws-runtime-error" role="status">
+              <strong>最近一条尚未清除的投递错误</strong>
+              <p>{status.deliveries.lastError.message}</p>
+              <DateLabel
+                value={status.deliveries.lastError.occurredAt || undefined}
+              />
+            </div>
+          ) : (
+            <p className="ws-runtime-note">当前没有尚未清除的投递错误记录。</p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 function Hub({
   user,
   mine,
@@ -2249,6 +2602,7 @@ function Hub({
     expiresAt: string;
   } | null>(null);
   const [policy, setPolicy] = useState<Agent | null>(null);
+  const [runtimeAgent, setRuntimeAgent] = useState<Agent | null>(null);
   const [command, setCommand] = useState<Agent | null>(null);
   const [verify, setVerify] = useState(false);
   const [disconnect, setDisconnect] = useState(false);
@@ -2363,6 +2717,13 @@ function Hub({
                 </button>
                 <button
                   className="ws-icon-button"
+                  aria-label={`查看 ${agent.displayName} 的运行状态`}
+                  onClick={() => setRuntimeAgent(agent)}
+                >
+                  <Cpu size={18} />
+                </button>
+                <button
+                  className="ws-icon-button"
                   aria-label={`给 ${agent.displayName} 发消息`}
                   onClick={() => {
                     selectAgent(agent.id);
@@ -2380,6 +2741,12 @@ function Hub({
         <Empty
           title="你的星图，从第一个 Agent 开始"
           description="生成接入链接，交给 Agent 的运行时完成连接。"
+        />
+      )}
+      {(runtimeAgent || active) && (
+        <AgentRuntimeStatus
+          key={(runtimeAgent || active)!.id}
+          agent={(runtimeAgent || active)!}
         />
       )}
       <div className="ws-hub-panels">
@@ -2808,7 +3175,13 @@ function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
     </Dialog>
   );
 }
-function Notifications({ refreshBell }: { refreshBell: () => void }) {
+function Notifications({
+  refreshBell,
+  agents,
+}: {
+  refreshBell: () => void;
+  agents: Agent[];
+}) {
   const resource = useResource<{ notifications: Notice[] }>(
     "/notifications",
     true,
@@ -2872,7 +3245,17 @@ function Notifications({ refreshBell }: { refreshBell: () => void }) {
               : item.threadId
                 ? item.kind?.includes("forum")
                   ? `/forum/${encodeURIComponent(item.threadId)}`
-                  : `/messages/${encodeURIComponent(item.threadId)}`
+                  : messagePath(
+                      item.threadId,
+                      chooseActiveAgent(
+                        agents,
+                        item.payload.actorAgentId,
+                        item.payload.targetType === "agent"
+                          ? item.payload.targetId
+                          : null,
+                        readActiveAgent(),
+                      ),
+                    )
                 : undefined;
             return (
               <article
@@ -3025,7 +3408,7 @@ function useInlineSession() {
     const abort = new AbortController();
     setLoading(true);
     setError("");
-    request<Session>("/api/session", { signal: abort.signal })
+    optionalSession({ signal: abort.signal })
       .then((data) => {
         if (!abort.signal.aborted) setSession(data);
       })

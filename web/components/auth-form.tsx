@@ -11,6 +11,7 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { api, errorMessage, mutate, request } from "../lib/client-api";
+import { authPath, safeReturnPath } from "../lib/auth-navigation";
 import "./workspace.css";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
@@ -22,8 +23,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [notice, setNotice] = useState("");
   const [email, setEmail] = useState("");
   const [available, setAvailable] = useState("");
+  const [returnPath, setReturnPath] = useState<string | null>(null);
   const register = mode === "register";
   useEffect(() => {
+    setReturnPath(
+      safeReturnPath(new URLSearchParams(window.location.search).get("next")),
+    );
     if (new URLSearchParams(window.location.search).get("reset") === "1")
       setStep("request");
   }, []);
@@ -63,14 +68,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               : {}),
           }),
         });
-        const next = new URLSearchParams(window.location.search).get("next");
         window.location.assign(
-          next &&
-            /^\/(?:messages|hub|notifications|settings|connections|agents|forum|live|discussions|rooms)(?:\/|$|\?)/.test(
-              next,
-            )
-            ? next
-            : "/hub",
+          safeReturnPath(
+            new URLSearchParams(window.location.search).get("next"),
+          ) || "/hub",
         );
       }
     } catch (cause) {
@@ -266,7 +267,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {step === "credentials" ? (
             <p className="auth-switch">
               {register ? "已经有账号？" : "还没有账号？"}{" "}
-              <Link href={register ? "/login" : "/register"}>
+              <Link
+                href={authPath(register ? "login" : "register", returnPath)}
+              >
                 {register ? "登录" : "创建账号"} <ArrowRight size={14} />
               </Link>
             </p>

@@ -1,12 +1,14 @@
+import { recordAgentActivity } from './agent-activity';
 import {
   Inject,
   Injectable,
+  Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { setTimeout as delay } from 'node:timers/promises';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
   AgentStatus,
@@ -31,6 +33,14 @@ export interface PollResult {
 export class FederationDeliveryService
   implements OnModuleInit, OnModuleDestroy
 {
+  private readonly logger = new Logger(FederationDeliveryService.name);
+  private readonly activeDeliveryStatuses = [
+    DeliveryStatus.Pending,
+    DeliveryStatus.Sent,
+    DeliveryStatus.Retrying,
+  ];
+  private readonly webhookRequestTimeoutMs: number;
+  private isProcessingWebhooks = false;
   private readonly retryScheduleMs: number[];
   private readonly replayWindowMs: number;
   private readonly deliverySweepIntervalMs: number;
@@ -53,6 +63,8 @@ export class FederationDeliveryService
     private readonly eventRepository: Repository<EventEntity>,
     private readonly federationCredentialsService: FederationCredentialsService,
   ) {
+    this.webhookRequestTimeoutMs =
+      environment.nodeEnv === 'test' ? 200 : 10_000;
     this.retryScheduleMs =
       environment.nodeEnv === 'test' ? [0, 100, 200] : [0, 5_000, 30_000];
     this.replayWindowMs = environment.nodeEnv === 'test' ? 800 : 15 * 60 * 1000;
@@ -70,7 +82,9 @@ export class FederationDeliveryService
     }, this.deliverySweepIntervalMs);
     this.deliverySweepTimer.unref();
     this.presenceSweepTimer = setInterval(() => {
-      void this.sweepStaleAgentPresence();
+      void this.sweepStaleAgentPresence().catch(() =>
+        this.logger.warn('Presence sweep failed; it will retry.'),
+      );
     }, this.presenceSweepIntervalMs);
     this.presenceSweepTimer.unref();
   }
@@ -117,28 +131,15 @@ export class FederationDeliveryService
     recipientAgentId: string,
     connection: AgentConnectionEntity,
   ): Promise<void> {
-    const deliveries = await this.deliveryRepository.findBy({
-      recipientAgentId,
-    });
-
-    const pendingDeliveries = deliveries.filter(
-      (delivery) =>
-        delivery.status !== DeliveryStatus.Acked &&
-        delivery.status !== DeliveryStatus.DeadLetter,
+    await this.deliveryRepository.update(
+      { recipientAgentId, status: In(this.activeDeliveryStatuses) },
+      {
+        agentConnectionId: connection.id,
+        deliveryChannel: connection.pollingEnabled
+          ? DeliveryChannel.Polling
+          : DeliveryChannel.Webhook,
+      },
     );
-
-    if (pendingDeliveries.length === 0) {
-      return;
-    }
-
-    for (const delivery of pendingDeliveries) {
-      delivery.agentConnectionId = connection.id;
-      delivery.deliveryChannel = connection.pollingEnabled
-        ? DeliveryChannel.Polling
-        : DeliveryChannel.Webhook;
-    }
-
-    await this.deliveryRepository.save(pendingDeliveries);
     this.poke();
   }
 
@@ -234,15 +235,24 @@ export class FederationDeliveryService
         continue;
       }
 
-      delivery.status = DeliveryStatus.Acked;
-      delivery.ackedAt = new Date();
-      delivery.nextAttemptAt = null;
-      delivery.lastError = null;
-      await this.deliveryRepository.save(delivery);
+      const acknowledged = await this.deliveryRepository.update(
+        {
+          id: delivery.id,
+          recipientAgentId: agent.id,
+          status: Not(DeliveryStatus.Acked),
+        },
+        {
+          status: DeliveryStatus.Acked,
+          ackedAt: new Date(),
+          nextAttemptAt: null,
+          lastError: null,
+          deadLetteredAt: null,
+        },
+      );
 
       results.push({
         deliveryId,
-        status: 'acked',
+        status: acknowledged.affected ? 'acked' : 'already_acked',
       });
     }
 
@@ -337,16 +347,13 @@ export class FederationDeliveryService
         break;
       }
 
-      const attemptNumber = outstanding.attemptCount;
-      outstanding.attemptCount += 1;
-      outstanding.deliveryChannel = DeliveryChannel.Polling;
-      outstanding.lastAttemptAt = new Date();
-      outstanding.status =
-        attemptNumber === 0 ? DeliveryStatus.Sent : DeliveryStatus.Retrying;
-      outstanding.nextAttemptAt = this.nextAttemptAt(outstanding.attemptCount);
-
-      const savedDelivery = await this.deliveryRepository.save(outstanding);
-      deliveries.push(await this.serializeDeliveryById(savedDelivery.id));
+      const claimed = await this.claimDeliveryAttempt(
+        outstanding,
+        DeliveryChannel.Polling,
+        this.nextAttemptAt(outstanding.attemptCount + 1),
+      );
+      if (!claimed) continue;
+      deliveries.push(await this.serializeDeliveryById(claimed.id));
       break;
     }
 
@@ -357,41 +364,17 @@ export class FederationDeliveryService
     agent: AuthenticatedFederatedAgent,
     heartbeat: boolean,
   ): Promise<void> {
-    const now = new Date();
-    const [connection, persistedAgent] = await Promise.all([
-      this.agentConnectionRepository.findOneBy({
-        id: agent.connectionId,
-        agentId: agent.id,
-      }),
-      this.agentRepository.findOneBy({
-        id: agent.id,
-      }),
-    ]);
-
-    if (connection) {
-      connection.lastSeenAt = now;
-      if (heartbeat) {
-        connection.lastHeartbeatAt = now;
-      }
-      await this.agentConnectionRepository.save(connection);
-    }
-
-    if (!persistedAgent) {
-      return;
-    }
-
-    persistedAgent.lastSeenAt = now;
-    if (persistedAgent.status === AgentStatus.Offline) {
-      persistedAgent.status = AgentStatus.Online;
-    }
-    await this.agentRepository.save(persistedAgent);
+    await recordAgentActivity(
+      this.agentRepository,
+      this.agentConnectionRepository,
+      agent,
+      heartbeat,
+    );
   }
 
   private async processDueWebhookDeliveries(): Promise<void> {
-    if (this.isStopped) {
-      return;
-    }
-
+    if (this.isStopped || this.isProcessingWebhooks) return;
+    this.isProcessingWebhooks = true;
     try {
       const connections = await this.agentConnectionRepository.find({
         where: {},
@@ -427,6 +410,13 @@ export class FederationDeliveryService
           continue;
         }
 
+        const claimed = await this.claimDeliveryAttempt(
+          outstanding,
+          DeliveryChannel.Webhook,
+          new Date(Date.now() + this.webhookRequestTimeoutMs + 1_000),
+        );
+        if (!claimed) continue;
+
         const payload = await this.serializeDeliveryById(outstanding.id);
         const body = JSON.stringify({
           delivery: payload,
@@ -438,6 +428,7 @@ export class FederationDeliveryService
           body,
         );
 
+        const timeoutSignal = AbortSignal.timeout(this.webhookRequestTimeoutMs);
         try {
           const response = await fetch(connection.webhookUrl, {
             method: 'POST',
@@ -448,31 +439,38 @@ export class FederationDeliveryService
               'x-agents-chat-signature': signature,
             },
             body,
+            signal: timeoutSignal,
           });
+          void response.body?.cancel().catch(() => undefined);
 
           if (!response.ok) {
             await this.markDeliveryAttemptFailure(
-              outstanding,
+              claimed,
               `Webhook returned HTTP ${response.status}.`,
             );
             continue;
           }
 
-          const attemptNumber = outstanding.attemptCount;
-          outstanding.attemptCount += 1;
-          outstanding.deliveryChannel = DeliveryChannel.Webhook;
-          outstanding.lastAttemptAt = new Date();
-          outstanding.status =
-            attemptNumber === 0 ? DeliveryStatus.Sent : DeliveryStatus.Retrying;
-          outstanding.lastError = null;
-          outstanding.nextAttemptAt = this.nextAttemptAt(
-            outstanding.attemptCount,
+          // ACK is terminal even when it arrived before the HTTP response.
+          await this.deliveryRepository.update(
+            {
+              id: claimed.id,
+              status: In(this.activeDeliveryStatuses),
+              attemptCount: claimed.attemptCount,
+            },
+            {
+              lastError: null,
+              nextAttemptAt: this.nextAttemptAt(claimed.attemptCount),
+            },
           );
-          await this.deliveryRepository.save(outstanding);
         } catch (error) {
           const message =
-            error instanceof Error ? error.message : 'Webhook delivery failed.';
-          await this.markDeliveryAttemptFailure(outstanding, message);
+            timeoutSignal.aborted ||
+            (error instanceof Error &&
+              ['TimeoutError', 'AbortError'].includes(error.name))
+              ? 'Webhook request timed out.'
+              : 'Webhook delivery failed.';
+          await this.markDeliveryAttemptFailure(claimed, message);
         }
       }
     } catch (error) {
@@ -483,32 +481,60 @@ export class FederationDeliveryService
         return;
       }
 
-      throw error;
+      this.logger.warn('Webhook delivery sweep failed; it will retry.');
+    } finally {
+      this.isProcessingWebhooks = false;
     }
+  }
+
+  private async claimDeliveryAttempt(
+    delivery: DeliveryEntity,
+    channel: DeliveryChannel,
+    nextAttemptAt: Date,
+  ): Promise<DeliveryEntity | null> {
+    const next = {
+      attemptCount: delivery.attemptCount + 1,
+      deliveryChannel: channel,
+      lastAttemptAt: new Date(),
+      status:
+        delivery.attemptCount === 0
+          ? DeliveryStatus.Sent
+          : DeliveryStatus.Retrying,
+      nextAttemptAt,
+    };
+    const claimed = await this.deliveryRepository.update(
+      {
+        id: delivery.id,
+        status: In(this.activeDeliveryStatuses),
+        attemptCount: delivery.attemptCount,
+      },
+      next,
+    );
+    return claimed.affected ? Object.assign(delivery, next) : null;
   }
 
   private async markDeliveryAttemptFailure(
     delivery: DeliveryEntity,
     message: string,
   ): Promise<void> {
-    delivery.attemptCount += 1;
-    delivery.lastAttemptAt = new Date();
-    delivery.lastError = message;
-
-    if (
+    const expired =
       delivery.attemptCount >= this.retryScheduleMs.length ||
-      delivery.replayExpiresAt.getTime() <= Date.now()
-    ) {
-      delivery.status = DeliveryStatus.DeadLetter;
-      delivery.deadLetteredAt = new Date();
-      delivery.nextAttemptAt = null;
-      await this.deliveryRepository.save(delivery);
-      return;
-    }
-
-    delivery.status = DeliveryStatus.Retrying;
-    delivery.nextAttemptAt = this.nextAttemptAt(delivery.attemptCount);
-    await this.deliveryRepository.save(delivery);
+      delivery.replayExpiresAt.getTime() <= Date.now();
+    await this.deliveryRepository.update(
+      {
+        id: delivery.id,
+        status: In(this.activeDeliveryStatuses),
+        attemptCount: delivery.attemptCount,
+      },
+      {
+        lastError: message,
+        status: expired ? DeliveryStatus.DeadLetter : DeliveryStatus.Retrying,
+        deadLetteredAt: expired ? new Date() : null,
+        nextAttemptAt: expired
+          ? null
+          : this.nextAttemptAt(delivery.attemptCount),
+      },
+    );
   }
 
   private async ensureDeliveryIsActive(
@@ -525,10 +551,18 @@ export class FederationDeliveryService
       delivery.replayExpiresAt.getTime() <= Date.now() ||
       delivery.attemptCount >= this.retryScheduleMs.length
     ) {
-      delivery.status = DeliveryStatus.DeadLetter;
-      delivery.deadLetteredAt = new Date();
-      delivery.nextAttemptAt = null;
-      await this.deliveryRepository.save(delivery);
+      await this.deliveryRepository.update(
+        {
+          id: delivery.id,
+          status: In(this.activeDeliveryStatuses),
+          attemptCount: delivery.attemptCount,
+        },
+        {
+          status: DeliveryStatus.DeadLetter,
+          deadLetteredAt: new Date(),
+          nextAttemptAt: null,
+        },
+      );
       return false;
     }
 

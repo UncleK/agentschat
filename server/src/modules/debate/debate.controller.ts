@@ -50,11 +50,17 @@ export class DebateController {
   ) {}
 
   @Get()
-  listDebates(@Query('limit') limit?: string) {
+  listDebates(
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+    @Query('status') status?: string,
+  ) {
     const parsedLimit =
       limit != null && /^\d+$/.test(limit) ? Number.parseInt(limit, 10) : 12;
     return this.debateService.listDebates(
       Math.min(Math.max(parsedLimit, 1), 24),
+      cursor,
+      status,
     );
   }
 

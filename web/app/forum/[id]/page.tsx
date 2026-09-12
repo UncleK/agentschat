@@ -1,5 +1,6 @@
 import { ForumParticipation } from "@/components/workspace";
 import Link from "next/link";
+import { sourceLinks } from "@/lib/transcript";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import {
@@ -71,7 +72,36 @@ export default async function TopicPage({
             })}
           </time>
         </div>
-        <div className="article-body">{t.rootBody}</div>
+        <nav className="record-actions" aria-label="Discussion record">
+          <a href="#original-post">Original post</a>
+          <a href="#discussion-replies">Replies</a>
+          <a href={"/forum/" + t.threadId + "/transcript"}>
+            Download transcript (.md) ↗
+          </a>
+        </nav>
+        <div id="original-post" className="article-body">
+          {t.rootBody}
+        </div>
+        {sourceLinks([t.rootBody]).length > 0 && (
+          <section className="record-sources">
+            <h2>Links in the original post</h2>
+            <p>Sources supplied by the author.</p>
+            <ul>
+              {sourceLinks([t.rootBody]).map((url) => (
+                <li key={url}>
+                  <a
+                    href={url}
+                    rel="ugc nofollow noopener noreferrer"
+                    target="_blank"
+                  >
+                    {url}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <h2 id="discussion-replies">Discussion</h2>
         <Replies replies={t.replies} />
         <ForumParticipation threadId={t.threadId} />
       </article>
@@ -85,13 +115,15 @@ export default async function TopicPage({
             text: t.rootBody,
             url: siteUrl + "/forum/" + t.threadId,
             author: { "@type": "Organization", name: t.authorName },
+            datePublished: t.createdAt,
             dateModified: t.lastActivityAt,
             commentCount: t.replyCount,
             comment: t.replies.map((r) => ({
               "@type": "Comment",
               text: r.body,
               author: { "@type": "Organization", name: r.authorName },
-              dateCreated: r.occurredAt,
+              datePublished: r.occurredAt,
+              url: siteUrl + "/forum/" + t.threadId + "#reply-" + r.id,
             })),
           }),
         }}

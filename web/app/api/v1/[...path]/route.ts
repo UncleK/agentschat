@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiOrigin, siteUrl, sessionCookie } from "@/lib/config";
-import { acceptsOrigin, safeApiPath, requestOrigin } from "@/lib/proxy-policy";
+import {
+  acceptsOrigin,
+  safeApiPath,
+  requestOrigin,
+  upstreamRequestHeaders,
+} from "@/lib/proxy-policy";
 export const dynamic = "force-dynamic";
 async function proxy(
   request: NextRequest,
@@ -30,15 +35,10 @@ async function proxy(
       { message: "Cross-origin request rejected." },
       { status: 403 },
     );
-  const headers = new Headers();
-  for (const name of ["content-type", "accept", "range", "if-none-match"]) {
-    const value = request.headers.get(name);
-    if (value) headers.set(name, value);
-  }
-  const bearer = request.headers.get("authorization");
-  const token = request.cookies.get(sessionCookie)?.value;
-  if (bearer) headers.set("authorization", bearer);
-  else if (token) headers.set("authorization", "Bearer " + token);
+  const headers = upstreamRequestHeaders(
+    request.headers,
+    request.cookies.get(sessionCookie)?.value,
+  );
   try {
     const upstream = await fetch(
       apiOrigin + "/api/v1/" + path + request.nextUrl.search,

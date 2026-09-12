@@ -32,8 +32,14 @@ import { ModerationService } from '../moderation/moderation.service';
 import {
   isContentHidden,
   visibleMetadata,
+  visibleMetadataSql,
 } from '../moderation/content-visibility';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  encodePublicListCursor,
+  parsePublicListCursor,
+  publicCursorTimeSql,
+} from '../public/public-list-cursor';
 
 interface DebateActor {
   type: SubjectType;
@@ -152,30 +158,72 @@ export class DebateService {
     );
   }
 
-  async listDebates(limit = 12) {
-    const sessions = await this.debateSessionRepository.find({
-      where: {
-        thread: {
-          visibility: ThreadVisibility.Public,
-          metadata: visibleMetadata(),
-        },
-      },
-      order: {
-        createdAt: 'DESC',
-      },
-      take: limit,
-    });
+  async listDebates(
+    limit = 12,
+    cursorValue?: string | null,
+    statusValue?: string | null,
+  ) {
+    const status = this.optionalString(statusValue);
+    if (
+      status &&
+      status !== 'finished' &&
+      !Object.values(DebateSessionStatus).includes(
+        status as DebateSessionStatus,
+      )
+    ) {
+      throw new BadRequestException(
+        'status must be a valid debate session status.',
+      );
+    }
+    const cursorScope = `debates:${status ?? ''}`;
+    const cursor = parsePublicListCursor(cursorValue, cursorScope);
+    const query = this.debateSessionRepository
+      .createQueryBuilder('session')
+      .innerJoin('session.thread', 'thread')
+      .where('thread.visibility = :visibility', {
+        visibility: ThreadVisibility.Public,
+      })
+      .andWhere(visibleMetadataSql('thread.metadata'));
+    if (status === 'finished') {
+      query.andWhere('session.status IN (:...statuses)', {
+        statuses: [DebateSessionStatus.Ended, DebateSessionStatus.Archived],
+      });
+    } else if (status) query.andWhere('session.status = :status', { status });
+    if (cursor)
+      query.andWhere(
+        '(session.createdAt < :cursorTime OR (session.createdAt = :cursorTime AND session.id < :cursorId))',
+        { cursorTime: cursor.time, cursorId: cursor.id },
+      );
+    const page = await query
+      .addSelect(publicCursorTimeSql('session.createdAt'), 'cursorTime')
+      .addSelect('CAST(session.id AS text)', 'cursorId')
+      .orderBy('session.createdAt', 'DESC')
+      .addOrderBy('session.id', 'DESC')
+      .limit(limit + 1)
+      .getRawAndEntities<{ cursorTime: string; cursorId: string }>();
+    const sessions = page.entities.slice(0, limit);
+    const boundary = page.raw.find(
+      (row) => row.cursorId === sessions.at(-1)?.id,
+    );
 
     return {
       sessions: await Promise.all(
-        sessions.map((session) => this.getDebate(session.id)),
+        sessions.map((session) => this.getDebate(session.id, false)),
       ),
+      nextCursor:
+        page.entities.length > limit && boundary
+          ? encodePublicListCursor(
+              cursorScope,
+              boundary.cursorTime,
+              boundary.cursorId,
+            )
+          : null,
     };
   }
 
-  async getDebate(debateSessionId: string) {
+  async getDebate(debateSessionId: string, sweep = true) {
     await this.assertDebatePubliclyReadable(debateSessionId);
-    await this.sweepDebateSession(debateSessionId);
+    if (sweep) await this.sweepDebateSession(debateSessionId);
 
     const debateSession = await this.debateSessionRepository.findOne({
       where: {
@@ -296,8 +344,9 @@ export class DebateService {
     const result = await this.dataSource.transaction(async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
-      const debateSession = await debateSessionRepository.findOneBy({
-        id: debateSessionId,
+      const debateSession = await debateSessionRepository.findOne({
+        where: { id: debateSessionId },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!debateSession) {
@@ -387,8 +436,9 @@ export class DebateService {
     const result = await this.dataSource.transaction(async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
-      const debateSession = await debateSessionRepository.findOneBy({
-        id: debateSessionId,
+      const debateSession = await debateSessionRepository.findOne({
+        where: { id: debateSessionId },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!debateSession) {
@@ -449,8 +499,9 @@ export class DebateService {
     const result = await this.dataSource.transaction(async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
-      const debateSession = await debateSessionRepository.findOneBy({
-        id: debateSessionId,
+      const debateSession = await debateSessionRepository.findOne({
+        where: { id: debateSessionId },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!debateSession) {
@@ -534,8 +585,9 @@ export class DebateService {
     const result = await this.dataSource.transaction(async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
-      const debateSession = await debateSessionRepository.findOneBy({
-        id: debateSessionId,
+      const debateSession = await debateSessionRepository.findOne({
+        where: { id: debateSessionId },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!debateSession) {
@@ -589,8 +641,9 @@ export class DebateService {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
       const debateSeatRepository = manager.getRepository(DebateSeatEntity);
-      const debateSession = await debateSessionRepository.findOneBy({
-        id: debateSessionId,
+      const debateSession = await debateSessionRepository.findOne({
+        where: { id: debateSessionId },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!debateSession) {
@@ -625,29 +678,7 @@ export class DebateService {
       const seats = await this.loadSeats(manager, debateSession.id);
       const seat = this.resolveReplacingSeat(seats, input.seatId);
 
-      const occupiedElsewhere = await debateSeatRepository
-        .createQueryBuilder('seat')
-        .innerJoin(
-          DebateSessionEntity,
-          'session',
-          'session.id = seat.debate_session_id',
-        )
-        .where('seat.agent_id = :agentId', { agentId })
-        .andWhere('seat.id != :seatId', { seatId: seat.id })
-        .andWhere('session.status IN (:...statuses)', {
-          statuses: [
-            DebateSessionStatus.Pending,
-            DebateSessionStatus.Live,
-            DebateSessionStatus.Paused,
-          ],
-        })
-        .getExists();
-
-      if (occupiedElsewhere) {
-        throw new ConflictException(
-          'The replacement agent already occupies another active debate seat.',
-        );
-      }
+      await this.assertAgentsAvailableForSeats(manager, [agentId], seat.id);
 
       await debateSeatRepository.update(
         { id: seat.id },
@@ -701,8 +732,9 @@ export class DebateService {
         manager.getRepository(DebateSessionEntity);
       const debateTurnRepository = manager.getRepository(DebateTurnEntity);
       const debateSeatRepository = manager.getRepository(DebateSeatEntity);
-      const debateSession = await debateSessionRepository.findOneBy({
-        id: debateSessionId,
+      const debateSession = await debateSessionRepository.findOne({
+        where: { id: debateSessionId },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!debateSession || debateSession.status !== DebateSessionStatus.Live) {
@@ -839,8 +871,9 @@ export class DebateService {
     const debateSessionRepository = manager.getRepository(DebateSessionEntity);
     const debateTurnRepository = manager.getRepository(DebateTurnEntity);
     const debateSeatRepository = manager.getRepository(DebateSeatEntity);
-    const debateSession = await debateSessionRepository.findOneBy({
-      id: input.debateSessionId,
+    const debateSession = await debateSessionRepository.findOne({
+      where: { id: input.debateSessionId },
+      lock: { mode: 'pessimistic_write' },
     });
 
     if (!debateSession) {
@@ -1066,9 +1099,14 @@ export class DebateService {
   async assertSpectatorCommentAllowed(
     actor: DebateActor,
     debateSessionId: string,
+    manager?: EntityManager,
   ) {
-    const debateSession = await this.debateSessionRepository.findOneBy({
-      id: debateSessionId,
+    const repository =
+      manager?.getRepository(DebateSessionEntity) ??
+      this.debateSessionRepository;
+    const debateSession = await repository.findOne({
+      where: { id: debateSessionId },
+      ...(manager ? { lock: { mode: 'pessimistic_write' as const } } : {}),
     });
 
     if (!debateSession) {
@@ -1077,8 +1115,20 @@ export class DebateService {
       );
     }
 
+    if (
+      debateSession.status === DebateSessionStatus.Ended ||
+      debateSession.status === DebateSessionStatus.Archived ||
+      debateSession.archivedAt
+    ) {
+      throw new ForbiddenException(
+        'Ended or archived debates do not accept new activity.',
+      );
+    }
+
     if (actor.type === SubjectType.Agent) {
-      const occupiesSeat = await this.debateSeatRepository.exist({
+      const seats =
+        manager?.getRepository(DebateSeatEntity) ?? this.debateSeatRepository;
+      const occupiesSeat = await seats.exist({
         where: {
           debateSessionId,
           agentId: actor.id,
@@ -1119,6 +1169,10 @@ export class DebateService {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
       const debateSeatRepository = manager.getRepository(DebateSeatEntity);
+      await this.assertAgentsAvailableForSeats(manager, [
+        proAgentId,
+        conAgentId,
+      ]);
       const thread = await threadRepository.save(
         threadRepository.create({
           contextType: ThreadContextType.DebateSpectator,
@@ -1244,6 +1298,50 @@ export class DebateService {
         'Suspended agents cannot be seated in a debate.',
       );
     }
+  }
+
+  private async assertAgentsAvailableForSeats(
+    manager: EntityManager,
+    agentIds: string[],
+    exceptSeatId?: string,
+  ): Promise<void> {
+    // Creation and replacement share this lock order so two sessions cannot
+    // reserve the same agent between checking availability and inserting a seat.
+    const agents = await manager
+      .getRepository(AgentEntity)
+      .createQueryBuilder('agent')
+      .where('agent.id IN (:...agentIds)', { agentIds })
+      .orderBy('agent.id', 'ASC')
+      .setLock('pessimistic_write')
+      .getMany();
+    if (agents.length !== new Set(agentIds).size)
+      throw new NotFoundException('A debate agent was not found.');
+    if (agents.some((agent) => agent.status === AgentStatus.Suspended)) {
+      throw new ForbiddenException(
+        'Suspended agents cannot be seated in a debate.',
+      );
+    }
+    const occupied = manager
+      .getRepository(DebateSeatEntity)
+      .createQueryBuilder('seat')
+      .innerJoin('seat.debateSession', 'session')
+      .where('seat.agentId IN (:...agentIds)', { agentIds })
+      .andWhere('seat.status = :seatStatus', {
+        seatStatus: DebateSeatStatus.Occupied,
+      })
+      .andWhere('session.status IN (:...statuses)', {
+        statuses: [
+          DebateSessionStatus.Pending,
+          DebateSessionStatus.Live,
+          DebateSessionStatus.Paused,
+        ],
+      });
+    if (exceptSeatId)
+      occupied.andWhere('seat.id != :exceptSeatId', { exceptSeatId });
+    if (await occupied.getExists())
+      throw new ConflictException(
+        'A debater already occupies another active debate seat.',
+      );
   }
 
   private assertHostActor(

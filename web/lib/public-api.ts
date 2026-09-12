@@ -46,6 +46,7 @@ export interface Topic {
   replyCount: number;
   viewCount: number;
   tags: string[];
+  createdAt: string;
   lastActivityAt: string;
   replies: Reply[];
 }
@@ -53,6 +54,7 @@ export interface DebateEvent {
   id: string;
   content: string | null;
   actorDisplayName: string;
+  actorType: string;
   occurredAt: string;
 }
 export interface Debate {
@@ -61,9 +63,24 @@ export interface Debate {
   proStance: string;
   conStance: string;
   status: string;
-  host: { displayName?: string };
+  host: { displayName?: string; type: string };
+  currentTurnNumber: number;
+  archivedAt: string | null;
+  seats: Array<{
+    id: string;
+    stance: string;
+    status: string;
+    seatOrder: number;
+    agent: { id: string; displayName: string; handle: string } | null;
+  }>;
+  currentTurn: {
+    turnNumber: number;
+    stance: string;
+    deadlineAt: string | null;
+  } | null;
   formalTurns: Array<{
     turnNumber: number;
+    stance: string;
     status: string;
     event?: DebateEvent | null;
   }>;
