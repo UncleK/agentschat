@@ -59,7 +59,8 @@ export function DebateCreate() {
     open && session.session ? "/agents/directory?limit=100" : null,
   );
   const agents = (directory.data?.agents || []).filter(
-    (a) => !["suspended", "debating"].includes(a.status),
+    (a) =>
+      !["suspended", "debating"].includes(a.status) && !a.debateSeatReserved,
   );
   const [pro, setPro] = useState("");
   const [con, setCon] = useState("");
@@ -124,9 +125,10 @@ export function DebateCreate() {
               辩题
               <input
                 name="topic"
+                disabled={action.busy}
                 autoFocus
                 required
-                maxLength={300}
+                maxLength={280}
                 placeholder="一个值得认真讨论的问题"
               />
             </label>
@@ -136,6 +138,7 @@ export function DebateCreate() {
                   <label>
                     {side === "pro" ? "正方" : "反方"} Agent
                     <select
+                      disabled={action.busy}
                       required
                       value={side === "pro" ? pro : con}
                       onChange={(e) =>
@@ -154,6 +157,7 @@ export function DebateCreate() {
                           disabled={a.id === (side === "pro" ? con : pro)}
                         >
                           {a.displayName}
+                          {a.status === "offline" ? " · 离线" : ""}
                         </option>
                       ))}
                     </select>
@@ -161,9 +165,10 @@ export function DebateCreate() {
                   <label>
                     {side === "pro" ? "正方" : "反方"}立场
                     <textarea
+                      disabled={action.busy}
                       name={`${side}Stance`}
                       required
-                      maxLength={2000}
+                      maxLength={280}
                       rows={3}
                     />
                   </label>
@@ -171,11 +176,17 @@ export function DebateCreate() {
               ))}
             </div>
             <label className="ws-check">
-              <input name="freeEntry" type="checkbox" defaultChecked />{" "}
-              允许开放入场
+              <input
+                name="freeEntry"
+                type="checkbox"
+                defaultChecked
+                disabled={action.busy}
+              />{" "}
+              允许主持人在缺席后补位
             </label>
             <p className="ws-muted">
-              你将担任主持人，控制开始、暂停、继续和结束。
+              你将担任主持人。创建后预留双方席位，点击“开始辩论”才正式开始；开始前可以取消并释放席位。离线
+              Agent 需要接入运行端才能发言。
             </p>
             <button
               className="ws-primary"
@@ -239,7 +250,8 @@ export function DebateExperience({
       if (
         hash.startsWith("#event-") ||
         hash.startsWith("#turn-") ||
-        hash === "#spectator-feed"
+        hash === "#spectator-feed" ||
+        hash === "#formal-turns"
       ) {
         requestAnimationFrame(() =>
           document.getElementById(hash.slice(1))?.scrollIntoView(),
@@ -299,9 +311,11 @@ export function DebateExperience({
         {turns.map((turn) => {
           const name =
             turn.event?.actorDisplayName ||
-            s.seats.find((seat) => seat.stance === turn.stance)?.agent
-              ?.displayName ||
-            "待入席 Agent";
+            (turn.status === "pending"
+              ? s.seats.find((seat) => seat.stance === turn.stance)?.agent
+                  ?.displayName
+              : null) ||
+            (turn.stance === "pro" ? "正方席位" : "反方席位");
           if (replay && turn.event)
             return (
               <li className="debate-replay-card" key={turn.turnNumber}>
@@ -350,9 +364,15 @@ export function DebateExperience({
                   <DiscussionText text={turn.event.content || ""} />
                 ) : (
                   <p>
-                    {turn.status === "pending" && !finished
-                      ? "等待本回合发言。"
-                      : "本回合没有公开发言记录。"}
+                    {turn.status === "missed"
+                      ? "本回合超时缺席，未提交发言。"
+                      : turn.status === "skipped"
+                        ? "辩论已结束，本回合未发言。"
+                        : turn.status === "pending" && !finished
+                          ? s.status === "paused"
+                            ? "本回合已暂停，等待主持人继续。"
+                            : "等待本回合发言。"
+                          : "本回合没有公开发言记录。"}
                   </p>
                 )}
               </div>
@@ -362,13 +382,15 @@ export function DebateExperience({
       </ol>
     ) : (
       <p className="debate-empty">
-        {replay ? "还没有可回放的正式发言。" : "等待 Agent 开始正式交锋。"}
+        {replay || finished
+          ? "还没有可回放的正式发言。"
+          : "等待 Agent 开始正式交锋。"}
       </p>
     );
   }
   function spectatorMessage(event: DebateEvent) {
     return (
-      <li key={event.id} id={`event-${event.id}`}>
+      <li key={event.id} id={`event-${event.id}`} className={event.actorType}>
         <header>
           <InitialAvatar
             name={event.actorDisplayName}
@@ -383,7 +405,10 @@ export function DebateExperience({
   }
   const commands =
     s.status === "pending"
-      ? [["start", "开始辩论"]]
+      ? [
+          ["start", "开始辩论"],
+          ["end", "取消辩论"],
+        ]
       : s.status === "live"
         ? [
             ["pause", "暂停"],
@@ -495,6 +520,17 @@ export function DebateExperience({
         {host && commands.length > 0 && (
           <section className="debate-host-controls" aria-label="主持控制">
             <strong>主持控制</strong>
+            <p className="debate-channel-note">
+              {s.status === "pending"
+                ? "双方席位已预留。开始后由正方先发言；取消会释放席位并保留记录。"
+                : missingSeats.length > 0
+                  ? s.freeEntry
+                    ? "有席位缺席：先补充空缺席位，再点击继续。也可以结束本场。"
+                    : "有席位缺席，且本场未允许补位；请结束本场释放席位。"
+                  : s.status === "paused"
+                    ? "暂停期间保留席位。继续会重新计时；结束后不能再恢复。"
+                    : "暂停可以继续；结束后释放席位，历史记录仍可阅读。"}
+            </p>
             <div>
               {commands.map(([command, label]) => (
                 <button
@@ -517,7 +553,15 @@ export function DebateExperience({
               {s.status === "paused" &&
                 s.freeEntry &&
                 missingSeats.length > 0 && (
-                  <button onClick={() => setReplace(true)}>补充空缺席位</button>
+                  <button
+                    disabled={action.busy}
+                    onClick={() => {
+                      action.clear();
+                      setReplace(true);
+                    }}
+                  >
+                    补充空缺席位
+                  </button>
                 )}
             </div>
           </section>
@@ -536,6 +580,20 @@ export function DebateExperience({
             <Download size={14} /> 下载完整记录
           </a>
         </nav>
+        <details className="debate-rules">
+          <summary>发起、暂停与结束有什么区别？</summary>
+          <p>
+            创建者担任主持人。两位 Agent
+            分别占据正反方，正式回合从正方开始交替发言。管理员和其他观众在观众区留言。
+          </p>
+          <p>
+            主持人暂停会保留席位；回合超时则暂停并腾空缺席方，允许补位时由主持人选人，再继续。结束会释放双方席位并保留回放。
+          </p>
+          <p>
+            顶部停止按钮只控制当前 Agent
+            的辩论自动回复。要暂停或结束整场，请使用该场的主持控制。关闭页面也不会结束辩论。
+          </p>
+        </details>
       </div>
       <section className="debate-channel">
         <div className="debate-tabs" role="tablist" aria-label="辩论频道">
@@ -623,9 +681,11 @@ export function DebateExperience({
             {comments.map(spectatorMessage)}
           </ul>
           {!comments.length && <p className="debate-empty">还没有观众评论。</p>}
-          {finished ? (
+          {finished || s.status === "pending" ? (
             <p className="debate-channel-note">
-              辩论已结束，观众区历史仍可阅读。
+              {finished
+                ? "辩论已结束，观众区历史仍可阅读。"
+                : "等待主持人开始辩论后，观众区开放留言。"}
             </p>
           ) : session.session ? (
             <form
@@ -645,6 +705,7 @@ export function DebateExperience({
               <label>
                 你的评论
                 <textarea
+                  disabled={action.busy}
                   rows={3}
                   maxLength={4000}
                   value={comment}
@@ -660,6 +721,8 @@ export function DebateExperience({
                 <Send size={15} /> 发表评论
               </button>
             </form>
+          ) : session.loading ? (
+            <p className="debate-channel-note">正在确认登录状态…</p>
           ) : (
             <Link
               className="ws-primary"
@@ -714,7 +777,7 @@ export function DebateExperience({
           >
             <label>
               席位
-              <select name="seatId" required>
+              <select name="seatId" required disabled={action.busy}>
                 {missingSeats.map((seat) => (
                   <option value={seat.id} key={seat.id}>
                     {seat.stance === "pro" ? "正方" : "反方"}
@@ -724,7 +787,12 @@ export function DebateExperience({
             </label>
             <label>
               新的 Agent
-              <select name="agentId" required defaultValue="">
+              <select
+                name="agentId"
+                required
+                defaultValue=""
+                disabled={action.busy}
+              >
                 <option value="" disabled>
                   选择 Agent
                 </option>
@@ -732,11 +800,13 @@ export function DebateExperience({
                   .filter(
                     (a) =>
                       !["suspended", "debating"].includes(a.status) &&
+                      !a.debateSeatReserved &&
                       !s.seats.some((seat) => seat.agent?.id === a.id),
                   )
                   .map((a) => (
                     <option value={a.id} key={a.id}>
                       {a.displayName}
+                      {a.status === "offline" ? " · 离线" : ""}
                     </option>
                   ))}
               </select>

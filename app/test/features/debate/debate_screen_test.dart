@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -7,6 +8,7 @@ import 'package:agents_chat_app/core/session/app_session_scope.dart';
 import 'package:agents_chat_app/core/theme/app_theme.dart';
 import 'package:agents_chat_app/features/debate/debate_panel.dart';
 import 'package:agents_chat_app/features/debate/debate_repository.dart';
+import 'package:agents_chat_app/features/debate/debate_models.dart';
 import 'package:agents_chat_app/features/debate/debate_screen.dart';
 import 'package:agents_chat_app/features/debate/debate_view_model.dart';
 
@@ -50,6 +52,61 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'poll refreshes replaced seats without new turns and does not undo session selection',
+    (tester) async {
+      final sample = DebateViewModel.sample();
+      final paused = sample.selectedSession.copyWith(
+        lifecycle: DebateLifecycle.paused,
+      );
+      final initial = sample.copyWith(
+        sessions: [paused, ...sample.sessions.skip(1)],
+      );
+      final repository = _ChangingDebateRepository(initial);
+      final controller = AppSessionController(
+        apiClient: FakeApiClient(),
+        authRepository: FakeAuthRepository(),
+        agentsRepository: FakeAgentsRepository(),
+        storage: InMemoryAppSessionStorage(),
+      );
+      addTearDown(controller.dispose);
+      await controller.bootstrap();
+      await pumpDebateScreen(
+        tester,
+        viewModel: initial,
+        controller: controller,
+        debateRepository: repository,
+      );
+      repository.value = initial.copyWith(
+        sessions: [
+          paused.copyWith(
+            proSeat: paused.proSeat.copyWith(
+              profile: const DebateProfileModel(
+                id: 'replacement',
+                name: 'New seat speaker',
+                headline: 'Replacement',
+                kind: DebateParticipantKind.agent,
+              ),
+            ),
+          ),
+          ...sample.sessions.skip(1),
+        ],
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(RegExp('New seat speaker', caseSensitive: false)), findsWidgets);
+      repository.pending = Completer<DebateViewModel>();
+      await tester.pump(const Duration(seconds: 4));
+      await tester.tap(find.byKey(const Key('debate-next-session-button')));
+      await tester.pumpAndSettle();
+      final nextTopic = sample.sessions[1].topic;
+      expect(find.text(nextTopic), findsOneWidget);
+      repository.pending!.complete(repository.value);
+      await tester.pumpAndSettle();
+      expect(find.text(nextTopic), findsOneWidget);
+    },
+  );
 
   testWidgets('debate screen pumps in process mode', (tester) async {
     await pumpDebateScreen(tester);
@@ -391,6 +448,26 @@ class _StaticDebateRepository extends DebateRepository {
     required String seatId,
     required String agentId,
   }) async {}
+}
+
+class _ChangingDebateRepository extends DebateRepository {
+  _ChangingDebateRepository(this.value)
+    : super(apiClient: ApiClient(baseUrl: 'http://localhost'));
+  DebateViewModel value;
+  Completer<DebateViewModel>? pending;
+  @override
+  Future<DebateViewModel> readViewModel({
+    required String viewerId,
+    required String viewerName,
+    String? preferredSessionId,
+    String? activeAgentId,
+    bool usePublicDirectory = false,
+  }) async {
+    if (pending != null) return pending!.future;
+    return preferredSessionId == null
+        ? value
+        : value.selectSession(preferredSessionId);
+  }
 }
 
 class _TrackingDebateRepository extends DebateRepository {

@@ -70,14 +70,14 @@ export class DebateController {
     @CurrentHuman() human: AuthenticatedHuman,
     @Body() body: CreateDebateBody,
   ) {
-    return this.debateService.createHumanHostedDebate(human, body);
+    return this.debateService.createHumanHostedDebate(human, body ?? {});
   }
 
   @Post(':debateSessionId/start')
   @UseGuards(HumanAuthGuard)
   startDebate(
     @CurrentHuman() human: AuthenticatedHuman,
-    @Param('debateSessionId') debateSessionId: string,
+    @Param('debateSessionId', new ParseUUIDPipe()) debateSessionId: string,
   ) {
     return this.debateService.startDebate(
       {
@@ -92,7 +92,7 @@ export class DebateController {
   @UseGuards(HumanAuthGuard)
   pauseDebate(
     @CurrentHuman() human: AuthenticatedHuman,
-    @Param('debateSessionId') debateSessionId: string,
+    @Param('debateSessionId', new ParseUUIDPipe()) debateSessionId: string,
     @Body() body: PauseDebateBody,
   ) {
     return this.debateService.pauseDebate(
@@ -101,7 +101,7 @@ export class DebateController {
         id: human.id,
       },
       debateSessionId,
-      body.reason,
+      body?.reason,
     );
   }
 
@@ -109,7 +109,7 @@ export class DebateController {
   @UseGuards(HumanAuthGuard)
   assignReplacement(
     @CurrentHuman() human: AuthenticatedHuman,
-    @Param('debateSessionId') debateSessionId: string,
+    @Param('debateSessionId', new ParseUUIDPipe()) debateSessionId: string,
     @Body() body: ReplacementSeatBody,
   ) {
     return this.debateService.assignReplacementSeat(
@@ -119,8 +119,8 @@ export class DebateController {
       },
       {
         debateSessionId,
-        seatId: body.seatId,
-        agentId: body.agentId,
+        seatId: body?.seatId,
+        agentId: body?.agentId,
       },
     );
   }
@@ -129,7 +129,7 @@ export class DebateController {
   @UseGuards(HumanAuthGuard)
   resumeDebate(
     @CurrentHuman() human: AuthenticatedHuman,
-    @Param('debateSessionId') debateSessionId: string,
+    @Param('debateSessionId', new ParseUUIDPipe()) debateSessionId: string,
   ) {
     return this.debateService.resumeDebate(
       {
@@ -144,7 +144,7 @@ export class DebateController {
   @UseGuards(HumanAuthGuard)
   endDebate(
     @CurrentHuman() human: AuthenticatedHuman,
-    @Param('debateSessionId') debateSessionId: string,
+    @Param('debateSessionId', new ParseUUIDPipe()) debateSessionId: string,
   ) {
     return this.debateService.endDebate(
       {
@@ -159,7 +159,7 @@ export class DebateController {
   @UseGuards(HumanAuthGuard)
   postSpectatorComment(
     @CurrentHuman() human: AuthenticatedHuman,
-    @Param('debateSessionId') debateSessionId: string,
+    @Param('debateSessionId', new ParseUUIDPipe()) debateSessionId: string,
     @Body() body: SpectatorCommentBody,
   ) {
     return this.contentService.postDebateSpectatorComment(

@@ -182,6 +182,7 @@ export interface PublicAgentBootstrapResponse {
 
 export interface AgentDirectoryEntry extends AgentSummary {
   liveDebateSessionId: string | null;
+  debateSeatReserved: boolean;
   sourceType: string | null;
   vendorName: string | null;
   runtimeName: string | null;
@@ -1535,62 +1536,84 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<AgentDirectoryEntry[]> {
     if (agents.length === 0) return [];
     const ids = agents.map((agent) => agent.id);
-    const [totals, relationships, debateSeats] = await Promise.all([
-      this.followRepository
-        .createQueryBuilder('follow')
-        .select('follow.targetAgentId', 'agentId')
-        .addSelect('COUNT(*)', 'count')
-        .where(
-          'follow.followerType = :followerType AND follow.targetType = :targetType',
-          {
-            followerType: SubjectType.Agent,
-            targetType: FollowTargetType.Agent,
-          },
-        )
-        .andWhere('follow.targetAgentId IN (:...ids)', { ids })
-        .groupBy('follow.targetAgentId')
-        .getRawMany<{ agentId: string; count: string }>(),
-      actor.type === SubjectType.Agent
-        ? this.followRepository.find({
-            where: [
-              {
-                followerType: SubjectType.Agent,
-                followerSubjectId: actor.id,
-                targetType: FollowTargetType.Agent,
-                targetSubjectId: In(ids),
-              },
-              {
-                followerType: SubjectType.Agent,
-                followerSubjectId: In(ids),
-                targetType: FollowTargetType.Agent,
-                targetSubjectId: actor.id,
-              },
-            ],
-            select: { followerSubjectId: true, targetSubjectId: true },
+    const [totals, relationships, debateSeats, reservedSeats] =
+      await Promise.all([
+        this.followRepository
+          .createQueryBuilder('follow')
+          .select('follow.targetAgentId', 'agentId')
+          .addSelect('COUNT(*)', 'count')
+          .where(
+            'follow.followerType = :followerType AND follow.targetType = :targetType',
+            {
+              followerType: SubjectType.Agent,
+              targetType: FollowTargetType.Agent,
+            },
+          )
+          .andWhere('follow.targetAgentId IN (:...ids)', { ids })
+          .groupBy('follow.targetAgentId')
+          .getRawMany<{ agentId: string; count: string }>(),
+        actor.type === SubjectType.Agent
+          ? this.followRepository.find({
+              where: [
+                {
+                  followerType: SubjectType.Agent,
+                  followerSubjectId: actor.id,
+                  targetType: FollowTargetType.Agent,
+                  targetSubjectId: In(ids),
+                },
+                {
+                  followerType: SubjectType.Agent,
+                  followerSubjectId: In(ids),
+                  targetType: FollowTargetType.Agent,
+                  targetSubjectId: actor.id,
+                },
+              ],
+              select: { followerSubjectId: true, targetSubjectId: true },
+            })
+          : Promise.resolve([]),
+        this.dataSource
+          .getRepository(DebateSeatEntity)
+          .createQueryBuilder('seat')
+          .innerJoin('seat.debateSession', 'debate')
+          .innerJoin('debate.thread', 'thread')
+          .select('seat.agentId', 'agentId')
+          .addSelect('seat.debateSessionId', 'sessionId')
+          .where('seat.agentId IN (:...ids)', { ids })
+          .andWhere('seat.status = :seatStatus', {
+            seatStatus: DebateSeatStatus.Occupied,
           })
-        : Promise.resolve([]),
-      this.dataSource
-        .getRepository(DebateSeatEntity)
-        .createQueryBuilder('seat')
-        .innerJoin('seat.debateSession', 'debate')
-        .innerJoin('debate.thread', 'thread')
-        .select('seat.agentId', 'agentId')
-        .addSelect('seat.debateSessionId', 'sessionId')
-        .where('seat.agentId IN (:...ids)', { ids })
-        .andWhere('seat.status = :seatStatus', {
-          seatStatus: DebateSeatStatus.Occupied,
-        })
-        .andWhere('debate.status = :status', {
-          status: DebateSessionStatus.Live,
-        })
-        .andWhere('thread.visibility = :visibility', {
-          visibility: ThreadVisibility.Public,
-        })
-        .andWhere(visibleMetadataSql('thread.metadata'))
-        .orderBy('debate.updatedAt', 'DESC')
-        .addOrderBy('debate.id', 'ASC')
-        .getRawMany<{ agentId: string; sessionId: string }>(),
-    ]);
+          .andWhere('debate.status = :status', {
+            status: DebateSessionStatus.Live,
+          })
+          .andWhere('thread.visibility = :visibility', {
+            visibility: ThreadVisibility.Public,
+          })
+          .andWhere(visibleMetadataSql('thread.metadata'))
+          .orderBy('debate.updatedAt', 'DESC')
+          .addOrderBy('debate.id', 'ASC')
+          .getRawMany<{ agentId: string; sessionId: string }>(),
+        // Availability includes hidden, pending and paused sessions. Only expose
+        // a reservation flag here; public live-room links keep their visibility filter.
+        this.dataSource
+          .getRepository(DebateSeatEntity)
+          .createQueryBuilder('seat')
+          .innerJoin('seat.debateSession', 'debate')
+          .select('seat.agentId', 'agentId')
+          .distinct(true)
+          .where('seat.agentId IN (:...ids)', { ids })
+          .andWhere('seat.status = :seatStatus', {
+            seatStatus: DebateSeatStatus.Occupied,
+          })
+          .andWhere('debate.status IN (:...statuses)', {
+            statuses: [
+              DebateSessionStatus.Pending,
+              DebateSessionStatus.Live,
+              DebateSessionStatus.Paused,
+            ],
+          })
+          .getRawMany<{ agentId: string }>(),
+      ]);
+    const reservedAgentIds = new Set(reservedSeats.map((seat) => seat.agentId));
     const liveSessions = new Map<string, string>();
     for (const seat of debateSeats) {
       if (!liveSessions.has(seat.agentId))
@@ -1618,6 +1641,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         counts.get(agent.id) ?? 0,
       ),
       liveDebateSessionId: liveSessions.get(agent.id) ?? null,
+      debateSeatReserved: reservedAgentIds.has(agent.id),
     }));
   }
 
@@ -1648,6 +1672,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return {
       ...this.serializeAgentSummary(agent),
       liveDebateSessionId: null,
+      debateSeatReserved: false,
       sourceType: agent.sourceType,
       vendorName: agent.vendorName,
       runtimeName: agent.runtimeName,

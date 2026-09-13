@@ -213,6 +213,10 @@ class DebateRepository {
                   ),
             ),
             kind: DebateParticipantKind.agent,
+            canTakeSeat:
+                json['debateSeatReserved'] != true &&
+                json['status'] != 'suspended' &&
+                json['status'] != 'debating',
           );
         })
         .where((profile) => profile.id.isNotEmpty)
@@ -237,10 +241,22 @@ class DebateRepository {
       append(profile);
     }
     for (final session in sessions) {
-      append(session.proSeat.profile);
-      append(session.conSeat.profile);
-      if (session.host.isAgent) {
-        append(session.host);
+      for (final profile in [
+        session.proSeat.profile,
+        session.conSeat.profile,
+        if (session.host.isAgent) session.host,
+      ]) {
+        // Historical seats are readable even when the directory is unavailable;
+        // they are not evidence that an Agent is eligible for a new seat.
+        append(
+          DebateProfileModel(
+            id: profile.id,
+            name: profile.name,
+            headline: profile.headline,
+            kind: profile.kind,
+            canTakeSeat: false,
+          ),
+        );
       }
     }
 
@@ -311,6 +327,11 @@ class DebateRepository {
     );
     final lifecycle = _mapLifecycle(json['status'] as String?);
     final rawTurns = json['formalTurns'] as List<dynamic>? ?? const [];
+    final submittedTurnIds = rawTurns
+        .cast<Map<String, dynamic>>()
+        .where((turn) => turn['event'] != null)
+        .map((turn) => turn['id'])
+        .toSet();
     final formalTurns = rawTurns
         .map(
           (item) => _mapFormalTurn(
@@ -367,7 +388,11 @@ class DebateRepository {
       spectatorCountLabel: _spectatorCountLabel(spectatorIds.length),
       formalTurns: formalTurns,
       replayItems: formalTurns
-          .where((turn) => turn.quote.trim().isNotEmpty)
+          .where(
+            (turn) =>
+                submittedTurnIds.contains(turn.id) &&
+                turn.quote.trim().isNotEmpty,
+          )
           .map(
             (turn) => DebateReplayItemModel(
               id: '${turn.id}-replay',
@@ -462,15 +487,33 @@ class DebateRepository {
     final stance = (json['stance'] as String? ?? '').trim().toLowerCase();
     final side = stance == 'con' ? DebateSide.con : DebateSide.pro;
     final rawEvent = json['event'] as Map<String, dynamic>?;
+    final turnStatus = json['status'] as String? ?? 'pending';
+    final noSubmission = turnStatus == 'missed'
+        ? localizedAppText(
+            key: 'debateMissedTurn',
+            en: 'This turn timed out without a submission.',
+            zhHans: '本回合超时缺席，未提交发言。',
+          )
+        : turnStatus == 'skipped'
+        ? localizedAppText(
+            key: 'debateSkippedTurn',
+            en: 'The debate ended before this turn was submitted.',
+            zhHans: '辩论已结束，本回合未发言。',
+          )
+        : _pendingTurnText(
+            side: side,
+            turnNumber: json['turnNumber'] as int? ?? 0,
+          );
     final content = _displayName(
       rawEvent?['content'] as String?,
-      fallback: _pendingTurnText(
-        side: side,
-        turnNumber: json['turnNumber'] as int? ?? 0,
-      ),
+      fallback: noSubmission,
     );
     final speakerName = _displayName(
-      (seatJson?['agent'] as Map<String, dynamic>?)?['displayName'] as String?,
+      (rawEvent?['actorDisplayName'] as String?) ??
+          (turnStatus == 'pending'
+              ? ((seatJson?['agent'] as Map<String, dynamic>?)?['displayName']
+                    as String?)
+              : null),
       fallback: side == DebateSide.pro
           ? localizedAppText(
               key: 'msgProSeat02c83784',
@@ -489,7 +532,7 @@ class DebateRepository {
       phaseLabel: _phaseLabel(json['turnNumber'] as int? ?? 0),
       speakerSide: side,
       speakerName: speakerName,
-      summary: rawEvent == null
+      summary: rawEvent == null && turnStatus == 'pending'
           ? localizedAppText(
               key: 'msgAwaitingAFormalSubmissionFromSpeakerName74a595d6',
               args: <String, Object?>{'speakerName': speakerName},

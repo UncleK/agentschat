@@ -6,6 +6,99 @@ import 'package:agents_chat_app/features/debate/debate_repository.dart';
 
 void main() {
   group('DebateRepository', () {
+    test(
+      'keeps original speakers after replacement and excludes reserved roster entries',
+      () async {
+        final repository = DebateRepository(
+          apiClient: _FakeApiClient(
+            getHandler: (path, {queryParameters}) async {
+              if (path == '/debates')
+                return {
+                  'sessions': [
+                    {
+                      'debateSessionId': 'history',
+                      'status': 'paused',
+                      'seats': [
+                        {
+                          'id': 'pro-seat',
+                          'stance': 'pro',
+                          'status': 'occupied',
+                          'agent': {
+                            'id': 'replacement',
+                            'displayName': 'Replacement',
+                          },
+                        },
+                      ],
+                      'formalTurns': [
+                        {
+                          'id': 'turn-1',
+                          'seatId': 'pro-seat',
+                          'stance': 'pro',
+                          'turnNumber': 1,
+                          'status': 'submitted',
+                          'event': {
+                            'actorDisplayName': 'Original speaker',
+                            'content': 'Original argument',
+                          },
+                        },
+                        {
+                          'id': 'turn-2',
+                          'seatId': 'pro-seat',
+                          'stance': 'pro',
+                          'turnNumber': 2,
+                          'status': 'missed',
+                        },
+                        {
+                          'id': 'turn-3',
+                          'seatId': 'pro-seat',
+                          'stance': 'pro',
+                          'turnNumber': 3,
+                          'status': 'skipped',
+                        },
+                      ],
+                      'spectatorFeed': [],
+                    },
+                  ],
+                };
+              return {
+                'agents': [
+                  {
+                    'id': 'reserved',
+                    'displayName': 'Reserved',
+                    'status': 'offline',
+                    'debateSeatReserved': true,
+                  },
+                  {
+                    'id': 'suspended',
+                    'displayName': 'Suspended',
+                    'status': 'suspended',
+                  },
+                  {
+                    'id': 'free',
+                    'displayName': 'Free',
+                    'status': 'offline',
+                    'debateSeatReserved': false,
+                  },
+                ],
+              };
+            },
+          ),
+        );
+        final model = await repository.readViewModel(
+          viewerId: 'viewer',
+          viewerName: 'Viewer',
+        );
+        expect(model.availableDebaters.map((agent) => agent.id), ['free']);
+        final turns = model.selectedSession.formalTurns;
+        expect(turns[0].speakerName, 'Original speaker');
+        expect(turns[0].quote, 'Original argument');
+        expect(turns[1].speakerName, isNot('Replacement'));
+        expect(turns[1].summary, contains('timed out'));
+      expect(turns[2].summary, contains('ended'));
+      expect(model.selectedSession.replayItems, hasLength(1));
+      },
+    );
+
     test('maps pro and con stance text from the session payload', () async {
       final repository = DebateRepository(
         apiClient: _FakeApiClient(

@@ -95,6 +95,142 @@ describe('Debate state machine (e2e)', () => {
     await context?.close();
   });
 
+  it('lets only the host cancel pending debates, releasing both reservations without inventing turns', async () => {
+    const host = await registerHuman(
+      app,
+      'cancel-host@example.com',
+      'Cancel Host',
+    );
+    const other = await registerHuman(app, 'cancel-other@example.com', 'Other');
+    const pro = await importSelfAgent(app, 'cancel-pro', 'Cancel Pro');
+    const con = await importSelfAgent(app, 'cancel-con', 'Cancel Con');
+    const payload = {
+      topic: 'Cancellation lifecycle',
+      proStance: 'Pro',
+      conStance: 'Con',
+      proAgentId: pro.id,
+      conAgentId: con.id,
+      freeEntry: true,
+    };
+    await request(app.getHttpServer())
+      .post('/api/v1/debates')
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .expect(400);
+    for (const command of [
+      'start',
+      'pause',
+      'resume',
+      'end',
+      'replacements',
+      'spectator-comments',
+    ]) {
+      await request(app.getHttpServer())
+        .post(`/api/v1/debates/invalid-id/${command}`)
+        .set('Authorization', `Bearer ${host.accessToken}`)
+        .expect(400);
+    }
+    const create = await request(app.getHttpServer())
+      .post('/api/v1/debates')
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .send({ ...payload, proStance: 'x'.repeat(281) })
+      .expect(400);
+    expect(create.body).toMatchObject({
+      message: 'proStance must be at most 280 characters.',
+    });
+    const validCreate = await request(app.getHttpServer())
+      .post('/api/v1/debates')
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .send(payload)
+      .expect(201);
+    const id = typedValue<{ debateSessionId: string }>(
+      validCreate.body,
+    ).debateSessionId;
+    const directory = async () => {
+      const result = await request(app.getHttpServer())
+        .get('/api/v1/agents/public-directory')
+        .expect(200);
+      return typedValue<{
+        agents: Array<{
+          id: string;
+          debateSeatReserved: boolean;
+          liveDebateSessionId: string | null;
+        }>;
+      }>(result.body).agents;
+    };
+    let agents = await directory();
+    for (const agentId of [pro.id, con.id]) {
+      expect(agents.find((agent) => agent.id === agentId)).toMatchObject({
+        debateSeatReserved: true,
+        liveDebateSessionId: null,
+      });
+    }
+    await request(app.getHttpServer())
+      .post('/api/v1/debates')
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .send(payload)
+      .expect(409);
+    await request(app.getHttpServer())
+      .post(`/api/v1/debates/${id}/end`)
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/api/v1/debates/${id}/spectator-comments`)
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .send({ contentType: 'text', content: 'Before start' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/api/v1/debates/${id}/end`)
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .expect(201);
+    const view = await request(app.getHttpServer())
+      .get(`/api/v1/debates/${id}`)
+      .expect(200);
+    expect(view.body).toMatchObject({
+      status: 'ended',
+      currentTurn: null,
+      formalTurns: [],
+    });
+    const ended = await eventRepository.findOneByOrFail({
+      targetId: id,
+      eventType: 'debate.ended',
+    });
+    expect(ended.metadata).toMatchObject({
+      reason: 'host_cancelled_before_start',
+      finalTurnNumber: 0,
+    });
+    agents = await directory();
+    for (const agentId of [pro.id, con.id])
+      expect(
+        agents.find((agent) => agent.id === agentId)?.debateSeatReserved,
+      ).toBe(false);
+    for (const command of ['start', 'resume', 'end']) {
+      await request(app.getHttpServer())
+        .post(`/api/v1/debates/${id}/${command}`)
+        .set('Authorization', `Bearer ${host.accessToken}`)
+        .expect(409);
+    }
+    // Reuse both Agents, checking availability through live, paused and ended states.
+    const retry = await request(app.getHttpServer())
+      .post('/api/v1/debates')
+      .set('Authorization', `Bearer ${host.accessToken}`)
+      .send(payload)
+      .expect(201);
+    const retryId = typedValue<{ debateSessionId: string }>(
+      retry.body,
+    ).debateSessionId;
+    for (const command of ['start', 'pause', 'resume', 'end']) {
+      await request(app.getHttpServer())
+        .post(`/api/v1/debates/${retryId}/${command}`)
+        .set('Authorization', `Bearer ${host.accessToken}`)
+        .expect(201);
+      const entry = (await directory()).find((agent) => agent.id === pro.id);
+      expect(entry?.debateSeatReserved).toBe(command !== 'end');
+      expect(entry?.liveDebateSessionId).toBe(
+        ['start', 'resume'].includes(command) ? retryId : null,
+      );
+    }
+  });
+
   it('rejects malformed debate ids with 4xx while preserving 404 for valid missing ids', async () => {
     const missingDebateId = randomUUID();
 

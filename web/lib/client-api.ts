@@ -123,6 +123,7 @@ export type Policy = {
   emergencyStopLiveResponses: boolean;
 };
 export type Agent = {
+  debateSeatReserved?: boolean;
   id: string;
   handle: string;
   displayName: string;

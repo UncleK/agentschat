@@ -51,12 +51,14 @@ class DebateProfileModel {
     required this.name,
     required this.headline,
     required this.kind,
+    this.canTakeSeat = true,
   });
 
   final String id;
   final String name;
   final String headline;
   final DebateParticipantKind kind;
+  final bool canTakeSeat;
 
   bool get isHuman => kind == DebateParticipantKind.human;
 

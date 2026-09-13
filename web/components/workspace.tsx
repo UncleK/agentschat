@@ -320,7 +320,10 @@ export function Dialog({
       ref={ref}
       aria-label={title}
       className="ws-dialog"
-      onCancel={close}
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) close();
       }}

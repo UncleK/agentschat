@@ -170,7 +170,7 @@ class _DebateScreenState extends State<DebateScreen> {
     if (directoryErrorMessage != null && directoryErrorMessage.isNotEmpty) {
       return false;
     }
-    if (_viewModel.debaterRoster.length >= 2) {
+    if (_viewModel.availableDebaters.length >= 2) {
       return true;
     }
 
@@ -188,7 +188,7 @@ class _DebateScreenState extends State<DebateScreen> {
     if (refreshedDirectoryError != null && refreshedDirectoryError.isNotEmpty) {
       return false;
     }
-    return _viewModel.debaterRoster.length >= 2;
+    return _viewModel.availableDebaters.length >= 2;
   }
 
   void _showCreateDebateUnavailableMessage() {
@@ -242,7 +242,7 @@ class _DebateScreenState extends State<DebateScreen> {
     final draft = await showSwipeBackSheet<DebateInitiateDraft>(
       context: context,
       builder: (context) => _InitiateDebateSheet(
-        debaterRoster: _viewModel.debaterRoster,
+        debaterRoster: _viewModel.availableDebaters,
         hostRoster: _viewModel.hostRoster,
       ),
     );
@@ -517,6 +517,15 @@ class _DebateScreenState extends State<DebateScreen> {
       session.formalTurns.length,
       session.proSeat.stance,
       session.conSeat.stance,
+      session.proSeat.profile.id,
+      session.proSeat.profile.name,
+      session.proSeat.availability.name,
+      session.conSeat.profile.id,
+      session.conSeat.profile.name,
+      session.conSeat.availability.name,
+      session.missingSeatSide?.name ?? '',
+      session.freeEntryEnabled,
+      viewModel.availableDebaters.map((agent) => agent.id).join(','),
       session.spectatorCountLabel,
       session.spectatorMessages.length,
       lastTurn?.id ?? '',
@@ -546,20 +555,24 @@ class _DebateScreenState extends State<DebateScreen> {
             _activePanel == DebatePanel.spectator) &&
         _isNearLivePanelBottom();
     final currentSignature = _selectedSessionRefreshSignature(_viewModel);
+    final requestedSessionId =
+        _viewModel.selectedSessionOrNull?.id ?? widget.sessionTargetId;
     _isRefreshingDebatesSilently = true;
 
     try {
       final nextViewModel = await repository.readViewModel(
         viewerId: _currentViewerId(session),
         viewerName: _currentViewerName(session),
-        preferredSessionId:
-            _viewModel.selectedSessionOrNull?.id ?? widget.sessionTargetId,
+        preferredSessionId: requestedSessionId,
         activeAgentId: session.currentActiveAgent?.id,
         usePublicDirectory: !hasAuthenticatedHumanSession,
       );
       if (!mounted) {
         return;
       }
+      if ((_viewModel.selectedSessionOrNull?.id ?? widget.sessionTargetId) !=
+          requestedSessionId)
+        return;
       final nextSignature = _selectedSessionRefreshSignature(nextViewModel);
       if (nextSignature == currentSignature) {
         return;
@@ -1793,7 +1806,7 @@ class _StageHostControls extends StatelessWidget {
 
     switch (session.lifecycle) {
       case DebateLifecycle.pending:
-        actions.add(
+        actions.addAll([
           _StageHostActionButton(
             buttonKey: const Key('debate-start-button'),
             icon: Icons.play_arrow_rounded,
@@ -1801,7 +1814,20 @@ class _StageHostControls extends StatelessWidget {
             enabled: onStart != null,
             onPressed: onStart,
           ),
-        );
+          const SizedBox(width: AppSpacing.xs),
+          _StageHostActionButton(
+            buttonKey: const Key('debate-cancel-button'),
+            icon: Icons.close_rounded,
+            tooltip: context.localizedText(
+              key: 'debateCancelBeforeStart',
+              en: 'Cancel debate and release seats',
+              zhHans: '取消辩论并释放席位',
+            ),
+            color: AppColors.warning,
+            enabled: onEnd != null,
+            onPressed: onEnd,
+          ),
+        ]);
       case DebateLifecycle.live:
         actions.addAll([
           _StageHostActionButton(
@@ -1859,6 +1885,7 @@ class _StageHostControls extends StatelessWidget {
 
 class _StageHostActionButton extends StatelessWidget {
   const _StageHostActionButton({
+    this.tooltip,
     this.buttonKey,
     required this.icon,
     required this.color,
@@ -1867,6 +1894,7 @@ class _StageHostActionButton extends StatelessWidget {
   });
 
   final Key? buttonKey;
+  final String? tooltip;
   final IconData icon;
   final Color color;
   final VoidCallback? onPressed;
@@ -1880,6 +1908,7 @@ class _StageHostActionButton extends StatelessWidget {
         ignoring: !enabled,
         child: IconButton(
           key: buttonKey,
+          tooltip: tooltip,
           onPressed: enabled ? onPressed : null,
           icon: Icon(icon, size: 18),
           style: IconButton.styleFrom(
@@ -2737,11 +2766,18 @@ class _FormalTurnList extends StatelessWidget {
         key: const Key('debate-process-empty'),
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Text(
-          context.localizedText(
-            key: 'msgFormalTurnsStayEmptyUntilTheHostStartsTheDebate269b565b',
-            en: 'Formal turns stay empty until the host starts the debate. Spectators can watch the setup, but humans never author this lane.',
-            zhHans: '在主持人启动辩论前，正式回合会保持为空。观众可以旁观准备过程，但人类不会在这条正式通道内发言。',
-          ),
+          session.showReplayTab
+              ? context.localizedText(
+                  key: 'debateNoFormalReplay',
+                  en: 'This debate ended without any formal submissions.',
+                  zhHans: '这场辩论已结束，没有正式发言记录。',
+                )
+              : context.localizedText(
+                  key:
+                      'msgFormalTurnsStayEmptyUntilTheHostStartsTheDebate269b565b',
+                  en: 'Formal turns stay empty until the host starts the debate. Spectators can watch the setup, but humans never author this lane.',
+                  zhHans: '在主持人启动辩论前，正式回合会保持为空。观众可以旁观准备过程，但人类不会在这条正式通道内发言。',
+                ),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       );
@@ -3630,6 +3666,7 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
             child: TextField(
               key: const Key('debate-topic-input'),
               controller: _topicController,
+              maxLength: 280,
               onChanged: (_) => setState(() {}),
               minLines: 1,
               maxLines: 2,
@@ -3856,6 +3893,7 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
             TextField(
               key: fieldKey,
               controller: controller,
+              maxLength: 280,
               onChanged: (_) => setState(() {}),
               minLines: 3,
               maxLines: 5,
@@ -3901,9 +3939,9 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                   children: [
                     Text(
                       context.localizedText(
-                        key: 'msgEnableFreeEntry3691d42c',
-                        en: 'Enable Free Entry',
-                        zhHans: '开启自由入场',
+                        key: 'debateEnableHostReplacement',
+                        en: 'Allow host replacements',
+                        zhHans: '允许主持人在缺席后补位',
                       ),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
@@ -3912,10 +3950,9 @@ class _InitiateDebateSheetState extends State<_InitiateDebateSheet> {
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
                       context.localizedText(
-                        key:
-                            'msgAgentsCanJoinDebateFreelyWhenASeatOpense01a9339',
-                        en: 'Agents can join debate freely when a seat opens.',
-                        zhHans: '当席位空出时，智能体可以自由加入辩论。',
+                        key: 'debateHostReplacementExplanation',
+                        en: 'After a missed turn, the host selects a replacement, then resumes the debate.',
+                        zhHans: '回合超时缺席后，由主持人选择补位智能体，再继续辩论。',
                       ),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: AppColors.onSurfaceMuted,

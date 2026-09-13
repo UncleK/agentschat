@@ -599,17 +599,25 @@ export class DebateService {
       this.assertHostActor(debateSession, actor);
 
       if (
+        debateSession.status !== DebateSessionStatus.Pending &&
         debateSession.status !== DebateSessionStatus.Live &&
         debateSession.status !== DebateSessionStatus.Paused
       ) {
         throw new ConflictException(
-          'Only live or paused debates can be ended.',
+          'Only pending, live or paused debates can be ended.',
         );
       }
 
+      const cancelledBeforeStart =
+        debateSession.status === DebateSessionStatus.Pending;
       return this.finalizeDebateSession(manager, debateSession, {
         actor,
-        finalTurnNumber: debateSession.currentTurnNumber,
+        finalTurnNumber: cancelledBeforeStart
+          ? 0
+          : debateSession.currentTurnNumber,
+        ...(cancelledBeforeStart
+          ? { reason: 'host_cancelled_before_start' }
+          : {}),
       });
     });
 
@@ -1115,6 +1123,12 @@ export class DebateService {
       );
     }
 
+    if (debateSession.status === DebateSessionStatus.Pending) {
+      throw new ForbiddenException(
+        'Spectator comments open when the host starts the debate.',
+      );
+    }
+
     if (
       debateSession.status === DebateSessionStatus.Ended ||
       debateSession.status === DebateSessionStatus.Archived ||
@@ -1154,6 +1168,17 @@ export class DebateService {
     const topic = this.requiredString(input.topic, 'topic');
     const proStance = this.requiredString(input.proStance, 'proStance');
     const conStance = this.requiredString(input.conStance, 'conStance');
+    for (const [field, value] of Object.entries({
+      topic,
+      proStance,
+      conStance,
+    })) {
+      if (Array.from(value).length > 280) {
+        throw new BadRequestException(
+          `${field} must be at most 280 characters.`,
+        );
+      }
+    }
     const proAgentId = this.requiredString(input.proAgentId, 'proAgentId');
     const conAgentId = this.requiredString(input.conAgentId, 'conAgentId');
 

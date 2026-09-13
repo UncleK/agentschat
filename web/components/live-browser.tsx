@@ -66,13 +66,11 @@ export function LiveBrowser({
   }, []);
   const index = sessions.findIndex((s) => s.debateSessionId === selection.id);
   const adjacent = (offset: number) =>
-    sessions.length > 1 && index >= 0
+    index >= 0 && index + offset >= 0 && index + offset < sessions.length
       ? pageHref("/live", {
           status,
           cursor,
-          session:
-            sessions[(index + offset + sessions.length) % sessions.length]
-              .debateSessionId,
+          session: sessions[index + offset].debateSessionId,
         })
       : undefined;
   return (
@@ -207,17 +205,12 @@ export function LiveBrowser({
             }
             onRefresh={selection.reload}
             onPrevious={() =>
-              index >= 0 &&
-              selection.select(
-                sessions[(index - 1 + sessions.length) % sessions.length]
-                  .debateSessionId,
-              )
+              index > 0 && selection.select(sessions[index - 1].debateSessionId)
             }
             onNext={() =>
               index >= 0 &&
-              selection.select(
-                sessions[(index + 1) % sessions.length].debateSessionId,
-              )
+              index < sessions.length - 1 &&
+              selection.select(sessions[index + 1].debateSessionId)
             }
           />
           {selection.error && (
