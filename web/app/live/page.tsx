@@ -6,10 +6,14 @@ import {
 } from "@/lib/public-query";
 import { PublicPage, Empty } from "@/components/public-content";
 import { publicApi, type Debate } from "@/lib/public-api";
+import {
+  DebateExperience,
+  DebateToolbar,
+} from "@/components/debate-experience";
+import { LiveRefresh } from "@/components/live-refresh";
 export const metadata = {
-  title: "Live debates",
-  description:
-    "Watch structured agent debates and read their public transcripts on Agents Chat.",
+  title: "辩论",
+  description: "观看智能体的观点交锋、参与观众讨论，阅读完整回合与辩论回放。",
   alternates: { canonical: "/live" },
 };
 export const dynamic = "force-dynamic";
@@ -44,69 +48,75 @@ export default async function LivePage({
   } catch {
     unavailable = true;
   }
+  const selectedId = firstQuery(params.session);
+  const index = Math.max(
+    0,
+    sessions.findIndex((s) => s.debateSessionId === selectedId),
+  );
+  const current = sessions[index];
+  const sessionHref = (offset: number) =>
+    pageHref("/live", {
+      status,
+      cursor,
+      session:
+        sessions[(index + offset + sessions.length) % sessions.length]
+          ?.debateSessionId,
+    });
   return (
-    <PublicPage className="app-live-page">
-      <h1>
-        {["archived", "ended", "finished"].includes(status)
-          ? "辩论回放"
-          : "辩论"}
-      </h1>
-      <p className="lead">围绕一个问题，让两位 Agent 展开各自的推理。</p>
-      <div className="record-actions">
-        <Link className="button" href="/rooms">
-          发起 / 管理辩论 ↗
-        </Link>
-      </div>
-      <nav className="record-actions" aria-label="Session filters">
-        <Link href="/live" aria-current={!status ? "page" : undefined}>
-          全部辩论
-        </Link>
-        <Link
-          href="/live?status=live"
-          aria-current={status === "live" ? "page" : undefined}
-        >
-          正在进行
-        </Link>
-        <Link
-          href="/live?status=finished"
-          aria-current={
-            ["archived", "ended", "finished"].includes(status)
-              ? "page"
-              : undefined
-          }
-        >
-          回放与归档
-        </Link>
-      </nav>
-      {sessions.length ? (
-        <div className="public-grid">
-          {sessions.map((s) => (
-            <Link
-              href={"/live/" + s.debateSessionId}
-              className="public-card"
-              key={s.debateSessionId}
-            >
-              <span className="eyebrow">
-                {(
-                  {
-                    pending: "待开始",
-                    live: "进行中",
-                    paused: "已暂停",
-                    ended: "已结束",
-                    archived: "已归档",
-                  } as Record<string, string>
-                )[s.status] || s.status}
-              </span>
-              <h2>{s.topic}</h2>
-              <p>{s.proStance}</p>
-              <p>↔ {s.conStance}</p>
-              <span className="card-foot">进入辩论 ↗</span>
-            </Link>
-          ))}
-        </div>
+    <PublicPage className="flutter-live-page">
+      <LiveRefresh enabled={true} />
+      <DebateToolbar />
+      {current ? (
+        <DebateExperience
+          key={current.debateSessionId}
+          debate={current}
+          previous={sessions.length > 1 ? sessionHref(-1) : undefined}
+          next={sessions.length > 1 ? sessionHref(1) : undefined}
+          position={`${index + 1} / ${sessions.length}`}
+        />
       ) : (
         <Empty unavailable={unavailable} noun="debates" />
       )}
+      <details className="debate-session-directory">
+        <summary>全部辩论 · {sessions.length}</summary>
+        <nav className="record-actions" aria-label="辩论筛选">
+          <Link href="/live" aria-current={!status ? "page" : undefined}>
+            全部辩论
+          </Link>
+          <Link
+            href="/live?status=live"
+            aria-current={status === "live" ? "page" : undefined}
+          >
+            正在进行
+          </Link>
+          <Link
+            href="/live?status=finished"
+            aria-current={status === "finished" ? "page" : undefined}
+          >
+            回放与归档
+          </Link>
+        </nav>
+        <div>
+          {sessions.map((s) => (
+            <Link key={s.debateSessionId} href={"/live/" + s.debateSessionId}>
+              <span>
+                {
+                  (
+                    {
+                      pending: "待开始",
+                      live: "进行中",
+                      paused: "已暂停",
+                      ended: "已结束",
+                      archived: "已归档",
+                    } as Record<string, string>
+                  )[s.status]
+                }
+              </span>
+              {s.topic}
+            </Link>
+          ))}
+        </div>
+      </details>
       <nav className="record-actions" aria-label="Session pages">
         {cursor && <Link href={pageHref("/live", { status })}>最新辩论</Link>}
         {nextCursor && (

@@ -321,6 +321,18 @@ class DebateRepository {
         .toList(growable: false);
     final rawSpectatorFeed =
         json['spectatorFeed'] as List<dynamic>? ?? const [];
+    // Count participants, not messages (or system lifecycle events).
+    final spectatorIds = rawSpectatorFeed
+        .cast<Map<String, dynamic>>()
+        .where(
+          (event) =>
+              event['actorType'] == 'human' || event['actorType'] == 'agent',
+        )
+        .map(
+          (event) =>
+              '${event['actorType']}:${event['actorUserId'] ?? event['actorAgentId'] ?? event['actorDisplayName']}',
+        )
+        .toSet();
     final spectatorMessages = rawSpectatorFeed
         .map(
           (item) => _mapSpectatorMessage(
@@ -352,7 +364,7 @@ class DebateRepository {
       lifecycle: lifecycle,
       freeEntryEnabled: json['freeEntry'] as bool? ?? false,
       humanHostEnabled: json['humanHostAllowed'] as bool? ?? false,
-      spectatorCountLabel: _spectatorCountLabel(spectatorMessages.length),
+      spectatorCountLabel: _spectatorCountLabel(spectatorIds.length),
       formalTurns: formalTurns,
       replayItems: formalTurns
           .where((turn) => turn.quote.trim().isNotEmpty)

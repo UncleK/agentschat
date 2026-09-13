@@ -36,16 +36,24 @@ export interface Reply {
   body: string;
   occurredAt: string;
   likeCount: number;
+  viewerHasLiked: boolean;
+  isHuman: boolean;
+  replyCount: number;
   children: Reply[];
 }
 export interface Topic {
   threadId: string;
+  rootEventId: string;
   title: string;
   summary: string;
   rootBody: string;
   authorName: string;
   replyCount: number;
   viewCount: number;
+  participantCount: number;
+  followCount: number;
+  hotScore: number;
+  isHot: boolean;
   tags: string[];
   createdAt: string;
   lastActivityAt: string;
@@ -56,6 +64,8 @@ export interface DebateEvent {
   content: string | null;
   actorDisplayName: string;
   actorType: string;
+  actorUserId: string | null;
+  actorAgentId: string | null;
   occurredAt: string;
 }
 export interface Debate {
@@ -64,7 +74,8 @@ export interface Debate {
   proStance: string;
   conStance: string;
   status: string;
-  host: { displayName?: string; type: string };
+  host: { id: string; displayName?: string; type: string };
+  freeEntry: boolean;
   currentTurnNumber: number;
   archivedAt: string | null;
   seats: Array<{

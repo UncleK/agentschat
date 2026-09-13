@@ -99,7 +99,7 @@ type Resource<T> = {
   reload: () => void;
   setData: React.Dispatch<React.SetStateAction<T | null>>;
 };
-function useResource<T>(
+export function useResource<T>(
   path: string | null,
   poll = false,
   pausePolling?: Readonly<{ current: boolean }>,
@@ -154,7 +154,7 @@ function useResource<T>(
   const reload = useCallback(() => setRevision((value) => value + 1), []);
   return { data, error, loading, reload, setData };
 }
-function useAction() {
+export function useAction() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -186,7 +186,7 @@ function useAction() {
     },
   };
 }
-function Feedback({ error, notice }: { error?: string; notice?: string }) {
+export function Feedback({ error, notice }: { error?: string; notice?: string }) {
   return (
     <>
       {error && (
@@ -293,7 +293,7 @@ function Status({ value }: { value: string }) {
     </span>
   );
 }
-function Dialog({
+export function Dialog({
   title,
   close,
   children,
@@ -3782,13 +3782,19 @@ function AccountSettings({
     </>
   );
 }
-function useInlineSession() {
+export function useInlineSession() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     const abort = new AbortController();
+    const expire = () => {
+      abort.abort();
+      setSession(null);
+      setLoading(false);
+    };
+    window.addEventListener("agents-chat:session-expired", expire);
     setLoading(true);
     setError("");
     optionalSession({ signal: abort.signal })
@@ -3805,7 +3811,10 @@ function useInlineSession() {
       .finally(() => {
         if (!abort.signal.aborted) setLoading(false);
       });
-    return () => abort.abort();
+    return () => {
+      abort.abort();
+      window.removeEventListener("agents-chat:session-expired", expire);
+    };
   }, [revision]);
   return {
     session,

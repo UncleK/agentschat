@@ -1,0 +1,1213 @@
+/* Flutter AppColors / ForumScreen / DebateScreen, with a wide Web layout. */
+.content-page.flutter-forum-page,
+.content-page.flutter-forum-detail,
+.content-page.flutter-live-page {
+  max-width: 1320px;
+  width: calc(100% - 64px);
+  padding-top: 22px;
+  color: #dfe2eb;
+  overflow-wrap: anywhere;
+}
+.app-surface-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  min-height: 42px;
+}
+.app-surface-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #00daf3;
+}
+.app-surface-toolbar > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.app-surface-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  color: #c1c6d7;
+  padding: 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: none;
+}
+.app-surface-icon:hover {
+  background: #00daf312;
+  color: #00daf3;
+}
+.app-surface-icon:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.discussion-text {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  line-height: 1.65;
+}
+.discussion-text .agentmoji-inline {
+  display: inline-block;
+  width: 1.7em;
+  height: 1.7em;
+  vertical-align: middle;
+  margin: 0 3px;
+  object-fit: contain;
+}
+.surface-stop {
+  position: relative;
+  display: inline-flex;
+}
+.surface-stop > .app-surface-icon {
+  color: #a855f7;
+}
+.surface-stop > .app-surface-icon[aria-pressed="true"] {
+  color: #ffc857;
+  background: #ffc85712;
+}
+.surface-stop-feedback {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: min(280px, 70vw);
+  z-index: 20;
+  background: #262a31;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px #0006;
+  font-size: 12px;
+}
+.discussion-text p {
+  white-space: pre-wrap;
+  margin: 0 0 16px;
+  font-size: inherit;
+  color: inherit;
+  line-height: inherit;
+}
+.discussion-text p:last-child {
+  margin-bottom: 0;
+}
+.discussion-text code {
+  font:
+    0.88em ui-monospace,
+    monospace;
+  background: #0a0e1470;
+  border-radius: 5px;
+  padding: 2px 5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.discussion-text pre {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid #41475455;
+  background: #10141a;
+  padding: 16px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+}
+.discussion-text pre code {
+  padding: 0;
+  background: transparent;
+}
+.discussion-text a {
+  color: #00daf3;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.app-initial-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #00daf321;
+  color: #00daf3;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  font-size: 14px;
+}
+.app-initial-avatar.human {
+  color: #ffc857;
+  background: #ffc8571b;
+}
+.flutter-forum-page {
+  background:
+    radial-gradient(ellipse at 90% 5%, #00daf30b, transparent 45%),
+    radial-gradient(ellipse at 0% 32%, #a855f70b, transparent 42%);
+}
+.flutter-forum-page > h1 {
+  font-size: 40px;
+  line-height: 1.1;
+  margin: 10px 0 18px;
+  letter-spacing: -1.3px;
+}
+.flutter-forum-page > h1,
+.flutter-forum-thread > h1,
+.forum-topic-card h2 {
+  font-weight: 700;
+}
+.flutter-forum-page > .lead {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #c1c6d7;
+  max-width: 760px;
+  margin-bottom: 26px;
+}
+.forum-status-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+.forum-status {
+  display: inline-flex;
+  border: 1px solid #00daf350;
+  background: #00daf316;
+  border-radius: 99px;
+  padding: 7px 12px;
+  color: #00daf3;
+  font-size: 12px;
+}
+.forum-status-row details {
+  margin-left: auto;
+  max-width: 100%;
+}
+.forum-status-row summary {
+  cursor: pointer;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: #c1c6d7;
+  padding: 7px 0;
+  font-size: 13px;
+}
+.forum-status-row .search-form {
+  margin: 10px 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+}
+.forum-status-row .search-form input {
+  min-width: 100px;
+  flex: 1;
+}
+.forum-section-label {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #00daf3;
+  font-size: 14px;
+  letter-spacing: 1px;
+  margin: 0 0 42px;
+}
+.forum-section-label > span {
+  flex: 1;
+  height: 1px;
+  background: #41475440;
+}
+.flutter-forum-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.forum-featured {
+  cursor: pointer;
+  grid-row: span 6;
+  background: #262a31f0;
+  border: 1px solid #41475420;
+  border-radius: 32px;
+  padding: 28px;
+  box-shadow: 0 20px 50px #00daf30b;
+  min-width: 0;
+}
+.forum-featured-badge {
+  height: 28px;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
+.forum-featured-badge > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 99px;
+  background: #00daf329;
+  color: #00daf3;
+  font-size: 11px;
+  padding: 5px 12px;
+  letter-spacing: 0.3px;
+}
+.forum-featured h2 {
+  font-size: 32px;
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -1px;
+  margin: 0 0 24px;
+  color: #dfe2eb;
+}
+.forum-featured h2 a:hover {
+  color: #00daf3;
+}
+.forum-participants {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  color: #c1c6d7;
+  font-size: 13px;
+}
+.forum-avatar-stack {
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+.forum-avatar-stack > span {
+  display: grid;
+  place-items: center;
+  margin-left: -8px;
+  width: 34px;
+  height: 34px;
+  border: 2px solid #262a31;
+  border-radius: 50%;
+  background: #31353c;
+  color: #00daf3;
+  font-size: 11px;
+}
+.forum-avatar-stack > span:last-child {
+  color: #dfe2eb;
+}
+.forum-featured-quote {
+  padding: 22px;
+  background: #181c228f;
+  border-left: 2px solid #00daf3cc;
+  border-radius: 24px;
+  font-size: 17px;
+  color: #c1c6d7;
+  font-style: italic;
+  line-height: 1.65;
+}
+.forum-featured-quote footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  font-size: 11px;
+  font-style: normal;
+  color: #8b90a0;
+}
+.forum-featured-quote footer strong {
+  color: #00daf3;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+}
+.forum-featured-quote footer a {
+  margin-left: auto;
+  color: #00daf3;
+}
+.forum-topic-card {
+  padding: 22px;
+  background: #181c22d6;
+  border: 1px solid #41475425;
+  border-radius: 28px;
+  display: block;
+  min-width: 0;
+  transition: border-color 0.15s;
+}
+.forum-topic-card:hover {
+  border-color: #00daf360;
+}
+.forum-topic-card h2 {
+  font-size: 21px;
+  line-height: 1.25;
+  letter-spacing: -0.3px;
+  margin: 0 0 14px;
+  color: #dfe2eb;
+}
+.forum-topic-card > p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #c1c6d7;
+  margin: 0 0 20px;
+}
+.forum-topic-card footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  color: #c1c6d7;
+  font-size: 12px;
+}
+.forum-topic-card footer span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.forum-topic-card footer .hot {
+  color: #a855f7;
+}
+.forum-thread-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: #8b90a0;
+  margin: 0 0 24px;
+}
+.forum-thread-nav a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.flutter-forum-thread > h1 {
+  font-size: 28px;
+  line-height: 1.3;
+  margin: 0 0 24px;
+  letter-spacing: -0.5px;
+}
+.forum-thread-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 30px;
+  align-items: start;
+}
+.forum-root-card {
+  padding: 24px;
+  background: #262a31;
+  border-left: 3px solid #00daf3;
+  border-radius: 22px;
+  min-width: 0;
+}
+.forum-root-card > header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.forum-root-card > header .app-initial-avatar {
+  height: 54px;
+  width: 54px;
+  font-size: 22px;
+}
+.forum-root-card > header strong {
+  font-size: 20px;
+  color: #00daf3;
+}
+.forum-root-card > header p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #8b90a0;
+  margin: 6px 0 0;
+}
+.forum-root-card > .discussion-text {
+  font-size: 17px;
+  font-style: italic;
+  color: #dfe2eb;
+}
+.forum-root-card > footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.forum-root-card > footer span {
+  padding: 6px 9px;
+  border-radius: 99px;
+  background: #10141a55;
+  color: #c1c6d7;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.forum-discussion {
+  min-width: 0;
+}
+.forum-discussion > h2 {
+  font-size: 16px;
+  color: #00daf3;
+  margin: 0 0 24px;
+  letter-spacing: 0.6px;
+}
+.forum-discussion > h2 span {
+  font-size: 12px;
+  color: #8b90a0;
+  margin-left: 6px;
+}
+.forum-branch {
+  list-style: none;
+  padding: 0 0 0 14px;
+  margin: 0;
+  border-left: 1px solid #00daf340;
+}
+.forum-branch > li {
+  margin: 0 0 18px;
+  position: relative;
+  scroll-margin-top: 110px;
+}
+.forum-branch > li:before {
+  content: "";
+  position: absolute;
+  left: -15px;
+  top: 30px;
+  width: 14px;
+  height: 1px;
+  background: #00daf340;
+}
+.forum-branch.nested {
+  margin: 14px 0 0 10px;
+  border-color: #ffc85735;
+}
+.forum-reply-card {
+  padding: 16px;
+  background: #1c2026;
+  border-left: 2px solid #00daf3;
+  border-radius: 18px;
+  min-width: 0;
+}
+.forum-reply-card.human {
+  border-left-color: #ffc857;
+}
+.forum-reply-card > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+.forum-reply-card > header strong {
+  color: #00daf3;
+  font-size: 15px;
+  min-width: 0;
+}
+.forum-reply-card.human > header strong {
+  color: #ffc857;
+}
+.forum-reply-card > header time {
+  margin-left: auto;
+  font-size: 10px;
+  color: #8b90a0;
+  flex-shrink: 0;
+}
+.forum-reply-card .discussion-text {
+  font-size: 14px;
+  color: #c1c6d7;
+}
+.forum-reply-card > footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+  color: #8b90a0;
+  font-size: 12px;
+}
+.forum-reply-card > footer button,
+.forum-reply-card > footer span,
+.forum-reply-card > footer a {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  color: inherit;
+  font: inherit;
+}
+.forum-reply-card > footer button {
+  cursor: pointer;
+}
+.forum-reply-card > footer button[aria-pressed="true"] {
+  color: #00daf3;
+}
+.forum-reply-card > footer .forum-reply-button {
+  margin-left: auto;
+  border: 1px solid #00daf360;
+  border-radius: 99px;
+  padding: 7px 15px;
+  color: #00daf3;
+  background: #00daf310;
+}
+.forum-waiting {
+  padding: 24px;
+  border-radius: 18px;
+  background: #181c22;
+  color: #8b90a0;
+  line-height: 1.7;
+}
+.forum-back-button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  background: #00daf3;
+  color: #00363d;
+  padding: 14px 24px;
+  border-radius: 15px;
+  margin: 28px auto 0;
+  max-width: 260px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.forum-compose-quote {
+  margin: 0 0 20px;
+  max-height: 180px;
+  overflow: auto;
+  background: #181c22;
+  padding: 16px;
+  border-left: 2px solid #00daf3;
+  border-radius: 14px;
+  color: #c1c6d7;
+  font-size: 14px;
+}
+.flutter-debate-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: 22px;
+}
+.debate-stage-column {
+  min-width: 0;
+}
+.debate-stage {
+  padding: 14px 14px 24px;
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at 8% 20%, #00daf31e, transparent 60%),
+    radial-gradient(ellipse at 98% 20%, #a855f71f, transparent 60%), #181c22;
+  border: 1px solid #41475425;
+}
+.debate-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.debate-switcher a,
+.debate-switcher button {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #1c2026c9;
+  border: 1px solid #41475450;
+  color: #c1c6d7;
+  width: 32px;
+  height: 32px;
+}
+.debate-switcher button:disabled {
+  opacity: 0.35;
+}
+.debate-switcher > span {
+  font-size: 11px;
+  color: #8b90a0;
+}
+.debate-matchup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+}
+.debate-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  min-width: 0;
+  color: #00daf3;
+}
+.debate-seat.con {
+  color: #a855f7;
+}
+.debate-seat > .app-initial-avatar {
+  height: 88px;
+  width: 88px;
+  background: linear-gradient(#31353c, #181c22);
+  border: 2px solid currentColor;
+  box-shadow: 0 0 24px #00daf32e;
+  outline: 4px solid #10141a55;
+  outline-offset: -6px;
+  font-size: 26px;
+  color: inherit;
+}
+.debate-seat.con > .app-initial-avatar {
+  box-shadow: 0 0 24px #a855f72e;
+}
+.debate-seat-side {
+  background: currentColor;
+  border-radius: 99px;
+  padding: 3px 12px;
+  font-size: 11px;
+  position: relative;
+  color: #00363d;
+  background: #00daf3;
+}
+.debate-seat.con > .debate-seat-side {
+  background: #a855f7;
+  color: #21093c;
+}
+.debate-seat > strong {
+  font-size: 17px;
+  line-height: 1.25;
+  color: #dfe2eb;
+  margin-top: 2px;
+}
+.debate-seat > small {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.debate-host {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+}
+.debate-host-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffc857;
+  background: #ffc85717;
+  border: 1px solid #ffc85740;
+}
+.debate-host > strong {
+  font-size: 12px;
+  margin-top: 6px;
+  color: #dfe2eb;
+}
+.debate-host > small {
+  font-size: 10px;
+  color: #c1c6d7;
+  line-height: 1.2;
+  margin: 4px 0;
+  max-width: 76px;
+}
+.debate-host > i {
+  width: 1px;
+  height: 22px;
+  background: linear-gradient(#ffc85770, #41475430);
+}
+.debate-host > b {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #41475450;
+  border-radius: 50%;
+  background: #262a31;
+  font-size: 14px;
+  color: #8b90a0;
+  font-family: ui-monospace, monospace;
+}
+.debate-topic {
+  margin-top: 10px;
+  padding: 20px;
+  border-radius: 24px;
+  background: #181c22;
+  border: 1px solid #41475429;
+}
+.debate-topic > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.debate-topic > header > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #00daf3;
+  font-weight: 700;
+}
+.debate-audience-count {
+  border-radius: 99px;
+  background: #262a31;
+  padding: 6px 9px;
+  color: #c1c6d7;
+  font-size: 10px;
+}
+.debate-topic > h1 {
+  color: #00daf3;
+  font-size: 29px;
+  font-weight: 750;
+  line-height: 1.12;
+  letter-spacing: -0.7px;
+  margin: 0 0 20px;
+}
+.debate-stance {
+  border-left: 2px solid #00daf3;
+  padding: 0 0 0 12px;
+  margin-top: 16px;
+  color: #00daf3;
+}
+.debate-stance.con {
+  border-left: 0;
+  border-right: 2px solid #a855f7;
+  padding: 0 12px 0 0;
+  text-align: right;
+  color: #a855f7;
+}
+.debate-stance > strong {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+.debate-stance > strong > span {
+  opacity: 0.5;
+  letter-spacing: 3px;
+}
+.debate-stance > p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #c1c6d7;
+  margin: 5px 0 0;
+  white-space: pre-wrap;
+}
+.debate-state {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #8b90a0;
+  margin-top: 18px;
+  border-top: 1px solid #41475435;
+  padding-top: 10px;
+}
+.debate-channel {
+  min-width: 0;
+  background: #181c22f0;
+  border: 1px solid #41475425;
+  border-radius: 24px;
+  padding: 10px;
+}
+.debate-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid #41475425;
+  border-radius: 16px;
+  background: #181c22;
+}
+.debate-tabs > button {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  color: #c1c6d7;
+  font: inherit;
+  font-size: 13px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  padding: 12px 4px;
+  cursor: pointer;
+}
+.debate-tabs > button[aria-selected="true"] {
+  color: #00daf3;
+  border-color: #00daf366;
+  background: #00daf314;
+}
+.debate-turns,
+.debate-spectators {
+  list-style: none;
+  padding: 10px 6px;
+  margin: 0;
+}
+.debate-turns > li,
+.debate-spectators > li {
+  margin: 14px 0 24px;
+  scroll-margin-top: 110px;
+  min-width: 0;
+}
+.debate-turns > li > header,
+.debate-spectators > li > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.debate-turns > li > header strong,
+.debate-spectators > li > header strong {
+  color: #00daf3;
+  font-size: 14px;
+}
+.debate-turns > li > header time,
+.debate-spectators > li > header time {
+  margin-left: auto;
+  color: #8b90a0;
+  font-size: 10px;
+}
+.debate-turns > li.con > header strong {
+  color: #a855f7;
+}
+.debate-turns > li.con .app-initial-avatar {
+  color: #a855f7;
+  background: #a855f720;
+}
+.debate-turn-body {
+  border-left: 2px solid #00daf3;
+  background: #1c2026;
+  border-radius: 18px;
+  padding: 16px;
+  color: #c1c6d7;
+  font-size: 15px;
+}
+.debate-turns > li.con .debate-turn-body {
+  border-left-color: #a855f7;
+}
+.debate-turn-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 10px;
+  color: #8b90a0;
+  margin-bottom: 8px;
+}
+.debate-turn-body > p {
+  color: #8b90a0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.debate-channel-note {
+  color: #8b90a0;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 18px 10px;
+}
+.debate-empty {
+  padding: 30px 16px;
+  text-align: center;
+  color: #8b90a0;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.debate-spectators > li > .discussion-text {
+  background: #1c2026;
+  padding: 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  color: #c1c6d7;
+}
+.debate-comment-form {
+  padding: 10px;
+}
+.debate-host-controls {
+  padding: 16px;
+  border: 1px solid #ffc85735;
+  background: #ffc85707;
+  border-radius: 18px;
+  margin-top: 12px;
+}
+.debate-host-controls > strong {
+  font-size: 12px;
+  color: #ffc857;
+}
+.debate-host-controls > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.debate-host-controls button {
+  font: inherit;
+  font-size: 12px;
+  padding: 8px 13px;
+  border: 1px solid #00daf355;
+  border-radius: 99px;
+  background: #00daf312;
+  color: #00daf3;
+  cursor: pointer;
+}
+.debate-host-controls button.danger {
+  color: #ffb4ab;
+  background: #ffb4ab0a;
+  border-color: #ffb4ab40;
+}
+.debate-host-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.debate-record-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 20px 8px;
+  color: #8b90a0;
+  font-size: 11px;
+}
+.debate-record-links a {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.debate-sources {
+  padding: 16px;
+  font-size: 12px;
+  color: #8b90a0;
+}
+.debate-turns .debate-replay-card {
+  border: 1px solid #00daf32e;
+  border-radius: 18px;
+  padding: 18px;
+  background: #181c22;
+}
+.debate-replay-card > span {
+  display: inline-block;
+  border: 1px solid #414754;
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #c1c6d7;
+}
+.debate-replay-card > h3 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.5;
+  margin: 14px 0 8px;
+}
+.debate-replay-card > .discussion-text {
+  font-size: 14px;
+  color: #c1c6d7;
+}
+.debate-replay-card > a {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 11px;
+  color: #00daf3;
+}
+.debate-sources > a {
+  display: block;
+  margin-top: 10px;
+  color: #00daf3;
+  overflow-wrap: anywhere;
+}
+.debate-session-directory {
+  margin-top: 32px;
+  padding: 18px;
+  border: 1px solid #41475450;
+  border-radius: 18px;
+  color: #c1c6d7;
+  font-size: 14px;
+}
+.debate-session-directory > summary {
+  cursor: pointer;
+}
+.debate-session-directory > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.debate-session-directory > div > a {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: #1c2026;
+  border-radius: 14px;
+  font-size: 14px;
+}
+.debate-session-directory > div > a > span {
+  font-size: 11px;
+  color: #00daf3;
+}
+.debate-create-side {
+  border-left: 2px solid #00daf3;
+  padding-left: 14px;
+  min-width: 0;
+}
+.debate-create-side.con {
+  border-color: #a855f7;
+}
+@media (min-width: 1100px) {
+  .debate-stage-column {
+    position: sticky;
+    top: 108px;
+  }
+  .debate-stage {
+    padding-bottom: 30px;
+  }
+  .debate-matchup {
+    padding-top: 12px;
+  }
+  .debate-channel {
+    min-height: 540px;
+  }
+}
+@media (max-width: 800px) {
+  body:has(.flutter-forum-page, .flutter-forum-detail, .flutter-live-page)
+    .site-header
+    .brand,
+  body:has(.flutter-forum-page, .flutter-forum-detail, .flutter-live-page)
+    .site-header
+    .header-tools {
+    display: none;
+  }
+  .flutter-forum-page > .app-surface-toolbar,
+  .flutter-live-page > .app-surface-toolbar,
+  .flutter-forum-detail > .app-surface-toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 20px;
+    margin: 0;
+    height: 64px;
+    background: #10141af5;
+    z-index: 61;
+  }
+  .content-page.flutter-forum-page,
+  .content-page.flutter-forum-detail {
+    width: calc(100% - 48px);
+    padding-top: 14px;
+  }
+  .content-page.flutter-live-page {
+    width: calc(100% - 32px);
+    padding-top: 12px;
+  }
+  .app-surface-toolbar {
+    margin-bottom: 22px;
+    min-height: 36px;
+  }
+  .app-surface-icon > span {
+    display: none;
+  }
+  .flutter-forum-page > h1 {
+    font-size: 36px;
+    margin-top: 10px;
+  }
+  .flutter-forum-page > .lead {
+    font-size: 15px;
+    line-height: 1.65;
+    margin-bottom: 26px;
+  }
+  .flutter-forum-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .forum-featured {
+    grid-row: auto;
+    padding: 24px;
+  }
+  .forum-featured h2 {
+    font-size: 30px;
+    line-height: 1.13;
+  }
+  .forum-featured-quote {
+    padding: 18px;
+    font-size: 16px;
+  }
+  .forum-section-label {
+    margin-bottom: 36px;
+  }
+  .forum-thread-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .flutter-forum-thread > h1 {
+    font-size: 22px;
+    line-height: 1.3;
+  }
+  .forum-root-card {
+    padding: 20px;
+  }
+  .forum-root-card > .discussion-text {
+    font-size: 16px;
+  }
+  .forum-reply-card {
+    padding: 13px;
+  }
+  .forum-reply-card > header {
+    gap: 7px;
+  }
+  .forum-reply-card > header .app-initial-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+  .forum-reply-card > header strong {
+    font-size: 14px;
+  }
+  .forum-reply-card > header time {
+    font-size: 9px;
+    max-width: 60px;
+  }
+  .forum-branch.nested {
+    margin-left: 3px;
+    padding-left: 10px;
+  }
+  .forum-branch.nested > li:before {
+    left: -11px;
+    width: 10px;
+  }
+  .forum-back-button {
+    max-width: none;
+  }
+  .flutter-debate-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .debate-stage {
+    padding: 10px 12px 20px;
+  }
+  .debate-matchup {
+    grid-template-columns: minmax(0, 1fr) 66px minmax(0, 1fr);
+    gap: 2px;
+  }
+  .debate-seat > .app-initial-avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 24px;
+  }
+  .debate-seat > strong {
+    font-size: 16px;
+  }
+  .debate-seat > small {
+    font-size: 10px;
+  }
+  .debate-topic {
+    padding: 16px;
+  }
+  .debate-topic > h1 {
+    font-size: 27px;
+  }
+  .debate-stance > p {
+    font-size: 13px;
+  }
+  .debate-tabs > button {
+    font-size: 12px;
+    padding: 12px 2px;
+    gap: 5px;
+  }
+  .debate-turn-body {
+    font-size: 14px;
+    padding: 14px;
+  }
+  .debate-record-links {
+    margin: 14px 8px 4px;
+  }
+  .debate-session-directory > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .forum-topic-card {
+    transition: none;
+  }
+}

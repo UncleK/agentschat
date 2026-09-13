@@ -3,21 +3,13 @@
 const { DataSource } = require('typeorm');
 const { AgentEntity } = require('../dist/src/database/entities/agent.entity');
 const { AuthService } = require('../dist/src/modules/auth/auth.service');
-const {
-  AgentsService,
-} = require('../dist/src/modules/agents/agents.service');
+const { AgentsService } = require('../dist/src/modules/agents/agents.service');
 const {
   ContentService,
 } = require('../dist/src/modules/content/content.service');
-const {
-  DebateService,
-} = require('../dist/src/modules/debate/debate.service');
-const {
-  PolicyService,
-} = require('../dist/src/modules/policy/policy.service');
-const {
-  FollowService,
-} = require('../dist/src/modules/follow/follow.service');
+const { DebateService } = require('../dist/src/modules/debate/debate.service');
+const { PolicyService } = require('../dist/src/modules/policy/policy.service');
+const { FollowService } = require('../dist/src/modules/follow/follow.service');
 
 async function seedRichPreview(app) {
   const db = app.get(DataSource);
@@ -370,9 +362,7 @@ async function seedRichPreview(app) {
         const turn = detail.currentTurn;
         const seat = detail.seats.find((value) => value.id === turn?.seatId);
         if (!turn || !seat?.agent?.id)
-          throw new Error(
-            'Expected a fixture debate turn and occupied seat.',
-          );
+          throw new Error('Expected a fixture debate turn and occupied seat.');
         return content.submitDebateTurn(seat.agent.id, {
           debateSessionId: transcript.debateSessionId,
           turnNumber: turn.turnNumber,
@@ -393,6 +383,36 @@ async function seedRichPreview(app) {
     await once('transcript:end', () =>
       debates.endDebate(host, transcript.debateSessionId),
     );
+    const replacement = await once('debate:replacement', () =>
+      debates.createHumanHostedDebate(reviewer, {
+        topic: '本地示例：缺席后，主持人如何补充辩论席位？',
+        proStance: '允许新 Agent 接替缺席者',
+        conStance: '保持论点连续并明确替换身份',
+        proAgentId: muse.id,
+        conAgentId: quiet.id,
+        freeEntry: true,
+      }),
+    );
+    await once('replacement:start', () =>
+      debates.startDebate(host, replacement.debateSessionId),
+    );
+    await once('replacement:expire', async () => {
+      // Expire only this named fixture, through the same sweep used at runtime.
+      await db.query(
+        "UPDATE debate_turns SET deadline_at = NOW() - INTERVAL '1 second' WHERE debate_session_id=$1 AND status='pending'",
+        [replacement.debateSessionId],
+      );
+      await debates.sweepDebateSession(replacement.debateSessionId);
+      const state = await debates.getDebate(replacement.debateSessionId);
+      if (
+        state.status !== 'paused' ||
+        !state.seats.some((seat) => seat.status === 'replacing' && !seat.agent)
+      )
+        throw new Error(
+          'Replacement fixture did not reach the expected state.',
+        );
+      return { debateSessionId: replacement.debateSessionId };
+    });
     console.log(
       `Rich local preview fixtures ready; ${added} new steps. Agents: ${[...actors, quiet, empty, lumen, echo].length}; empty@example.test has no Agent.`,
     );

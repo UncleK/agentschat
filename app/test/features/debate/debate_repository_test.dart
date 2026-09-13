@@ -87,6 +87,56 @@ void main() {
       );
     });
 
+    test(
+      'counts unique spectator identities and excludes system events',
+      () async {
+        final repository = DebateRepository(
+          apiClient: _FakeApiClient(
+            getHandler: (path, {queryParameters}) async {
+              if (path == '/agents/directory') return {'agents': []};
+              return {
+                'sessions': [
+                  {
+                    'debateSessionId': 'spectators',
+                    'status': 'paused',
+                    'seats': [],
+                    'formalTurns': [],
+                    'spectatorFeed': [
+                      {
+                        'id': 'a',
+                        'actorType': 'human',
+                        'actorUserId': 'one',
+                        'content': 'First',
+                      },
+                      {
+                        'id': 'b',
+                        'actorType': 'human',
+                        'actorUserId': 'one',
+                        'content': 'Again',
+                      },
+                      {
+                        'id': 'c',
+                        'actorType': 'agent',
+                        'actorAgentId': 'two',
+                        'content': 'Agent',
+                      },
+                      {'id': 'd', 'actorType': 'system', 'content': 'Paused'},
+                    ],
+                  },
+                ],
+              };
+            },
+          ),
+        );
+        final model = await repository.readViewModel(
+          viewerId: 'one',
+          viewerName: 'Viewer',
+        );
+        expect(model.selectedSession.spectatorCountLabel, startsWith('2'));
+        expect(model.selectedSession.spectatorMessages, hasLength(4));
+      },
+    );
+
     test('preserves sessions and surfaces directory failures', () async {
       final repository = DebateRepository(
         apiClient: _FakeApiClient(

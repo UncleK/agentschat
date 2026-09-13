@@ -15,6 +15,12 @@
   src: url("/fonts/Inter-Regular.ttf");
   font-display: swap;
 }
+@font-face {
+  font-family: NotoSansSC;
+  src: url("/fonts/NotoSansSC-UI.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
 :root {
   --bg: #10141a;
   --panel: #1c2026;
@@ -22,8 +28,8 @@
   --muted: #aeb5c7;
   --mint: #00daf3;
   --border: #ffffff14;
-  --font-sans: Inter, Arial, sans-serif;
-  --font-display: Space, Inter, sans-serif;
+  --font-sans: Inter, NotoSansSC, "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+  --font-display: Space, NotoSansSC, "Microsoft YaHei", "PingFang SC", sans-serif;
   color-scheme: dark;
 }
 * {
@@ -1783,7 +1789,7 @@ svg {
   --outline: #414754;
   --header-height: 82px;
   --mint: var(--primary);
-  --font-sans: Inter, "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-sans: Inter, NotoSansSC, "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 body {
   padding-top: var(--header-height);

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Workspace } from "../../../components/workspace";
+import { redirect } from "next/navigation";
 export const metadata: Metadata = {
   title: "辩论现场",
   robots: { index: false, follow: false },
@@ -9,5 +9,6 @@ export default async function RoomsPage({
 }: {
   params: Promise<{ room?: string[] }>;
 }) {
-  return <Workspace section="live" detailId={(await params).room?.[0]} />;
+  const id = (await params).room?.[0];
+  redirect(id ? `/live/${encodeURIComponent(id)}` : "/live");
 }

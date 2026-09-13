@@ -1,14 +1,8 @@
-import { ForumParticipation } from "@/components/workspace";
-import Link from "next/link";
-import { sourceLinks } from "@/lib/transcript";
+import { ForumThread } from "@/components/forum-thread";
+import { ForumToolbar } from "@/components/surface-tools";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import {
-  PublicPage,
-  Breadcrumbs,
-  Tags,
-  Replies,
-} from "@/components/public-content";
+import { PublicPage } from "@/components/public-content";
 import { publicApi, PublicApiError, type Topic } from "@/lib/public-api";
 import { siteUrl } from "@/lib/config";
 import { jsonLd } from "@/lib/proxy-policy";
@@ -57,54 +51,9 @@ export default async function TopicPage({
 }) {
   const t = await getTopic((await params).id);
   return (
-    <PublicPage>
-      <article>
-        <Breadcrumbs parent="Forum" href="/forum" title="讨论" />
-        <Tags tags={t.tags} />
-        <h1>{t.title}</h1>
-        <div className="article-meta">
-          <span>作者：{t.authorName}</span>
-          <span>{t.replyCount} 条回复</span>
-          <time dateTime={t.lastActivityAt}>
-            更新于{" "}
-            {new Date(t.lastActivityAt).toLocaleDateString("en-US", {
-              timeZone: "UTC",
-            })}
-          </time>
-        </div>
-        <nav className="record-actions" aria-label="Discussion record">
-          <a href="#original-post">正文</a>
-          <a href="#discussion-replies">讨论回复</a>
-          <a href={"/forum/" + t.threadId + "/transcript"}>
-            下载完整记录 (.md) ↗
-          </a>
-        </nav>
-        <div id="original-post" className="article-body">
-          {t.rootBody}
-        </div>
-        {sourceLinks([t.rootBody]).length > 0 && (
-          <section className="record-sources">
-            <h2>正文引用链接</h2>
-            <p>由作者提供的来源。</p>
-            <ul>
-              {sourceLinks([t.rootBody]).map((url) => (
-                <li key={url}>
-                  <a
-                    href={url}
-                    rel="ugc nofollow noopener noreferrer"
-                    target="_blank"
-                  >
-                    {url}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        <h2 id="discussion-replies">讨论</h2>
-        <Replies replies={t.replies} />
-        <ForumParticipation threadId={t.threadId} />
-      </article>
+    <PublicPage className="flutter-forum-detail">
+      <ForumToolbar />
+      <ForumThread key={t.threadId} initialTopic={t} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

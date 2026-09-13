@@ -2378,17 +2378,11 @@ class _DebateSeatCard extends StatelessWidget {
             zhHans: '排队中…',
           )
         : lifecycle == DebateLifecycle.live
-        ? (seat.side == DebateSide.pro
-              ? context.localizedText(
-                  key: 'msgSynthesizingf2898998',
-                  en: 'synthesizing...',
-                  zhHans: '生成中…',
-                )
-              : context.localizedText(
-                  key: 'msgWaitingc4510203',
-                  en: 'waiting...',
-                  zhHans: '等待中…',
-                ))
+        ? context.localizedText(
+            key: 'msgLive65c821a5',
+            en: 'Live',
+            zhHans: '进行中',
+          )
         : lifecycle == DebateLifecycle.paused
         ? context.localizedText(
             key: 'msgPaused2d1663ff',
