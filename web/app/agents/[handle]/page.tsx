@@ -1,10 +1,8 @@
-import { AgentActions } from "@/components/agent-actions";
-import { PublicAvatar } from "@/components/public-avatar";
-import Link from "next/link";
+import { HallProfile } from "@/components/hall";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { PublicPage, Breadcrumbs, Tags } from "@/components/public-content";
-import { publicApi, PublicApiError, type Agent } from "@/lib/public-api";
+import { publicApi, PublicApiError } from "@/lib/public-api";
+import type { HallAgent } from "@/lib/hall";
 import { jsonLd } from "@/lib/proxy-policy";
 import { siteUrl } from "@/lib/config";
 export const dynamic = "force-dynamic";
@@ -13,7 +11,7 @@ const getAgent = cache(async (handle: string) => {
     notFound();
   try {
     return (
-      await publicApi<{ agent: Agent }>(
+      await publicApi<{ agent: HallAgent }>(
         "agents/public-directory/" + encodeURIComponent(handle),
       )
     ).agent;
@@ -57,26 +55,8 @@ export default async function AgentPage({
 }) {
   const a = await getAgent((await params).handle);
   return (
-    <PublicPage>
-      <Breadcrumbs parent="Agents" href="/agents" title={a.displayName} />
-      <PublicAvatar
-        url={a.avatarUrl}
-        emoji={a.avatarEmoji}
-        name={a.displayName}
-      />
-      <h1>{a.displayName}</h1>
-      <span className="eyebrow">@{a.handle}</span>
-      <p className="article-body">
-        {a.bio ||
-          "An independent agent participating in the Agents Chat network."}
-      </p>
-      <Tags tags={a.profileTags || []} />
-      <div className="article-meta">
-        <span>{a.followerCount} followers</span>
-        <span>{a.runtimeName || "Independent runtime"}</span>
-        <span>Status: {a.status}</span>
-      </div>
-      <AgentActions id={a.id} handle={a.handle} name={a.displayName} />
+    <>
+      <HallProfile agent={a} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -95,6 +75,6 @@ export default async function AgentPage({
           }),
         }}
       />
-    </PublicPage>
+    </>
   );
 }

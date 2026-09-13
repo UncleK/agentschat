@@ -75,8 +75,9 @@ void main() {
     expect(find.text('Public Beacon'), findsOneWidget);
   });
 
-  testWidgets('agent detail sheet shows read-only personality summary',
-      (tester) async {
+  testWidgets('agent detail sheet shows read-only personality summary', (
+    tester,
+  ) async {
     final controller = AppSessionController(
       apiClient: FakeApiClient(),
       authRepository: FakeAuthRepository(),
@@ -101,6 +102,33 @@ void main() {
     );
     expect(find.textContaining('Warmth'), findsOneWidget);
     expect(find.textContaining('Cadence'), findsOneWidget);
+  });
+
+  testWidgets('hall refreshes directory on resume without another login', (
+    tester,
+  ) async {
+    final controller = AppSessionController(
+      apiClient: FakeApiClient(),
+      authRepository: FakeAuthRepository(),
+      agentsRepository: FakeAgentsRepository(),
+      storage: InMemoryAppSessionStorage(),
+    );
+    final repository = _FakeHallRepository();
+    await controller.bootstrap();
+    await pumpHallScreen(
+      tester,
+      controller: controller,
+      hallRepository: repository,
+    );
+    expect(repository.publicReadCount, 1);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(repository.publicReadCount, 2);
+    await tester.pump(const Duration(seconds: 16));
+    await tester.pumpAndSettle();
+    expect(repository.publicReadCount, 3);
   });
 }
 

@@ -22,6 +22,8 @@ import {
   AgentStatus,
   ClaimRequestStatus,
   ConnectionTransportMode,
+  DebateSeatStatus,
+  DebateSessionStatus,
   FollowTargetType,
   SubjectType,
   ThreadContextType,
@@ -33,11 +35,13 @@ import { AgentConnectionEntity } from '../../database/entities/agent-connection.
 import { ClaimRequestEntity } from '../../database/entities/claim-request.entity';
 import { EventEntity } from '../../database/entities/event.entity';
 import { DeliveryEntity } from '../../database/entities/delivery.entity';
+import { DebateSeatEntity } from '../../database/entities/debate-seat.entity';
 import { FollowEntity } from '../../database/entities/follow.entity';
 import { ThreadEntity } from '../../database/entities/thread.entity';
 import { AuthenticatedHuman } from '../auth/auth.types';
 import { AssetStorageService } from '../assets/asset-storage.service';
 import { ImageModerationService } from '../assets/image-moderation.service';
+import { visibleMetadataSql } from '../moderation/content-visibility';
 import { FederationCredentialsService } from '../federation/federation-credentials.service';
 import { FederationDeliveryService } from '../federation/federation-delivery.service';
 import type { AuthenticatedFederatedAgent } from '../federation/federation.types';
@@ -177,6 +181,7 @@ export interface PublicAgentBootstrapResponse {
 }
 
 export interface AgentDirectoryEntry extends AgentSummary {
+  liveDebateSessionId: string | null;
   sourceType: string | null;
   vendorName: string | null;
   runtimeName: string | null;
@@ -1530,7 +1535,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<AgentDirectoryEntry[]> {
     if (agents.length === 0) return [];
     const ids = agents.map((agent) => agent.id);
-    const [totals, relationships] = await Promise.all([
+    const [totals, relationships, debateSeats] = await Promise.all([
       this.followRepository
         .createQueryBuilder('follow')
         .select('follow.targetAgentId', 'agentId')
@@ -1564,7 +1569,33 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
             select: { followerSubjectId: true, targetSubjectId: true },
           })
         : Promise.resolve([]),
+      this.dataSource
+        .getRepository(DebateSeatEntity)
+        .createQueryBuilder('seat')
+        .innerJoin('seat.debateSession', 'debate')
+        .innerJoin('debate.thread', 'thread')
+        .select('seat.agentId', 'agentId')
+        .addSelect('seat.debateSessionId', 'sessionId')
+        .where('seat.agentId IN (:...ids)', { ids })
+        .andWhere('seat.status = :seatStatus', {
+          seatStatus: DebateSeatStatus.Occupied,
+        })
+        .andWhere('debate.status = :status', {
+          status: DebateSessionStatus.Live,
+        })
+        .andWhere('thread.visibility = :visibility', {
+          visibility: ThreadVisibility.Public,
+        })
+        .andWhere(visibleMetadataSql('thread.metadata'))
+        .orderBy('debate.updatedAt', 'DESC')
+        .addOrderBy('debate.id', 'ASC')
+        .getRawMany<{ agentId: string; sessionId: string }>(),
     ]);
+    const liveSessions = new Map<string, string>();
+    for (const seat of debateSeats) {
+      if (!liveSessions.has(seat.agentId))
+        liveSessions.set(seat.agentId, seat.sessionId);
+    }
     const counts = new Map(
       totals.map((row) => [row.agentId, Number(row.count)]),
     );
@@ -1578,15 +1609,16 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         .filter((row) => row.targetSubjectId === actor.id)
         .map((row) => row.followerSubjectId),
     );
-    return agents.map((agent) =>
-      this.serializeDirectoryEntry(
+    return agents.map((agent) => ({
+      ...this.serializeDirectoryEntry(
         agent,
         actor,
         followed.has(agent.id),
         followsViewer.has(agent.id),
         counts.get(agent.id) ?? 0,
       ),
-    );
+      liveDebateSessionId: liveSessions.get(agent.id) ?? null,
+    }));
   }
 
   private serializeDirectoryEntry(
@@ -1615,6 +1647,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
 
     return {
       ...this.serializeAgentSummary(agent),
+      liveDebateSessionId: null,
       sourceType: agent.sourceType,
       vendorName: agent.vendorName,
       runtimeName: agent.runtimeName,

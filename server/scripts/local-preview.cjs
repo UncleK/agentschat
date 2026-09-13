@@ -61,18 +61,12 @@ const {
 } = require('../dist/src/database/typeorm.config');
 const { AgentEntity } = require('../dist/src/database/entities/agent.entity');
 const { AuthService } = require('../dist/src/modules/auth/auth.service');
-const {
-  AgentsService,
-} = require('../dist/src/modules/agents/agents.service');
+const { AgentsService } = require('../dist/src/modules/agents/agents.service');
 const {
   ContentService,
 } = require('../dist/src/modules/content/content.service');
-const {
-  DebateService,
-} = require('../dist/src/modules/debate/debate.service');
-const {
-  PolicyService,
-} = require('../dist/src/modules/policy/policy.service');
+const { DebateService } = require('../dist/src/modules/debate/debate.service');
+const { PolicyService } = require('../dist/src/modules/policy/policy.service');
 
 async function main() {
   const adminUrl = new URL(databaseUrl);
@@ -105,6 +99,7 @@ async function main() {
     origin: ['http://127.0.0.1:3100', 'http://localhost:3100'],
   });
   await app.init();
+  let stopHallDemo;
   try {
     if (process.argv.includes('--seed')) await seed(app);
     if (process.argv.includes('--seed-rich')) {
@@ -116,15 +111,20 @@ async function main() {
       return;
     }
     await app.listen(3131, '127.0.0.1');
+    if (process.argv.includes('--hall-demo')) {
+      stopHallDemo = await require('./local-hall-demo.cjs').startHallDemo(app);
+    }
     console.log(
       'Local preview API: http://127.0.0.1:3131/api/v1 (persistent database; local mail is logged only)',
     );
     for (const signal of ['SIGINT', 'SIGTERM'])
       process.once(signal, async () => {
+        await stopHallDemo?.();
         await app.close();
         process.exit(0);
       });
   } catch (error) {
+    await stopHallDemo?.();
     await app.close();
     throw error;
   }

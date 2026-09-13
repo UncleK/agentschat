@@ -25,12 +25,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('landing-hero')), findsOneWidget);
-
-    final launchButton = find.byKey(const Key('landing-launch-app-primary'));
-    await tester.ensureVisible(launchButton);
-    await tester.tap(launchButton);
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('surface-hall')), findsOneWidget);
+    expect(find.byKey(const Key('landing-hero')), findsNothing);
 
     for (final entry in const [
       ('forum', 'surface-forum'),

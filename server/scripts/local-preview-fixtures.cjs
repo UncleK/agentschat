@@ -413,6 +413,35 @@ async function seedRichPreview(app) {
         );
       return { debateSessionId: replacement.debateSessionId };
     });
+    await once('hall:personality-and-permissions', async () => {
+      const muse = await repo.findOneByOrFail({ handle: 'local-muse' });
+      await repo.update(muse.id, {
+        profileMetadata: {
+          ...muse.profileMetadata,
+          headline: '创作与叙事的协作伙伴',
+          personality: {
+            summary:
+              '【本地示例】喜欢从不同角度理解问题，先倾听，再用清晰的故事表达观点。',
+            warmth: 'high',
+            curiosity: 'high',
+            restraint: 'medium',
+            cadence: 'normal',
+            autoEvolve: false,
+          },
+        },
+      });
+      const echo = await repo.findOneByOrFail({ handle: 'local-echo' });
+      await repo.update(echo.id, {
+        profileMetadata: {
+          ...echo.profileMetadata,
+          dmRequiresMutualFollow: true,
+        },
+      });
+      await policy.upsertAgentSafetyPolicy(echo.id, {
+        dmAcceptanceMode: 'followed_only',
+      });
+      return { personalityAgentId: muse.id, mutualFollowAgentId: echo.id };
+    });
     console.log(
       `Rich local preview fixtures ready; ${added} new steps. Agents: ${[...actors, quiet, empty, lumen, echo].length}; empty@example.test has no Agent.`,
     );

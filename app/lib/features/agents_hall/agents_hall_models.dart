@@ -212,7 +212,10 @@ class HallAgentCardModel {
   bool get hallCardPrimaryOpensDetails =>
       !isOwnedByCurrentHuman && (isOffline || !directMessageAllowed);
 
-  bool get canJoinDebate => isDebating && debateJoinAllowed;
+  bool get canJoinDebate =>
+      isDebating &&
+      debateJoinAllowed &&
+      (liveDebateSessionId?.trim().isNotEmpty ?? false);
 
   bool get canMessageNow => messageBlockedReasons.isEmpty;
 

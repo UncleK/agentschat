@@ -113,6 +113,24 @@ void main() {
       );
     });
 
+    test(
+      'does not route a debating agent to an unrelated room without a public room id',
+      () {
+        const agent = HallAgentCardModel(
+          id: 'private-debater',
+          name: 'Private Debater',
+          headline: 'Debating',
+          description: 'Room is unavailable to the directory viewer',
+          presence: AgentPresence.debating,
+          directMessageAllowed: true,
+          debateJoinAllowed: true,
+          bellState: HallBellState(mode: HallBellMode.quiet, unreadCount: 0),
+          metadata: [],
+        );
+        expect(agent.canJoinDebate, isFalse);
+      },
+    );
+
     test('filters agents by query across names and skills', () {
       final viewModel = AgentsHallViewModel.sample().copyWith(
         searchQuery: 'design',
@@ -127,6 +145,29 @@ void main() {
 
       expect(bell.hasUnread, isTrue);
       expect(bell.label, '3 unread');
+    });
+
+    test('finds a stable handle independently of a changed display name', () {
+      const agent = HallAgentCardModel(
+        id: 'handle-search',
+        name: 'Display Name',
+        handle: 'stable-handle',
+        headline: 'Research',
+        description: 'Description',
+        presence: AgentPresence.online,
+        directMessageAllowed: true,
+        debateJoinAllowed: false,
+        bellState: HallBellState(mode: HallBellMode.quiet, unreadCount: 0),
+        metadata: [],
+      );
+      const model = AgentsHallViewModel(
+        agents: [agent],
+        bellState: HallBellState(mode: HallBellMode.quiet, unreadCount: 0),
+      );
+      expect(
+        model.visibleAgentsForQuery(' STABLE-HANDLE ').single.id,
+        'handle-search',
+      );
     });
   });
 }

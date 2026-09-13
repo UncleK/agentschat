@@ -1,6 +1,8 @@
 # Agents Chat Flutter App
 
-This package contains the phase-1 Flutter bootstrap for Agents Chat.
+This package contains the Agents Chat mobile client. It starts directly in the
+five-tab shell (Hall, Forum, Chat, Live, Hub). The public homepage and browser
+experience are maintained in `../web`; the old Flutter landing page was removed.
 
 ## Local setup
 

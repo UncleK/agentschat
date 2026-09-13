@@ -55,7 +55,8 @@ class AgentsHallScreen extends StatefulWidget {
   State<AgentsHallScreen> createState() => _AgentsHallScreenState();
 }
 
-class _AgentsHallScreenState extends State<AgentsHallScreen> {
+class _AgentsHallScreenState extends State<AgentsHallScreen>
+    with WidgetsBindingObserver {
   late AgentsHallViewModel _viewModel;
   AgentsHallRepository? _hallRepository;
   FollowRepository? _followRepository;
@@ -69,11 +70,18 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
   int _followRequestId = 0;
   int _messageRequestId = 0;
   int _handledDetailRequestId = 0;
+  Timer? _directoryRefreshTimer;
+  bool _directorySyncInFlight = false;
 
   @override
   void initState() {
     super.initState();
     _viewModel = widget.initialViewModel;
+    WidgetsBinding.instance.addObserver(this);
+    _directoryRefreshTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _refreshDirectory(),
+    );
     _syncShellSearchAction();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeHandleInitialDetailRequest();
@@ -99,11 +107,29 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
 
   @override
   void dispose() {
+    _directoryRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     final onSearchActionChanged = widget.onSearchActionChanged;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       onSearchActionChanged?.call(null);
     });
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshDirectory();
+  }
+
+  void _refreshDirectory() {
+    if (!mounted ||
+        !widget.enableSessionSync ||
+        _directorySyncInFlight ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+    final session = AppSessionScope.maybeOf(context);
+    if (session != null) unawaited(_syncDirectory(session, showLoading: false));
   }
 
   @override
@@ -238,19 +264,23 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
     _applySearchQuery(query);
   }
 
-  Future<void> _syncDirectory(AppSessionController session) async {
+  Future<void> _syncDirectory(
+    AppSessionController session, {
+    bool showLoading = true,
+  }) async {
     if (session.bootstrapStatus != AppSessionBootstrapStatus.ready ||
         _hallRepository == null) {
       return;
     }
 
     final requestId = ++_directoryRequestId;
+    _directorySyncInFlight = true;
     final isAuthenticated = session.isAuthenticated;
     final activeAgentId = isAuthenticated
         ? session.currentActiveAgent?.id
         : null;
     setState(() {
-      _isLoadingDirectory = true;
+      _isLoadingDirectory = showLoading;
       _directoryLoadError = null;
     });
 
@@ -281,6 +311,15 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       });
       _maybeHandleInitialDetailRequest();
     } on ApiException catch (error) {
+      if (!_canApplySessionResult(
+        requestId: requestId,
+        currentRequestId: _directoryRequestId,
+        session: session,
+        activeAgentId: activeAgentId,
+        isAuthenticated: isAuthenticated,
+      )) {
+        return;
+      }
       if (error.isUnauthorized && isAuthenticated) {
         await session.handleUnauthorized();
         return;
@@ -290,22 +329,31 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       }
       setState(() {
         _isLoadingDirectory = false;
-        _directoryLoadError = isAuthenticated ? error.message : null;
+        _directoryLoadError = error.message;
         _isUsingLiveDirectory = false;
       });
       _maybeHandleInitialDetailRequest();
     } catch (_) {
-      if (!mounted) {
+      if (!_canApplySessionResult(
+        requestId: requestId,
+        currentRequestId: _directoryRequestId,
+        session: session,
+        activeAgentId: activeAgentId,
+        isAuthenticated: isAuthenticated,
+      )) {
         return;
       }
       setState(() {
         _isLoadingDirectory = false;
-        _directoryLoadError = isAuthenticated
-            ? 'Unable to sync the live agents directory right now.'
-            : null;
+        _directoryLoadError = context.localizedText(
+          en: 'Unable to sync the live agents directory right now.',
+          zhHans: '暂时无法同步智能体目录，请稍后重试。',
+        );
         _isUsingLiveDirectory = false;
       });
       _maybeHandleInitialDetailRequest();
+    } finally {
+      if (requestId == _directoryRequestId) _directorySyncInFlight = false;
     }
   }
 
@@ -472,8 +520,17 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
       return;
     }
     setState(() {
-      _viewModel = _viewModel.toggleFollow(agentId);
+      // A directory refresh may already contain the successful mutation.
+      // Apply the requested state once, and invalidate any older directory read.
+      _directoryRequestId += 1;
+      _directorySyncInFlight = false;
+      _isLoadingDirectory = false;
+      if (_agentById(agentId, session: session).viewerFollowsAgent !=
+          shouldFollow) {
+        _viewModel = _viewModel.toggleFollow(agentId);
+      }
     });
+    if (canUseBackend) unawaited(_syncDirectory(session, showLoading: false));
     final nextAgent = _agentById(agentId, session: session);
     _showSnackBar(
       nextAgent.viewerFollowsAgent
@@ -603,6 +660,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
     HallAgentCardModel agent,
     String content,
   ) async {
+    if (_messageRequestAgentId != null) return;
     final session = AppSessionScope.maybeOf(context);
     final activeAgentId = session?.currentActiveAgent?.id;
     final trimmedContent = content.trim();
@@ -660,6 +718,7 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
         activeAgentId: activeAgentId,
         isAuthenticated: true,
       )) {
+        if (mounted) setState(() => _messageRequestAgentId = null);
         return;
       }
       if (!mounted) {
@@ -722,6 +781,10 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
           ),
         ),
       );
+    } finally {
+      if (mounted && requestId == _messageRequestId) {
+        setState(() => _messageRequestAgentId = null);
+      }
     }
   }
 
@@ -1672,8 +1735,16 @@ class _AgentCard extends StatelessWidget {
                               const SizedBox.shrink(),
                             _CompactPresencePill(
                               label: _compactCount(agent.followerCount),
-                              semanticsLabel:
-                                  context.localizedText(key: 'msgCompactCountFollowerCountFollowers7ed9c1ab', args: <String, Object?>{'compactCountFollowerCount': agent.followerCount}, en: '${agent.followerCount} followers', zhHans: '${agent.followerCount} 位关注者'),
+                              semanticsLabel: context.localizedText(
+                                key:
+                                    'msgCompactCountFollowerCountFollowers7ed9c1ab',
+                                args: <String, Object?>{
+                                  'compactCountFollowerCount':
+                                      agent.followerCount,
+                                },
+                                en: '${agent.followerCount} followers',
+                                zhHans: '${agent.followerCount} 位关注者',
+                              ),
                               foreground: AppColors.onSurfaceMuted,
                               background: AppColors.surfaceHighest.withValues(
                                 alpha: 0.48,
@@ -1807,9 +1878,9 @@ class _AgentDetailSheet extends StatelessWidget {
     String? runtimeValue;
     String? sourceValue;
     for (final item in agent.metadata) {
-      if (item.label == 'Runtime') {
+      if (const ['Runtime', '运行时', '运行环境'].contains(item.label)) {
         runtimeValue = _localizedAgentMetadataValue(context, item.value);
-      } else if (item.label == 'Source') {
+      } else if (const ['Source', '来源'].contains(item.label)) {
         sourceValue = _localizedAgentMetadataValue(context, item.value);
       }
     }
@@ -1982,8 +2053,7 @@ class _AgentDetailSheet extends StatelessWidget {
                                           ? context.localizedText(
                                               key:
                                                   'msgNoBehaviorSummaryYet0f3ae2fb',
-                                              en:
-                                                  'No behavior summary synced yet.',
+                                              en: 'No behavior summary synced yet.',
                                               zhHans: '暂时还没有同步人格摘要。',
                                             )
                                           : agent.personality!.summary,
@@ -2002,38 +2072,22 @@ class _AgentDetailSheet extends StatelessWidget {
                                       children: [
                                         _DetailTagChip(
                                           label:
-                                              '${context.localizedText(
-                                                key: 'msgWarmth763a2ad7',
-                                                en: 'Warmth',
-                                                zhHans: '温度',
-                                              )} · ${_localizedPersonalityValue(context, agent.personality!.warmth)}',
+                                              '${context.localizedText(key: 'msgWarmth763a2ad7', en: 'Warmth', zhHans: '温度')} · ${_localizedPersonalityValue(context, agent.personality!.warmth)}',
                                           accentColor: accentColor,
                                         ),
                                         _DetailTagChip(
                                           label:
-                                              '${context.localizedText(
-                                                key: 'msgCuriosity4403ea7a',
-                                                en: 'Curiosity',
-                                                zhHans: '好奇心',
-                                              )} · ${_localizedPersonalityValue(context, agent.personality!.curiosity)}',
+                                              '${context.localizedText(key: 'msgCuriosity4403ea7a', en: 'Curiosity', zhHans: '好奇心')} · ${_localizedPersonalityValue(context, agent.personality!.curiosity)}',
                                           accentColor: accentColor,
                                         ),
                                         _DetailTagChip(
                                           label:
-                                              '${context.localizedText(
-                                                key: 'msgRestraintd68829ef',
-                                                en: 'Restraint',
-                                                zhHans: '克制',
-                                              )} · ${_localizedPersonalityValue(context, agent.personality!.restraint)}',
+                                              '${context.localizedText(key: 'msgRestraintd68829ef', en: 'Restraint', zhHans: '克制')} · ${_localizedPersonalityValue(context, agent.personality!.restraint)}',
                                           accentColor: accentColor,
                                         ),
                                         _DetailTagChip(
                                           label:
-                                              '${context.localizedText(
-                                                key: 'msgCadence1d5232de',
-                                                en: 'Cadence',
-                                                zhHans: '节奏',
-                                              )} · ${_localizedPersonalityValue(context, agent.personality!.cadence)}',
+                                              '${context.localizedText(key: 'msgCadence1d5232de', en: 'Cadence', zhHans: '节奏')} · ${_localizedPersonalityValue(context, agent.personality!.cadence)}',
                                           accentColor: accentColor,
                                         ),
                                         _DetailTagChip(

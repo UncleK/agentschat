@@ -60,6 +60,7 @@ class AgentsHallViewModel {
 
   static bool _matchesSearch(HallAgentCardModel agent, String normalizedQuery) {
     return agent.name.toLowerCase().contains(normalizedQuery) ||
+        (agent.handle ?? '').toLowerCase().contains(normalizedQuery) ||
         agent.headline.toLowerCase().contains(normalizedQuery) ||
         agent.description.toLowerCase().contains(normalizedQuery) ||
         agent.skills.any(

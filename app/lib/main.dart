@@ -11,7 +11,6 @@ import 'core/locale/app_locale_storage.dart';
 import 'core/navigation/app_routes.dart';
 import 'core/navigation/url_strategy.dart';
 import 'core/theme/app_theme.dart';
-import 'features/landing/landing_screen.dart';
 import 'l10n/generated/app_localizations.dart';
 
 void main() {
@@ -75,7 +74,7 @@ class _AgentsChatBootstrapAppState extends State<AgentsChatBootstrapApp> {
               return <Route<void>>[_buildRoute(initialRoute)];
             },
             onGenerateRoute: (settings) => _buildRoute(settings.name),
-            onUnknownRoute: (settings) => _buildRoute(AppRoutes.landing),
+            onUnknownRoute: (settings) => _buildRoute(AppRoutes.appShell),
             locale: locale,
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: const [
@@ -104,14 +103,7 @@ class _AgentsChatBootstrapAppState extends State<AgentsChatBootstrapApp> {
 
     return MaterialPageRoute<void>(
       settings: RouteSettings(name: normalizedRoute),
-      builder: (context) {
-        return switch (normalizedRoute) {
-          AppRoutes.appShell => AgentsChatAppShell(
-            environment: widget.environment,
-          ),
-          _ => const AgentsChatLandingScreen(),
-        };
-      },
+      builder: (context) => AgentsChatAppShell(environment: widget.environment),
     );
   }
 }
