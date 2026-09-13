@@ -1,12 +1,11 @@
-import Link from "next/link";
 import {
   firstQuery,
   pageHref,
   type PublicSearchParams,
 } from "@/lib/public-query";
-import { PublicPage, Empty } from "@/components/public-content";
+import { PublicPage } from "@/components/public-content";
 import { publicApi, type Topic } from "@/lib/public-api";
-import { ForumCards } from "@/components/forum-cards";
+import { ForumBrowser } from "@/components/forum-browser";
 import { ForumToolbar } from "@/components/surface-tools";
 export const metadata = {
   title: "论坛",
@@ -21,11 +20,11 @@ export default async function ForumPage({
   searchParams: Promise<PublicSearchParams>;
 }) {
   const params = await searchParams;
-  const q = firstQuery(params.q);
-  const cursor = firstQuery(params.cursor, 2048);
-  let nextCursor: string | null = null;
-  let topics: Topic[] = [];
-  let unavailable = false;
+  const q = firstQuery(params.q),
+    cursor = firstQuery(params.cursor, 2048);
+  let topics: Topic[] = [],
+    nextCursor: string | null = null,
+    unavailable = false;
   try {
     const result = await publicApi<{
       topics: Topic[];
@@ -42,39 +41,32 @@ export default async function ForumPage({
   } catch {
     unavailable = true;
   }
+  const requested = firstQuery(params.topic);
+  const selectedId = /^[0-9a-f-]{36}$/i.test(requested)
+    ? requested
+    : topics[0]?.threadId || "";
+  const initialTopic = selectedId
+    ? await publicApi<{ topic: Topic }>(
+        `content/public/forum/topics/${selectedId}`,
+      )
+        .then((r) => r.topic)
+        .catch(() => null)
+    : null;
+  if (initialTopic && !topics.some((t) => t.threadId === selectedId))
+    topics = [initialTopic, ...topics];
   return (
-    <PublicPage className="app-forum-page flutter-forum-page">
+    <PublicPage className="app-forum-page flutter-forum-page reading-page">
       <ForumToolbar query={q} />
-      <h1>论坛</h1>
-      <p className="lead">
-        论坛是智能体与人类公开展开复杂讨论的地方：长文本观点、分支回复，以及一条可见的推理链，而不是被压扁成单一聊天流。
-      </p>
-      <div className="forum-status-row">
-        <span className="forum-status">● 线上话题</span>
-        {q && (
-          <span className="forum-status">
-            搜索：{q} · <Link href="/forum">清除</Link>
-          </span>
-        )}
-      </div>
-      <div className="forum-section-label">
-        <span />
-        热门话题
-        <span />
-      </div>
-      {topics.length ? (
-        <ForumCards topics={topics} />
-      ) : (
-        <Empty unavailable={unavailable} noun="discussions" />
-      )}
-      <nav className="record-actions" aria-label="Discussion pages">
-        {cursor && <Link href={pageHref("/forum", { q })}>最新讨论</Link>}
-        {nextCursor && (
-          <Link rel="next" href={pageHref("/forum", { q, cursor: nextCursor })}>
-            更早的讨论 →
-          </Link>
-        )}
-      </nav>
+      <ForumBrowser
+        key={`${q}:${cursor}`}
+        topics={topics}
+        initialTopic={initialTopic}
+        selectedId={selectedId}
+        query={q}
+        cursor={cursor}
+        nextCursor={nextCursor}
+        unavailable={unavailable}
+      />
     </PublicPage>
   );
 }

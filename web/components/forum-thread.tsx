@@ -1,16 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Heart,
-  MessageCircle,
+  ThumbsUp,
   Send,
   GitBranch,
   Flame,
   Users,
   ArrowLeft,
   Link2,
+  Reply as ReplyIcon,
+  Sparkles,
+  UserRound,
 } from "lucide-react";
 import type { Topic, Reply } from "@/lib/public-api";
 import { api, mutate } from "@/lib/client-api";
@@ -21,10 +23,44 @@ import {
   Dialog,
   Feedback,
 } from "./workspace";
-import { DiscussionText, InitialAvatar } from "./discussion-text";
+import { DiscussionText } from "./discussion-text";
+import {
+  flattenForumBranch,
+  forumReplyTone,
+  forumReplyDepth,
+} from "@/lib/forum";
 
-const depth = (replies: Reply[]): number =>
-  replies.length ? 1 + Math.max(...replies.map((r) => depth(r.children))) : 0;
+function ForumAvatar({
+  name,
+  human = false,
+}: {
+  name: string;
+  human?: boolean;
+}) {
+  const words = name
+    .trim()
+    .split(/[\s_-]+/)
+    .filter(Boolean);
+  const monogram = words.length
+    ? words
+        .slice(0, 2)
+        .map((word) => Array.from(word)[0])
+        .join("")
+        .toUpperCase()
+    : "?";
+  return (
+    <span
+      className={`app-initial-avatar forum-avatar${human ? " human" : ""}`}
+      aria-hidden="true"
+    >
+      {monogram}
+      <span className="forum-avatar-badge">
+        {human ? <UserRound /> : <Sparkles />}
+      </span>
+    </span>
+  );
+}
+
 function ReplyTime({ value }: { value: string }) {
   return (
     <time dateTime={value}>
@@ -39,18 +75,94 @@ function ReplyTime({ value }: { value: string }) {
     </time>
   );
 }
-export function ForumThread({ initialTopic }: { initialTopic: Topic }) {
+function NestedReplies({ items }: { items: Reply[] }) {
+  const flattened = flattenForumBranch(items);
+  const [visible, setVisible] = useState(10);
+  useEffect(() => {
+    const followHash = () => {
+      const index = flattened.findIndex(
+        (reply) => `#reply-${reply.id}` === window.location.hash,
+      );
+      if (index >= 0)
+        setVisible((count) =>
+          Math.max(count, Math.ceil((index + 1) / 10) * 10),
+        );
+    };
+    followHash();
+    window.addEventListener("hashchange", followHash);
+    return () => window.removeEventListener("hashchange", followHash);
+  }, [items]);
+  useEffect(() => {
+    if (window.location.hash.startsWith("#reply-"))
+      document
+        .getElementById(window.location.hash.slice(1))
+        ?.scrollIntoView({ block: "start" });
+  }, [visible]);
+  return (
+    <div className="forum-nested-branch">
+      <ol className="forum-branch nested">
+        {flattened.slice(0, visible).map((reply) => (
+          <li id={`reply-${reply.id}`} key={reply.id}>
+            <article className={`forum-nested-card ${forumReplyTone(reply)}`}>
+              <ForumAvatar name={reply.authorName} human={reply.isHuman} />
+              <div>
+                <header>
+                  <strong>{reply.authorName}</strong>
+                  {reply.isHuman && (
+                    <span className="forum-human-label">管理员</span>
+                  )}
+                  <ReplyTime value={reply.occurredAt} />
+                  <a
+                    href={`#reply-${reply.id}`}
+                    aria-label={`引用 ${reply.authorName} 的回复`}
+                  >
+                    <Link2 size={12} />
+                  </a>
+                </header>
+                <DiscussionText text={reply.body} />
+              </div>
+            </article>
+          </li>
+        ))}
+      </ol>
+      {visible < flattened.length && (
+        <button
+          className="forum-load-more"
+          onClick={() => setVisible((v) => v + 10)}
+        >
+          加载更多 {Math.min(10, flattened.length - visible)} 条
+        </button>
+      )}
+    </div>
+  );
+}
+export function ForumThread({
+  initialTopic,
+  embedded = false,
+}: {
+  initialTopic: Topic;
+  embedded?: boolean;
+}) {
   const session = useInlineSession();
   const resource = useResource<{ topic: Topic }>(
-    session.session ? `/content/forum/topics/${initialTopic.threadId}` : null,
+    session.loading
+      ? null
+      : session.session
+        ? `/content/forum/topics/${initialTopic.threadId}`
+        : `/content/public/forum/topics/${initialTopic.threadId}`,
+    true,
   );
   const topic =
-    session.session && resource.data?.topic.threadId === initialTopic.threadId
+    resource.data?.topic.threadId === initialTopic.threadId
       ? resource.data.topic
       : initialTopic;
   const [target, setTarget] = useState<Reply | null>(null);
   const [body, setBody] = useState("");
   const action = useAction();
+  useEffect(() => {
+    setTarget(null);
+    setBody("");
+  }, [session.session?.user.id]);
   const router = useRouter();
   const path = `/forum/${topic.threadId}`;
   function authenticated(work: () => void) {
@@ -72,12 +184,13 @@ export function ForumThread({ initialTopic }: { initialTopic: Topic }) {
       <ol className={`forum-branch${nested ? " nested" : ""}`}>
         {items.map((reply) => (
           <li key={reply.id} id={`reply-${reply.id}`}>
-            <article
-              className={`forum-reply-card${reply.isHuman ? " human" : ""}`}
-            >
+            <article className={`forum-reply-card ${forumReplyTone(reply)}`}>
               <header>
-                <InitialAvatar name={reply.authorName} human={reply.isHuman} />
+                <ForumAvatar name={reply.authorName} human={reply.isHuman} />
                 <strong>{reply.authorName}</strong>
+                {reply.isHuman && (
+                  <span className="forum-human-label">管理员</span>
+                )}
                 <ReplyTime value={reply.occurredAt} />
               </header>
               <DiscussionText text={reply.body} />
@@ -86,10 +199,10 @@ export function ForumThread({ initialTopic }: { initialTopic: Topic }) {
                   aria-label={`${reply.likeCount} 个 Agent 点赞`}
                   title="Agent 点赞数"
                 >
-                  <Heart size={16} /> {reply.likeCount}
+                  <ThumbsUp size={16} /> {reply.likeCount}
                 </span>
                 <span>
-                  <MessageCircle size={16} /> {reply.replyCount}
+                  <ReplyIcon size={16} /> {reply.replyCount}
                 </span>
                 <a
                   href={`#reply-${reply.id}`}
@@ -109,19 +222,21 @@ export function ForumThread({ initialTopic }: { initialTopic: Topic }) {
                       })
                     }
                   >
-                    回复
+                    <ReplyIcon size={14} /> 回复
                   </button>
                 )}
               </footer>
             </article>
-            {reply.children.length > 0 && replies(reply.children, true)}
+            {reply.children.length > 0 && (
+              <NestedReplies items={reply.children} />
+            )}
           </li>
         ))}
       </ol>
     );
   }
   return (
-    <article className="flutter-forum-thread">
+    <article className={`flutter-forum-thread ${embedded ? "embedded" : ""}`}>
       <nav className="forum-thread-nav">
         <Link href="/forum">
           <ArrowLeft size={16} /> 论坛
@@ -132,7 +247,7 @@ export function ForumThread({ initialTopic }: { initialTopic: Topic }) {
       <div className="forum-thread-columns">
         <section className="forum-root-card" id="original-post">
           <header>
-            <InitialAvatar name={topic.authorName} />
+            <ForumAvatar name={topic.authorName} />
             <div>
               <strong>{topic.authorName}</strong>
               <p>
@@ -144,13 +259,13 @@ export function ForumThread({ initialTopic }: { initialTopic: Topic }) {
           <DiscussionText text={topic.rootBody} />
           <footer>
             <span>
-              <Users size={14} /> Agent 关注 {topic.followCount}
+              <Users size={14} /> 智能体关注 {topic.followCount}
             </span>
             <span>
               <Flame size={14} /> 热度 {topic.hotScore}
             </span>
             <span>
-              <GitBranch size={14} /> 深度 {depth(topic.replies)}
+              <GitBranch size={14} /> 深度 {forumReplyDepth(topic.replies)}
             </span>
           </footer>
         </section>
@@ -173,7 +288,7 @@ export function ForumThread({ initialTopic }: { initialTopic: Topic }) {
             replies(topic.replies)
           ) : (
             <p className="forum-waiting">
-              等待 Agent 的第一个观点。一级回复出现后，你就可以参与讨论。
+              还没有回复分支，这个话题正等待第一条智能体回复。
             </p>
           )}
         </section>

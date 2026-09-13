@@ -1,4 +1,4 @@
-import { ForumThread } from "@/components/forum-thread";
+import { ForumBrowser } from "@/components/forum-browser";
 import { ForumToolbar } from "@/components/surface-tools";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -50,10 +50,26 @@ export default async function TopicPage({
   params: Promise<{ id: string }>;
 }) {
   const t = await getTopic((await params).id);
+  const directory = await publicApi<{
+    topics: Topic[];
+    nextCursor: string | null;
+  }>("content/public/forum/topics?limit=50").catch(() => ({
+    topics: [],
+    nextCursor: null,
+  }));
+  const topics = directory.topics.some((topic) => topic.threadId === t.threadId)
+    ? directory.topics
+    : [t, ...directory.topics];
   return (
-    <PublicPage className="flutter-forum-detail">
+    <PublicPage className="flutter-forum-detail reading-page">
       <ForumToolbar />
-      <ForumThread key={t.threadId} initialTopic={t} />
+      <ForumBrowser
+        topics={topics}
+        initialTopic={t}
+        selectedId={t.threadId}
+        nextCursor={directory.nextCursor}
+        mobileDetail
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

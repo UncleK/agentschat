@@ -1,0 +1,362 @@
+.reading-pane {
+  min-width: 0;
+}
+.reading-pane-header {
+  display: none;
+}
+.reading-loading {
+  padding: 48px 24px;
+  color: #c1c6d7;
+}
+.reading-loading p {
+  margin-bottom: 16px;
+}
+.reading-loading button,
+.reading-refresh-error button {
+  border: 1px solid #00daf340;
+  background: #00daf310;
+  color: #00daf3;
+  border-radius: 12px;
+  padding: 8px 14px;
+}
+.forum-introduction h1 {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 10px 0 18px;
+  letter-spacing: -1.3px;
+}
+.forum-introduction .lead {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #c1c6d7;
+  max-width: 760px;
+  margin-bottom: 26px;
+}
+.live-topic-directory {
+  margin-top: 24px;
+}
+.live-topic-directory > summary {
+  cursor: pointer;
+  padding: 14px 0;
+  color: #c1c6d7;
+}
+.live-topic-cards {
+  display: grid;
+  gap: 16px;
+}
+.live-topic-card {
+  display: block;
+  padding: 24px;
+  border: 1px solid #41475470;
+  border-radius: 24px;
+  background: #1c2026;
+  color: #c1c6d7;
+}
+.live-topic-card:hover {
+  border-color: #00daf380;
+}
+.live-topic-card[aria-current="true"] {
+  border-color: #00daf3;
+  background: #12303a66;
+}
+.live-topic-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #c1c6d7;
+  font-size: 12px;
+  border: 1px solid #41475470;
+  border-radius: 99px;
+  padding: 3px 10px;
+}
+.live-topic-card.live .live-topic-status {
+  color: #00daf3;
+  background: #00daf310;
+  border-color: #00daf330;
+}
+.live-topic-card.paused .live-topic-status {
+  color: #ffc857;
+}
+.live-topic-card h2 {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 16px 0;
+  color: #dfe2eb;
+  letter-spacing: -0.4px;
+}
+.live-topic-matchup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  font-size: 13px;
+  align-items: center;
+  padding: 14px 0;
+  border-block: 1px solid #41475450;
+  margin-bottom: 14px;
+}
+.live-topic-matchup span:first-child {
+  color: #00daf3;
+}
+.live-topic-matchup span:last-child {
+  color: #a855f7;
+  text-align: right;
+}
+.live-topic-matchup b {
+  color: #8b90a0;
+  font:
+    700 12px Inter,
+    sans-serif;
+}
+.live-topic-card p {
+  font-size: 13px;
+  margin-top: 8px;
+}
+.live-topic-card p span {
+  color: #8b90a0;
+}
+.live-topic-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  font-size: 11px;
+  color: #8b90a0;
+}
+.live-topic-card footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.live-filters {
+  margin-top: 0;
+}
+.live-filters a[aria-current="page"] {
+  color: #00daf3;
+  border-color: #00daf380;
+}
+.reading-refresh-error {
+  padding: 16px;
+  color: #ffc857;
+}
+body:has(.reading-page) .site-footer {
+  display: none;
+}
+
+/* Only the desktop workspace owns scroll. Each pane has a persistent toolbar. */
+@media (min-width: 1024px) {
+  body:has(.reading-page) {
+    overflow: hidden;
+  }
+  .content-page.reading-page {
+    width: calc(100% - 48px);
+    max-width: 1800px;
+    height: calc(100dvh - var(--header-height));
+    padding: 16px 0 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .reading-page > .app-surface-toolbar {
+    flex: 0 0 auto;
+    margin: 0 0 14px;
+    min-height: 40px;
+  }
+  .reading-workspace {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(340px, 0.9fr) minmax(480px, 1.1fr);
+    gap: 20px;
+  }
+  .reading-pane {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #414754 transparent;
+    border: 1px solid #41475460;
+    border-radius: 24px;
+    background: #10141a99;
+    scroll-padding-top: 72px;
+  }
+  .reading-pane:focus-visible {
+    outline: 1px solid #00daf360;
+    outline-offset: 2px;
+  }
+  .reading-pane-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 58px;
+    padding: 12px 20px;
+    background: #151a21f5;
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid #41475450;
+    font-size: 13px;
+  }
+  .reading-pane-header > strong {
+    color: #c1c6d7;
+  }
+  .reading-pane-header > div {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .reading-pane-header button,
+  .reading-pane-header a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: 0;
+    color: #00daf3;
+    padding: 5px;
+    font-size: 12px;
+  }
+  .reading-pane-content {
+    padding: 24px;
+    min-width: 0;
+  }
+  .reading-workspace .flutter-forum-grid,
+  .reading-workspace .forum-thread-columns,
+  .reading-workspace .flutter-debate-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reading-workspace .forum-featured {
+    grid-row: auto;
+  }
+  .reading-workspace .forum-featured.selected,
+  .reading-workspace .forum-topic-card[aria-current="true"] {
+    border-color: #00daf3a0;
+    box-shadow: inset 3px 0 #00daf3;
+  }
+  .reading-workspace .forum-thread-nav > a:first-child,
+  .reading-workspace .forum-back-button {
+    display: none;
+  }
+  .reading-workspace .forum-thread-nav {
+    margin-bottom: 18px;
+    justify-content: flex-end;
+  }
+  .reading-workspace .forum-featured {
+    padding: 24px;
+  }
+  .reading-workspace .forum-featured h2 {
+    font-size: 28px;
+  }
+  .reading-workspace .forum-featured-quote {
+    font-size: 16px;
+    padding: 18px;
+  }
+  .reading-workspace .forum-featured-quote > .discussion-text {
+    max-height: 280px;
+    overflow: hidden;
+    mask-image: linear-gradient(#000 90%, transparent);
+  }
+  .reading-workspace .forum-featured-quote footer {
+    position: relative;
+  }
+  .reading-workspace .debate-stage-column {
+    position: static;
+  }
+  .reading-workspace .debate-channel {
+    min-height: 0;
+  }
+  .reading-workspace .debate-stage {
+    padding: 12px 16px 22px;
+  }
+  .reading-workspace .debate-matchup {
+    grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
+    gap: 6px;
+  }
+  .reading-workspace .debate-seat > .app-initial-avatar {
+    width: 76px;
+    height: 76px;
+    font-size: 25px;
+  }
+  .reading-workspace .debate-seat > strong {
+    font-size: 17px;
+  }
+  .reading-workspace .debate-topic {
+    padding: 22px;
+  }
+  .reading-workspace .debate-topic > h1 {
+    font-size: 28px;
+  }
+  .reading-workspace .debate-tabs {
+    position: sticky;
+    top: 58px;
+    z-index: 1;
+  }
+  .reading-workspace .live-topic-directory {
+    margin-top: 0;
+  }
+  .live-topic-directory[open] > summary {
+    display: none;
+  }
+}
+@media (max-width: 1023px) {
+  .forum-workspace:not(.mobile-detail) > .reading-details,
+  .forum-workspace.mobile-detail > .reading-primary {
+    display: none;
+  }
+  .live-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+  .live-workspace > .reading-details {
+    order: 0;
+  }
+  .live-workspace > .reading-primary {
+    order: 1;
+  }
+  .reading-workspace .flutter-forum-grid,
+  .reading-workspace .forum-thread-columns,
+  .reading-workspace .flutter-debate-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reading-workspace .forum-featured {
+    grid-row: auto;
+  }
+}
+@media (max-width: 800px) {
+  .forum-introduction h1 {
+    font-size: 36px;
+  }
+  .forum-introduction .lead {
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  body:has(.reading-page) .site-header .primary-navigation {
+    left: 16px;
+    right: 16px;
+    bottom: 12px;
+    width: auto;
+    height: 52px;
+    min-height: 52px;
+    padding: 3px 12px;
+    border: 1px solid #41475466;
+    border-radius: 24px;
+    background: #10141aeb;
+    box-shadow: 0 12px 28px #0008;
+  }
+  body:has(.reading-page) .site-header .primary-navigation a {
+    border-radius: 20px;
+    min-height: 44px;
+    padding: 3px 8px;
+    gap: 2px;
+    font-size: 11px;
+  }
+  body:has(.reading-page) .site-header .primary-navigation a svg {
+    width: 20px;
+    height: 20px;
+  }
+}

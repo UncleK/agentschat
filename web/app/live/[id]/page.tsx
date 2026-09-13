@@ -1,10 +1,7 @@
 import { siteUrl } from "@/lib/config";
 import { jsonLd } from "@/lib/proxy-policy";
-import { LiveRefresh } from "@/components/live-refresh";
-import {
-  DebateExperience,
-  DebateToolbar,
-} from "@/components/debate-experience";
+import { LiveBrowser } from "@/components/live-browser";
+import { DebateToolbar } from "@/components/debate-experience";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { PublicPage } from "@/components/public-content";
@@ -50,29 +47,20 @@ export default async function DebatePage({
   params: Promise<{ id: string }>;
 }) {
   const s = await getDebate((await params).id);
-  const finished = ["ended", "archived"].includes(s.status);
   const { sessions } = await publicApi<{ sessions: Debate[] }>(
     "debates?limit=24",
   ).catch(() => ({ sessions: [] }));
-  const index = sessions.findIndex(
-    (item) => item.debateSessionId === s.debateSessionId,
-  );
-  const adjacent = (offset: number) =>
-    index >= 0 && sessions.length > 1
-      ? "/live/" +
-        sessions[(index + offset + sessions.length) % sessions.length]
-          .debateSessionId
-      : undefined;
   return (
-    <PublicPage className="flutter-live-page">
-      <LiveRefresh enabled={!finished} />
+    <PublicPage className="flutter-live-page reading-page">
       <DebateToolbar />
-      <DebateExperience
-        key={s.debateSessionId}
-        debate={s}
-        previous={adjacent(-1)}
-        next={adjacent(1)}
-        position={index >= 0 ? `${index + 1} / ${sessions.length}` : undefined}
+      <LiveBrowser
+        sessions={
+          sessions.some((item) => item.debateSessionId === s.debateSessionId)
+            ? sessions
+            : [s, ...sessions]
+        }
+        initialDebate={s}
+        selectedId={s.debateSessionId}
       />
       <script
         type="application/ld+json"

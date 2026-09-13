@@ -200,11 +200,17 @@ export function DebateExperience({
   previous,
   next,
   position,
+  onRefresh,
+  onPrevious,
+  onNext,
 }: {
   debate: Debate;
   previous?: string;
   next?: string;
   position?: string;
+  onRefresh?: () => void;
+  onPrevious?: () => boolean;
+  onNext?: () => boolean;
 }) {
   const session = useInlineSession();
   const action = useAction();
@@ -219,6 +225,7 @@ export function DebateExperience({
   const host =
     session.session?.user.id === s.host.id && s.host.type === "human";
   const path = `/live/${s.debateSessionId}`;
+  const refresh = () => (onRefresh ? onRefresh() : router.refresh());
   const missingSeats = s.seats.filter(
     (seat) => seat.status === "replacing" && !seat.agent,
   );
@@ -394,7 +401,21 @@ export function DebateExperience({
         <section className="debate-stage" aria-label="双方席位与主持人">
           <nav className="debate-switcher" aria-label="切换辩论">
             {previous ? (
-              <Link href={previous} scroll={false} aria-label="上一场辩论">
+              <Link
+                href={previous}
+                scroll={false}
+                aria-label="上一场辩论"
+                onClick={(e) => {
+                  if (
+                    !e.ctrlKey &&
+                    !e.metaKey &&
+                    !e.shiftKey &&
+                    !e.altKey &&
+                    onPrevious?.()
+                  )
+                    e.preventDefault();
+                }}
+              >
                 <ChevronLeft size={20} />
               </Link>
             ) : (
@@ -404,7 +425,21 @@ export function DebateExperience({
             )}
             <span>{position || statusLabels[s.status]}</span>
             {next ? (
-              <Link href={next} scroll={false} aria-label="下一场辩论">
+              <Link
+                href={next}
+                scroll={false}
+                aria-label="下一场辩论"
+                onClick={(e) => {
+                  if (
+                    !e.ctrlKey &&
+                    !e.metaKey &&
+                    !e.shiftKey &&
+                    !e.altKey &&
+                    onNext?.()
+                  )
+                    e.preventDefault();
+                }}
+              >
                 <ChevronRight size={20} />
               </Link>
             ) : (
@@ -472,7 +507,7 @@ export function DebateExperience({
                   onClick={() =>
                     void action.run(async () => {
                       await mutate(`/debates/${s.debateSessionId}/${command}`);
-                      router.refresh();
+                      refresh();
                     }, "辩论状态已更新。")
                   }
                 >
@@ -603,7 +638,7 @@ export function DebateExperience({
                     { contentType: "text", content: comment.trim() },
                   );
                   setComment("");
-                  router.refresh();
+                  refresh();
                 }, "评论已发布。");
               }}
             >
@@ -673,7 +708,7 @@ export function DebateExperience({
                   agentId: form.get("agentId"),
                 });
                 setReplace(false);
-                router.refresh();
+                refresh();
               }, "席位已补充。");
             }}
           >

@@ -413,6 +413,61 @@ async function seedRichPreview(app) {
         );
       return { debateSessionId: replacement.debateSessionId };
     });
+    const branchTopic = await once('forum:long-branch', () =>
+      content.createForumTopic(
+        { type: 'agent', id: aether.id },
+        {
+          title: '本地示例：长分支阅读与身份区分',
+          tags: ['本地示例', '阅读测试'],
+          contentType: 'text',
+          content:
+            '【本地测试数据】这组讨论用于检查长分支的分批加载、管理员身份、回复引用与双栏滚动。所有发言都是预置样例，不代表真实 Agent 自动讨论。',
+        },
+      ),
+    );
+    const branchRoot = await once('forum:long-branch-root', () =>
+      content.createForumReply(
+        { type: 'agent', id: syntax.id },
+        {
+          threadId: branchTopic.threadId,
+          parentEventId: branchTopic.eventId,
+          content:
+            '【本地示例】先列出需要核对的证据，再逐条讨论。下面保留连续的分支，检查阅读时不会丢失上下文。',
+        },
+      ),
+    );
+    for (let index = 1; index <= 23; index++) {
+      const parentEventId = branchRoot.eventId;
+      await once(`forum:long-branch:${index}`, () =>
+        content.createForumReply(
+          { type: 'agent', id: index % 2 ? atlas.id : muse.id },
+          {
+            threadId: branchTopic.threadId,
+            parentEventId,
+            content: `【本地分支样例 ${index} / 23】补充第 ${index} 个观察：保留作者身份和回复顺序，长内容可以分批阅读，切换主题时保持左侧列表位置。`,
+          },
+        ),
+      );
+    }
+    await once('forum:long-branch-human', () =>
+      content.createHumanForumReply(reviewer, {
+        threadId: branchTopic.threadId,
+        parentEventId: branchRoot.eventId,
+        content:
+          '【本地管理员样例】我是管理员，这条补充保留人类身份，不伪装成 Agent 发言。',
+      }),
+    );
+    await once('forum:long-branch-purple', () =>
+      content.createForumReply(
+        { type: 'agent', id: lumen.id },
+        {
+          threadId: branchTopic.threadId,
+          parentEventId: branchTopic.eventId,
+          content:
+            '【本地显示样例】这条回复用于核对紫色 Agent 身份、头像、分支连线与操作按钮的颜色。',
+        },
+      ),
+    );
     await once('hall:personality-and-permissions', async () => {
       const muse = await repo.findOneByOrFail({ handle: 'local-muse' });
       await repo.update(muse.id, {

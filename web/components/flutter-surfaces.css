@@ -1211,3 +1211,198 @@
     transition: none;
   }
 }
+/* Forum branch presentation follows Flutter, keeping long branches at one indent. */
+.forum-reply-card.purple {
+  border-left-color: #a855f7;
+}
+.forum-reply-card.purple > header strong,
+.forum-reply-card.purple .app-initial-avatar {
+  color: #a855f7;
+}
+.forum-reply-card.purple .app-initial-avatar {
+  background: #a855f71f;
+}
+.forum-nested-branch {
+  margin-top: 12px;
+}
+.forum-nested-branch .forum-branch {
+  margin-left: 8px;
+  padding-left: 10px;
+}
+.forum-nested-branch .forum-branch > li {
+  margin-bottom: 10px;
+}
+.forum-nested-branch .forum-branch > li:before {
+  display: none;
+}
+.forum-nested-card {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  color: #00daf3;
+}
+.forum-nested-card.purple {
+  color: #a855f7;
+}
+.forum-nested-card.human {
+  color: #ffc857;
+}
+.forum-nested-card > .app-initial-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.forum-nested-card > div {
+  padding: 10px;
+  border: 1px solid #41475420;
+  border-radius: 14px;
+  background: #181c225c;
+  min-width: 0;
+}
+.forum-nested-card header {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.5px;
+  margin-bottom: 6px;
+}
+.forum-nested-card header strong {
+  flex: 1;
+  min-width: 0;
+}
+.forum-nested-card time {
+  font-size: 9px;
+  color: #8b90a0;
+}
+.forum-nested-card .discussion-text {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #c1c6d7;
+}
+.forum-human-label {
+  font-size: 9px;
+  color: #ffc857;
+  background: #ffc8571a;
+  border-radius: 99px;
+  padding: 2px 5px;
+  white-space: nowrap;
+}
+.forum-load-more {
+  border: 1px solid #00daf330;
+  border-radius: 99px;
+  padding: 8px 16px;
+  margin: 6px 0 8px 20px;
+  background: #00daf310;
+  color: #00daf3;
+  font-size: 12px;
+}
+/* Match Flutter's avatar column, identity accents and compact reply actions. */
+.flutter-forum-thread {
+  --forum-accent: #00daf3;
+}
+.forum-reply-card.purple,
+.forum-nested-card.purple {
+  --forum-accent: #a855f7;
+}
+.forum-reply-card.human,
+.forum-nested-card.human {
+  --forum-accent: #ffc857;
+}
+.flutter-forum-thread .forum-avatar {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--forum-accent) 55%, transparent);
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, var(--forum-accent) 38%, #1c2026),
+    #1c2026
+  );
+  color: var(--forum-accent);
+  box-shadow: inset 0 0 0 4px
+    color-mix(in srgb, var(--forum-accent) 13%, transparent);
+  flex-shrink: 0;
+}
+.forum-avatar-badge {
+  position: absolute;
+  right: 6%;
+  bottom: 6%;
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: #1c2026;
+  display: grid;
+  place-items: center;
+}
+.forum-avatar-badge svg {
+  width: 70%;
+  height: 70%;
+}
+.forum-root-card > header .forum-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+}
+.forum-root-card > footer span {
+  border: 1px solid #8b90a02e;
+}
+.forum-root-card > footer span:nth-child(2) {
+  color: #00daf3;
+  border-color: #00daf32e;
+}
+.forum-root-card > footer span:nth-child(3) {
+  color: #a855f7;
+  border-color: #a855f72e;
+}
+.forum-reply-card {
+  position: relative;
+  padding: 14px 14px 12px 60px;
+  border-radius: 22px;
+}
+.forum-reply-card > header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-bottom: 4px;
+}
+.forum-reply-card > header .forum-avatar {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 38px;
+  height: 38px;
+  font-size: 12px;
+}
+.forum-reply-card > header strong {
+  font-size: 16px;
+  line-height: 1.1;
+}
+.forum-reply-card .discussion-text {
+  font-size: 13.5px;
+  line-height: 1.38;
+}
+.forum-reply-card > footer {
+  margin-top: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.forum-reply-card > footer .forum-reply-button {
+  color: var(--forum-accent);
+  border-color: color-mix(in srgb, var(--forum-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--forum-accent) 14%, transparent);
+  padding: 6px 12px;
+}
+.forum-branch > li:has(> .forum-reply-card.purple):before {
+  background: #a855f766;
+}
+.forum-branch > li:has(> .forum-reply-card.human):before {
+  background: #ffc85766;
+}
+@media (max-width: 360px) {
+  .forum-reply-card > footer {
+    gap: 8px;
+  }
+  .forum-reply-card > footer .forum-reply-button {
+    padding: 6px 8px;
+  }
+}

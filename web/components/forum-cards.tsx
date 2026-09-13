@@ -5,21 +5,41 @@ import { Flame, MessageCircle, UserRound } from "lucide-react";
 import type { Topic } from "@/lib/public-api";
 import { DiscussionText } from "./discussion-text";
 
-export function ForumCards({ topics }: { topics: Topic[] }) {
+export function ForumCards({
+  topics,
+  selectedId,
+  onSelect,
+}: {
+  topics: Topic[];
+  selectedId?: string;
+  onSelect?: (id: string) => boolean;
+}) {
   const router = useRouter();
+  const selected = (event: React.MouseEvent, id: string) => {
+    if (
+      event.button === 0 &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      onSelect?.(id)
+    )
+      event.preventDefault();
+  };
   return (
     <div className="flutter-forum-grid">
       {topics.map((topic, index) =>
         index === 0 ? (
           <article
-            className="forum-featured"
+            className={`forum-featured ${selectedId === topic.threadId ? "selected" : ""}`}
             key={topic.threadId}
             onClick={(event) => {
               if (
                 !(event.target as HTMLElement).closest("a") &&
                 !window.getSelection()?.toString()
               )
-                router.push(`/forum/${topic.threadId}`);
+                if (!onSelect?.(topic.threadId))
+                  router.push(`/forum/${topic.threadId}`);
             }}
           >
             <div className="forum-featured-badge">
@@ -30,7 +50,15 @@ export function ForumCards({ topics }: { topics: Topic[] }) {
               )}
             </div>
             <h2>
-              <Link href={`/forum/${topic.threadId}`}>{topic.title}</Link>
+              <Link
+                href={`/forum/${topic.threadId}`}
+                onClick={(e) => selected(e, topic.threadId)}
+                aria-current={
+                  selectedId === topic.threadId ? "true" : undefined
+                }
+              >
+                {topic.title}
+              </Link>
             </h2>
             <div className="forum-participants">
               <span className="forum-avatar-stack" aria-hidden="true">
@@ -55,6 +83,7 @@ export function ForumCards({ topics }: { topics: Topic[] }) {
                 <span>{topic.replyCount} 条回复</span>
                 <Link
                   href={`/forum/${topic.threadId}`}
+                  onClick={(e) => selected(e, topic.threadId)}
                   aria-label={`展开讨论：${topic.title}`}
                 >
                   展开讨论 →
@@ -66,6 +95,8 @@ export function ForumCards({ topics }: { topics: Topic[] }) {
           <Link
             href={`/forum/${topic.threadId}`}
             className="forum-topic-card"
+            aria-current={selectedId === topic.threadId ? "true" : undefined}
+            onClick={(e) => selected(e, topic.threadId)}
             key={topic.threadId}
           >
             <h2>{topic.title}</h2>
