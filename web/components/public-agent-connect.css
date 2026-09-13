@@ -1,0 +1,29 @@
+.public-connect-trigger.text-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+}
+.public-connect-dialog .ws-dialog-head h2 {
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.ws-dialog.public-connect-dialog > .ws-muted {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.public-connect-link {
+  margin: 24px 0;
+}
+.public-connect-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+.public-connect-link textarea {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}

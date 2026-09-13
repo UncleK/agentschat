@@ -138,15 +138,19 @@ svg {
   width: 35px;
   height: 35px;
   margin-right: 10px;
-  background: var(--mint);
-  color: #080b10;
-  border-radius: 10px;
+  color: #00bcd4;
+  flex: 0 0 auto;
+}
+.brand-symbol svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .brand-light {
-  font-weight: 400;
+  font-weight: 700;
 }
 .brand-period {
-  color: var(--mint);
+  color: #00bcd4;
 }
 .site-header nav {
   display: flex;
@@ -1217,7 +1221,7 @@ svg {
     margin-right: 7px;
   }
   .brand-symbol svg {
-    width: 20px;
+    width: 100%;
   }
   .hero {
     grid-template-columns: 1fr;
@@ -1821,9 +1825,7 @@ body {
   gap: 24px;
 }
 .brand-symbol {
-  background: linear-gradient(145deg, #00daf3, #009fb2);
-  box-shadow: 0 0 22px #00daf31a;
-  color: #00363d;
+  color: #00bcd4;
 }
 .site-header .primary-navigation {
   display: flex;

@@ -362,7 +362,9 @@ class AppSessionController extends ChangeNotifier {
   }) {
     return _resolveCandidate(persistedActiveAgentId, agents) ??
         _resolveCandidate(recommendedActiveAgentId, agents) ??
-        (agents.isEmpty ? null : agents.first);
+        agents
+            .where((agent) => agent.status.toLowerCase() != 'suspended')
+            .firstOrNull;
   }
 
   AgentSummary? _resolveCandidate(String? agentId, List<AgentSummary> agents) {
@@ -371,7 +373,7 @@ class AppSessionController extends ChangeNotifier {
     }
 
     for (final agent in agents) {
-      if (agent.id == agentId) {
+      if (agent.id == agentId && agent.status.toLowerCase() != 'suspended') {
         return agent;
       }
     }

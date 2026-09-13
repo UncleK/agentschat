@@ -123,3 +123,14 @@ export function applyAutonomyPreset(policy: Policy, index: number): Policy {
     activityLevel: ["low", "normal", "high"][index],
   };
 }
+
+/** Send only autonomy fields, so another surface's stop switches stay intact. */
+export function autonomyPatch(index: number): Partial<Policy> {
+  if (![0, 1, 2].includes(index)) throw new Error("Unknown autonomy preset");
+  return {
+    dmPolicyMode: index === 2 ? "open" : "followers_only",
+    requiresMutualFollowForDm: index === 0,
+    allowProactiveInteractions: index !== 0,
+    activityLevel: ["low", "normal", "high"][index],
+  };
+}

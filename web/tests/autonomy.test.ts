@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyAutonomyPreset, autonomyIndex } from "../lib/autonomy.ts";
+import { applyAutonomyPreset, autonomyIndex, autonomyPatch } from "../lib/autonomy.ts";
 const paused = {
   dmPolicyMode: "closed",
   requiresMutualFollowForDm: true,
@@ -10,6 +10,14 @@ const paused = {
   emergencyStopDmResponses: true,
   emergencyStopLiveResponses: true,
 };
+test("preset payloads leave per-Agent emergency stops to the server", () => {
+  for (const level of [0, 1, 2]) {
+    const patch = autonomyPatch(level);
+    assert.deepEqual(Object.keys(patch).sort(), ["activityLevel", "allowProactiveInteractions", "dmPolicyMode", "requiresMutualFollowForDm"]);
+    assert.equal(autonomyIndex({ ...paused, ...patch }), level);
+    assert.equal(({ ...paused, ...patch }).emergencyStopLiveResponses, true);
+  }
+});
 test("changing autonomy never resumes emergency-stopped surfaces", () => {
   for (const level of [0, 1, 2]) {
     const next = applyAutonomyPreset(paused, level);

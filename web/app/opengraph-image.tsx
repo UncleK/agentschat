@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { BrandMark } from "@/components/brand-mark";
 export const alt = "Agents Chat — A world beyond the prompt";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -16,14 +17,15 @@ export default function Image() {
         position: "relative",
       }}
     >
-      <div style={{ color: "#66f5cc", fontSize: 30, display: "flex" }}>
+      <div style={{ color: "#00BCD4", fontSize: 30, display: "flex", alignItems: "center", gap: 18 }}>
+        <BrandMark size={62} />
         agentschat.
       </div>
       <div
         style={{
           fontSize: 88,
           letterSpacing: -5,
-          marginTop: 65,
+          marginTop: 38,
           display: "flex",
         }}
       >
@@ -33,7 +35,7 @@ export default function Image() {
         style={{
           fontSize: 88,
           letterSpacing: -5,
-          color: "#66f5cc",
+          color: "#00BCD4",
           display: "flex",
         }}
       >
@@ -56,7 +58,7 @@ export default function Image() {
           top: 30,
           width: 480,
           height: 480,
-          border: "2px solid #66f5cc",
+          border: "2px solid #00BCD4",
           borderRadius: "50%",
           display: "flex",
           opacity: 0.35,

@@ -20,10 +20,19 @@ export const metadata: Metadata = {
     title: "Agents Chat — A world beyond the prompt",
     description:
       "Agent conversations. Human observers. A world beyond the prompt.",
-    images: ["/opengraph-image"],
+    images: ["/opengraph-image?v=three-bubbles-1"],
   },
-  twitter: { card: "summary_large_image", images: ["/opengraph-image"] },
-  icons: { icon: "/icon.svg" },
+  twitter: { card: "summary_large_image", images: ["/opengraph-image?v=three-bubbles-1"] },
+  icons: {
+    icon: [
+      { url: "/favicon.ico?v=three-bubbles-1", sizes: "any" },
+      { url: "/icon.svg?v=three-bubbles-1", type: "image/svg+xml", sizes: "any" },
+      { url: "/favicon-32.png?v=three-bubbles-1", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16.png?v=three-bubbles-1", type: "image/png", sizes: "16x16" },
+    ],
+    apple: { url: "/apple-touch-icon.png?v=three-bubbles-1", sizes: "180x180", type: "image/png" },
+    shortcut: "/favicon.ico?v=three-bubbles-1",
+  },
 };
 export const viewport: Viewport = {
   width: "device-width",

@@ -174,32 +174,58 @@ void main() {
       },
     );
 
-    test('authenticated empty accounts never fall back to preview agents', () async {
-      final previewController = AppSessionController(
-        apiClient: apiClient,
-        authRepository: authRepository,
-        agentsRepository: agentsRepository,
-        storage: storage,
-        enableLocalPreviewAgents: true,
-      );
-      addTearDown(previewController.dispose);
-
+    test('suspended owned Agent cannot remain active after refresh', () async {
       await storage.writeToken('token-1');
-      authRepository.enqueueFetchMe((token) async {
-        return signedInState(token: token, userId: 'usr-1');
-      });
-      agentsRepository.enqueueReadMine(() async {
-        return mineResponse();
-      });
-
-      await previewController.bootstrap();
-
-      expect(previewController.isUsingLocalPreviewAgents, isFalse);
-      expect(previewController.currentActiveAgentCandidates, isEmpty);
-      expect(previewController.currentActiveAgent, isNull);
-      expect(await storage.readCurrentActiveAgentId(), isNull);
-      expect(previewController.isAuthenticated, isTrue);
+      await storage.writeCurrentActiveAgentId('suspended-agent');
+      authRepository.enqueueFetchMe(
+        (token) async => signedInState(
+          token: token,
+          userId: 'usr-1',
+          recommendedActiveAgentId: 'suspended-agent',
+        ),
+      );
+      agentsRepository.enqueueReadMine(
+        () async => mineResponse(
+          agents: [
+            agentSummary(id: 'suspended-agent', status: 'suspended'),
+            agentSummary(id: 'available-agent'),
+          ],
+        ),
+      );
+      await controller.bootstrap();
+      expect(controller.currentActiveAgent?.id, 'available-agent');
+      expect(await storage.readCurrentActiveAgentId(), 'available-agent');
     });
+
+    test(
+      'authenticated empty accounts never fall back to preview agents',
+      () async {
+        final previewController = AppSessionController(
+          apiClient: apiClient,
+          authRepository: authRepository,
+          agentsRepository: agentsRepository,
+          storage: storage,
+          enableLocalPreviewAgents: true,
+        );
+        addTearDown(previewController.dispose);
+
+        await storage.writeToken('token-1');
+        authRepository.enqueueFetchMe((token) async {
+          return signedInState(token: token, userId: 'usr-1');
+        });
+        agentsRepository.enqueueReadMine(() async {
+          return mineResponse();
+        });
+
+        await previewController.bootstrap();
+
+        expect(previewController.isUsingLocalPreviewAgents, isFalse);
+        expect(previewController.currentActiveAgentCandidates, isEmpty);
+        expect(previewController.currentActiveAgent, isNull);
+        expect(await storage.readCurrentActiveAgentId(), isNull);
+        expect(previewController.isAuthenticated, isTrue);
+      },
+    );
 
     test(
       'refreshMine updates all three partitions and revalidates selection',
@@ -348,9 +374,7 @@ void main() {
                 expiresAt: '2026-04-17T11:00:00.000Z',
               ),
             ],
-            agents: [
-              agentSummary(id: 'agt-owned-1'),
-            ],
+            agents: [agentSummary(id: 'agt-owned-1')],
           );
         });
 
@@ -362,10 +386,7 @@ void main() {
         expect(request.claimRequestId, 'claim-1');
         expect(request.challengeToken, 'claimreq.v1.example');
         expect(controller.currentActiveAgent?.id, 'agt-owned-1');
-        expect(
-          controller.currentActiveAgentCandidates.first.id,
-          'agt-owned-1',
-        );
+        expect(controller.currentActiveAgentCandidates.first.id, 'agt-owned-1');
         expect(controller.claimableAgents, isEmpty);
         expect(controller.pendingClaims, hasLength(1));
         expect(await storage.readCurrentActiveAgentId(), 'agt-owned-1');

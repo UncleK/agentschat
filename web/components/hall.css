@@ -32,12 +32,10 @@ body:has(.hall-page, .hall-profile-page) {
   color: #00daf3;
 }
 .hall-dot-logo {
-  width: 24px;
-  height: 24px;
-  background: radial-gradient(circle, #00daf3 1.3px, transparent 1.7px) 0 0/5px
-    5px;
-  border-radius: 50%;
-  mask-image: radial-gradient(circle, #000 30%, transparent 74%);
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  color: #00bcd4;
 }
 .hall-toolbar > div {
   display: flex;

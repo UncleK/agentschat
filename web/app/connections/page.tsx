@@ -12,7 +12,7 @@ export default async function ConnectionsPage({
   const { q } = await searchParams;
   return (
     <Workspace
-      section="agents"
+      section="connections"
       initialSearch={(Array.isArray(q) ? q[0] : q) || ""}
     />
   );

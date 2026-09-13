@@ -20,28 +20,10 @@ class HubViewModel {
 
   int get ownedAgentCount => ownedAgents.length;
 
-  List<HubOwnedAgentModel> get carouselAgents {
-    if (ownedAgents.length <= 20) {
-      return ownedAgents;
-    }
-
-    final selectedAgentId = this.selectedAgentId;
-    if (selectedAgentId == null || selectedAgentId.isEmpty) {
-      return ownedAgents.take(20).toList(growable: false);
-    }
-
-    final selectedIndex = ownedAgents.indexWhere(
-      (agent) => agent.id == selectedAgentId,
-    );
-    if (selectedIndex < 0 || selectedIndex < 20) {
-      return ownedAgents.take(20).toList(growable: false);
-    }
-
-    return <HubOwnedAgentModel>[
-      ...ownedAgents.take(19),
-      ownedAgents[selectedIndex],
-    ];
-  }
+  // PageView builds lazily; all usable Agents must remain reachable.
+  List<HubOwnedAgentModel> get carouselAgents => ownedAgents
+      .where((agent) => agent.statusLabel.toLowerCase() != 'suspended')
+      .toList(growable: false);
 
   bool get hasOwnedAgents => carouselAgents.isNotEmpty;
   bool get hasClaimableAgents => claimableAgents.isNotEmpty;
@@ -90,11 +72,18 @@ class HubViewModel {
             return HubOwnedAgentModel(
               id: agent.id,
               name: _displayName(agent.displayName, fallback: handleLabel),
+              avatarUrl: agent.avatarUrl,
+              avatarEmoji: agent.avatarEmoji,
               handle: handleLabel,
               headline:
                   previewProfile?.headline ??
                   agent.bio ??
-                  localizedAppText(key: 'msgHandleLabelIsReadyForDirectUsec8746e6d', args: <String, Object?>{'handleLabel': handleLabel}, en: '$handleLabel is ready for direct use.', zhHans: '$handleLabel 已可直接使用。'),
+                  localizedAppText(
+                    key: 'msgHandleLabelIsReadyForDirectUsec8746e6d',
+                    args: <String, Object?>{'handleLabel': handleLabel},
+                    en: '$handleLabel is ready for direct use.',
+                    zhHans: '$handleLabel 已可直接使用。',
+                  ),
               runtimeLabel:
                   previewProfile?.runtimeLabel ??
                   _runtimeLabelForOwnerType(agent.ownerType),
@@ -120,7 +109,13 @@ class HubViewModel {
               handle: handleLabel,
               headline:
                   agent.bio ??
-                  localizedAppText(key: 'msgHandleLabelMustCompleteClaimBeforeItCanBeActivefc999748', args: <String, Object?>{'handleLabel': handleLabel}, en: '$handleLabel must complete claim before it can be active.', zhHans: '$handleLabel 需要完成认领后才能激活。'),
+                  localizedAppText(
+                    key:
+                        'msgHandleLabelMustCompleteClaimBeforeItCanBeActivefc999748',
+                    args: <String, Object?>{'handleLabel': handleLabel},
+                    en: '$handleLabel must complete claim before it can be active.',
+                    zhHans: '$handleLabel 需要完成认领后才能激活。',
+                  ),
               statusLabel: _titleCase(agent.status),
             );
           })
@@ -130,13 +125,21 @@ class HubViewModel {
             final hasTargetAgent = claim.agentId.trim().isNotEmpty;
             final handleLabel = hasTargetAgent
                 ? _handleLabel(claim.handle, fallback: claim.agentId)
-                : localizedAppText(key: 'msgWaitingForYourAgentToAcceptThisLink0da52583', en: 'Waiting for your agent to accept this link', zhHans: '等待你的智能体接受此链接');
+                : localizedAppText(
+                    key: 'msgWaitingForYourAgentToAcceptThisLink0da52583',
+                    en: 'Waiting for your agent to accept this link',
+                    zhHans: '等待你的智能体接受此链接',
+                  );
             return HubPendingClaimModel(
               claimRequestId: claim.claimRequestId,
               agentId: claim.agentId,
               name: hasTargetAgent
                   ? _displayName(claim.displayName, fallback: handleLabel)
-                  : localizedAppText(key: 'msgPendingClaimLink40b61bf3', en: 'Pending claim link', zhHans: '待认领链接'),
+                  : localizedAppText(
+                      key: 'msgPendingClaimLink40b61bf3',
+                      en: 'Pending claim link',
+                      zhHans: '待认领链接',
+                    ),
               handle: handleLabel,
               statusLabel: _titleCase(claim.status),
               requestedAtLabel: _compactTimestamp(claim.requestedAt),
@@ -157,7 +160,11 @@ class HubViewModel {
     final provider = _providerLabel(authState.authProvider ?? 'email');
     final username = authState.username.trim();
     final email = authState.email.isEmpty
-        ? localizedAppText(key: 'msgSignedInHumanSessionc96f047e', en: 'Signed-in human session', zhHans: '已登录的人类会话')
+        ? localizedAppText(
+            key: 'msgSignedInHumanSessionc96f047e',
+            en: 'Signed-in human session',
+            zhHans: '已登录的人类会话',
+          )
         : authState.email;
     final handle = username.isNotEmpty ? '@$username' : email;
     return HubHumanAuthModel(
@@ -168,8 +175,18 @@ class HubViewModel {
           : authState.displayName,
       handle: handle,
       statusLine: authState.emailVerified
-          ? localizedAppText(key: 'msgActiveAgentSelectionImportAndClaimNowFollowThePersistedcae4c068', en: 'Active-agent selection, import, and claim now follow the persisted global session state.', zhHans: '当前激活智能体选择、导入和认领状态都会跟随已持久化的全局会话。')
-          : localizedAppText(key: 'msgEmailNotVerifiedYetVerifyItToEnablePasswordRecovery4280e73e', en: 'Email not verified yet. Verify it to enable password recovery on this address.', zhHans: '邮箱尚未验证。完成验证后才能为此地址启用找回密码。'),
+          ? localizedAppText(
+              key:
+                  'msgActiveAgentSelectionImportAndClaimNowFollowThePersistedcae4c068',
+              en: 'Active-agent selection, import, and claim now follow the persisted global session state.',
+              zhHans: '当前激活智能体选择、导入和认领状态都会跟随已持久化的全局会话。',
+            )
+          : localizedAppText(
+              key:
+                  'msgEmailNotVerifiedYetVerifyItToEnablePasswordRecovery4280e73e',
+              en: 'Email not verified yet. Verify it to enable password recovery on this address.',
+              zhHans: '邮箱尚未验证。完成验证后才能为此地址启用找回密码。',
+            ),
       email: email,
       isEmailVerified: authState.emailVerified,
     );
@@ -191,15 +208,27 @@ String _displayName(String value, {required String fallback}) {
 
 String _runtimeLabelForOwnerType(String ownerType) {
   if (ownerType.toLowerCase() == 'self') {
-    return localizedAppText(key: 'msgSelfOwned6a8f6e5f', en: 'Self-owned', zhHans: '自有');
+    return localizedAppText(
+      key: 'msgSelfOwned6a8f6e5f',
+      en: 'Self-owned',
+      zhHans: '自有',
+    );
   }
-  return localizedAppText(key: 'msgHumanOwned7a57b2fe', en: 'Human-owned', zhHans: '人类拥有');
+  return localizedAppText(
+    key: 'msgHumanOwned7a57b2fe',
+    en: 'Human-owned',
+    zhHans: '人类拥有',
+  );
 }
 
 String _providerLabel(String provider) {
   final normalized = provider.trim().toLowerCase();
   return switch (normalized) {
-    'email' => localizedAppText(key: 'msgEmail84add5b2', en: 'Email', zhHans: '邮箱'),
+    'email' => localizedAppText(
+      key: 'msgEmail84add5b2',
+      en: 'Email',
+      zhHans: '邮箱',
+    ),
     'google' => 'Google',
     'apple' => 'Apple',
     _ => _titleCase(provider),
@@ -209,13 +238,29 @@ String _providerLabel(String provider) {
 String _titleCase(String value) {
   final normalized = value.trim();
   if (normalized.isEmpty) {
-    return localizedAppText(key: 'msgUnknownbc7819b3', en: 'Unknown', zhHans: '未知');
+    return localizedAppText(
+      key: 'msgUnknownbc7819b3',
+      en: 'Unknown',
+      zhHans: '未知',
+    );
   }
 
   return switch (normalized.toLowerCase()) {
-    'online' => localizedAppText(key: 'msgOnlinec3e839df', en: 'Online', zhHans: '在线'),
-    'offline' => localizedAppText(key: 'msgOfflinee01fa717', en: 'Offline', zhHans: '离线'),
-    'debating' => localizedAppText(key: 'msgDebating598be654', en: 'Debating', zhHans: '辩论中'),
+    'online' => localizedAppText(
+      key: 'msgOnlinec3e839df',
+      en: 'Online',
+      zhHans: '在线',
+    ),
+    'offline' => localizedAppText(
+      key: 'msgOfflinee01fa717',
+      en: 'Offline',
+      zhHans: '离线',
+    ),
+    'debating' => localizedAppText(
+      key: 'msgDebating598be654',
+      en: 'Debating',
+      zhHans: '辩论中',
+    ),
     'pending' => localizedAppText(
       key: 'msgHubPendingStatus',
       en: 'Pending',
@@ -226,19 +271,44 @@ String _titleCase(String value) {
       en: 'Active',
       zhHans: '激活',
     ),
-    'claimed' => localizedAppText(key: 'msgClaimed83c87884', en: 'Claimed', zhHans: '已认领'),
-    'approved' => localizedAppText(key: 'msgApproved41b81eb8', en: 'Approved', zhHans: '已批准'),
-    'rejected' => localizedAppText(key: 'msgRejected27eeb7a2', en: 'Rejected', zhHans: '已拒绝'),
-    'expired' => localizedAppText(key: 'msgExpireda689a999', en: 'Expired', zhHans: '已过期'),
-    'trending' => localizedAppText(key: 'msgTrending8a12d562', en: 'Trending', zhHans: '热门'),
-    _ => '${normalized[0].toUpperCase()}${normalized.substring(1).toLowerCase()}',
+    'claimed' => localizedAppText(
+      key: 'msgClaimed83c87884',
+      en: 'Claimed',
+      zhHans: '已认领',
+    ),
+    'approved' => localizedAppText(
+      key: 'msgApproved41b81eb8',
+      en: 'Approved',
+      zhHans: '已批准',
+    ),
+    'rejected' => localizedAppText(
+      key: 'msgRejected27eeb7a2',
+      en: 'Rejected',
+      zhHans: '已拒绝',
+    ),
+    'expired' => localizedAppText(
+      key: 'msgExpireda689a999',
+      en: 'Expired',
+      zhHans: '已过期',
+    ),
+    'trending' => localizedAppText(
+      key: 'msgTrending8a12d562',
+      en: 'Trending',
+      zhHans: '热门',
+    ),
+    _ =>
+      '${normalized[0].toUpperCase()}${normalized.substring(1).toLowerCase()}',
   };
 }
 
 String _compactTimestamp(String value) {
   final normalized = value.trim();
   if (normalized.isEmpty) {
-    return localizedAppText(key: 'msgUnknownbc7819b3', en: 'Unknown', zhHans: '未知');
+    return localizedAppText(
+      key: 'msgUnknownbc7819b3',
+      en: 'Unknown',
+      zhHans: '未知',
+    );
   }
 
   final datePortion = normalized.split('T').first;

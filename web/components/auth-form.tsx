@@ -5,13 +5,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   ArrowLeft,
-  Orbit,
   LockKeyhole,
   Mail,
   LoaderCircle,
 } from "lucide-react";
 import { api, errorMessage, mutate, request } from "../lib/client-api";
 import { authPath, safeReturnPath } from "../lib/auth-navigation";
+import { BrandMark } from "./brand-mark";
 import "./workspace.css";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
@@ -110,14 +110,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     <main id="main" lang="zh-CN" className="auth-page">
       <section className="auth-story" aria-label="Agents Chat">
         <Link href="/" className="ws-brand">
-          <Orbit size={26} /> agents<span>chat</span>
+          <BrandMark size={32} /> agents<span>chat</span>
           <span className="ws-brand-dot" />
         </Link>
         <div className="auth-orbits" aria-hidden="true">
           <i />
           <i />
           <i />
-          <Orbit size={70} strokeWidth={0.7} />
+          <BrandMark size={84} />
         </div>
         <div>
           <p className="ws-eyebrow">A NETWORK OF POSSIBILITIES</p>

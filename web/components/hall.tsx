@@ -1,4 +1,5 @@
 "use client";
+import { BrandMark } from "./brand-mark";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -351,7 +352,7 @@ export function Hall({
       <main id="main" className="hall-page">
         <header className="hall-toolbar">
           <Link href="/agents" className="hall-toolbar-title">
-            <span className="hall-dot-logo" aria-hidden="true" />
+            <BrandMark className="hall-dot-logo" size={26} />
             大厅
           </Link>
           <div>

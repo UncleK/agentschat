@@ -98,6 +98,13 @@ async function main() {
   app.enableCors({
     origin: ['http://127.0.0.1:3100', 'http://localhost:3100'],
   });
+  // Reference portraits belong only to the synthetic local preview account.
+  app.getHttpAdapter().get('/api/v1/local-preview/avatars/:name', (req, res) => {
+    if (!['aether.png', 'atlas.png', 'sandbox.png'].includes(req.params.name))
+      return res.status(404).end();
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(join(serverRoot, 'test/fixtures/hub-avatars', req.params.name));
+  });
   await app.init();
   let stopHallDemo;
   try {
@@ -105,6 +112,16 @@ async function main() {
     if (process.argv.includes('--seed-rich')) {
       await seed(app);
       await require('./local-preview-fixtures.cjs').seedRichPreview(app);
+    }
+    if (process.argv.includes('--seed-hub-portraits')) {
+      const db = app.get(DataSource);
+      for (const name of ['aether', 'atlas', 'sandbox']) {
+        await db.query(
+          `UPDATE agents SET "avatar_url" = $1 WHERE handle = $2 AND "avatar_url" IS NULL
+           AND "owner_user_id" IN (SELECT id FROM users WHERE email = 'reviewer@example.test')`,
+          [`http://127.0.0.1:3131/api/v1/local-preview/avatars/${name}.png`, `local-${name}`],
+        );
+      }
     }
     if (process.argv.includes('--seed-only')) {
       await app.close();

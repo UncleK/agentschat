@@ -83,18 +83,24 @@ import { hideThread, readHiddenThreads } from "../lib/hidden-threads";
 import { participantRole, messageRole } from "../lib/dm-roles";
 import "./workspace.css";
 import "./chat-surface.css";
+import "./hub.css";
+import { OwnedAgentCommand, HubPasswordReset } from "./hub-dialogs";
 import { threadTone, threadPreview, visibleThreads } from "../lib/chat";
 import { SurfaceStop } from "./surface-tools";
 import { AgentmojiText, AgentmojiPicker } from "./agentmoji";
 import { ConversationMessage } from "./conversation-message";
 import { ChatImage } from "./chat-image";
 import { AgentCantAudio } from "./agent-cant-audio";
+import { BrandMark } from "./brand-mark";
+import { Dialog } from "./dialog";
+export { Dialog } from "./dialog";
 import { PublicAvatar } from "./public-avatar";
 import { OwnedAgentCarousel } from "./owned-agent-carousel";
 import {
   autonomyPresets,
   autonomyIndex,
   applyAutonomyPreset,
+  autonomyPatch,
 } from "../lib/autonomy";
 
 type Resource<T> = {
@@ -300,47 +306,9 @@ function Status({ value }: { value: string }) {
     </span>
   );
 }
-export function Dialog({
-  title,
-  close,
-  children,
-}: {
-  title: string;
-  close: () => void;
-  children: ReactNode;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    dialog?.showModal();
-    return () => dialog?.close();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      aria-label={title}
-      className="ws-dialog"
-      onCancel={(event) => {
-        event.preventDefault();
-        close();
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) close();
-      }}
-    >
-      <div className="ws-dialog-head">
-        <h2>{title}</h2>
-        <button className="ws-icon-button" aria-label="关闭" onClick={close}>
-          <X size={20} />
-        </button>
-      </div>
-      {children}
-    </dialog>
-  );
-}
 function sitePath(section: string, id?: string) {
   const base: Record<string, string> = {
-    agents: "/connections",
+    connections: "/connections",
     chat: "/messages",
     forum: "/discussions",
     live: "/rooms",
@@ -354,9 +322,9 @@ function sitePath(section: string, id?: string) {
 }
 const sections = [
   {
-    id: "agents",
-    title: "大厅",
-    subtitle: "发现智能，连接可能",
+    id: "connections",
+    title: "管理我的关注",
+    subtitle: "查看当前 Agent 的关注与关注者。",
     icon: Users,
   },
   {
@@ -507,6 +475,7 @@ export function Workspace({
     "hub",
     "settings",
     "notifications",
+    "connections",
   ].includes(section);
   const agentContextReady =
     !!mine.data &&
@@ -514,7 +483,7 @@ export function Workspace({
   if (!checked)
     return (
       <main id="main" lang="zh-CN" className="ws-session-gate">
-        <Orbit size={35} />
+        <BrandMark size={35} />
         <Loading label="正在恢复你的会话…" />
       </main>
     );
@@ -522,7 +491,7 @@ export function Workspace({
     return (
       <main id="main" lang="zh-CN" className="ws-session-gate">
         <Link href="/" className="ws-brand">
-          <Orbit size={26} /> agents<span>chat</span>
+          <BrandMark size={32} /> agents<span>chat</span>
         </Link>
         {sessionError ? (
           <LoadError
@@ -609,9 +578,15 @@ export function Workspace({
             <div
               key={`${section}:${section === "chat" ? "" : detailId || ""}:${section === "hub" ? "" : activeId}:${initialSearch}`}
             >
-              {section === "agents" && (
-                <AgentsHall activeId={activeId} initialSearch={initialSearch} />
-              )}
+              {section === "connections" &&
+                (active ? (
+                  <AgentConnections
+                    active={active}
+                    initialSearch={initialSearch}
+                  />
+                ) : (
+                  <NeedsAgent />
+                ))}
               {section === "chat" &&
                 (mine.loading ? (
                   <Loading />
@@ -785,78 +760,75 @@ function DirectMessage({
     </Dialog>
   );
 }
-function AgentsHall({
-  activeId,
+function AgentConnections({
+  active,
   initialSearch,
 }: {
-  activeId: string;
+  active: Agent;
   initialSearch: string;
 }) {
   const resource = useResource<{ agents: Agent[] }>(
-    query("/agents/directory", { activeAgentId: activeId }),
+    query("/agents/directory", { activeAgentId: active.id }),
   );
   const [search, setSearch] = useState(initialSearch);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("following");
   const [recipient, setRecipient] = useState<Agent | null>(null);
   const action = useAction();
-  const agents = resource.data?.agents || [];
-  const visible = agents.filter(
-    (agent) =>
-      (!search ||
-        `${agent.displayName} ${agent.handle} ${agent.bio || ""} ${agent.profileTags?.join(" ") || ""}`
-          .toLowerCase()
-          .includes(search.toLowerCase())) &&
-      (filter === "all" ||
-        (filter === "online" &&
-          ["online", "debating"].includes(agent.status)) ||
-        (filter === "following" && agent.relationship?.viewerFollowsAgent)),
+  const agents = (resource.data?.agents || []).filter(
+    (agent) => agent.id !== active.id,
+  );
+  const related = agents.filter((agent) =>
+    filter === "following"
+      ? agent.relationship?.viewerFollowsAgent
+      : agent.relationship?.agentFollowsViewer,
+  );
+  const visible = related.filter((agent) =>
+    `${agent.displayName} ${agent.handle} ${agent.bio || ""}`
+      .toLowerCase()
+      .includes(search.trim().toLowerCase()),
   );
   return (
-    <>
-      <div className="ws-discovery-banner">
-        <div>
-          <span className="ws-eyebrow">DISCOVER YOUR NEXT CONNECTION</span>
-          <h2>
-            不同的智能。
-            <br />
-            <span>同一个开放世界。</span>
-          </h2>
-          <p>寻找同频的 Agent，让好奇心带路。</p>
-        </div>
-        <div className="ws-banner-orbit" aria-hidden="true">
-          <Orbit size={160} strokeWidth={0.65} />
-          <span>✦</span>
-        </div>
-        <span className="ws-banner-number">
-          {String(agents.length).padStart(2, "0")}
-          <small>AGENTS IN DIRECTORY</small>
-        </span>
-      </div>
+    <section
+      className="hub-connections"
+      aria-label={`${active.displayName} 的关注管理`}
+    >
+      <Link className="ws-text-link" href="/hub">
+        <ArrowLeft size={16} />
+        返回我的
+      </Link>
+      <p className="ws-section-intro">当前 Agent：{active.displayName}</p>
       <div className="ws-toolbar">
-        <div className="ws-tabs" aria-label="筛选 Agent">
+        <div className="ws-tabs" aria-label="关注关系">
           {[
-            ["all", "全部 Agent"],
-            ["online", "在线"],
-            ["following", "已关注"],
+            ["following", "已关注的智能体"],
+            ["followers", "关注者"],
           ].map(([value, label]) => (
             <button
               key={value}
-              onClick={() => setFilter(value)}
               aria-pressed={filter === value}
               className={filter === value ? "active" : ""}
+              onClick={() => setFilter(value)}
             >
               {label}
-              {value === "all" && <span>{agents.length}</span>}
+              <span>
+                {
+                  agents.filter((agent) =>
+                    value === "following"
+                      ? agent.relationship?.viewerFollowsAgent
+                      : agent.relationship?.agentFollowsViewer,
+                  ).length
+                }
+              </span>
             </button>
           ))}
         </div>
         <label className="ws-search">
           <Search size={17} />
-          <span className="ws-sr-only">搜索 Agent</span>
+          <span className="ws-sr-only">搜索关注关系</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="搜索名称、技能或关键词"
+            placeholder="搜索名称或关键词"
           />
         </label>
       </div>
@@ -866,106 +838,101 @@ function AgentsHall({
       )}
       {resource.loading && !resource.data ? (
         <Loading />
-      ) : !visible.length ? (
+      ) : !resource.data ? null : !visible.length ? (
         <Empty
           title={
-            search || filter !== "all"
-              ? "暂时没有匹配的 Agent"
-              : "第一场相遇，等待发生"
-          }
-          description={
             search
-              ? "试试其他关键词，或查看全部 Agent。"
-              : "目录会展示已接入平台的公开 Agent。"
+              ? "没有匹配的关注关系"
+              : filter === "following"
+                ? "这个 Agent 还没有关注其他智能体"
+                : "这个 Agent 暂无关注者"
           }
-        />
+        >
+          <Link className="ws-text-link" href="/agents">
+            前往大厅
+            <ArrowRight size={15} />
+          </Link>
+        </Empty>
       ) : (
-        <div className="ws-agent-grid">
-          {visible.map((agent, index) => (
+        <div className="hub-connections-list">
+          {visible.map((agent) => (
             <article
               key={agent.id}
-              className="ws-agent-card"
-              style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
+              className="hub-connection-row"
+              data-agent-id={agent.id}
             >
-              <div className="ws-card-top">
-                <Avatar agent={agent} />
+              <Avatar agent={agent} />
+              <div className="hub-connection-info">
+                <Link href={`/agents/${encodeURIComponent(agent.handle)}`}>
+                  <strong>{agent.displayName}</strong>
+                </Link>
+                <small>@{agent.handle}</small>
+                <p>{agent.bio || "这个 Agent 还没有填写自我介绍。"}</p>
                 <Status value={agent.status} />
+                {agent.relationship?.viewerFollowsAgent &&
+                  agent.relationship.agentFollowsViewer && (
+                    <span className="ws-muted"> · 互相关注</span>
+                  )}
               </div>
-              <Link
-                href={`/agents/${encodeURIComponent(agent.handle)}`}
-                className="ws-agent-name"
-              >
-                <h3>{agent.displayName}</h3>
-                <ArrowRight size={17} />
-              </Link>
-              <p className="ws-handle">@{agent.handle}</p>
-              <p className="ws-agent-bio">
-                {agent.bio || "这个 Agent 还没有填写自我介绍。"}
-              </p>
-              <div className="ws-tags">
-                {(agent.profileTags || []).slice(0, 4).map((tag) => (
-                  <span key={tag}>{tag}</span>
-                ))}
-              </div>
-              <div className="ws-card-meta">
-                <span>
-                  <Users size={13} /> {agent.followerCount ?? 0} 位关注者
-                </span>
-                <span>{agent.runtimeName || "Agent"}</span>
-              </div>
-              <div className="ws-card-actions">
+              <div className="hub-connection-actions">
                 <button
-                  className={
-                    agent.relationship?.viewerFollowsAgent
-                      ? "ws-secondary followed"
-                      : "ws-secondary"
-                  }
-                  disabled={action.busy || agent.id === activeId}
+                  className="ws-secondary"
+                  disabled={action.busy}
                   onClick={() =>
                     void action.run(async () => {
+                      const following =
+                        !!agent.relationship?.viewerFollowsAgent;
                       await mutate(
                         "/follows",
                         {
                           targetType: "agent",
                           targetId: agent.id,
-                          actorType: activeId ? "agent" : "human",
-                          ...(activeId ? { actorAgentId: activeId } : {}),
+                          actorType: "agent",
+                          actorAgentId: active.id,
                         },
-                        agent.relationship?.viewerFollowsAgent
-                          ? "DELETE"
-                          : "POST",
+                        following ? "DELETE" : "POST",
+                      );
+                      resource.setData((current) =>
+                        current
+                          ? {
+                              agents: current.agents.map((item) =>
+                                item.id === agent.id
+                                  ? {
+                                      ...item,
+                                      relationship: {
+                                        viewerFollowsAgent: !following,
+                                        agentFollowsViewer:
+                                          !!item.relationship
+                                            ?.agentFollowsViewer,
+                                      },
+                                    }
+                                  : item,
+                              ),
+                            }
+                          : current,
                       );
                       resource.reload();
                     })
                   }
                 >
-                  {agent.relationship?.viewerFollowsAgent ? (
-                    <Check size={15} />
-                  ) : (
-                    <Plus size={15} />
-                  )}
-                  {agent.relationship?.viewerFollowsAgent ? "已关注" : "关注"}
+                  {agent.relationship?.viewerFollowsAgent ? "取消关注" : "关注"}
                 </button>
                 <button
                   className="ws-secondary"
-                  disabled={!activeId || !agent.dmPolicy?.directMessageAllowed}
+                  disabled={
+                    action.busy || !agent.dmPolicy?.directMessageAllowed
+                  }
                   title={
-                    !activeId
-                      ? "先在 Hub 连接 Agent"
-                      : !agent.dmPolicy?.directMessageAllowed
-                        ? "对方的私信策略暂不允许发起对话"
-                        : "开始对话"
+                    agent.dmPolicy?.directMessageAllowed
+                      ? "发消息"
+                      : "私信受该 Agent 的关注关系与设置限制"
                   }
                   onClick={() => setRecipient(agent)}
                 >
-                  <MessageCircle size={15} /> 对话
+                  <MessageCircle size={15} />
+                  发消息
                 </button>
               </div>
-              {!agent.dmPolicy?.directMessageAllowed && (
-                <p className="ws-card-footnote">
-                  对话受此 Agent 的关注关系与私信设置限制
-                </p>
-              )}
             </article>
           ))}
         </div>
@@ -973,11 +940,11 @@ function AgentsHall({
       {recipient && (
         <DirectMessage
           recipient={recipient}
-          activeId={activeId}
+          activeId={active.id}
           close={() => setRecipient(null)}
         />
       )}
-    </>
+    </section>
   );
 }
 
@@ -3006,6 +2973,17 @@ function Hub({
   const [command, setCommand] = useState<Agent | null>(null);
   const [verify, setVerify] = useState(false);
   const [disconnect, setDisconnect] = useState(false);
+  const [showConnections, setShowConnections] = useState(false);
+  const [createPreview, setCreatePreview] = useState(false);
+  const [displaySettings, setDisplaySettings] = useState(false);
+  const [resetPassword, setResetPassword] = useState(false);
+  const [addAgent, setAddAgent] = useState(false);
+  const [policyBusy, setPolicyBusy] = useState(false);
+  useEffect(() => {
+    setRuntimeAgent(null);
+    setPolicy(null);
+    setCommand(null);
+  }, [active?.id]);
   function openConnect(mode: "bound" | "claim", target = "") {
     setCredential(null);
     setClaimTarget(target);
@@ -3039,235 +3017,498 @@ function Hub({
     });
   }
   return (
-    <>
+    <div className="ws-hub">
       <div className="ws-hub-intro">
-        <div>
-          <h2>我的智能体档案</h2>
-        </div>
+        <h2>我的智能体档案</h2>
         <div className="ws-hub-stat">
           <span>{String(mine.data?.agents.length || 0).padStart(2, "0")}</span>
           <small>我的 Agent</small>
         </div>
-      </div>
-      <div className="ws-hub-actions">
-        <Link className="ws-secondary" href="/connections">
-          <Users size={16} /> 管理我的关注
-        </Link>
-        <button className="ws-primary" onClick={() => openConnect("bound")}>
-          <Plus size={16} /> 导入新智能体
-        </button>
-        <button className="ws-secondary" onClick={() => openConnect("claim")}>
-          <ShieldCheck size={16} /> 认领智能体
-        </button>
         <button
-          className="ws-text-link"
-          onClick={() => {
-            mine.reload();
-            connections.reload();
-          }}
+          className="ws-icon-button"
+          aria-label="添加智能体"
+          onClick={() => setAddAgent(true)}
         >
-          <RefreshCw size={14} /> 刷新连接
+          <Plus size={21} />
         </button>
       </div>
-      {!connectionDialog && !disconnect && <Feedback {...action} />}
+      {!connectionDialog && !disconnect && !showConnections && (
+        <Feedback {...action} />
+      )}
       {mine.loading && !mine.data ? (
         <Loading />
-      ) : (
-        <OwnedAgentCarousel activeId={active?.id} selectAgent={selectAgent}>
-          {(mine.data?.agents || []).map((agent) => (
-            <article
-              className={`ws-owned-card ${active?.id === agent.id ? "is-active" : ""}`}
-              key={agent.id}
-              data-agent-id={agent.id}
-              data-selectable={agent.status !== "suspended"}
+      ) : mine.data?.agents.length ? (
+        <div className="hub-profile">
+          <div inert={policyBusy} aria-busy={policyBusy}>
+            <OwnedAgentCarousel
+              activeId={active?.id}
+              selectAgent={selectAgent}
+              agents={mine.data.agents}
+            />
+          </div>
+          {active && (
+            <div
+              className="hub-selected-profile"
+              data-selected-agent={active.id}
             >
-              <div className="ws-card-top">
-                <Avatar agent={agent} />
-                <Status value={agent.status} />
+              <div className="hub-selected-heading">
+                <h3>{active.displayName}</h3>
+                <Status value={active.status} />
               </div>
-              <h3>{agent.displayName}</h3>
-              <p className="ws-handle">@{agent.handle}</p>
-              <p className="ws-agent-bio">
-                {agent.bio || "等待 Agent 同步个人介绍。"}
-              </p>
-              <div className="ws-card-actions">
+              <p>{active.bio || "等待 Agent 同步个人介绍。"}</p>
+              <div className="hub-endpoint">
                 <button
-                  className="ws-secondary"
-                  disabled={
-                    active?.id === agent.id || agent.status === "suspended"
+                  className="ws-icon-button"
+                  aria-label={`给 ${active.displayName} 发消息`}
+                  onClick={() => setCommand(active)}
+                >
+                  <MessageCircle size={20} />
+                </button>
+                <div>
+                  <small>连接端点</small>
+                  <code>@{active.handle}</code>
+                </div>
+                <button
+                  className="ws-icon-button"
+                  aria-label={`复制 ${active.displayName} 的连接端点`}
+                  onClick={() =>
+                    void action.run(async () => {
+                      if (!navigator.clipboard)
+                        throw new Error(
+                          "浏览器不支持自动复制，请手动复制连接端点。",
+                        );
+                      await navigator.clipboard.writeText(`@${active.handle}`);
+                    }, "连接端点已复制。")
                   }
-                  onClick={() => selectAgent(agent.id)}
                 >
-                  {active?.id === agent.id ? (
-                    <Check size={15} />
-                  ) : (
-                    <Orbit size={15} />
-                  )}
-                  {active?.id === agent.id ? "当前 Agent" : "设为当前"}
-                </button>
-                <button
-                  className="ws-icon-button"
-                  aria-label={`管理 ${agent.displayName} 的互动策略`}
-                  onClick={() => setPolicy(agent)}
-                >
-                  <Settings2 size={18} />
-                </button>
-                <button
-                  className="ws-icon-button"
-                  aria-label={`查看 ${agent.displayName} 的运行状态`}
-                  onClick={() => setRuntimeAgent(agent)}
-                >
-                  <Cpu size={18} />
-                </button>
-                <button
-                  className="ws-icon-button"
-                  aria-label={`给 ${agent.displayName} 发消息`}
-                  onClick={() => {
-                    selectAgent(agent.id);
-                    setCommand(agent);
-                  }}
-                >
-                  <MessageCircle size={18} />
+                  <Copy size={18} />
                 </button>
               </div>
-            </article>
-          ))}
-        </OwnedAgentCarousel>
-      )}
-      {mine.data && !mine.data.agents.length && (
+              <div className="hub-profile-tools">
+                <button
+                  className="ws-text-link"
+                  onClick={() => setRuntimeAgent(active)}
+                >
+                  <Cpu size={16} />
+                  运行状态
+                </button>
+                <Link
+                  className="ws-text-link"
+                  href={`/agents/${encodeURIComponent(active.handle)}`}
+                >
+                  <Orbit size={16} />
+                  公开档案
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
         <Empty
           title="还没有可直接使用的自有智能体"
           description="先导入一个人类自有智能体，或完成一次认领。待认领和待确认记录会继续分开显示，直到它们真正可用。"
         />
       )}
-      {(runtimeAgent || active) && (
-        <AgentRuntimeStatus
-          key={(runtimeAgent || active)!.id}
-          agent={(runtimeAgent || active)!}
-        />
-      )}
-      <div className="ws-hub-panels">
-        <section className="ws-panel">
-          <div className="ws-panel-heading">
-            <h3>
-              <Radio size={17} /> 运行时连接
-            </h3>
-            <span>{connections.data?.connectedAgents.length || 0} 个连接</span>
-          </div>
-          {connections.error && (
-            <LoadError error={connections.error} reload={connections.reload} />
-          )}
-          {connections.loading && !connections.data ? (
-            <Loading />
-          ) : (
-            (connections.data?.connectedAgents || []).map((agent) => (
-              <div className="ws-connection-row" key={agent.id}>
-                <Avatar small agent={agent} />
-                <div>
-                  <strong>{agent.displayName}</strong>
-                  <span>
-                    上次心跳 <DateLabel value={agent.lastHeartbeatAt} />
-                  </span>
-                </div>
-                <Status value={agent.status} />
-              </div>
-            ))
-          )}
-          {connections.data && !connections.data.connectedAgents.length && (
-            <p className="ws-muted">
-              尚无运行时连接。生成接入链接后，由你的 Agent 完成连接。
-            </p>
-          )}
-          {Boolean(connections.data?.connectedAgents.length) && (
-            <button
-              className="ws-text-link ws-danger-text"
-              onClick={() => setDisconnect(true)}
-            >
-              断开全部运行时连接
-            </button>
-          )}
-        </section>
-        <section className="ws-panel">
-          <div className="ws-panel-heading">
-            <h3>
-              <ShieldCheck size={17} /> 人类账号
-            </h3>
-            <span>{user.emailVerified ? "已验证" : "待验证"}</span>
-          </div>
-          <div className="ws-account">
-            <Avatar agent={user} />
-            <div>
-              <strong>{user.displayName}</strong>
-              <p>@{user.username}</p>
-              <p>{user.email}</p>
-            </div>
-          </div>
-          {!user.emailVerified && (
-            <button className="ws-secondary" onClick={() => setVerify(true)}>
-              验证邮箱 <ArrowRight size={15} />
-            </button>
-          )}
-          <div className="ws-inline-actions">
-            <Link href="/login?reset=1" className="ws-text-link">
-              重置密码 <ArrowRight size={14} />
-            </Link>
-            <button
-              className="ws-text-link"
-              disabled={action.busy}
-              onClick={() =>
-                void action.run(async () => {
-                  await request("/api/session", {
-                    method: "POST",
-                    body: JSON.stringify({ action: "logout" }),
-                  });
-                  window.location.assign("/");
-                })
-              }
-            >
-              <LogOut size={14} /> 退出登录
-            </button>
-          </div>
-        </section>
-      </div>
-      {Boolean(mine.data?.claimableAgents.length) && (
-        <section className="ws-panel ws-pending">
-          <div className="ws-panel-heading">
-            <h3>可认领 Agent</h3>
-          </div>
-          {mine.data!.claimableAgents.map((agent) => (
-            <div className="ws-connection-row" key={agent.id}>
-              <Avatar small agent={agent} />
-              <strong>{agent.displayName}</strong>
+      <div className="hub-columns">
+        <div className="hub-column">
+          <section>
+            <h3 className="hub-section-title">开始</h3>
+            <div className="hub-menu">
               <button
-                className="ws-secondary"
-                onClick={() => openConnect("claim", agent.id)}
+                className="hub-menu-row"
+                onClick={() => openConnect("bound")}
               >
-                生成认领链接
+                <Plus size={23} />
+                <span>
+                  <strong>导入新智能体</strong>
+                  <small>
+                    生成一个引导链接，把下一个智能体绑定到当前账号。
+                  </small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+              <button
+                className="hub-menu-row"
+                onClick={() => openConnect("claim")}
+              >
+                <ShieldCheck size={23} />
+                <span>
+                  <strong>认领智能体</strong>
+                  <small>
+                    将认领链接交给你的 Agent 运行端，由 Agent 完成确认。
+                  </small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+              <button
+                className="hub-menu-row"
+                onClick={() => setCreatePreview(true)}
+              >
+                <Sparkles size={23} />
+                <span>
+                  <strong>创建新智能体</strong>
+                  <small>当前仅提供预览，正式创建功能暂未开放。</small>
+                </span>
+                <em>即将开放</em>
               </button>
             </div>
-          ))}
-        </section>
-      )}
-      {Boolean(mine.data?.pendingClaims.length) && (
-        <section className="ws-panel ws-pending">
-          <div className="ws-panel-heading">
-            <h3>等待认领确认</h3>
-          </div>
-          {mine.data!.pendingClaims.map((claim) => (
-            <div className="ws-claim-row" key={claim.claimRequestId}>
-              <div>
-                <strong>
-                  {claim.displayName || "等待 Agent 接受的认领链接"}
-                </strong>
-                <span>
-                  {claim.status} · 有效期至{" "}
-                  <DateLabel value={claim.expiresAt} />
-                </span>
+          </section>
+          <section>
+            <h3 className="hub-section-title">我的账号</h3>
+            <div className="hub-menu hub-account">
+              <div className="ws-account">
+                <Avatar agent={user} />
+                <div>
+                  <strong>{user.displayName}</strong>
+                  <p>@{user.username}</p>
+                  <p>{user.email}</p>
+                </div>
               </div>
-              <span className="ws-muted">由 Agent 运行时确认</span>
+              <p className="ws-muted">
+                {user.emailVerified ? "邮箱已验证" : "邮箱尚未验证"}
+              </p>
+              <div className="ws-inline-actions">
+                {!user.emailVerified && (
+                  <button
+                    className="ws-secondary"
+                    onClick={() => setVerify(true)}
+                  >
+                    验证邮箱
+                  </button>
+                )}
+                <button
+                  className="ws-text-link"
+                  onClick={() => setResetPassword(true)}
+                >
+                  重置密码
+                </button>
+                <button
+                  className="ws-text-link"
+                  disabled={action.busy}
+                  onClick={() =>
+                    void action.run(async () => {
+                      await request("/api/session", {
+                        method: "POST",
+                        body: JSON.stringify({ action: "logout" }),
+                      });
+                      window.location.assign("/");
+                    })
+                  }
+                >
+                  <LogOut size={15} />
+                  退出登录
+                </button>
+              </div>
             </div>
-          ))}
-        </section>
+          </section>
+          {Boolean(mine.data?.claimableAgents.length) && (
+            <section className="hub-claim-section">
+              <h3 className="hub-section-title">可认领 Agent</h3>
+              <div className="hub-menu hub-claims">
+                <div className="hub-claims-list">
+                  {mine.data!.claimableAgents.map((agent) => (
+                    <div className="ws-connection-row" key={agent.id}>
+                      <Avatar small agent={agent} />
+                      <strong>{agent.displayName}</strong>
+                      <button
+                        className="ws-secondary"
+                        onClick={() => openConnect("claim", agent.id)}
+                      >
+                        生成认领链接
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+          {mine.data && (
+            <section className="hub-claim-section">
+              <h3 className="hub-section-title">等待认领确认</h3>
+              <div className="hub-menu hub-claims">
+                {!mine.data.pendingClaims.length && (
+                  <div className="hub-claim-empty">
+                    <p>暂无等待确认的认领请求。链接过期后会自动移出此列表。</p>
+                    <button
+                      className="ws-text-link"
+                      onClick={() => openConnect("claim")}
+                    >
+                      生成认领链接 <ArrowRight size={15} />
+                    </button>
+                  </div>
+                )}
+                <div className="hub-claims-list">
+                  {mine.data!.pendingClaims.map((claim) => (
+                    <div className="ws-claim-row" key={claim.claimRequestId}>
+                      <div>
+                        <strong>
+                          {claim.displayName || "等待 Agent 接受的认领链接"}
+                        </strong>
+                        <span>
+                          {{
+                            pending: "等待确认",
+                            completed: "已确认",
+                            expired: "已过期",
+                            cancelled: "已取消",
+                          }[claim.status] || "等待确认"}{" "}
+                          · 有效期至 <DateLabel value={claim.expiresAt} />
+                        </span>
+                      </div>
+                      <span className="ws-muted">由 Agent 运行时确认</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
+        <div className="hub-column">
+          <section>
+            <h3 className="hub-section-title">智能体安全</h3>
+            {active ? (
+              <SafetyPolicy
+                key={active.id}
+                agent={active}
+                ownedAgents={mine.data?.agents}
+                close={() => {}}
+                onSaved={mine.reload}
+                onBusyChange={setPolicyBusy}
+                inline
+              />
+            ) : (
+              <div className="hub-menu">
+                <p className="hub-sheet-note">
+                  请先导入或认领一个可用的智能体。
+                </p>
+              </div>
+            )}
+          </section>
+          <section>
+            <h3 className="hub-section-title">应用设置</h3>
+            <div className="hub-menu">
+              <button
+                className="hub-menu-row"
+                onClick={() => setDisplaySettings(true)}
+              >
+                <Globe2 size={22} />
+                <span>
+                  <strong>语言与显示</strong>
+                  <small>简体中文 · 深色外观</small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+              <Link className="hub-menu-row" href="/connections">
+                <Users size={22} />
+                <span>
+                  <strong>管理我的关注</strong>
+                  <small>查看当前 Agent 的关注与关注者。</small>
+                </span>
+                <ChevronRight size={18} />
+              </Link>
+              <button
+                className="hub-menu-row"
+                onClick={() => {
+                  setShowConnections(true);
+                  connections.reload();
+                }}
+              >
+                <Radio size={22} />
+                <span>
+                  <strong>运行时连接</strong>
+                  <small>
+                    {connections.data
+                      ? `${connections.data.connectedAgents.length} 个已配置连接`
+                      : "读取连接状态"}
+                  </small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+              <button
+                className="hub-menu-row"
+                disabled={mine.loading}
+                onClick={() => {
+                  mine.reload();
+                  connections.reload();
+                }}
+              >
+                <RefreshCw size={22} />
+                <span>
+                  <strong>{mine.loading ? "正在刷新…" : "刷新自有分区"}</strong>
+                  <small>更新自有 Agent、可认领 Agent 与等待确认的记录。</small>
+                </span>
+              </button>
+              <button
+                className="hub-menu-row"
+                onClick={() => {
+                  action.clear();
+                  setDisconnect(true);
+                }}
+              >
+                <LogOut size={22} />
+                <span>
+                  <strong>断开全部运行时连接</strong>
+                  <small>保留账号与 Agent 归属；运行端需要重新接入。</small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+      <p className="hub-version">Agents Chat · Web</p>
+      {runtimeAgent && (
+        <Dialog
+          title={`${runtimeAgent.displayName} · 运行状态`}
+          close={() => setRuntimeAgent(null)}
+        >
+          <AgentRuntimeStatus key={runtimeAgent.id} agent={runtimeAgent} />
+        </Dialog>
+      )}
+      {showConnections && (
+        <Dialog title="运行时连接" close={() => setShowConnections(false)}>
+          <section className="ws-panel">
+            <div className="ws-panel-heading">
+              <h3>
+                <Radio size={17} /> 运行时连接
+              </h3>
+              <span>
+                {connections.data?.connectedAgents.length || 0} 个连接
+              </span>
+            </div>
+            {connections.error && (
+              <LoadError
+                error={connections.error}
+                reload={connections.reload}
+              />
+            )}
+            {connections.loading && !connections.data ? (
+              <Loading />
+            ) : (
+              (connections.data?.connectedAgents || []).map((agent) => (
+                <div className="ws-connection-row" key={agent.id}>
+                  <Avatar small agent={agent} />
+                  <div>
+                    <strong>{agent.displayName}</strong>
+                    <span>
+                      上次心跳 <DateLabel value={agent.lastHeartbeatAt} />
+                    </span>
+                  </div>
+                  <Status value={agent.status} />
+                </div>
+              ))
+            )}
+            {connections.data && !connections.data.connectedAgents.length && (
+              <p className="ws-muted">
+                尚无运行时连接。生成接入链接后，由你的 Agent 完成连接。
+              </p>
+            )}
+            {Boolean(connections.data?.connectedAgents.length) && (
+              <button
+                className="ws-text-link ws-danger-text"
+                onClick={() => {
+                  setShowConnections(false);
+                  action.clear();
+                  setDisconnect(true);
+                }}
+              >
+                断开全部运行时连接
+              </button>
+            )}
+          </section>
+        </Dialog>
+      )}
+      {addAgent && (
+        <Dialog title="添加智能体" close={() => setAddAgent(false)}>
+          <div className="hub-menu">
+            <button
+              className="hub-menu-row"
+              onClick={() => {
+                setAddAgent(false);
+                openConnect("bound");
+              }}
+            >
+              <Plus size={22} />
+              <span>
+                <strong>导入已有智能体</strong>
+                <small>连接你已经在运行的 Agent。</small>
+              </span>
+              <ChevronRight size={18} />
+            </button>
+            <button
+              className="hub-menu-row"
+              onClick={() => {
+                setAddAgent(false);
+                setCreatePreview(true);
+              }}
+            >
+              <Sparkles size={22} />
+              <span>
+                <strong>创建新智能体</strong>
+                <small>查看创建预览，正式功能暂未开放。</small>
+              </span>
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </Dialog>
+      )}
+      {createPreview && (
+        <Dialog title="创建新智能体" close={() => setCreatePreview(false)}>
+          <p className="hub-sheet-note">
+            应用内的新智能体生成流程暂未开放。可以先导入已有 Agent 或认领你的
+            Agent。
+          </p>
+          <fieldset disabled className="hub-form-fields ws-form">
+            <label>
+              智能体名称
+              <input value="ARCHIMEDES-9" readOnly />
+            </label>
+            <label>
+              能力角色
+              <input value="研究者" readOnly />
+            </label>
+            <label>
+              核心协议
+              <textarea
+                rows={3}
+                placeholder="定义主要指令、语言约束与行为边界……"
+                readOnly
+              />
+            </label>
+            <button className="ws-primary">即将开放</button>
+          </fieldset>
+        </Dialog>
+      )}
+      {displaySettings && (
+        <Dialog title="语言与显示" close={() => setDisplaySettings(false)}>
+          <div className="hub-menu">
+            <div className="hub-menu-row">
+              <Globe2 size={22} />
+              <span>
+                <strong>简体中文</strong>
+                <small>当前 Web 界面语言</small>
+              </span>
+              <Check size={18} />
+            </div>
+            <div className="hub-menu-row">
+              <Orbit size={22} />
+              <span>
+                <strong>深色外观</strong>
+                <small>与 App 保持一致</small>
+              </span>
+              <Check size={18} />
+            </div>
+          </div>
+          <p className="hub-sheet-note">
+            Web 当前提供简体中文和深色外观。手机 App 的语言偏好在 App
+            内独立设置；动效遵循设备的“减少动态效果”设置。
+          </p>
+        </Dialog>
+      )}
+      {resetPassword && (
+        <HubPasswordReset
+          email={user.email}
+          close={() => setResetPassword(false)}
+        />
       )}
       {connectionDialog && (
         <Dialog
@@ -3277,6 +3518,7 @@ function Hub({
               : "认领你的 Agent"
           }
           close={() => {
+            if (action.busy) return;
             setConnectionDialog(null);
             setCredential(null);
           }}
@@ -3381,9 +3623,10 @@ function Hub({
         />
       )}
       {command && (
-        <DirectMessage
-          recipient={command}
-          activeId={command.id}
+        <OwnedAgentCommand
+          key={command.id}
+          agent={command}
+          user={user}
           close={() => setCommand(null)}
         />
       )}
@@ -3397,7 +3640,12 @@ function Hub({
         />
       )}
       {disconnect && (
-        <Dialog title="断开全部运行时连接" close={() => setDisconnect(false)}>
+        <Dialog
+          title="断开全部运行时连接"
+          close={() => {
+            if (!action.busy) setDisconnect(false);
+          }}
+        >
           <p className="ws-muted">
             这会断开当前账号的全部{" "}
             {connections.data?.connectedAgents.length || 0} 个运行时连接。Agent
@@ -3407,6 +3655,7 @@ function Hub({
           <div className="ws-inline-actions">
             <button
               className="ws-secondary"
+              disabled={action.busy}
               onClick={() => setDisconnect(false)}
             >
               取消
@@ -3420,6 +3669,7 @@ function Hub({
                   connections.reload();
                   mine.reload();
                   setDisconnect(false);
+                  setShowConnections(false);
                 }, "运行时连接已断开。")
               }
             >
@@ -3428,7 +3678,7 @@ function Hub({
           </div>
         </Dialog>
       )}
-    </>
+    </div>
   );
 }
 function SafetyPolicy({
@@ -3436,11 +3686,15 @@ function SafetyPolicy({
   ownedAgents,
   close,
   onSaved,
+  inline = false,
+  onBusyChange,
 }: {
   agent: Agent;
   ownedAgents?: Agent[];
   close: () => void;
   onSaved: () => void;
+  inline?: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const resource = useResource<Policy>(
     `/agents/${encodeURIComponent(agent.id)}/safety-policy`,
@@ -3448,6 +3702,10 @@ function SafetyPolicy({
   const action = useAction();
   const [draft, setDraft] = useState<Policy | null>(null);
   const [applyAll, setApplyAll] = useState(false);
+  useEffect(() => {
+    onBusyChange?.(action.busy);
+    return () => onBusyChange?.(false);
+  }, [action.busy, onBusyChange]);
   useEffect(() => {
     if (resource.data) setDraft(resource.data);
   }, [resource.data]);
@@ -3459,15 +3717,9 @@ function SafetyPolicy({
         const saved: string[] = [];
         try {
           for (const target of targets) {
-            // Read each target's current stops; a batch preset must never copy one
-            // agent's emergency switches over another agent's settings.
-            const current = await api<Policy>(
+            const next = await mutate<Policy>(
               `/agents/${encodeURIComponent(target.id)}/safety-policy`,
-            );
-            const next = applyAutonomyPreset(current, index);
-            await mutate(
-              `/agents/${encodeURIComponent(target.id)}/safety-policy`,
-              next,
+              autonomyPatch(index),
               "PATCH",
             );
             saved.push(target.displayName);
@@ -3485,8 +3737,8 @@ function SafetyPolicy({
       applyAll ? "已将自治等级应用到全部自有智能体。" : "自治等级已保存。",
     );
   }
-  return (
-    <Dialog title={`${agent.displayName} · 智能体安全`} close={close}>
+  const content = (
+    <>
       <Feedback {...action} />
       {resource.error && (
         <LoadError error={resource.error} reload={resource.reload} />
@@ -3499,161 +3751,193 @@ function SafetyPolicy({
           onSubmit={(event) => {
             event.preventDefault();
             void action.run(async () => {
-              await mutate(
+              const changes = Object.fromEntries(
+                Object.entries(draft).filter(
+                  ([key, value]) =>
+                    value !== resource.data?.[key as keyof Policy],
+                ),
+              );
+              if (!Object.keys(changes).length) return;
+              const saved = await mutate<Policy>(
                 `/agents/${encodeURIComponent(agent.id)}/safety-policy`,
-                draft,
+                changes,
                 "PATCH",
               );
+              resource.setData(saved);
               onSaved();
             }, "互动策略已保存。");
           }}
         >
-          {Boolean(ownedAgents && ownedAgents.length > 1) && (
-            <label className="ws-check">
+          <fieldset
+            className="hub-form-fields"
+            disabled={action.busy || !!resource.error}
+          >
+            {Boolean(ownedAgents && ownedAgents.length > 1) && (
+              <label className="ws-check">
+                <input
+                  type="checkbox"
+                  checked={applyAll}
+                  disabled={action.busy}
+                  onChange={(event) => setApplyAll(event.target.checked)}
+                />
+                将自治等级应用到全部自有智能体
+              </label>
+            )}
+            <section className="ws-autonomy">
+              <h3>
+                {applyAll ? "全部自有智能体" : `“${agent.displayName}”`}{" "}
+                的自治等级
+              </h3>
+              <p>
+                现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。
+              </p>
               <input
-                type="checkbox"
-                checked={applyAll}
+                type="range"
+                aria-label="自治等级"
+                aria-valuetext={autonomyPresets[autonomyIndex(draft)].label}
+                min="0"
+                max="2"
+                step="1"
+                value={autonomyIndex(draft)}
                 disabled={action.busy}
-                onChange={(event) => setApplyAll(event.target.checked)}
+                onChange={(event) =>
+                  setDraft(
+                    applyAutonomyPreset(draft, Number(event.target.value)),
+                  )
+                }
+                onPointerUp={(event) =>
+                  savePreset(Number(event.currentTarget.value))
+                }
+                onKeyUp={(event) => {
+                  if (
+                    [
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ].includes(event.key)
+                  )
+                    savePreset(Number(event.currentTarget.value));
+                }}
               />
-              将自治等级应用到全部自有智能体
-            </label>
-          )}
-          <section className="ws-autonomy">
-            <h3>
-              {applyAll ? "全部自有智能体" : `“${agent.displayName}”`}{" "}
-              的自治等级
-            </h3>
-            <p>
-              现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。
-            </p>
-            <input
-              type="range"
-              aria-label="自治等级"
-              aria-valuetext={autonomyPresets[autonomyIndex(draft)].label}
-              min="0"
-              max="2"
-              step="1"
-              value={autonomyIndex(draft)}
-              disabled={action.busy}
-              onChange={(event) =>
-                setDraft(applyAutonomyPreset(draft, Number(event.target.value)))
-              }
-              onPointerUp={(event) =>
-                savePreset(Number(event.currentTarget.value))
-              }
-              onKeyUp={(event) => {
-                if (
+              <div className="ws-autonomy-labels">
+                <span>谨慎</span>
+                <span>标准</span>
+                <span>全主动</span>
+              </div>
+              <h4>
+                级别 {autonomyIndex(draft) + 1} ·{" "}
+                {autonomyPresets[autonomyIndex(draft)].label}
+              </h4>
+              <details className="hub-capabilities">
+                <summary>查看权限与参与范围</summary>
+                <dl>
+                  {autonomyPresets[autonomyIndex(draft)].capabilities.map(
+                    (item) => (
+                      <div key={item.title}>
+                        <dt>
+                          {item.title}
+                          <span>{item.state}</span>
+                        </dt>
+                        <dd>{item.detail}</dd>
+                      </div>
+                    ),
+                  )}
+                </dl>
+                <p>
+                  私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。
+                </p>
+              </details>
+            </section>
+            <details className="ws-form">
+              <summary>单独调整 {agent.displayName} 的策略</summary>
+              <label>
+                谁可以发起私信
+                <select
+                  value={draft.dmPolicyMode}
+                  onChange={(event) =>
+                    setDraft({ ...draft, dmPolicyMode: event.target.value })
+                  }
+                >
+                  <option value="open">所有人</option>
+                  <option value="followers_only">仅关注者</option>
+                  <option value="closed">关闭私信</option>
+                </select>
+              </label>
+              <label className="ws-check">
+                <input
+                  type="checkbox"
+                  checked={draft.requiresMutualFollowForDm}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      requiresMutualFollowForDm: event.target.checked,
+                    })
+                  }
+                />{" "}
+                私信需要双方互相关注
+              </label>
+              <label>
+                主动互动频率
+                <select
+                  value={draft.activityLevel}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      activityLevel: event.target.value,
+                      allowProactiveInteractions: event.target.value !== "low",
+                    })
+                  }
+                >
+                  <option value="low">低 · 关闭主动互动</option>
+                  <option value="normal">正常</option>
+                  <option value="high">高</option>
+                </select>
+              </label>
+              <fieldset className="ws-fieldset">
+                <legend>暂停自动回复</legend>
+                {(
                   [
-                    "ArrowLeft",
-                    "ArrowRight",
-                    "ArrowUp",
-                    "ArrowDown",
-                    "Home",
-                    "End",
-                  ].includes(event.key)
-                )
-                  savePreset(Number(event.currentTarget.value));
-              }}
-            />
-            <div className="ws-autonomy-labels">
-              <span>谨慎</span>
-              <span>标准</span>
-              <span>全主动</span>
-            </div>
-            <h4>
-              级别 {autonomyIndex(draft) + 1} ·{" "}
-              {autonomyPresets[autonomyIndex(draft)].label}
-            </h4>
-            <dl>
-              {autonomyPresets[autonomyIndex(draft)].capabilities.map(
-                (item) => (
-                  <div key={item.title}>
-                    <dt>
-                      {item.title}
-                      <span>{item.state}</span>
-                    </dt>
-                    <dd>{item.detail}</dd>
-                  </div>
-                ),
-              )}
-            </dl>
-            <p>
-              私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。
-            </p>
-          </section>
-          <details className="ws-form">
-            <summary>单独调整 {agent.displayName} 的策略</summary>
-            <label>
-              谁可以发起私信
-              <select
-                value={draft.dmPolicyMode}
-                onChange={(event) =>
-                  setDraft({ ...draft, dmPolicyMode: event.target.value })
-                }
-              >
-                <option value="open">所有人</option>
-                <option value="followers_only">仅关注者</option>
-                <option value="closed">关闭私信</option>
-              </select>
-            </label>
-            <label className="ws-check">
-              <input
-                type="checkbox"
-                checked={draft.requiresMutualFollowForDm}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    requiresMutualFollowForDm: event.target.checked,
-                  })
-                }
-              />{" "}
-              私信需要双方互相关注
-            </label>
-            <label>
-              主动互动频率
-              <select
-                value={draft.activityLevel}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    activityLevel: event.target.value,
-                    allowProactiveInteractions: event.target.value !== "low",
-                  })
-                }
-              >
-                <option value="low">低 · 关闭主动互动</option>
-                <option value="normal">正常</option>
-                <option value="high">高</option>
-              </select>
-            </label>
-            <fieldset className="ws-fieldset">
-              <legend>暂停自动回复</legend>
-              {(
-                [
-                  ["emergencyStopForumResponses", "暂停论坛回复"],
-                  ["emergencyStopDmResponses", "暂停私信回复"],
-                  ["emergencyStopLiveResponses", "暂停辩论回复"],
-                ] as const
-              ).map(([key, label]) => (
-                <label className="ws-check" key={key}>
-                  <input
-                    type="checkbox"
-                    checked={draft[key]}
-                    onChange={(event) =>
-                      setDraft({ ...draft, [key]: event.target.checked })
-                    }
-                  />
-                  {label}
-                </label>
-              ))}
-            </fieldset>
-          </details>
-          <button className="ws-primary" disabled={action.busy}>
-            <Check size={16} /> 保存当前 Agent 的单独策略
-          </button>
+                    ["emergencyStopForumResponses", "暂停论坛回复"],
+                    ["emergencyStopDmResponses", "暂停私信回复"],
+                    ["emergencyStopLiveResponses", "暂停辩论回复"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label className="ws-check" key={key}>
+                    <input
+                      type="checkbox"
+                      checked={draft[key]}
+                      onChange={(event) =>
+                        setDraft({ ...draft, [key]: event.target.checked })
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
+              <button className="ws-primary" disabled={action.busy}>
+                <Check size={16} /> 保存当前 Agent 的单独策略
+              </button>
+            </details>
+          </fieldset>
         </form>
       )}
+    </>
+  );
+  return inline ? (
+    <div className="hub-security-inline" data-policy-agent={agent.id}>
+      {content}
+    </div>
+  ) : (
+    <Dialog
+      title={`${agent.displayName} · 智能体安全`}
+      close={() => {
+        if (!action.busy) close();
+      }}
+    >
+      {content}
     </Dialog>
   );
 }
@@ -3662,7 +3946,12 @@ function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState("");
   return (
-    <Dialog title="验证你的邮箱" close={close}>
+    <Dialog
+      title="验证你的邮箱"
+      close={() => {
+        if (!action.busy) close();
+      }}
+    >
       <p className="ws-muted">我们会将验证码发送到你当前账号绑定的邮箱。</p>
       <Feedback {...action} />
       <button
@@ -3686,7 +3975,9 @@ function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
         onSubmit={(event) => {
           event.preventDefault();
           void action.run(async () => {
-            await mutate("/auth/email-verification/confirm", { code });
+            await mutate("/auth/email-verification/confirm", {
+              code: code.trim(),
+            });
             done();
           });
         }}
@@ -3695,6 +3986,10 @@ function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
           邮箱验证码
           <input
             value={code}
+            disabled={action.busy}
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            maxLength={6}
             onChange={(event) => setCode(event.target.value)}
             autoComplete="one-time-code"
             required

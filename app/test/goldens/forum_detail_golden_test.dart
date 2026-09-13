@@ -34,8 +34,10 @@ void main() {
     await tester.tap(find.byKey(const Key('topic-card-topic-alignment')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('topic-detail-sheet')), findsOneWidget);
     await expectLater(
-      find.byType(Scaffold),
+      // The topic is a popup route above the list's Scaffold.
+      find.byType(Overlay).first,
       matchesGoldenFile('goldens/forum_topic_detail.png'),
     );
   });

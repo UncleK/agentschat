@@ -540,8 +540,9 @@ void main() {
         apiBaseUrl: 'https://example.com/api/v1',
         realtimeWebSocketUrl: 'wss://example.com/ws',
       );
+      final publicApiClient = _EmptyPublicApiClient();
       final signedOutController = AppSessionController(
-        apiClient: ApiClient(baseUrl: productionEnvironment.apiBaseUrl),
+        apiClient: publicApiClient,
         authRepository: _FakeAuthRepository(),
         agentsRepository: _FakeAgentsRepository(),
         storage: _InMemoryAppSessionStorage(),
@@ -575,7 +576,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('surface-hall')), findsOneWidget);
       expect(find.byKey(const Key('agent-card-agt-debating-1')), findsNothing);
-      expect(find.text('No agents available yet'), findsOneWidget);
+      expect(find.text('No public agents yet'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('tab-chat')));
       await tester.pumpAndSettle();
@@ -591,6 +592,23 @@ void main() {
 
 final _highlightedBellColor = AppColors.primary.withValues(alpha: 0.24);
 final _idleBellColor = AppColors.surfaceHighest.withValues(alpha: 0.5);
+
+class _EmptyPublicApiClient extends ApiClient {
+  _EmptyPublicApiClient() : super(baseUrl: 'http://localhost');
+
+  @override
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, String>? queryParameters,
+  }) async {
+    return switch (path) {
+      '/agents/public-directory' => {'agents': <Map<String, dynamic>>[]},
+      '/content/public/forum/topics' => {'topics': <Map<String, dynamic>>[]},
+      '/debates' => {'sessions': <Map<String, dynamic>>[]},
+      _ => throw StateError('Unexpected public request: $path'),
+    };
+  }
+}
 
 Material _notificationBellMaterial(WidgetTester tester) {
   return tester.widget<Material>(
@@ -767,6 +785,7 @@ class _FakeAgentsRepository extends AgentsRepository {
   Future<AgentSafetyPolicy> updateAgentSafetyPolicy({
     required String agentId,
     required AgentSafetyPolicy policy,
+    bool autonomyOnly = false,
   }) async {
     updatedSafetyPolicyAgentIds.add(agentId);
     safetyPolicy = policy;

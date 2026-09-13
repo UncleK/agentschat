@@ -192,6 +192,13 @@ void main() {
         final summaryFinder = find.byKey(
           const Key('agent-safety-autonomy-summary-agt-owned-1'),
         );
+        final details = find.descendant(
+          of: summaryFinder,
+          matching: find.byType(ExpansionTile),
+        );
+        await tester.ensureVisible(details);
+        await tester.tap(details);
+        await tester.pumpAndSettle();
         expect(summaryFinder, findsOneWidget);
         expect(
           find.descendant(of: summaryFinder, matching: find.text('Active')),
@@ -272,6 +279,13 @@ void main() {
         final summaryFinder = find.byKey(
           const Key('agent-safety-autonomy-summary-agt-owned-1'),
         );
+        final details = find.descendant(
+          of: summaryFinder,
+          matching: find.byType(ExpansionTile),
+        );
+        await tester.ensureVisible(details);
+        await tester.tap(details);
+        await tester.pumpAndSettle();
         expect(
           find.descendant(of: summaryFinder, matching: find.text('Guarded')),
           findsOneWidget,
@@ -392,6 +406,13 @@ void main() {
         final summaryFinder = find.byKey(
           const Key('agent-safety-autonomy-summary-agt-owned-1'),
         );
+        final details = find.descendant(
+          of: summaryFinder,
+          matching: find.byType(ExpansionTile),
+        );
+        await tester.ensureVisible(details);
+        await tester.tap(details);
+        await tester.pumpAndSettle();
         expect(
           find.descendant(of: summaryFinder, matching: find.text('Active')),
           findsOneWidget,
@@ -430,9 +451,9 @@ void main() {
           requiresMutualFollowForDm: true,
           allowProactiveInteractions: false,
           activityLevel: AgentActivityLevel.low,
-          emergencyStopForumResponses: false,
+          emergencyStopForumResponses: true,
           emergencyStopDmResponses: false,
-          emergencyStopLiveResponses: false,
+          emergencyStopLiveResponses: true,
         );
         const updatedPolicy = AgentSafetyPolicy(
           dmPolicyMode: AgentDmPolicyMode.open,
@@ -467,6 +488,8 @@ void main() {
           required policy,
         }) async {
           updatedCalls.add(agentId);
+          expect(policy.emergencyStopForumResponses, agentId == 'agt-owned-2');
+          expect(policy.emergencyStopLiveResponses, agentId == 'agt-owned-2');
           expect(policy.dmPolicyMode, AgentDmPolicyMode.open);
           expect(policy.requiresMutualFollowForDm, isFalse);
           expect(policy.allowProactiveInteractions, isTrue);
@@ -478,6 +501,8 @@ void main() {
           required policy,
         }) async {
           updatedCalls.add(agentId);
+          expect(policy.emergencyStopForumResponses, agentId == 'agt-owned-2');
+          expect(policy.emergencyStopLiveResponses, agentId == 'agt-owned-2');
           expect(policy.dmPolicyMode, AgentDmPolicyMode.open);
           expect(policy.requiresMutualFollowForDm, isFalse);
           expect(policy.allowProactiveInteractions, isTrue);
@@ -966,24 +991,34 @@ void main() {
       },
     );
 
-    testWidgets('refreshing a reordered list keeps the selected card and endpoint together', (
-      WidgetTester tester,
-    ) async {
-      final selected = agentSummary(id: 'agt-owned-1', displayName: 'Owned One');
-      await authenticateWithMine(mineResponse(agents: [selected]));
-      await pumpHub(tester);
-      agentsRepository.enqueueReadMine(() async => mineResponse(agents: [
-        agentSummary(id: 'agt-owned-3', displayName: 'New Three'),
-        agentSummary(id: 'agt-owned-2', displayName: 'New Two'),
-        selected,
-      ]));
-      await controller.refreshMine();
-      await tester.pumpAndSettle();
-      final carousel = tester.widget<PageView>(find.byKey(const Key('owned-agent-carousel')));
-      expect(carousel.controller!.page, 2);
-      expect(controller.currentActiveAgent?.id, 'agt-owned-1');
-      expect(find.text('@agt-owned-1'), findsOneWidget);
-    });
+    testWidgets(
+      'refreshing a reordered list keeps the selected card and endpoint together',
+      (WidgetTester tester) async {
+        final selected = agentSummary(
+          id: 'agt-owned-1',
+          displayName: 'Owned One',
+        );
+        await authenticateWithMine(mineResponse(agents: [selected]));
+        await pumpHub(tester);
+        agentsRepository.enqueueReadMine(
+          () async => mineResponse(
+            agents: [
+              agentSummary(id: 'agt-owned-3', displayName: 'New Three'),
+              agentSummary(id: 'agt-owned-2', displayName: 'New Two'),
+              selected,
+            ],
+          ),
+        );
+        await controller.refreshMine();
+        await tester.pumpAndSettle();
+        final carousel = tester.widget<PageView>(
+          find.byKey(const Key('owned-agent-carousel')),
+        );
+        expect(carousel.controller!.page, 2);
+        expect(controller.currentActiveAgent?.id, 'agt-owned-1');
+        expect(find.text('@agt-owned-1'), findsOneWidget);
+      },
+    );
 
     testWidgets('selecting an owned agent updates the global active agent', (
       WidgetTester tester,
@@ -1146,6 +1181,131 @@ void main() {
         expect(find.text('Run diagnostics'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'accepted first command clears draft even when history read fails',
+      (tester) async {
+        await authenticateWithMine(
+          mineResponse(
+            agents: [agentSummary(id: 'agt-owned-1', displayName: 'Owned One')],
+          ),
+        );
+        apiClient.enqueueGet((path, query) async {
+          expect(query?['threadUsage'], 'owned_agent_command');
+          return {'threads': <Map<String, dynamic>>[], 'nextCursor': null};
+        });
+        var sends = 0;
+        apiClient.enqueuePost((path, body) async {
+          sends++;
+          return {'threadId': 'accepted-thread', 'eventId': 'accepted-message'};
+        });
+        apiClient.enqueueGet(
+          (path, query) async => throw StateError('History unavailable'),
+        );
+        await pumpHub(tester);
+        await tester.tap(
+          find.byKey(const Key('selected-agent-message-button')),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const Key('owned-agent-command-input')),
+          'Do this once',
+        );
+        await tester.tap(
+          find.byKey(const Key('owned-agent-command-send-button')),
+        );
+        await tester.pumpAndSettle();
+        expect(sends, 1);
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const Key('owned-agent-command-input')),
+              )
+              .controller!
+              .text,
+          isEmpty,
+        );
+        expect(
+          find.text('Message sent. Refresh to load the conversation.'),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const Key('owned-agent-command-send-button')),
+        );
+        await tester.pumpAndSettle();
+        expect(sends, 1);
+      },
+    );
+
+    testWidgets('older command history survives a latest-page refresh', (
+      tester,
+    ) async {
+      await authenticateWithMine(
+        mineResponse(agents: [agentSummary(id: 'agt-owned-1')]),
+      );
+      Map<String, dynamic> message(String id, int minute) => {
+        'eventId': id,
+        'actor': {'type': 'human', 'id': 'usr-hub', 'displayName': 'Me'},
+        'contentType': 'text',
+        'content': id,
+        'occurredAt':
+            '2026-04-14T08:${minute.toString().padLeft(2, '0')}:00.000Z',
+      };
+      apiClient.enqueueGet(
+        (path, query) async => {
+          'threads': [
+            {
+              'threadId': 'history-thread',
+              'threadUsage': 'owned_agent_command',
+              'counterpart': {'type': 'human', 'id': 'usr-hub'},
+            },
+          ],
+        },
+      );
+      apiClient.enqueueGet(
+        (path, query) async => {
+          'messages': [message('recent', 2)],
+          'nextCursor': 'older-page',
+        },
+      );
+      apiClient.enqueueGet((path, query) async {
+        expect(query?['cursor'], 'older-page');
+        return {
+          'messages': [message('earlier', 1)],
+          'nextCursor': null,
+        };
+      });
+      apiClient.enqueueGet(
+        (path, query) async => {
+          'messages': [message('recent', 2), message('newest', 3)],
+          'nextCursor': 'older-page',
+        },
+      );
+      await pumpHub(tester);
+      await tester.tap(find.byKey(const Key('selected-agent-message-button')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('owned-agent-command-older')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('owned-agent-command-older')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('owned-agent-command-msg-earlier')),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('owned-agent-command-msg-earlier')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('owned-agent-command-msg-newest')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('owned-agent-command-older')), findsNothing);
+    });
 
     testWidgets(
       'message button keeps the agent command sheet open and authenticates inline when the admin is signed out',
@@ -1311,6 +1471,44 @@ void main() {
         expect(find.textContaining('agents-chat://launch?'), findsOneWidget);
         expect(find.textContaining('mode=claim'), findsOneWidget);
         expect(controller.pendingClaims, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'all owned Agents remain reachable and selection waits for the swipe to settle',
+      (tester) async {
+        await authenticateWithMine(
+          mineResponse(
+            agents: List.generate(
+              25,
+              (i) => agentSummary(
+                id: 'agt-owned-${i + 1}',
+                displayName: 'Owned ${i + 1}',
+              ),
+            ),
+          ),
+        );
+        await pumpHub(tester);
+        final carousel = tester.widget<PageView>(
+          find.byKey(const Key('owned-agent-carousel')),
+        );
+        expect(carousel.childrenDelegate.estimatedChildCount, 25);
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byKey(const Key('owned-agent-carousel'))),
+        );
+        await gesture.moveBy(const Offset(-20, 0));
+        await tester.pump();
+        await gesture.moveBy(const Offset(-140, 0));
+        await tester.pump(const Duration(milliseconds: 80));
+        expect(controller.currentActiveAgent?.id, 'agt-owned-1');
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(controller.currentActiveAgent?.id, isNot('agt-owned-1'));
+        await controller.setCurrentActiveAgent('agt-owned-24');
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('owned-agent-next')));
+        await tester.pumpAndSettle();
+        expect(controller.currentActiveAgent?.id, 'agt-owned-25');
       },
     );
 

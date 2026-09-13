@@ -2,8 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SessionNavigation } from "./session-navigation";
+import { BrandMark } from "./brand-mark";
 import {
-  AudioLines,
   Bot,
   Compass,
   MessagesSquare,
@@ -55,7 +55,7 @@ export function SiteHeader() {
       <div className="site-header-inner">
         <Link className="brand" href="/" aria-label="Agents Chat 首页">
           <span className="brand-symbol">
-            <AudioLines size={23} />
+            <BrandMark />
           </span>
           agents<span className="brand-light">chat</span>
           <span className="brand-period">.</span>
@@ -98,8 +98,9 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div>
-        <Link className="brand" href="/">
-          agents<span className="brand-light">chat.</span>
+        <Link className="brand" href="/" aria-label="Agents Chat 首页">
+          <span className="brand-symbol"><BrandMark /></span>
+          agents<span className="brand-light">chat</span><span className="brand-period">.</span>
         </Link>
         <p>Agent 的交流中心 · 人类的观察席</p>
       </div>

@@ -25,6 +25,7 @@ import '../../core/widgets/surface_card.dart';
 import '../../core/widgets/swipe_back_sheet.dart';
 import 'hub_models.dart';
 import 'hub_view_model.dart';
+import 'hub_connections_sheet.dart';
 
 const _agentsChatSkillRepoUrl = 'https://github.com/UncleK/agentschat.git';
 const _agentsChatSkillRepoBranch = 'stable';
@@ -52,7 +53,7 @@ class _HubScreenState extends State<HubScreen> {
   @override
   void initState() {
     super.initState();
-    _agentPageController = PageController(viewportFraction: 0.34);
+    _agentPageController = PageController(viewportFraction: 0.38);
   }
 
   @override
@@ -91,7 +92,34 @@ class _HubScreenState extends State<HubScreen> {
 
   Future<void> _selectOwnedAgent(String agentId) async {
     final session = AppSessionScope.read(context);
-    await session.setCurrentActiveAgent(agentId);
+    if (session.currentActiveAgent?.id == agentId) return;
+    try {
+      await session.setCurrentActiveAgent(agentId);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar(
+        context.localizedText(
+          key: 'hubAgentSwitchFailed',
+          en: 'Unable to switch Agent. Try again.',
+          zhHans: '暂时无法切换 Agent，请重试。',
+        ),
+      );
+    }
+  }
+
+  void _moveCarouselTo(int index) {
+    if (!_agentPageController.hasClients) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _agentPageController.jumpToPage(index);
+    } else {
+      unawaited(
+        _agentPageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 360),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+    }
   }
 
   Future<void> _openClaimLauncherSheet({HubClaimableAgentModel? agent}) async {
@@ -508,8 +536,7 @@ class _HubScreenState extends State<HubScreen> {
         ? viewModel.ownedAgents
         : <HubOwnedAgentModel>[selectedAgent];
     final nextPolicies = <String, AgentSafetyPolicy>{
-      for (final agent in targetAgents)
-        agent.id: buildNext(_effectiveAgentSafety(agent)),
+      for (final agent in targetAgents) agent.id: buildNext(agent.safetyPolicy),
     };
 
     setState(() {
@@ -527,6 +554,7 @@ class _HubScreenState extends State<HubScreen> {
         await session.agentsRepository.updateAgentSafetyPolicy(
           agentId: agent.id,
           policy: nextPolicies[agent.id]!,
+          autonomyOnly: true,
         );
       }
       await session.refreshMine();
@@ -544,6 +572,12 @@ class _HubScreenState extends State<HubScreen> {
     } on ApiException catch (error) {
       if (error.isUnauthorized) {
         await session.handleUnauthorized();
+        if (mounted)
+          setState(() {
+            _isSavingAgentSecurity = false;
+            _globalAgentSafetyDraft = null;
+            _agentSafetyOverrides.clear();
+          });
         return;
       }
       await _restoreAgentSecurityState(session);
@@ -619,7 +653,8 @@ class _HubScreenState extends State<HubScreen> {
     _lastCarouselAgentIndex = targetIndex;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_agentPageController.hasClients ||
+      if (!mounted ||
+          !_agentPageController.hasClients ||
           _lastCarouselAgentId != selectedAgentId ||
           _lastCarouselAgentIndex != targetIndex) {
         return;
@@ -744,37 +779,94 @@ class _HubScreenState extends State<HubScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SizedBox(
-                            height: 170,
-                            child: PageView.builder(
-                              key: const Key('owned-agent-carousel'),
-                              controller: _agentPageController,
-                              clipBehavior: Clip.none,
-                              itemCount: viewModel.carouselAgents.length,
-                              onPageChanged: (index) {
-                                unawaited(
-                                  _selectOwnedAgent(
-                                    viewModel.carouselAgents[index].id,
-                                  ),
-                                );
+                            height: 210,
+                            child: NotificationListener<ScrollEndNotification>(
+                              onNotification: (notification) {
+                                if (notification.metrics.axis ==
+                                        Axis.horizontal &&
+                                    _agentPageController.hasClients) {
+                                  final index = (_agentPageController.page ?? 0)
+                                      .round();
+                                  if (index >= 0 &&
+                                      index < viewModel.carouselAgents.length) {
+                                    unawaited(
+                                      _selectOwnedAgent(
+                                        viewModel.carouselAgents[index].id,
+                                      ),
+                                    );
+                                  }
+                                }
+                                return false;
                               },
-                              itemBuilder: (context, index) {
-                                final agent = viewModel.carouselAgents[index];
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.xxs,
-                                  ),
-                                  child: _OwnedAgentCard(
-                                    agent: agent,
-                                    isSelected: agent.id == selectedAgent?.id,
-                                    laneOffset:
-                                        index - viewModel.selectedAgentIndex,
-                                    onTap: () {
-                                      unawaited(_selectOwnedAgent(agent.id));
+                              child: PageView.builder(
+                                key: const Key('owned-agent-carousel'),
+                                controller: _agentPageController,
+                                clipBehavior: Clip.hardEdge,
+                                itemCount: viewModel.carouselAgents.length,
+                                itemBuilder: (context, index) {
+                                  final agent = viewModel.carouselAgents[index];
+                                  return AnimatedBuilder(
+                                    animation: _agentPageController,
+                                    builder: (context, _) {
+                                      final page =
+                                          _agentPageController.hasClients &&
+                                              _agentPageController
+                                                  .position
+                                                  .hasContentDimensions
+                                          ? _agentPageController.page ??
+                                                viewModel.selectedAgentIndex
+                                                    .toDouble()
+                                          : viewModel.selectedAgentIndex
+                                                .toDouble();
+                                      return _OwnedAgentCard(
+                                        agent: agent,
+                                        isSelected:
+                                            agent.id == selectedAgent?.id,
+                                        laneOffset: index - page,
+                                        onTap: () => _moveCarouselTo(index),
+                                      );
                                     },
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                key: const Key('owned-agent-previous'),
+                                tooltip: context.localizedText(
+                                  key: 'hubPreviousAgent',
+                                  en: 'Previous Agent',
+                                  zhHans: '上一个 Agent',
+                                ),
+                                onPressed: viewModel.canSelectPreviousAgent
+                                    ? () => _moveCarouselTo(
+                                        viewModel.selectedAgentIndex - 1,
+                                      )
+                                    : null,
+                                icon: const Icon(Icons.chevron_left_rounded),
+                              ),
+                              Text(
+                                '${viewModel.selectedAgentIndex + 1} / ${viewModel.carouselAgents.length}',
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                              IconButton(
+                                key: const Key('owned-agent-next'),
+                                tooltip: context.localizedText(
+                                  key: 'hubNextAgent',
+                                  en: 'Next Agent',
+                                  zhHans: '下一个 Agent',
+                                ),
+                                onPressed: viewModel.canSelectNextAgent
+                                    ? () => _moveCarouselTo(
+                                        viewModel.selectedAgentIndex + 1,
+                                      )
+                                    : null,
+                                icon: const Icon(Icons.chevron_right_rounded),
+                              ),
+                            ],
                           ),
                           if (selectedAgent != null) ...[
                             const SizedBox(height: AppSpacing.sm),
@@ -1060,9 +1152,9 @@ class _HubScreenState extends State<HubScreen> {
                   accentColor: AppColors.error,
                   icon: Icons.logout_rounded,
                   title: context.localizedText(
-                    key: 'msgDisconnectAllSessions11333a22',
-                    en: 'Disconnect all sessions',
-                    zhHans: '断开全部会话',
+                    key: 'msgHubSignOutCurrentDevice',
+                    en: 'Sign out',
+                    zhHans: '退出登录',
                   ),
                   subtitle: context.localizedText(
                     key: 'msgSignOutThisDeviceAndClearTheActiveHuman2b0f3989',
@@ -1270,6 +1362,33 @@ class _HubScreenState extends State<HubScreen> {
               ),
               const SizedBox(height: AppSpacing.xs),
               _HubMenuRow(
+                rowKey: const Key('app-settings-following-button'),
+                accentColor: AppColors.primary,
+                icon: Icons.people_outline,
+                title: context.localizedText(
+                  en: 'Manage following',
+                  zhHans: '管理我的关注',
+                ),
+                subtitle: context.localizedText(
+                  en: 'View the current Agent’s following and followers.',
+                  zhHans: '查看当前 Agent 的关注与关注者。',
+                ),
+                enabled: viewModel.selectedAgentOrNull != null,
+                onTap: viewModel.selectedAgentOrNull == null
+                    ? null
+                    : () {
+                        final session = AppSessionScope.read(context);
+                        unawaited(
+                          showSwipeBackSheet<void>(
+                            context: context,
+                            builder: (_) =>
+                                HubConnectionsSheet(session: session),
+                          ),
+                        );
+                      },
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              _HubMenuRow(
                 rowKey: const Key('app-settings-disconnect-agents-button'),
                 accentColor: AppColors.error,
                 icon: Icons.logout_rounded,
@@ -1383,200 +1502,172 @@ class _OwnedAgentCard extends StatelessWidget {
     required this.laneOffset,
     required this.onTap,
   });
-
   final HubOwnedAgentModel agent;
   final bool isSelected;
-  final int laneOffset;
+  final double laneOffset;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = _originColorFor(agent.origin);
-    final isLeftLane = laneOffset < 0;
-    final laneShift = isSelected
+    final lane = MediaQuery.disableAnimationsOf(context)
         ? 0.0
-        : isLeftLane
-        ? 20.0
-        : -20.0;
-    final laneRotation = isSelected
-        ? 0.0
-        : isLeftLane
-        ? 0.22
-        : -0.22;
-    final avatarWidth = isSelected ? 110.0 : 72.0;
-    final avatarHeight = isSelected ? 110.0 : 72.0;
-
-    return AnimatedOpacity(
-      opacity: isSelected ? 1 : 0.42,
-      duration: AppEffects.fast,
-      child: Transform.translate(
-        offset: Offset(laneShift, 0),
-        child: Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001)
-            ..rotateY(laneRotation),
+        : laneOffset.clamp(-2.5, 2.5).toDouble();
+    final depth = lane.abs();
+    final fallback = Center(
+      child: Text(
+        agent.avatarEmoji?.trim().isNotEmpty == true
+            ? agent.avatarEmoji!
+            : _avatarLetters(agent.name),
+        style: const TextStyle(
+          fontSize: 34,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF152C3D),
+        ),
+      ),
+    );
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, 0.00125)
+        ..translate(-lane * 30, 0.0, -depth * 65)
+        ..rotateY(-lane * .52)
+        ..scale((1 - depth * .2).clamp(.6, 1.0)),
+      child: Opacity(
+        opacity: (1 - depth * .6).clamp(.18, 1.0),
+        child: Semantics(
+          selected: isSelected,
+          button: true,
+          label: agent.name,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               key: Key('owned-agent-card-${agent.id}'),
               onTap: onTap,
-              borderRadius: AppRadii.hero,
-              child: SizedBox(
-                width: double.infinity,
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 20,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Stack(
                       clipBehavior: Clip.none,
+                      alignment: Alignment.center,
                       children: [
-                        AnimatedContainer(
-                          duration: AppEffects.fast,
-                          width: avatarWidth,
-                          height: avatarHeight,
+                        Container(
+                          width: 112,
+                          height: 112,
+                          clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
+                            borderRadius: BorderRadius.circular(19),
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                               colors: [
-                                isSelected
-                                    ? const Color(0xFFF7E6C9)
-                                    : AppColors.surfaceHighest,
-                                isSelected
-                                    ? const Color(0xFFE0C79E)
-                                    : AppColors.surfaceHigh,
-                                if (isSelected)
-                                  accentColor.withValues(alpha: 0.18),
+                                Color(0xFFF8E6C5),
+                                Color(0xFFCFC7B9),
+                                Color(0xFF9AAFBF),
                               ],
                             ),
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(16),
-                            ),
                             border: Border.all(
-                              color: accentColor.withValues(
-                                alpha: isSelected ? 0.32 : 0.14,
+                              width: isSelected ? 2 : 1,
+                              color: isSelected
+                                  ? AppColors.primary.withValues(alpha: .7)
+                                  : AppColors.outline.withValues(alpha: .3),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: .28),
+                                blurRadius: 22,
+                                offset: const Offset(0, 15),
                               ),
-                              width: isSelected ? 1.6 : 1,
-                            ),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: accentColor.withValues(
-                                        alpha: 0.18,
-                                      ),
-                                      blurRadius: 22,
-                                      offset: const Offset(0, 12),
-                                    ),
-                                  ]
-                                : const [],
+                              if (isSelected)
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(
+                                    alpha: .13,
+                                  ),
+                                  blurRadius: 26,
+                                ),
+                              if (isSelected)
+                                BoxShadow(
+                                  color: AppColors.tertiary.withValues(
+                                    alpha: .12,
+                                  ),
+                                  blurRadius: 24,
+                                  offset: const Offset(9, 10),
+                                ),
+                            ],
                           ),
-                          child: Center(
-                            child: Text(
-                              _avatarLetters(agent.name),
-                              style:
-                                  (isSelected
-                                          ? Theme.of(
-                                              context,
-                                            ).textTheme.headlineLarge
-                                          : Theme.of(
-                                              context,
-                                            ).textTheme.titleMedium)
-                                      ?.copyWith(
-                                        color: isSelected
-                                            ? AppColors.background
-                                            : AppColors.onSurfaceMuted,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: isSelected ? -0.5 : -0.2,
-                                      ),
-                            ),
-                          ),
+                          child: agent.avatarUrl?.isNotEmpty == true
+                              ? Image.network(
+                                  agent.avatarUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => fallback,
+                                )
+                              : fallback,
                         ),
                         if (isSelected)
                           Positioned(
-                            bottom: -8,
-                            left: 0,
-                            right: 0,
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.sm,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: AppRadii.pill,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.primary.withValues(
-                                        alpha: 0.32,
-                                      ),
-                                      blurRadius: 12,
+                            bottom: -7,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(
+                                      alpha: .3,
                                     ),
-                                  ],
-                                ),
-                                child: Text(
-                                  context.localizedText(
-                                    key: 'msgACTIVEc72633f6',
-                                    en: 'ACTIVE',
-                                    zhHans: '当前激活',
+                                    blurRadius: 12,
                                   ),
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: AppColors.onPrimary,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: context
-                                            .localeAwareLetterSpacing(
-                                              latin: 1.1,
-                                            ),
-                                      ),
+                                ],
+                              ),
+                              child: Text(
+                                context.localizedText(
+                                  key: 'msgACTIVEc72633f6',
+                                  en: 'ACTIVE',
+                                  zhHans: '当前激活',
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.onPrimary,
                                 ),
                               ),
                             ),
                           ),
                       ],
                     ),
-                    SizedBox(height: isSelected ? 14 : 10),
+                    const SizedBox(height: 18),
                     Text(
                       context.localeAwareCaps(agent.name),
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          (isSelected
-                                  ? Theme.of(context).textTheme.headlineSmall
-                                  : Theme.of(context).textTheme.labelSmall)
-                              ?.copyWith(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.onSurfaceMuted,
-                                fontWeight: FontWeight.w700,
-                                fontSize: isSelected ? 18 : 9.5,
-                                letterSpacing: context.localeAwareLetterSpacing(
-                                  latin: isSelected ? -0.4 : 1.2,
-                                ),
-                              ),
-                    ),
-                    if (!isSelected) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        context.localeAwareCaps(
-                          agent.handle.replaceFirst('@', ''),
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.onSurfaceMuted.withValues(
-                            alpha: 0.82,
-                          ),
-                          fontSize: 8,
-                          letterSpacing: context.localeAwareLetterSpacing(
-                            latin: 1,
-                          ),
-                        ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontSize: isSelected ? 18 : 12,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.onSurfaceMuted,
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      agent.handle.replaceFirst('@', ''),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontSize: 9,
+                        color: AppColors.onSurfaceMuted,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1743,6 +1834,8 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
   bool _isAuthenticating = false;
   bool _isCheckingUsername = false;
   bool _isRefreshingThread = false;
+  bool _isLoadingOlder = false;
+  String? _olderCursor;
   bool? _isUsernameAvailable;
   String? _threadId;
   String? _loadError;
@@ -2038,6 +2131,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     try {
       final threadsResponse = await _chatRepository.getThreads(
         activeAgentId: widget.agent.id,
+        threadUsage: 'owned_agent_command',
         limit: 50,
       );
       if (!_canApplyLoadResult(requestId)) {
@@ -2135,6 +2229,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     setState(() {
       _threadId = threadId;
       _messages = _mapVisibleMessages(response.messages);
+      _olderCursor = response.nextCursor;
       _isLoadingThread = false;
       _loadError = null;
     });
@@ -2163,7 +2258,8 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         _isLoadingThread ||
         _isSendingMessage ||
         _isAuthenticating ||
-        _isRefreshingThread) {
+        _isRefreshingThread ||
+        _isLoadingOlder) {
       return;
     }
 
@@ -2179,7 +2275,28 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         return;
       }
 
-      final nextMessages = _mapVisibleMessages(response.messages);
+      var collected = response.messages;
+      var cursor = response.nextCursor;
+      final known = _messages.map((message) => message.id).toSet();
+      final visited = <String>{};
+      while (known.isNotEmpty &&
+          cursor != null &&
+          !collected.any((message) => known.contains(message.eventId))) {
+        if (!visited.add(cursor)) throw StateError('Repeated message cursor');
+        final older = await _chatRepository.getMessages(
+          threadId: threadId,
+          activeAgentId: widget.agent.id,
+          cursor: cursor,
+          limit: 50,
+        );
+        collected = [...older.messages, ...collected];
+        cursor = older.nextCursor;
+      }
+      if (!mounted || _threadId != threadId) return;
+      final nextMessages = _mergeCommandMessages(
+        _messages,
+        _mapVisibleMessages(collected),
+      );
       if (!_messagesChanged(nextMessages)) {
         return;
       }
@@ -2201,6 +2318,77 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     } finally {
       _isRefreshingThread = false;
     }
+  }
+
+  Future<void> _loadOlderMessages() async {
+    final threadId = _threadId;
+    final cursor = _olderCursor;
+    if (threadId == null ||
+        cursor == null ||
+        _isLoadingOlder ||
+        _isRefreshingThread)
+      return;
+    final oldExtent = _threadScrollController.hasClients
+        ? _threadScrollController.position.maxScrollExtent
+        : 0.0;
+    final oldOffset = _threadScrollController.hasClients
+        ? _threadScrollController.offset
+        : 0.0;
+    setState(() => _isLoadingOlder = true);
+    try {
+      final response = await _chatRepository.getMessages(
+        threadId: threadId,
+        activeAgentId: widget.agent.id,
+        cursor: cursor,
+        limit: 50,
+      );
+      if (!mounted || threadId != _threadId) return;
+      setState(() {
+        _messages = _mergeCommandMessages(
+          _messages,
+          _mapVisibleMessages(response.messages),
+        );
+        _olderCursor = response.nextCursor == cursor
+            ? null
+            : response.nextCursor;
+        _sendError = null;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _threadScrollController.hasClients) {
+          final position = _threadScrollController.position;
+          _threadScrollController.jumpTo(
+            (oldOffset + position.maxScrollExtent - oldExtent).clamp(
+              0.0,
+              position.maxScrollExtent,
+            ),
+          );
+        }
+      });
+    } catch (_) {
+      if (mounted)
+        setState(
+          () => _sendError = localizedAppText(
+            key: 'msgHubOlderMessagesFailed',
+            en: 'Could not load earlier messages. Try again.',
+            zhHans: '暂时无法读取更早消息，请重试。',
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _isLoadingOlder = false);
+    }
+  }
+
+  List<_OwnedAgentCommandMessage> _mergeCommandMessages(
+    List<_OwnedAgentCommandMessage> previous,
+    List<_OwnedAgentCommandMessage> incoming,
+  ) {
+    final unique = {
+      for (final message in [...previous, ...incoming]) message.id: message,
+    };
+    return unique.values.toList()..sort((a, b) {
+      final compared = a.occurredAt.compareTo(b.occurredAt);
+      return compared != 0 ? compared : a.id.compareTo(b.id);
+    });
   }
 
   Future<void> _sendMessage() async {
@@ -2256,22 +2444,42 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         if (createdThreadId.isEmpty) {
           throw StateError('Command thread id was not returned.');
         }
-        final messagesResponse = await _chatRepository.getMessages(
-          threadId: createdThreadId,
-          activeAgentId: widget.agent.id,
-          limit: 50,
-        );
-        if (!_canApplySendResult(requestId)) {
-          return;
-        }
+        if (!_canApplySendResult(requestId)) return;
+        // The command was accepted. A failed history read must never leave it
+        // in the composer where a retry would send the same command again.
         setState(() {
           _threadId = createdThreadId;
-          _messages = _mapVisibleMessages(messagesResponse.messages);
-          _isSendingMessage = false;
-          _sendError = null;
-          _loadError = null;
         });
-        _scrollThreadToBottom();
+        _composerController.clear();
+        try {
+          final messagesResponse = await _chatRepository.getMessages(
+            threadId: createdThreadId,
+            activeAgentId: widget.agent.id,
+            limit: 50,
+          );
+          if (!_canApplySendResult(requestId)) {
+            return;
+          }
+          setState(() {
+            _threadId = createdThreadId;
+            _messages = _mapVisibleMessages(messagesResponse.messages);
+            _olderCursor = messagesResponse.nextCursor;
+            _isSendingMessage = false;
+            _sendError = null;
+            _loadError = null;
+          });
+          _scrollThreadToBottom();
+        } catch (_) {
+          if (!_canApplySendResult(requestId)) return;
+          setState(() {
+            _isSendingMessage = false;
+            _loadError = localizedAppText(
+              key: 'msgHubCommandSentHistoryUnavailable',
+              en: 'Message sent. Refresh to load the conversation.',
+              zhHans: '消息已发送，刷新后可重新读取对话。',
+            );
+          });
+        }
       }
 
       _composerController.clear();
@@ -2380,6 +2588,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     final body = message.content?.trim();
     return _OwnedAgentCommandMessage(
       id: message.eventId,
+      occurredAt: message.occurredAt,
       authorName: message.actor.displayName.trim().isEmpty
           ? isHuman
                 ? _currentHumanDisplayName
@@ -2464,6 +2673,18 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                 controller: _threadScrollController,
                 child: Column(
                   children: [
+                    if (_olderCursor != null)
+                      TextButton(
+                        key: const Key('owned-agent-command-older'),
+                        onPressed: _isLoadingOlder ? null : _loadOlderMessages,
+                        child: Text(
+                          localizedAppText(
+                            key: 'msgHubLoadEarlierMessages',
+                            en: 'Load earlier messages',
+                            zhHans: '读取更早消息',
+                          ),
+                        ),
+                      ),
                     for (var index = 0; index < _messages.length; index++) ...[
                       _OwnedAgentCommandBubble(message: _messages[index]),
                       if (index != _messages.length - 1)
@@ -2991,22 +3212,15 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         : AppColors.outlineBright;
     final infoText = _hasAuthenticatedHuman
         ? context.localizedText(
-            key:
-                'msgThisIsARealTwoPersonThreadBetweenCurrentHumanDisplayNameAnd8a31a23c',
-            args: <String, Object?>{
-              'currentHumanDisplayName': _currentHumanDisplayName,
-              'activeAgentName': activeAgentName,
-            },
-            en: 'This is a real two-person thread between $_currentHumanDisplayName and $activeAgentName. First send creates the private admin line if it does not exist yet.',
-            zhHans:
-                '这是一条真实存在的双人线程，参与者是 $_currentHumanDisplayName 和 $activeAgentName。如果它还不存在，你发送的第一条消息就会创建这条私有管理通道。',
+            key: 'msgHubPrivateCommandParticipants',
+            args: {'agentName': activeAgentName},
+            en: 'Your private conversation with $activeAgentName.',
+            zhHans: '你与 $activeAgentName 的专属对话。',
           )
         : context.localizedText(
-            key: 'msgThisPrivateAdminThreadUsesRealBackendDMDataSigna3113058',
-            args: <String, Object?>{'activeAgentName': activeAgentName},
-            en: 'This private admin thread uses real backend DM data. Sign in here first, then the sheet will continue directly into $activeAgentName\'s command line.',
-            zhHans:
-                '这条私有管理线程会直接读取后端真实私信数据。请先在这里登录，之后这个面板会继续进入 $activeAgentName 的命令通道。',
+            key: 'msgHubSignInToCommand',
+            en: 'Sign in to talk with your Agent.',
+            zhHans: '登录后即可与你的 Agent 对话。',
           );
 
     return Padding(
@@ -3043,11 +3257,15 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                               en: 'Agent Command Thread',
                               zhHans: '智能体命令线程',
                             ),
-                            style: Theme.of(context).textTheme.headlineMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             '$activeAgentName  $handleLabel',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: AppColors.onSurfaceMuted),
                           ),
@@ -3096,6 +3314,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
 class _OwnedAgentCommandMessage {
   const _OwnedAgentCommandMessage({
     required this.id,
+    required this.occurredAt,
     required this.authorName,
     required this.body,
     required this.timestampLabel,
@@ -3104,6 +3323,7 @@ class _OwnedAgentCommandMessage {
   });
 
   final String id;
+  final String occurredAt;
   final String authorName;
   final String body;
   final String timestampLabel;
@@ -4623,18 +4843,39 @@ class _AgentAutonomyPresetSummary extends StatelessWidget {
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.onSurfaceMuted),
             ),
-            const SizedBox(height: AppSpacing.md),
-            for (var index = 0; index < capabilities.length; index++) ...[
-              _AgentAutonomyCapabilityRow(capability: capabilities[index]),
-              if (index != capabilities.length - 1)
-                const SizedBox(height: AppSpacing.sm),
-            ],
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              preset.footer,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: AppColors.primaryFixed,
-                fontWeight: FontWeight.w600,
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                initiallyExpanded: false,
+                title: Text(
+                  localizedAppText(
+                    key: 'msgHubShowCapabilityDetails',
+                    en: 'Permissions and participation',
+                    zhHans: '查看权限与参与范围',
+                  ),
+                ),
+                children: [
+                  const SizedBox(height: AppSpacing.md),
+                  for (var index = 0; index < capabilities.length; index++) ...[
+                    _AgentAutonomyCapabilityRow(
+                      capability: capabilities[index],
+                    ),
+                    if (index != capabilities.length - 1)
+                      const SizedBox(height: AppSpacing.sm),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    preset.footer,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.primaryFixed,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -4752,7 +4993,7 @@ class _HubVersionFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Text(
-        'ETHER AI CORE V2.4.0-BUILD.88',
+        'Agents Chat · App',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: AppColors.outlineBright.withValues(alpha: 0.45),
           letterSpacing: 1.8,

@@ -1009,6 +1009,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         owner.id,
         agentId,
         agentRepository,
+        true,
       );
       let policy = await agentPolicyRepository.findOneBy({ agentId });
 
@@ -1839,11 +1840,11 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     ownerUserId: string,
     agentId: string,
     repository: Repository<AgentEntity> = this.agentRepository,
+    lock = false,
   ): Promise<AgentEntity> {
-    const agent = await repository.findOneBy({
-      id: agentId,
-      ownerType: AgentOwnerType.Human,
-      ownerUserId,
+    const agent = await repository.findOne({
+      where: { id: agentId, ownerType: AgentOwnerType.Human, ownerUserId },
+      ...(lock ? { lock: { mode: 'pessimistic_write' as const } } : {}),
     });
 
     if (!agent) {

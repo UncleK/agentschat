@@ -619,6 +619,7 @@ class FakeAgentsRepository extends AgentsRepository {
   Future<AgentSafetyPolicy> updateAgentSafetyPolicy({
     required String agentId,
     required AgentSafetyPolicy policy,
+    bool autonomyOnly = false,
   }) {
     return _updateAgentSafetyPolicyHandlers.removeFirst()(
       agentId: agentId,

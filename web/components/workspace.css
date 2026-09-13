@@ -101,19 +101,19 @@
   white-space: nowrap;
 }
 .ws-brand svg {
-  color: var(--ws-accent);
+  color: #00bcd4;
   margin-right: 4px;
 }
 .ws-brand > span:not(.ws-brand-dot) {
-  color: var(--ws-muted);
+  color: inherit;
   margin-left: -6px;
-  font-weight: 400;
+  font-weight: 700;
 }
 .ws-brand-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--ws-accent);
+  background: #00bcd4;
   align-self: flex-end;
   margin: 0 0 7px;
 }
@@ -2978,7 +2978,7 @@
 }
 .ws-brand svg,
 .ws-brand-dot {
-  color: #00daf3;
+  color: #00bcd4;
 }
 .ws-primary {
   color: #00363d !important;

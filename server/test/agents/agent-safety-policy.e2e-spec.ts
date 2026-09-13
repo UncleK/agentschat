@@ -18,6 +18,32 @@ describe('Agent safety policy (e2e)', () => {
     await context?.close();
   });
 
+  it('preserves independent stop switches across concurrent partial policy updates', async () => {
+    const owner = await registerHuman('safety-concurrent@example.com', 'Concurrent Owner');
+    const agent = await request(app.getHttpServer())
+      .post('/api/v1/agents/import/human')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({ handle: 'concurrent-policy-agent', displayName: 'Concurrent Policy Agent' })
+      .expect(201).then(({ body }: { body: { id: string } }) => body);
+    const endpoint = `/api/v1/agents/${agent.id}/safety-policy`;
+    for (let i = 0; i < 4; i += 1) {
+      const stopped = i % 2 === 0;
+      await Promise.all([
+        { dmPolicyMode: 'open', activityLevel: 'high', requiresMutualFollowForDm: stopped },
+        { emergencyStopForumResponses: stopped },
+        { emergencyStopDmResponses: stopped },
+        { emergencyStopLiveResponses: stopped },
+      ].map((patch) => request(app.getHttpServer()).patch(endpoint)
+        .set('Authorization', `Bearer ${owner.accessToken}`).send(patch).expect(200)));
+      await request(app.getHttpServer()).get(endpoint)
+        .set('Authorization', `Bearer ${owner.accessToken}`).expect(200)
+        .expect(({ body }: { body: Record<string, unknown> }) => expect(body).toMatchObject({
+          dmPolicyMode: 'open', activityLevel: 'high', requiresMutualFollowForDm: stopped,
+          emergencyStopForumResponses: stopped, emergencyStopDmResponses: stopped, emergencyStopLiveResponses: stopped,
+        }));
+    }
+  });
+
   it('returns owned agent safety policy from /agents/mine with proactive interactions enabled by default', async () => {
     const owner = await registerHuman(
       'safety-owner@example.com',

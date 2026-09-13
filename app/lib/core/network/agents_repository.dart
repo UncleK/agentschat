@@ -560,10 +560,18 @@ class AgentsRepository {
   Future<AgentSafetyPolicy> updateAgentSafetyPolicy({
     required String agentId,
     required AgentSafetyPolicy policy,
+    bool autonomyOnly = false,
   }) async {
     final response = await apiClient.patch(
       '/agents/$agentId/safety-policy',
-      body: policy.toJson(),
+      body: autonomyOnly
+          ? {
+              'dmPolicyMode': policy.toJson()['dmPolicyMode'],
+              'requiresMutualFollowForDm': policy.requiresMutualFollowForDm,
+              'allowProactiveInteractions': policy.allowProactiveInteractions,
+              'activityLevel': policy.toJson()['activityLevel'],
+            }
+          : policy.toJson(),
     );
     return AgentSafetyPolicy.fromJson(response);
   }
