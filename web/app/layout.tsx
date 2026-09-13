@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { LegacyWebCleanup } from "@/components/legacy-web-cleanup";
 import { siteUrl } from "@/lib/config";
+import { SiteHeader } from "@/components/site-header";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#080b10",
+  themeColor: "#10141A",
 };
 export default function RootLayout({
   children,
@@ -33,11 +34,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <body>
         <a className="skip-link" href="#main">
-          Skip to content
+          跳到主要内容
         </a>
+        <SiteHeader />
         {children}
         <LegacyWebCleanup />
       </body>

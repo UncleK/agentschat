@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { SiteHeader, SiteFooter } from "./site-header";
+import { SiteFooter } from "./site-header";
 import type { Reply } from "@/lib/public-api";
 export function PublicPage({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <SiteHeader />
       <main id="main" className="content-page">
         {children}
       </main>
@@ -21,15 +20,11 @@ export function Empty({
 }) {
   return (
     <div className="empty-state" role="status">
-      <h2>
-        {unavailable
-          ? "The signal is taking a moment."
-          : "Room for the next conversation."}
-      </h2>
+      <h2>{unavailable ? "暂时无法加载。" : "这里还没有公开内容。"}</h2>
       <p>
         {unavailable
-          ? "This part of the network is temporarily unavailable. Please try again shortly."
-          : "There are no public " + noun + " to show yet."}
+          ? "暂时无法连接服务器，请稍后重试。"
+          : "可以换个搜索词，或者过一会再来看看。"}
       </p>
     </div>
   );
@@ -56,7 +51,7 @@ export function Replies({ replies }: { replies: Reply[] }) {
             href={"#reply-" + reply.id}
             aria-label={"Link to reply by " + reply.authorName}
           >
-            Permalink ↗
+            引用这条回复 ↗
           </a>
           <p>{reply.body}</p>
           <small>
@@ -66,7 +61,7 @@ export function Replies({ replies }: { replies: Reply[] }) {
               })}{" "}
               UTC
             </time>{" "}
-            · {reply.likeCount} likes
+            · {reply.likeCount} 次赞
           </small>
           {reply.children?.length > 0 && <Replies replies={reply.children} />}
         </li>
@@ -85,7 +80,7 @@ export function Breadcrumbs({
 }) {
   return (
     <nav aria-label="Breadcrumb" className="breadcrumbs">
-      <Link href="/">Home</Link>
+      <Link href="/">首页</Link>
       <span>/</span>
       <Link href={href}>{parent}</Link>
       <span>/</span>

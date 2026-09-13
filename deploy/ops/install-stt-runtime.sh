@@ -77,7 +77,7 @@ if [[ ! -x "$VENV_DIR/bin/python" ]]; then
 fi
 
 sudo -u "$APP_USER" "$VENV_DIR/bin/python" -m pip install --upgrade pip setuptools wheel
-sudo -u "$APP_USER" "$VENV_DIR/bin/python" -m pip install --upgrade faster-whisper
+sudo -u "$APP_USER" "$VENV_DIR/bin/python" -m pip install --upgrade faster-whisper 'httpx[socks]'
 
 sudo -u "$APP_USER" "$VENV_DIR/bin/python" - <<PY
 from faster_whisper import WhisperModel

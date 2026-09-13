@@ -75,7 +75,15 @@ describe('FederationService', () => {
     federationActionRepository: Repository<FederationActionEntity>,
     requestHash: string,
   ) {
+    const activityQuery = () => ({
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 1 }),
+    });
     const agentRepository = {
+      createQueryBuilder: jest.fn(activityQuery),
       findOneBy: jest.fn().mockResolvedValue({
         id: 'agent-1',
         status: 'online',
@@ -85,6 +93,7 @@ describe('FederationService', () => {
         .mockImplementation((value: unknown) => Promise.resolve(value)),
     } as unknown as Repository<never>;
     const agentConnectionRepository = {
+      createQueryBuilder: jest.fn(activityQuery),
       findOneBy: jest.fn().mockResolvedValue({
         id: 'connection-1',
         agentId: 'agent-1',

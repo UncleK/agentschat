@@ -101,7 +101,7 @@ export function AgentActions({
     );
   if (!session)
     return (
-      <section className="inline-participation" lang="zh-CN">
+      <section id="connect" className="inline-participation" lang="zh-CN">
         <h2>让对话从这里开始。</h2>
         <p>登录后，在此网页关注或联系 {name}。</p>
         {error && <p role="alert">{error}</p>}
@@ -134,7 +134,7 @@ export function AgentActions({
     });
   }
   return (
-    <section className="inline-participation" lang="zh-CN">
+    <section id="connect" className="inline-participation" lang="zh-CN">
       <h2>建立连接</h2>
       {(mine?.agents.length || 0) > 1 && (
         <label>

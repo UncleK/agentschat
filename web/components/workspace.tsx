@@ -74,6 +74,7 @@ import {
 } from "../lib/dm-state";
 import { participantRole, messageRole } from "../lib/dm-roles";
 import "./workspace.css";
+import { AgentmojiText, AgentmojiPicker } from "./agentmoji";
 
 type Resource<T> = {
   data: T | null;
@@ -395,11 +396,6 @@ export function Workspace({
       window.removeEventListener("agents-chat:session-expired", expire);
   }, []);
   const mine = useResource<Mine>(session ? "/agents/mine" : null);
-  const bell = useResource<{ unreadCount: number }>(
-    session ? "/notifications/bell-state" : null,
-    true,
-  );
-  const logout = useAction();
   useEffect(() => {
     const abort = new AbortController();
     setChecked(false);
@@ -529,75 +525,10 @@ export function Workspace({
       </main>
     );
   return (
-    <div className="workspace" lang="zh-CN">
+    <div className={`workspace ws-section-${section}`} lang="zh-CN">
       <a href="#main" className="ws-skip">
         跳到主要内容
       </a>
-      <aside className="ws-sidebar">
-        <Link href="/" className="ws-brand">
-          <Orbit size={25} /> agents<span>chat</span>
-          <span className="ws-brand-dot" />
-        </Link>
-        <p className="ws-sidebar-label">YOUR SPACE</p>
-        <nav aria-label="网站导航">
-          {sections.map((item) => (
-            <Link
-              href={
-                item.id === "agents"
-                  ? "/agents"
-                  : item.id === "forum"
-                    ? "/forum"
-                    : item.id === "live"
-                      ? "/live"
-                      : sitePath(item.id)
-              }
-              key={item.id}
-              className={section === item.id ? "active" : ""}
-              aria-label={item.title}
-              aria-current={section === item.id ? "page" : undefined}
-            >
-              <item.icon size={19} />
-              <span>{item.title}</span>
-              {item.id === "notifications" &&
-                Boolean(bell.data?.unreadCount) && (
-                  <b className="ws-count">{bell.data!.unreadCount}</b>
-                )}
-              {section === item.id && <span className="ws-nav-active" />}
-            </Link>
-          ))}
-        </nav>
-        <div className="ws-sidebar-bottom">
-          <Link href="/docs" className="ws-help">
-            <CircleHelp size={17} /> 接入指南 <ArrowRight size={14} />
-          </Link>
-          <div className="ws-user">
-            <Avatar small agent={session.user} />
-            <div>
-              <strong>
-                {session.user.displayName || session.user.username}
-              </strong>
-              <span>@{session.user.username}</span>
-            </div>
-            <button
-              aria-label="退出登录"
-              className="ws-icon-button"
-              disabled={logout.busy}
-              onClick={() =>
-                void logout.run(async () => {
-                  await request("/api/session", {
-                    method: "POST",
-                    body: JSON.stringify({ action: "logout" }),
-                  });
-                  window.location.assign("/");
-                })
-              }
-            >
-              <LogOut size={17} />
-            </button>
-          </div>
-          <Feedback error={logout.error} />
-        </div>
-      </aside>
       <div className="ws-main">
         <header className="ws-topbar">
           <span className="ws-breadcrumb">
@@ -691,7 +622,14 @@ export function Workspace({
               />
             )}
             {section === "notifications" && (
-              <Notifications refreshBell={bell.reload} agents={owned} />
+              <Notifications
+                refreshBell={() =>
+                  window.dispatchEvent(
+                    new Event("agents-chat:notifications-changed"),
+                  )
+                }
+                agents={owned}
+              />
             )}
             {section === "settings" && (
               <AccountSettings
@@ -1025,6 +963,14 @@ function Chat({
   const [cursor, setCursor] = useState<string | null | undefined>();
   const pagination = useAction();
   const [command, setCommand] = useState(false);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 801px)");
+    const update = () => setWide(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const allThreads = [...(threads.data?.threads || []), ...extraThreads]
     .filter(
       (thread, index, rows) =>
@@ -1076,7 +1022,9 @@ function Chat({
   const nextCursor = cursor === undefined ? threads.data?.nextCursor : cursor;
   return (
     <>
-      <div className="ws-chat-layout">
+      <div
+        className={`ws-chat-layout ${detailId ? "ws-chat-detail-view" : "ws-chat-list-view"}`}
+      >
         <aside className="ws-thread-pane">
           <div className="ws-thread-heading">
             <h2>
@@ -1109,6 +1057,7 @@ function Chat({
               {visible.map((thread) => (
                 <Link
                   href={messagePath(thread.threadId, active.id)}
+                  scroll={false}
                   key={thread.threadId}
                   className={`ws-thread ${selectedId === thread.threadId ? "selected" : ""}`}
                 >
@@ -1163,7 +1112,7 @@ function Chat({
           <Feedback {...pagination} />
         </aside>
         <section className="ws-conversation">
-          {selectedId ? (
+          {selectedId && (detailId || wide) ? (
             <Conversation
               key={selectedId}
               threadId={selectedId}
@@ -1227,6 +1176,7 @@ function Conversation({
   historyRef.current = history;
   const [syncingHistory, setSyncingHistory] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [messageSearch, setMessageSearch] = useState("");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
@@ -1234,11 +1184,17 @@ function Conversation({
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const recordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const bottom = useRef<HTMLDivElement>(null);
+  const messageList = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
   const action = useAction();
   const older = useAction();
   const [readError, setReadError] = useState("");
   const messages = history.messages;
+  const visibleMessages = messages.filter((message) =>
+    `${message.actor.displayName} ${message.content || ""}`
+      .toLowerCase()
+      .includes(messageSearch.trim().toLowerCase()),
+  );
   const participants = resource.data?.participants || [];
   const lastId = messages.at(-1)?.eventId;
   useEffect(() => {
@@ -1282,7 +1238,8 @@ function Conversation({
     };
   }, [resource.data]);
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "nearest" });
+    const list = messageList.current;
+    if (list && followLatest.current) list.scrollTop = list.scrollHeight;
   }, [lastId]);
   useEffect(() => {
     if (!resource.data) return;
@@ -1434,6 +1391,8 @@ function Conversation({
         }
         setText("");
         setFile(null);
+        followLatest.current = true;
+        setMessageSearch("");
         resource.reload();
         onSent();
       },
@@ -1446,6 +1405,14 @@ function Conversation({
   return (
     <>
       <header className="ws-conversation-heading">
+        <Link
+          href={messagePath(undefined, active.id)}
+          scroll={false}
+          className="ws-icon-button ws-mobile-back"
+          aria-label="返回聊天列表"
+        >
+          <ArrowLeft size={21} />
+        </Link>
         <div className="ws-conversation-title">
           <span className="ws-conversation-icon">
             <MessageCircle size={20} />
@@ -1499,7 +1466,26 @@ function Conversation({
           })}
         </ul>
       )}
-      <div className="ws-message-list">
+      <label className="ws-search ws-message-search">
+        <Search size={15} />
+        <input
+          aria-label="搜索已加载消息"
+          placeholder="搜索已加载消息"
+          value={messageSearch}
+          onChange={(event) => setMessageSearch(event.target.value)}
+        />
+        {messageSearch && <span>{visibleMessages.length} 条</span>}
+      </label>
+      <div
+        className="ws-message-list"
+        ref={messageList}
+        onScroll={() => {
+          const list = messageList.current;
+          if (list)
+            followLatest.current =
+              list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+        }}
+      >
         {resource.error && (
           <LoadError error={resource.error} reload={resource.reload} />
         )}
@@ -1545,7 +1531,12 @@ function Conversation({
               </button>
             )}
             <Feedback {...older} />
-            {messages.map((message) => {
+            {messageSearch && !visibleMessages.length && (
+              <p className="ws-history-state">
+                已加载的消息中没有匹配内容。可加载更早消息继续查找。
+              </p>
+            )}
+            {visibleMessages.map((message) => {
               const role = messageRole(
                 message.actor,
                 participants,
@@ -1554,7 +1545,7 @@ function Conversation({
               );
               return (
                 <article
-                  className={`ws-message role-${role.key} ${message.actor.type === "human" ? "from-human" : ""}`}
+                  className={`ws-message role-${role.key} ${role.key === "local-agent" || role.key === "local-human" ? "from-local" : ""}`}
                   key={message.eventId}
                 >
                   <div className="ws-message-byline">
@@ -1585,6 +1576,11 @@ function Conversation({
                           }
                           alt={message.content || "聊天图片"}
                           loading="lazy"
+                          onLoad={() => {
+                            const list = messageList.current;
+                            if (list && followLatest.current)
+                              list.scrollTop = list.scrollHeight;
+                          }}
                         />
                       </a>
                     ) : null}
@@ -1599,7 +1595,11 @@ function Conversation({
                         aria-label={`${message.actor.displayName} 的语音`}
                       />
                     )}
-                    {message.content && <p>{message.content}</p>}
+                    {message.content && (
+                      <p>
+                        <AgentmojiText text={message.content} />
+                      </p>
+                    )}
                     {message.contentType === "audio" && (
                       <span className="ws-transcript">
                         <Mic size={12} /> 语音转写
@@ -1618,7 +1618,6 @@ function Conversation({
               !syncingHistory && <Empty title="这段对话还没有消息" />}
           </>
         )}
-        <div ref={bottom} />
       </div>
       <div className="ws-composer-wrap">
         <Feedback {...action} error={action.error || readError} />
@@ -1661,6 +1660,10 @@ function Conversation({
           />
           <div className="ws-composer-actions">
             <div>
+              <AgentmojiPicker
+                disabled={action.busy || recording}
+                onSelect={(code) => setText((value) => value + code)}
+              />
               <label
                 className={`ws-icon-button ws-upload ${action.busy || recording ? "disabled" : ""}`}
                 title="上传图片或音频"

@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { CurrentHuman } from './current-human.decorator';
 import { AuthService } from './auth.service';
+import { AuthRateLimitGuard } from './auth-rate-limit.guard';
 import type { AuthSessionBootstrapResponse } from './auth.service';
 import { HumanAuthGuard } from './human-auth.guard';
 import type { AuthenticatedHuman } from './auth.types';
@@ -58,6 +59,7 @@ export class AuthController {
   }
 
   @Post('register/email')
+  @UseGuards(AuthRateLimitGuard)
   registerWithEmail(@Body() body: EmailRegistrationBody) {
     return this.authService.registerWithEmail(body);
   }
@@ -68,6 +70,7 @@ export class AuthController {
   }
 
   @Post('login/email')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(200)
   loginWithEmail(@Body() body: EmailLoginBody) {
     return this.authService.loginWithEmail(body);
@@ -75,14 +78,14 @@ export class AuthController {
 
   @Post('email-verification/request')
   @HttpCode(200)
-  @UseGuards(HumanAuthGuard)
+  @UseGuards(HumanAuthGuard, AuthRateLimitGuard)
   requestEmailVerificationCode(@CurrentHuman() human: AuthenticatedHuman) {
     return this.authService.requestEmailVerificationCode(human);
   }
 
   @Post('email-verification/confirm')
   @HttpCode(200)
-  @UseGuards(HumanAuthGuard)
+  @UseGuards(HumanAuthGuard, AuthRateLimitGuard)
   confirmEmailVerificationCode(
     @CurrentHuman() human: AuthenticatedHuman,
     @Body() body: EmailVerificationConfirmBody,
@@ -91,12 +94,14 @@ export class AuthController {
   }
 
   @Post('password-reset/request')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(200)
   requestPasswordResetCode(@Body() body: PasswordResetRequestBody) {
     return this.authService.requestPasswordResetCode(body);
   }
 
   @Post('password-reset/confirm')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(200)
   confirmPasswordReset(@Body() body: PasswordResetConfirmBody) {
     return this.authService.confirmPasswordReset(body);

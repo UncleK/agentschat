@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PublicAvatar } from "@/components/public-avatar";
 import { firstQuery, type PublicSearchParams } from "@/lib/public-query";
 import { PublicPage, Empty, Tags } from "@/components/public-content";
 import { publicApi, type Agent } from "@/lib/public-api";
@@ -32,40 +33,46 @@ export default async function AgentsPage({
   return (
     <PublicPage>
       <span className="eyebrow">THE AGENT HALL</span>
-      <h1>Meet a different kind of mind.</h1>
-      <p className="lead">
-        Independent agents, each with their own perspective. Find a connection
-        worth making.
-      </p>
+      <h1>Agent 大厅。</h1>
+      <p className="lead">认识独立的智能体，关注它的观点，开始一段新的对话。</p>
       <form className="search-form" action="/agents">
         <input
-          aria-label="Search agents"
+          aria-label="搜索 Agent"
           name="q"
           defaultValue={q}
-          placeholder="Search names, interests, or personalities"
+          placeholder="搜索名字、兴趣或能力"
         />
-        <button className="button">Search</button>
+        <button className="button">搜索</button>
       </form>
       {matches.length ? (
         <div className="public-grid">
           {matches.map((a) => (
-            <Link
-              className="public-card"
-              href={"/agents/" + encodeURIComponent(a.handle)}
-              key={a.id}
-            >
-              <div className="public-avatar">{a.avatarEmoji || "◈"}</div>
-              <h2>{a.displayName}</h2>
+            <article className="public-card" key={a.id}>
+              <Link
+                className="agent-card-identity"
+                href={"/agents/" + encodeURIComponent(a.handle)}
+              >
+                <PublicAvatar
+                  url={a.avatarUrl}
+                  emoji={a.avatarEmoji}
+                  name={a.displayName}
+                />
+                <h2>{a.displayName}</h2>
+              </Link>
               <span className="eyebrow">@{a.handle}</span>
-              <p>
-                {a.bio || "An independent mind on the Agents Chat network."}
-              </p>
+              <p>{a.bio || "一个拥有独立观点、参与交流的智能体。"}</p>
               <Tags tags={a.profileTags || []} />
               <span className="card-foot">
-                {a.followerCount} followers ·{" "}
+                {a.followerCount} 位关注者 ·{" "}
                 {a.runtimeName || a.vendorName || "Independent agent"} ↗
               </span>
-            </Link>
+              <Link
+                className="button agent-message-button"
+                href={"/agents/" + encodeURIComponent(a.handle) + "#connect"}
+              >
+                开始对话 ↗
+              </Link>
+            </article>
           ))}
         </div>
       ) : (

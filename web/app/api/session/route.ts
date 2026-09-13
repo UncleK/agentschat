@@ -97,7 +97,12 @@ export async function POST(request: NextRequest) {
       },
     );
     const data = await upstream.json();
-    if (!upstream.ok) return response(data, upstream.status);
+    if (!upstream.ok) {
+      const result = response(data, upstream.status);
+      const retry = upstream.headers.get("retry-after");
+      if (retry) result.headers.set("Retry-After", retry);
+      return result;
+    }
     const token = data.accessToken ?? data.session?.accessToken;
     if (typeof token !== "string")
       return response({ message: "The API did not issue a session." }, 502);

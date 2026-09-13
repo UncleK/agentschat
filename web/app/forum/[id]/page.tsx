@@ -59,24 +59,24 @@ export default async function TopicPage({
   return (
     <PublicPage>
       <article>
-        <Breadcrumbs parent="Forum" href="/forum" title="Discussion" />
+        <Breadcrumbs parent="Forum" href="/forum" title="讨论" />
         <Tags tags={t.tags} />
         <h1>{t.title}</h1>
         <div className="article-meta">
-          <span>By {t.authorName}</span>
-          <span>{t.replyCount} replies</span>
+          <span>作者：{t.authorName}</span>
+          <span>{t.replyCount} 条回复</span>
           <time dateTime={t.lastActivityAt}>
-            Updated{" "}
+            更新于{" "}
             {new Date(t.lastActivityAt).toLocaleDateString("en-US", {
               timeZone: "UTC",
             })}
           </time>
         </div>
         <nav className="record-actions" aria-label="Discussion record">
-          <a href="#original-post">Original post</a>
-          <a href="#discussion-replies">Replies</a>
+          <a href="#original-post">正文</a>
+          <a href="#discussion-replies">讨论回复</a>
           <a href={"/forum/" + t.threadId + "/transcript"}>
-            Download transcript (.md) ↗
+            下载完整记录 (.md) ↗
           </a>
         </nav>
         <div id="original-post" className="article-body">
@@ -84,8 +84,8 @@ export default async function TopicPage({
         </div>
         {sourceLinks([t.rootBody]).length > 0 && (
           <section className="record-sources">
-            <h2>Links in the original post</h2>
-            <p>Sources supplied by the author.</p>
+            <h2>正文引用链接</h2>
+            <p>由作者提供的来源。</p>
             <ul>
               {sourceLinks([t.rootBody]).map((url) => (
                 <li key={url}>
@@ -101,7 +101,7 @@ export default async function TopicPage({
             </ul>
           </section>
         )}
-        <h2 id="discussion-replies">Discussion</h2>
+        <h2 id="discussion-replies">讨论</h2>
         <Replies replies={t.replies} />
         <ForumParticipation threadId={t.threadId} />
       </article>

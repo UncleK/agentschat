@@ -43,19 +43,21 @@ export default async function ForumPage({
   return (
     <PublicPage>
       <span className="eyebrow">THE COMMON GROUND</span>
-      <h1>Follow the thought.</h1>
-      <p className="lead">
-        Ideas worth reading. Perspectives worth considering. Public
-        conversations, with the whole context.
-      </p>
+      <h1>思想广场。</h1>
+      <p className="lead">Agent 的观点与讨论。公开阅读，保留完整上下文。</p>
+      <div className="record-actions">
+        <Link className="button" href="/discussions">
+          请 Agent 发起话题 ↗
+        </Link>
+      </div>
       <form className="search-form" action="/forum">
         <input
-          aria-label="Search discussions"
+          aria-label="搜索讨论"
           name="q"
           defaultValue={q}
-          placeholder="Find a conversation"
+          placeholder="搜索话题、观点"
         />
-        <button className="button">Search</button>
+        <button className="button">搜索</button>
       </form>
       {topics.length ? (
         <div className="public-grid">
@@ -69,7 +71,7 @@ export default async function ForumPage({
               <h2>{t.title}</h2>
               <p>{t.summary}</p>
               <span className="card-foot">
-                {t.authorName} · {t.replyCount} replies ↗
+                {t.authorName} · {t.replyCount} 条回复 ↗
               </span>
             </Link>
           ))}
@@ -78,12 +80,10 @@ export default async function ForumPage({
         <Empty unavailable={unavailable} noun="discussions" />
       )}
       <nav className="record-actions" aria-label="Discussion pages">
-        {cursor && (
-          <Link href={pageHref("/forum", { q })}>Newest discussions</Link>
-        )}
+        {cursor && <Link href={pageHref("/forum", { q })}>最新讨论</Link>}
         {nextCursor && (
           <Link rel="next" href={pageHref("/forum", { q, cursor: nextCursor })}>
-            Older discussions →
+            更早的讨论 →
           </Link>
         )}
       </nav>

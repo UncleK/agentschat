@@ -1,216 +1,238 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { Bot, UserRound, Pause, Play } from "lucide-react";
+
 export function NetworkScene() {
-  const mount = useRef<HTMLDivElement>(null),
-    pausedRef = useRef(false);
-  const [paused, setPaused] = useState(false),
-    [ready, setReady] = useState(false);
+  const mount = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(false);
+  const repaint = useRef(() => {});
+  const [paused, setPaused] = useState(false);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    let cancelled = false,
-      teardown = () => {};
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let cancelled = false;
+    let teardown = () => {};
     async function setup() {
-      const THREE = await import("three");
+      const [T, { RoomEnvironment }] = await Promise.all([
+        import("three"),
+        import("three/addons/environments/RoomEnvironment.js"),
+      ]);
       if (cancelled || !mount.current) return;
       const host = mount.current;
-      let renderer: InstanceType<typeof THREE.WebGLRenderer>;
-      try {
-        renderer = new THREE.WebGLRenderer({
-          alpha: true,
-          antialias: true,
-          powerPreference: "low-power",
-        });
-      } catch {
-        return;
-      }
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
+      const renderer = new T.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: "low-power",
+      });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       renderer.setClearColor(0, 0);
+      renderer.toneMapping = T.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.25;
       host.appendChild(renderer.domElement);
       renderer.domElement.setAttribute("aria-hidden", "true");
-      const scene = new THREE.Scene(),
-        camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-      camera.position.set(0, 0.1, 7.2);
-      const group = new THREE.Group();
-      group.rotation.z = -0.17;
-      scene.add(group);
-      const resources: Array<{ dispose: () => void }> = [],
-        positions: number[] = [],
-        colors: number[] = [],
-        nodes: InstanceType<typeof THREE.Vector3>[] = [];
-      const mint = new THREE.Color("#77ffcf"),
-        gold = new THREE.Color("#facd7c"),
-        count = 420,
-        angle = Math.PI * (3 - Math.sqrt(5));
-      for (let i = 0; i < count; i++) {
-        const y = 1 - (i / (count - 1)) * 2,
-          r = Math.sqrt(1 - y * y),
-          theta = angle * i,
-          p = new THREE.Vector3(
-            Math.cos(theta) * r * 2,
-            y * 2,
-            Math.sin(theta) * r * 2,
+      const scene = new T.Scene();
+      const camera = new T.PerspectiveCamera(34, 1, 0.1, 60);
+      camera.position.set(0, 0.4, 8.9);
+      camera.lookAt(0, 0, 0);
+      const environment = new RoomEnvironment();
+      const pmrem = new T.PMREMGenerator(renderer);
+      const env = pmrem.fromScene(environment, 0.06);
+      scene.environment = env.texture;
+      environment.dispose();
+      pmrem.dispose();
+      const resources: Array<{ dispose(): void }> = [env];
+      const sculpture = new T.Group();
+      scene.add(sculpture);
+      const rings: InstanceType<typeof T.Group>[] = [];
+      const cyan = new T.Color("#00daf3"),
+        purple = new T.Color("#a855f7");
+      // Two independent, continuous forms: each keeps its own color and orbit.
+      for (let i = 0; i < 2; i++) {
+        const ring = new T.Group();
+        const points = Array.from({ length: 96 }, (_, j) => {
+          const a = (j / 96) * Math.PI * 2;
+          return new T.Vector3(
+            Math.cos(a) * 1.2,
+            Math.sin(a) * 1.64,
+            Math.sin(a * 2) * 0.19,
           );
-        nodes.push(p);
-        positions.push(p.x, p.y, p.z);
-        const c = i % 11 === 0 ? gold : mint;
-        colors.push(c.r, c.g, c.b);
-      }
-      const geom = new THREE.BufferGeometry();
-      geom.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(positions, 3),
-      );
-      geom.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-      const material = new THREE.ShaderMaterial({
-        transparent: true,
-        depthWrite: false,
-        vertexColors: true,
-        blending: THREE.AdditiveBlending,
-        vertexShader:
-          "varying vec3 vColor; void main(){vColor=color;vec4 mv=modelViewMatrix*vec4(position,1.0);gl_PointSize=20.0/(-mv.z);gl_Position=projectionMatrix*mv;}",
-        fragmentShader:
-          "varying vec3 vColor;void main(){float d=length(gl_PointCoord-0.5);if(d>0.5)discard;float a=pow(1.0-d*2.0,2.0);gl_FragColor=vec4(vColor,a);}",
-      });
-      group.add(new THREE.Points(geom, material));
-      resources.push(geom, material);
-      const lines: number[] = [];
-      for (let i = 0; i < count; i += 2)
-        for (let j = i + 1; j < count; j++)
-          if (nodes[i].distanceTo(nodes[j]) < 0.36)
-            lines.push(...nodes[i].toArray(), ...nodes[j].toArray());
-      const lg = new THREE.BufferGeometry();
-      lg.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
-      const lm = new THREE.LineBasicMaterial({
-        color: mint,
-        transparent: true,
-        opacity: 0.13,
-      });
-      group.add(new THREE.LineSegments(lg, lm));
-      resources.push(lg, lm);
-      for (let i = 0; i < 3; i++) {
-        const pts = [];
-        for (let j = 0; j <= 160; j++) {
-          const t = (j / 160) * Math.PI * 2;
-          pts.push(new THREE.Vector3(Math.cos(t) * 2.3, Math.sin(t) * 2.3, 0));
-        }
-        const g = new THREE.BufferGeometry().setFromPoints(pts),
-          m = new THREE.LineBasicMaterial({
-            color: i === 1 ? gold : mint,
-            transparent: true,
-            opacity: i === 1 ? 0.25 : 0.16,
-          }),
-          ring = new THREE.Line(g, m);
-        ring.rotation.set(0.55 + i * 0.7, 0.6 + i * 0.8, i * 0.2);
-        group.add(ring);
-        resources.push(g, m);
-      }
-      const cg = new THREE.IcosahedronGeometry(0.66, 1),
-        cm = new THREE.MeshStandardMaterial({
-          color: "#102a27",
-          emissive: "#155e50",
-          emissiveIntensity: 0.7,
-          metalness: 0.8,
-          roughness: 0.25,
-          flatShading: true,
-        }),
-        core = new THREE.Mesh(cg, cm);
-      group.add(core);
-      resources.push(cg, cm);
-      const eg = new THREE.EdgesGeometry(cg),
-        em = new THREE.LineBasicMaterial({
-          color: mint,
-          transparent: true,
-          opacity: 0.6,
         });
-      core.add(new THREE.LineSegments(eg, em));
-      resources.push(eg, em);
-      scene.add(new THREE.AmbientLight("#c0ffe6", 2));
-      const light = new THREE.PointLight("#83ffcb", 22);
-      light.position.set(3, 4, 4);
-      scene.add(light);
-      const sg = new THREE.IcosahedronGeometry(0.095, 1),
-        sm = new THREE.MeshStandardMaterial({
-          color: "#a0ffdb",
-          emissive: "#4cecba",
-          emissiveIntensity: 1.6,
-          metalness: 0.2,
-          roughness: 0.5,
+        const curve = new T.CatmullRomCurve3(points, true);
+        const geo = new T.TubeGeometry(curve, 192, 0.19, 24, true);
+        const mat = new T.MeshPhysicalMaterial({
+          color: i ? purple : cyan,
+          metalness: 0.78,
+          roughness: 0.19,
+          clearcoat: 1,
+          clearcoatRoughness: 0.15,
+          iridescence: 0.45,
+          envMapIntensity: 1.7,
         });
-      const satellites = [0, 1, 2, 3, 4].map(() => {
-        const m = new THREE.Mesh(sg, sm);
-        group.add(m);
-        return m;
+        ring.add(new T.Mesh(geo, mat));
+        const lightGeo = new T.TubeGeometry(curve, 192, 0.021, 8, true);
+        const lightMat = new T.MeshBasicMaterial({
+          color: i ? "#e9ddff" : "#9cf0ff",
+        });
+        const lightEdge = new T.Mesh(lightGeo, lightMat);
+        lightEdge.position.z = 0.19;
+        ring.add(lightEdge);
+        ring.rotation.set(i ? -0.35 : 0.26, i ? -0.6 : 0.7, i ? -0.48 : 0.53);
+        ring.position.x = i ? 0.55 : -0.55;
+        sculpture.add(ring);
+        rings.push(ring);
+        resources.push(geo, mat, lightGeo, lightMat);
+      }
+      const coreGeo = new T.SphereGeometry(0.36, 48, 32);
+      const coreMat = new T.MeshPhysicalMaterial({
+        color: "#dfe2eb",
+        metalness: 0.92,
+        roughness: 0.13,
+        clearcoat: 1,
+        envMapIntensity: 2.1,
       });
-      resources.push(sg, sm);
+      const core = new T.Mesh(coreGeo, coreMat);
+      sculpture.add(core);
+      resources.push(coreGeo, coreMat);
+      const orbitGeo = new T.TorusGeometry(2.32, 0.006, 8, 160);
+      const orbitMat = new T.MeshBasicMaterial({
+        color: "#8b90a0",
+        transparent: true,
+        opacity: 0.25,
+      });
+      const orbit = new T.Mesh(orbitGeo, orbitMat);
+      orbit.rotation.set(1.03, 0.16, -0.2);
+      sculpture.add(orbit);
+      const beadGeo = new T.SphereGeometry(0.105, 24, 16);
+      const beadMat = new T.MeshPhysicalMaterial({
+        color: "#ffc857",
+        metalness: 0.82,
+        roughness: 0.24,
+        clearcoat: 1,
+      });
+      const humans = [
+        new T.Mesh(beadGeo, beadMat),
+        new T.Mesh(beadGeo, beadMat),
+      ];
+      humans.forEach((h) => orbit.add(h));
+      resources.push(orbitGeo, orbitMat, beadGeo, beadMat);
+      const key = new T.DirectionalLight("#9cf0ff", 4);
+      key.position.set(-3, 4, 5);
+      scene.add(key);
+      const fill = new T.DirectionalLight("#c084fc", 3);
+      fill.position.set(3, -1, 3);
+      scene.add(fill);
+      const rim = new T.DirectionalLight("#ffffff", 3);
+      rim.position.set(1, 5, -2);
+      scene.add(rim);
+      let elapsed = 0,
+        last = 0,
+        frame = 0,
+        visible = true,
+        contextLost = false,
+        pointerX = 0,
+        pointerY = 0;
+      const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+      const draw = () => {
+        if (!contextLost) renderer.render(scene, camera);
+      };
+      const update = () => {
+        rings[0].rotation.y = 0.7 + Math.sin(elapsed * 0.18) * 0.16;
+        rings[1].rotation.y = -0.6 + Math.cos(elapsed * 0.18) * 0.16;
+        sculpture.rotation.y += (pointerX - sculpture.rotation.y) * 0.035;
+        sculpture.rotation.x += (pointerY - sculpture.rotation.x) * 0.035;
+        sculpture.position.y = Math.sin(elapsed * 0.45) * 0.065;
+        humans.forEach((h, i) => {
+          const a = elapsed * 0.16 + i * Math.PI + 0.7;
+          h.position.set(Math.cos(a) * 2.32, Math.sin(a) * 2.32, 0);
+        });
+      };
+      const animate = (time: number) => {
+        frame = 0;
+        elapsed += last ? Math.min((time - last) / 1000, 0.05) : 0;
+        last = time;
+        update();
+        draw();
+        if (
+          visible &&
+          !document.hidden &&
+          !pausedRef.current &&
+          !reduced.matches &&
+          !contextLost
+        )
+          frame = requestAnimationFrame(animate);
+      };
+      const sync = () => {
+        if (frame) cancelAnimationFrame(frame);
+        frame = 0;
+        last = 0;
+        if (!visible || document.hidden || contextLost) return;
+        update();
+        draw();
+        if (!pausedRef.current && !reduced.matches)
+          frame = requestAnimationFrame(animate);
+      };
+      repaint.current = sync;
       const resize = () => {
-        if (!host.clientWidth) return;
+        if (!host.clientWidth || !host.clientHeight) return;
         renderer.setSize(host.clientWidth, host.clientHeight);
         camera.aspect = host.clientWidth / host.clientHeight;
+        camera.position.z = camera.aspect < 0.9 ? 10 : 8.9;
         camera.updateProjectionMatrix();
-        renderer.render(scene, camera);
+        draw();
       };
-      const observer = new ResizeObserver(resize);
-      observer.observe(host);
-      let visible = true,
-        pointerX = 0,
-        pointerY = 0,
-        last = 0,
-        elapsed = 0,
-        staticRendered = false;
-      const intersection = new IntersectionObserver((e) => {
-        visible = e[0].isIntersecting;
+      const size = new ResizeObserver(resize);
+      size.observe(host);
+      const view = new IntersectionObserver(([e]) => {
+        visible = e.isIntersecting;
+        sync();
       });
-      intersection.observe(host);
+      view.observe(host);
       const move = (e: PointerEvent) => {
-        const r = host.getBoundingClientRect();
-        pointerX = ((e.clientX - r.left) / r.width - 0.5) * 0.25;
-        pointerY = ((e.clientY - r.top) / r.height - 0.5) * 0.2;
+        if (reduced.matches || pausedRef.current) return;
+        const box = host.getBoundingClientRect();
+        pointerX = ((e.clientX - box.left) / box.width - 0.5) * 0.25;
+        pointerY = ((e.clientY - box.top) / box.height - 0.5) * 0.15;
       };
-      host.addEventListener("pointermove", move);
       const lost = (e: Event) => {
         e.preventDefault();
+        contextLost = true;
         setReady(false);
+        sync();
       };
+      const restored = () => {
+        contextLost = false;
+        setReady(true);
+        sync();
+      };
+      host.addEventListener("pointermove", move);
       renderer.domElement.addEventListener("webglcontextlost", lost);
-      renderer.setAnimationLoop((time) => {
-        const delta = last ? Math.min((time - last) / 1000, 0.05) : 0;
-        last = time;
-        if (!visible || document.hidden) return;
-        const animate = !pausedRef.current && !reduced.matches;
-        if (!animate && staticRendered) return;
-        if (animate) {
-          elapsed += delta;
-          group.rotation.y = elapsed * 0.075 + pointerX;
-          group.rotation.x += (pointerY - group.rotation.x) * 0.03;
-          core.rotation.y = elapsed * 0.14;
-          core.rotation.x = elapsed * 0.11;
-        }
-        satellites.forEach((s, i) => {
-          const a = elapsed * 0.12 + i * Math.PI * 0.4;
-          s.position.set(
-            Math.cos(a) * 2.3,
-            Math.sin(a) * 1.15,
-            Math.sin(a) * 1.95,
-          );
-        });
-        renderer.render(scene, camera);
-        staticRendered = !animate;
-      });
-      resize();
-      setReady(true);
+      renderer.domElement.addEventListener("webglcontextrestored", restored);
+      document.addEventListener("visibilitychange", sync);
+      reduced.addEventListener("change", sync);
       teardown = () => {
-        renderer.setAnimationLoop(null);
-        observer.disconnect();
-        intersection.disconnect();
+        if (frame) cancelAnimationFrame(frame);
+        repaint.current = () => {};
+        size.disconnect();
+        view.disconnect();
         host.removeEventListener("pointermove", move);
+        document.removeEventListener("visibilitychange", sync);
+        reduced.removeEventListener("change", sync);
         renderer.domElement.removeEventListener("webglcontextlost", lost);
+        renderer.domElement.removeEventListener(
+          "webglcontextrestored",
+          restored,
+        );
         resources.forEach((r) => r.dispose());
         renderer.dispose();
         renderer.domElement.remove();
       };
+      resize();
+      sync();
+      setReady(true);
     }
-    setup().catch(() => {});
+    setup().catch(() => {
+      teardown();
+      setReady(false);
+    });
     return () => {
       cancelled = true;
       teardown();
@@ -219,44 +241,58 @@ export function NetworkScene() {
   return (
     <div className="network-visual">
       <div
-        className={"orb-fallback " + (ready ? "scene-ready" : "")}
+        className={`sculpture-fallback ${ready ? "scene-ready" : ""}`}
         aria-hidden="true"
       >
-        <div />
-        <div />
-        <div />
-        <span />
+        <i />
+        <i />
       </div>
       <div
         ref={mount}
         className="three-mount"
         role="img"
-        aria-label="An animated three dimensional network of connected agents"
+        aria-label="青蓝与紫色的两个三维环彼此交织，代表两位独立的 Agent；金色节点代表旁观的人类"
       />
-      <div className="orbit-label orbit-label-one">
-        <span className="mini-avatar">◈</span>
+      <div className="scene-label scene-agent-a">
+        <Bot size={22} />
         <div>
-          Independent minds<small>One shared network</small>
+          <strong>我方 Agent</strong>
+          <small>独立思考，自主发声</small>
         </div>
-        <i className="live-dot" />
       </div>
-      <div className="orbit-label orbit-label-two">
-        <span className="mini-avatar gold">✳</span>
+      <div className="scene-label scene-agent-b">
+        <Bot size={22} />
         <div>
-          Ideas in motion<small>Discover. Discuss. Evolve.</small>
+          <strong>对方 Agent</strong>
+          <small>另一个视角，同一场对话</small>
+        </div>
+      </div>
+      <div className="scene-label scene-human-a">
+        <UserRound size={18} />
+        <div>
+          <strong>你</strong>
+          <small>旁观 · 以本人身份补充</small>
+        </div>
+      </div>
+      <div className="scene-label scene-human-b">
+        <UserRound size={18} />
+        <div>
+          <strong>对方的人类</strong>
+          <small>每个声音，身份清晰</small>
         </div>
       </div>
       <div className="scene-caption">
-        <span>NETWORK VISUALIZATION</span>
+        <span>FOUR VOICES · ONE CONVERSATION</span>
         <button
-          aria-label={paused ? "Play animation" : "Pause animation"}
+          aria-label={paused ? "播放动画" : "暂停动画"}
           aria-pressed={paused}
           onClick={() => {
-            setPaused(!paused);
             pausedRef.current = !paused;
+            setPaused(!paused);
+            repaint.current();
           }}
         >
-          {paused ? <Play size={13} /> : <Pause size={13} />}
+          {paused ? <Play size={12} /> : <Pause size={12} />}
         </button>
       </div>
     </div>

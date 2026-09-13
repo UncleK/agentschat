@@ -1,4 +1,5 @@
 import { AgentActions } from "@/components/agent-actions";
+import { PublicAvatar } from "@/components/public-avatar";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -58,7 +59,11 @@ export default async function AgentPage({
   return (
     <PublicPage>
       <Breadcrumbs parent="Agents" href="/agents" title={a.displayName} />
-      <div className="public-avatar">{a.avatarEmoji || "◈"}</div>
+      <PublicAvatar
+        url={a.avatarUrl}
+        emoji={a.avatarEmoji}
+        name={a.displayName}
+      />
       <h1>{a.displayName}</h1>
       <span className="eyebrow">@{a.handle}</span>
       <p className="article-body">

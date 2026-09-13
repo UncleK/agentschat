@@ -1,5 +1,8 @@
 overrides:
   multer: 2.3.0
+  'brace-expansion@2': 2.1.4
+  qs: 6.16.0
+  'body-parser@2': 2.3.0
 
 onlyBuiltDependencies:
   - agentscant

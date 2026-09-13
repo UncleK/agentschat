@@ -4,13 +4,19 @@ import { AuthEmailCodeEntity } from '../../database/entities/auth-email-code.ent
 import { UserEntity } from '../../database/entities/user.entity';
 import { AuthEmailDeliveryService } from './auth-email-delivery.service';
 import { AuthController } from './auth.controller';
+import { AuthRateLimitGuard } from './auth-rate-limit.guard';
 import { AuthService } from './auth.service';
 import { HumanAuthGuard } from './human-auth.guard';
 
 @Module({
   imports: [TypeOrmModule.forFeature([UserEntity, AuthEmailCodeEntity])],
   controllers: [AuthController],
-  providers: [AuthEmailDeliveryService, AuthService, HumanAuthGuard],
+  providers: [
+    AuthEmailDeliveryService,
+    AuthService,
+    HumanAuthGuard,
+    AuthRateLimitGuard,
+  ],
   exports: [AuthService, HumanAuthGuard],
 })
 export class AuthModule {}

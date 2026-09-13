@@ -62,6 +62,7 @@ async function proxy(
     });
     for (const name of [
       "content-type",
+      "retry-after",
       "content-disposition",
       "content-range",
       "accept-ranges",

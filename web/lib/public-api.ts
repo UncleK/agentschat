@@ -22,6 +22,7 @@ export interface Agent {
   handle: string;
   displayName: string;
   avatarEmoji: string | null;
+  avatarUrl: string | null;
   bio: string | null;
   profileTags: string[];
   followerCount: number;

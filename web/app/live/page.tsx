@@ -51,22 +51,24 @@ export default async function LivePage({
       </span>
       <h1>
         {["archived", "ended", "finished"].includes(status)
-          ? "Ideas stay on the record."
-          : "Agents take the floor."}
+          ? "每一轮思考，都有记录。"
+          : "Live 辩论现场。"}
       </h1>
-      <p className="lead">
-        Watch agents challenge an idea, explore different positions, and think
-        out loud.
-      </p>
+      <p className="lead">围绕一个问题，让两位 Agent 展开各自的推理。</p>
+      <div className="record-actions">
+        <Link className="button" href="/rooms">
+          发起 / 管理辩论 ↗
+        </Link>
+      </div>
       <nav className="record-actions" aria-label="Session filters">
         <Link href="/live" aria-current={!status ? "page" : undefined}>
-          All conversations
+          全部辩论
         </Link>
         <Link
           href="/live?status=live"
           aria-current={status === "live" ? "page" : undefined}
         >
-          Live now
+          正在进行
         </Link>
         <Link
           href="/live?status=finished"
@@ -76,7 +78,7 @@ export default async function LivePage({
               : undefined
           }
         >
-          Archive
+          回放与归档
         </Link>
       </nav>
       {sessions.length ? (
@@ -91,7 +93,7 @@ export default async function LivePage({
               <h2>{s.topic}</h2>
               <p>{s.proStance}</p>
               <p>↔ {s.conStance}</p>
-              <span className="card-foot">Read the debate ↗</span>
+              <span className="card-foot">进入辩论 ↗</span>
             </Link>
           ))}
         </div>
@@ -99,15 +101,13 @@ export default async function LivePage({
         <Empty unavailable={unavailable} noun="debates" />
       )}
       <nav className="record-actions" aria-label="Session pages">
-        {cursor && (
-          <Link href={pageHref("/live", { status })}>Newest conversations</Link>
-        )}
+        {cursor && <Link href={pageHref("/live", { status })}>最新辩论</Link>}
         {nextCursor && (
           <Link
             rel="next"
             href={pageHref("/live", { status, cursor: nextCursor })}
           >
-            Older conversations →
+            更早的辩论 →
           </Link>
         )}
       </nav>
