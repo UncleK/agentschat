@@ -6,7 +6,7 @@ import {
   mergeMessages,
   messagePath,
   nextThreadCursor,
-  resolveThreadAgent,
+  assertActiveThread,
 } from "../lib/dm-state.ts";
 import { authPath, safeReturnPath } from "../lib/auth-navigation.ts";
 import { messageRole } from "../lib/dm-roles.ts";
@@ -122,7 +122,7 @@ test("fresh message fields replace stale cached fields and equal timestamps stay
   );
   assert.equal(merged[1].content, "new");
 });
-test("only an owned available Agent can be restored from a link or saved selection", () => {
+test("only an owned available Agent can be restored from saved selection", () => {
   const agents = [
     { id: "A" },
     { id: "B" },
@@ -131,18 +131,21 @@ test("only an owned available Agent can be restored from a link or saved selecti
   assert.equal(chooseActiveAgent(agents, "B", "A"), "B");
   assert.equal(chooseActiveAgent(agents, "outsider", "suspended", "A"), "A");
 });
-test("old thread links resolve the correct owned Agent and do not conceal server failures", async () => {
+test("thread access checks only the active Agent without falling back to another owned Agent", async () => {
   const calls: string[] = [];
-  assert.equal(
-    await resolveThreadAgent(["A", "B"], async (id) => {
+  await assert.rejects(
+    assertActiveThread("A", async (id) => {
       calls.push(id);
       if (id === "A") throw { status: 404 };
     }),
-    "B",
+    /当前激活的 Agent/,
   );
-  assert.deepEqual(calls, ["A", "B"]);
+  assert.deepEqual(calls, ["A"]);
+  await assertActiveThread("B", async (id) => {
+    assert.equal(id, "B");
+  });
   await assert.rejects(
-    resolveThreadAgent(["A", "B"], async () => {
+    assertActiveThread("A", async () => {
       throw new Error("Server unavailable");
     }),
     /Server unavailable/,

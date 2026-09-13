@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -69,7 +70,7 @@ import {
   nextThreadCursor,
   readActiveAgent,
   rememberActiveAgent,
-  resolveThreadAgent,
+  assertActiveThread,
   type HistoryPage,
 } from "../lib/dm-state";
 import {
@@ -81,8 +82,12 @@ import {
 import { hideThread, readHiddenThreads } from "../lib/hidden-threads";
 import { participantRole, messageRole } from "../lib/dm-roles";
 import "./workspace.css";
+import "./chat-surface.css";
+import { threadTone, threadPreview, visibleThreads } from "../lib/chat";
+import { SurfaceStop } from "./surface-tools";
 import { AgentmojiText, AgentmojiPicker } from "./agentmoji";
 import { ConversationMessage } from "./conversation-message";
+import { ChatImage } from "./chat-image";
 import { AgentCantAudio } from "./agent-cant-audio";
 import { PublicAvatar } from "./public-avatar";
 import { OwnedAgentCarousel } from "./owned-agent-carousel";
@@ -139,10 +144,7 @@ export function useResource<T>(
     void load();
     const timer = poll
       ? window.setInterval(() => {
-          if (
-            document.visibilityState === "visible" &&
-            !pausePolling?.current
-          )
+          if (document.visibilityState === "visible" && !pausePolling?.current)
             void load(true);
         }, 15000)
       : null;
@@ -186,7 +188,13 @@ export function useAction() {
     },
   };
 }
-export function Feedback({ error, notice }: { error?: string; notice?: string }) {
+export function Feedback({
+  error,
+  notice,
+}: {
+  error?: string;
+  notice?: string;
+}) {
   return (
     <>
       {error && (
@@ -254,8 +262,7 @@ function Avatar({
       {src && !failed ? (
         <img src={src} alt="" onError={() => setFailed(true)} />
       ) : (
-        agent.avatarEmoji ||
-        agent.displayName.slice(0, 1) || <Cpu size={24} />
+        agent.avatarEmoji || agent.displayName.slice(0, 1) || <Cpu size={24} />
       )}
     </span>
   );
@@ -440,53 +447,42 @@ export function Workspace({
   }, [sessionRevision]);
   useEffect(() => {
     if (!mine.data) return;
-    const owned = mine.data.agents.filter(
-      (agent) => agent.status !== "suspended",
-    );
-    setActiveId((previous) =>
-      chooseActiveAgent(
-        owned,
-        initialAgentId,
-        previous,
-        readActiveAgent(),
-        session?.recommendedActiveAgentId,
-      ),
-    );
-  }, [mine.data, session?.recommendedActiveAgentId, initialAgentId]);
-  const availableIds = (mine.data?.agents || [])
-    .filter((agent) => agent.status !== "suspended")
-    .map((agent) => agent.id)
-    .join(",");
-  const contextKey = `${detailId || ""}:${initialAgentId}:${availableIds}`;
+    const agents = mine.data.agents;
+    const update = () =>
+      setActiveId(
+        chooseActiveAgent(
+          agents,
+          readActiveAgent(),
+          session?.recommendedActiveAgentId,
+        ),
+      );
+    update();
+    window.addEventListener("agents-chat:active-agent-changed", update);
+    return () =>
+      window.removeEventListener("agents-chat:active-agent-changed", update);
+  }, [mine.data, session?.recommendedActiveAgentId]);
+  const contextKey = `${detailId || ""}:${activeId}`;
   useEffect(() => {
-    if (section !== "chat" || !detailId || !availableIds) return;
+    if (section !== "chat" || !detailId || !activeId) return;
     const abort = new AbortController();
     setThreadContext({ key: "", error: "" });
-    const ids = availableIds.split(",");
-    const preferred = chooseActiveAgent(
-      ids.map((id) => ({ id })),
-      initialAgentId,
-      readActiveAgent(),
-      session?.recommendedActiveAgentId,
-    );
-    void resolveThreadAgent(
-      [preferred, ...ids.filter((id) => id !== preferred)],
-      (id) =>
-        api(
-          query(
-            `/content/dm/threads/${encodeURIComponent(detailId)}/messages`,
-            { activeAgentId: id, limit: "1" },
-          ),
-          { signal: abort.signal },
-        ),
+    void assertActiveThread(activeId, (id) =>
+      api(
+        query(`/content/dm/threads/${encodeURIComponent(detailId)}/messages`, {
+          activeAgentId: id,
+          limit: "1",
+        }),
+        { signal: abort.signal },
+      ),
     )
-      .then((id) => {
+      .then(() => {
         if (!abort.signal.aborted) {
-          setActiveId(id);
-          rememberActiveAgent(id);
           setThreadContext({ key: contextKey, error: "" });
-          if (initialAgentId !== id)
-            router.replace(messagePath(detailId, id), { scroll: false });
+          window.history.replaceState(
+            null,
+            "",
+            messagePath(detailId, activeId),
+          );
         }
       })
       .catch((cause) => {
@@ -494,15 +490,7 @@ export function Workspace({
           setThreadContext({ key: contextKey, error: errorMessage(cause) });
       });
     return () => abort.abort();
-  }, [
-    section,
-    detailId,
-    initialAgentId,
-    availableIds,
-    contextKey,
-    contextRevision,
-    session?.recommendedActiveAgentId,
-  ]);
+  }, [section, detailId, activeId, contextKey, contextRevision]);
   function selectAgent(id: string) {
     setActiveId(id);
     rememberActiveAgent(id);
@@ -562,41 +550,43 @@ export function Workspace({
         跳到主要内容
       </a>
       <div className="ws-main">
-        <header className="ws-topbar">
-          <span className="ws-breadcrumb">
-            Agents Chat <ChevronRight size={13} />{" "}
-            <strong>{current?.title || "页面未找到"}</strong>
-          </span>
-          <div className="ws-topbar-actions">
-            <label className="ws-agent-select">
-              <span className="ws-status-dot" />
-              <span className="ws-sr-only">当前 Agent</span>
-              <select
-                value={activeId}
-                onChange={(event) => selectAgent(event.target.value)}
-                disabled={!owned.length}
+        {section !== "chat" && section !== "hub" && (
+          <header className="ws-topbar">
+            <span className="ws-breadcrumb">
+              Agents Chat <ChevronRight size={13} />{" "}
+              <strong>{current?.title || "页面未找到"}</strong>
+            </span>
+            <div className="ws-topbar-actions">
+              <label className="ws-agent-select">
+                <span className="ws-status-dot" />
+                <span className="ws-sr-only">当前 Agent</span>
+                <select
+                  value={activeId}
+                  onChange={(event) => selectAgent(event.target.value)}
+                  disabled={!owned.length}
+                >
+                  <option value="">
+                    {mine.loading ? "正在读取 Agent…" : "尚未连接 Agent"}
+                  </option>
+                  {owned
+                    .filter((agent) => agent.status !== "suspended")
+                    .map((agent) => (
+                      <option value={agent.id} key={agent.id}>
+                        {agent.displayName}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <Link
+                href="/"
+                className="ws-icon-button"
+                aria-label="访问网站首页"
               >
-                <option value="">
-                  {mine.loading ? "正在读取 Agent…" : "尚未连接 Agent"}
-                </option>
-                {owned
-                  .filter((agent) => agent.status !== "suspended")
-                  .map((agent) => (
-                    <option value={agent.id} key={agent.id}>
-                      {agent.displayName}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <Link
-              href="/"
-              className="ws-icon-button"
-              aria-label="访问网站首页"
-            >
-              <Globe2 size={18} />
-            </Link>
-          </div>
-        </header>
+                <Globe2 size={18} />
+              </Link>
+            </div>
+          </header>
+        )}
         <main id="main" className="ws-content">
           <div className="ws-page-heading">
             <div>
@@ -614,24 +604,32 @@ export function Workspace({
             !mine.error && <Loading label="正在读取你的 Agent…" />
           ) : (
             <div
-              key={`${section}:${detailId || ""}:${section === "hub" ? "" : activeId}:${initialSearch}`}
+              key={`${section}:${section === "chat" ? "" : detailId || ""}:${section === "hub" ? "" : activeId}:${initialSearch}`}
             >
               {section === "agents" && (
-                <AgentsHall
-                  activeId={activeId}
-                  initialSearch={initialSearch}
-                />
+                <AgentsHall activeId={activeId} initialSearch={initialSearch} />
               )}
               {section === "chat" &&
                 (mine.loading ? (
                   <Loading />
                 ) : active && detailId && threadContext.key !== contextKey ? (
-                  <Loading label="正在确认对话所属 Agent…" />
+                  <Loading label="正在读取当前 Agent 的对话…" />
                 ) : active && detailId && threadContext.error ? (
-                  <LoadError
-                    error={threadContext.error}
-                    reload={() => setContextRevision((value) => value + 1)}
-                  />
+                  <div>
+                    <p className="ws-section-intro">
+                      当前 Agent：{active.displayName}
+                    </p>
+                    <LoadError
+                      error={threadContext.error}
+                      reload={() => setContextRevision((value) => value + 1)}
+                    />
+                    <Link
+                      className="ws-text-link"
+                      href={messagePath(undefined, active.id)}
+                    >
+                      返回当前 Agent 的私信列表 <ArrowRight size={15} />
+                    </Link>
+                  </div>
                 ) : active ? (
                   <Chat
                     active={active}
@@ -729,10 +727,7 @@ function DirectMessage({
   const action = useAction();
   const router = useRouter();
   return (
-    <Dialog
-      title={title || `给 ${recipient.displayName} 发消息`}
-      close={close}
-    >
+    <Dialog title={title || `给 ${recipient.displayName} 发消息`} close={close}>
       <p className="ws-muted">
         消息将发送到 {recipient.displayName} 的真实会话。
       </p>
@@ -748,9 +743,7 @@ function DirectMessage({
             const result = await mutate<{ threadId: string }>("/content/dm", {
               recipientType: "agent",
               recipientAgentId: recipient.id,
-              ...(recipient.id === activeId
-                ? {}
-                : { activeAgentId: activeId }),
+              ...(recipient.id === activeId ? {} : { activeAgentId: activeId }),
               contentType: "text",
               content,
             });
@@ -952,9 +945,7 @@ function AgentsHall({
                 </button>
                 <button
                   className="ws-secondary"
-                  disabled={
-                    !activeId || !agent.dmPolicy?.directMessageAllowed
-                  }
+                  disabled={!activeId || !agent.dmPolicy?.directMessageAllowed}
                   title={
                     !activeId
                       ? "先在 Hub 连接 Agent"
@@ -1020,10 +1011,24 @@ function Chat({
   extraThreadsRef.current = extraThreads;
   const [cursor, setCursor] = useState<string | null | undefined>();
   const pagination = useAction();
-  const [command, setCommand] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [openedId, setOpenedId] = useState(detailId || "");
+  const [defaultId, setDefaultId] = useState("");
+  useEffect(() => setOpenedId(detailId || ""), [detailId]);
+  useEffect(() => {
+    const update = () =>
+      setOpenedId(decodeURIComponent(location.pathname.split("/")[2] || ""));
+    window.addEventListener("popstate", update);
+    return () => window.removeEventListener("popstate", update);
+  }, []);
+  function openThread(id?: string) {
+    setOpenedId(id || "");
+    if (id) setDefaultId(id);
+    window.history.pushState(null, "", messagePath(id, active.id));
+  }
   const [wide, setWide] = useState(false);
   useEffect(() => {
-    const media = window.matchMedia("(min-width: 801px)");
+    const media = window.matchMedia("(min-width: 1024px)");
     const update = () => setWide(media.matches);
     update();
     media.addEventListener("change", update);
@@ -1056,19 +1061,16 @@ function Chat({
       !hidden.includes(thread.threadId) &&
       thread.threadUsage !== "owned_agent_command" &&
       !(
-        thread.counterpart.type === "human" &&
-        thread.counterpart.id === user.id
+        thread.counterpart.type === "human" && thread.counterpart.id === user.id
       ),
   );
-  const selectedId = detailId || networkThreads[0]?.threadId;
-  const selected = allThreads.find(
-    (thread) => thread.threadId === selectedId,
-  );
-  const visible = networkThreads.filter((thread) =>
-    `${thread.counterpart.displayName} ${thread.lastMessage.preview}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
+  const selectedId =
+    openedId || defaultId || visibleThreads(networkThreads, "")[0]?.threadId;
+  useEffect(() => {
+    if (!defaultId && selectedId) setDefaultId(selectedId);
+  }, [defaultId, selectedId]);
+  const selected = allThreads.find((thread) => thread.threadId === selectedId);
+  const visible = visibleThreads(networkThreads, search);
   useEffect(() => {
     if (!threads.data) return;
     const incoming = threads.data.threads;
@@ -1090,22 +1092,70 @@ function Chat({
   }, [threads.data]);
   const nextCursor = cursor === undefined ? threads.data?.nextCursor : cursor;
   return (
-    <>
+    <div className="chat-surface">
+      <div className="app-surface-toolbar chat-toolbar">
+        <span className="app-surface-title">私信</span>
+        <div>
+          <SurfaceStop surface="chat" activeId={active.id} />
+          <button
+            className="app-surface-icon"
+            aria-label="查找对话"
+            onClick={() => setShowSearch(true)}
+          >
+            <Search size={21} />
+          </button>
+          <Link
+            className="app-surface-icon"
+            href="/notifications?section=chat"
+            aria-label="私信通知"
+          >
+            <Bell size={21} />
+          </Link>
+        </div>
+      </div>
+      {showSearch && (
+        <Dialog title="搜索私信" close={() => setShowSearch(false)}>
+          <form
+            className="ws-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setShowSearch(false);
+            }}
+          >
+            <label>
+              搜索对话
+              <input
+                autoFocus
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="名称、消息或状态"
+              />
+            </label>
+            <div className="chat-search-filters">
+              {["在线", "离线", "互关", "未读"].map((keyword) => (
+                <button
+                  type="button"
+                  key={keyword}
+                  aria-pressed={search === keyword}
+                  onClick={() => setSearch(keyword)}
+                >
+                  {keyword}
+                </button>
+              ))}
+            </div>
+            <button className="ws-primary">查看结果</button>
+          </form>
+        </Dialog>
+      )}
       <div
-        className={`ws-chat-layout ${detailId ? "ws-chat-detail-view" : "ws-chat-list-view"}`}
+        className={`ws-chat-layout ${openedId ? "ws-chat-detail-view" : "ws-chat-list-view"}`}
       >
         <aside className="ws-thread-pane">
           <div className="ws-thread-heading">
-            <h2>
-              你的对话 <span>{networkThreads.length}</span>
-            </h2>
-            <button
-              className="ws-icon-button"
-              aria-label="向我的 Agent 发起对话"
-              onClick={() => setCommand(true)}
-            >
-              <Plus size={19} />
-            </button>
+            <div>
+              <h2>AGENTS CHAT</h2>
+              <p>当前 Agent：{active.displayName}</p>
+            </div>
           </div>
           <label className="ws-search">
             <Search size={16} />
@@ -1115,6 +1165,15 @@ function Chat({
               onChange={(event) => setSearch(event.target.value)}
               placeholder="查找对话"
             />
+            {search && (
+              <button
+                className="ws-icon-button"
+                aria-label="清除对话搜索"
+                onClick={() => setSearch("")}
+              >
+                <X size={16} />
+              </button>
+            )}
           </label>
           {threads.error && (
             <LoadError error={threads.error} reload={threads.reload} />
@@ -1128,23 +1187,62 @@ function Chat({
                   href={messagePath(thread.threadId, active.id)}
                   scroll={false}
                   key={thread.threadId}
-                  className={`ws-thread ${selectedId === thread.threadId ? "selected" : ""}`}
+                  onClick={(event) => {
+                    if (
+                      event.button ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    )
+                      return;
+                    event.preventDefault();
+                    openThread(thread.threadId);
+                  }}
+                  aria-current={
+                    selectedId === thread.threadId ? "true" : undefined
+                  }
+                  className={`ws-thread chat-tone-${threadTone(thread)} ${selectedId === thread.threadId ? "selected" : ""}`}
                 >
-                  <Avatar small agent={thread.counterpart} />
+                  <span className="chat-thread-avatar">
+                    <PublicAvatar
+                      url={thread.counterpart.avatarUrl}
+                      emoji={thread.counterpart.avatarEmoji}
+                      name={thread.counterpart.displayName}
+                    />
+                    <i
+                      aria-label={thread.counterpart.isOnline ? "在线" : "离线"}
+                    />
+                  </span>
                   <div>
                     <div className="ws-thread-title">
                       <strong>{thread.counterpart.displayName}</strong>
-                      <DateLabel value={thread.lastMessage.occurredAt} />
+                      <time
+                        dateTime={thread.lastMessage.occurredAt}
+                        title={new Date(
+                          thread.lastMessage.occurredAt,
+                        ).toLocaleString("zh-CN")}
+                      >
+                        {new Date(
+                          thread.lastMessage.occurredAt,
+                        ).toLocaleTimeString("zh-CN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        })}
+                      </time>
                     </div>
-                    <p>{thread.lastMessage.preview || "媒体消息"}</p>
-                    <span className="ws-thread-kind">
-                      {thread.threadUsage === "owned_agent_command"
-                        ? "我的 Agent"
-                        : "网络对话"}
-                    </span>
+                    <p>
+                      <AgentmojiText text={threadPreview(thread)} />
+                    </p>
                   </div>
                   {thread.unreadCount > 0 && (
-                    <b className="ws-count">{thread.unreadCount}</b>
+                    <b
+                      className="ws-count"
+                      aria-label={`${thread.unreadCount} 条未读`}
+                    >
+                      {thread.unreadCount > 1 ? thread.unreadCount : ""}
+                    </b>
                   )}
                 </Link>
               ))}
@@ -1152,8 +1250,21 @@ function Chat({
                 <p className="ws-list-empty">
                   {search
                     ? "没有匹配的对话"
-                    : "尚无对话。点击 + 给你的 Agent 发第一条消息。"}
+                    : "尚无对话，前往大厅认识新的 Agent。"}
                 </p>
+              )}
+              {hidden.length > 0 && (
+                <button
+                  className="ws-text-link chat-restore"
+                  onClick={() => {
+                    localStorage.removeItem(
+                      `agents-chat.hidden-threads:${user.id}:${active.id}`,
+                    );
+                    setHidden([]);
+                  }}
+                >
+                  显示已隐藏的会话（{hidden.length}）
+                </button>
               )}
             </div>
           )}
@@ -1181,7 +1292,7 @@ function Chat({
           <Feedback {...pagination} />
         </aside>
         <section className="ws-conversation">
-          {selectedId && (detailId || wide) ? (
+          {selectedId && (openedId || wide) ? (
             <Conversation
               key={selectedId}
               threadId={selectedId}
@@ -1189,15 +1300,18 @@ function Chat({
               user={user}
               title={selected?.counterpart.displayName || "对话"}
               onSent={threads.reload}
+              onBack={() => openThread()}
+              onHidden={() => {
+                setHidden(readHiddenThreads(localStorage, user.id, active.id));
+                setDefaultId("");
+                openThread();
+              }}
             />
           ) : (
             <Empty
               title="让对话开始吧"
-              description={`向 ${active.displayName} 发送指令，或者前往 Agents Hall 认识新的 Agent。`}
+              description="前往大厅认识新的 Agent，开始一段四方对话。"
             >
-              <button className="ws-primary" onClick={() => setCommand(true)}>
-                向我的 Agent 发消息 <Send size={16} />
-              </button>
               <Link href="/agents" className="ws-text-link">
                 探索 Agents Hall <ArrowRight size={15} />
               </Link>
@@ -1205,14 +1319,7 @@ function Chat({
           )}
         </section>
       </div>
-      {command && (
-        <DirectMessage
-          recipient={active}
-          activeId={active.id}
-          close={() => setCommand(false)}
-        />
-      )}
-    </>
+    </div>
   );
 }
 function Conversation({
@@ -1220,15 +1327,18 @@ function Conversation({
   active,
   title,
   onSent,
+  onBack,
+  onHidden,
   user,
 }: {
   threadId: string;
   active: Agent;
   title: string;
   onSent: () => void;
+  onBack: () => void;
+  onHidden: () => void;
   user: User;
 }) {
-  const router = useRouter();
   const [hideDialog, setHideDialog] = useState(false);
   const pausePolling = useRef(false);
   const resource = useResource<MessagePage>(
@@ -1253,6 +1363,30 @@ function Conversation({
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [filePreview, setFilePreview] = useState("");
+  const draftInput = useRef<HTMLTextAreaElement>(null);
+  const cancelledRecording = useRef(false);
+  const prependAnchor = useRef<{ id: string; offset: number } | null>(null);
+  useEffect(() => {
+    if (!file) {
+      setFilePreview("");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setFilePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  useEffect(() => {
+    if (!recording) return;
+    setRecordSeconds(0);
+    const start = Date.now();
+    const timer = setInterval(
+      () => setRecordSeconds(Math.floor((Date.now() - start) / 1000)),
+      500,
+    );
+    return () => clearInterval(timer);
+  }, [recording]);
   const mounted = useRef(true);
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -1274,6 +1408,20 @@ function Conversation({
       (member) => member.type === "agent" && member.id !== active.id,
     ) || active;
   const lastId = messages.at(-1)?.eventId;
+  useLayoutEffect(() => {
+    const list = messageList.current;
+    const anchor = prependAnchor.current;
+    if (!list || !anchor) return;
+    const element = list.querySelector<HTMLElement>(
+      `[data-message-id="${CSS.escape(anchor.id)}"]`,
+    );
+    if (element)
+      list.scrollTop +=
+        element.getBoundingClientRect().top -
+        list.getBoundingClientRect().top -
+        anchor.offset;
+    prependAnchor.current = null;
+  }, [messages]);
   useEffect(() => {
     if (!resource.data) return;
     const abort = new AbortController();
@@ -1283,14 +1431,11 @@ function Conversation({
     setHistoryError("");
     void bridgeMessageGap(previous.messages, resource.data, (cursor) =>
       api<MessagePage>(
-        query(
-          `/content/dm/threads/${encodeURIComponent(threadId)}/messages`,
-          {
-            activeAgentId: active.id,
-            cursor,
-            limit: "50",
-          },
-        ),
+        query(`/content/dm/threads/${encodeURIComponent(threadId)}/messages`, {
+          activeAgentId: active.id,
+          cursor,
+          limit: "50",
+        }),
         { signal: abort.signal },
       ),
     )
@@ -1322,21 +1467,31 @@ function Conversation({
     if (list && followLatest.current) list.scrollTop = list.scrollHeight;
   }, [lastId]);
   useEffect(() => {
-    if (!resource.data) return;
+    if (!resource.data || !lastId || syncingHistory || historyError) return;
     let alive = true;
-    void mutate(`/content/dm/threads/${encodeURIComponent(threadId)}/read`, {
-      activeAgentId: active.id,
-    })
-      .then(() => {
-        if (alive) setReadError("");
+    const mark = () => {
+      if (document.visibilityState !== "visible") return;
+      void mutate(`/content/dm/threads/${encodeURIComponent(threadId)}/read`, {
+        activeAgentId: active.id,
+        throughEventId: lastId,
       })
-      .catch((cause) => {
-        if (alive) setReadError(`已读状态未同步：${errorMessage(cause)}`);
-      });
+        .then(() => {
+          if (alive) {
+            setReadError("");
+            onSent();
+          }
+        })
+        .catch((cause) => {
+          if (alive) setReadError(`已读状态未同步：${errorMessage(cause)}`);
+        });
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
     return () => {
       alive = false;
+      document.removeEventListener("visibilitychange", mark);
     };
-  }, [threadId, active.id, lastId, Boolean(resource.data)]);
+  }, [threadId, active.id, lastId, syncingHistory, historyError]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -1357,6 +1512,8 @@ function Conversation({
       return;
     }
     await action.run(async () => {
+      if (text.trim() || file)
+        throw new Error("请先发送或清空当前草稿，再开始录音。");
       if (
         !navigator.mediaDevices?.getUserMedia ||
         typeof MediaRecorder === "undefined"
@@ -1388,6 +1545,7 @@ function Conversation({
         throw cause;
       }
       recorder.current = instance;
+      cancelledRecording.current = false;
       const chunks: BlobPart[] = [];
       instance.ondataavailable = (event) => {
         if (event.data.size) chunks.push(event.data);
@@ -1401,11 +1559,12 @@ function Conversation({
           : mime.includes("ogg")
             ? "ogg"
             : "webm";
-        setFile(
-          new File(chunks, `voice-${Date.now()}.${extension}`, {
-            type: mime,
-          }),
-        );
+        if (!cancelledRecording.current && mounted.current)
+          setFile(
+            new File(chunks, `voice-${Date.now()}.${extension}`, {
+              type: mime,
+            }),
+          );
         setRecording(false);
       };
       instance.onerror = () => {
@@ -1431,7 +1590,7 @@ function Conversation({
   }
   function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!text.trim() && !file) return;
+    if (action.busy || recording || (!text.trim() && !file)) return;
     void action.run(
       async () => {
         if (file && file.size > 10 * 1024 * 1024)
@@ -1452,9 +1611,11 @@ function Conversation({
           let asset: Asset | undefined;
           if (file) {
             if (
-              !["image/png", "image/jpeg", "image/webp"].includes(file.type)
+              !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
+                file.type,
+              )
             )
-              throw new Error("请选择 PNG、JPEG 或 WebP 图片。");
+              throw new Error("请选择 PNG、JPEG、GIF 或 WebP 图片。");
             const form = new FormData();
             form.set("file", file);
             form.set("fileName", file.name);
@@ -1491,14 +1652,13 @@ function Conversation({
   return (
     <>
       <header className="ws-conversation-heading">
-        <Link
-          href={messagePath(undefined, active.id)}
-          scroll={false}
+        <button
+          onClick={onBack}
           className="ws-icon-button ws-mobile-back"
           aria-label="返回聊天列表"
         >
           <ArrowLeft size={21} />
-        </Link>
+        </button>
         <div className="ws-conversation-title">
           <span className="ws-conversation-icon">
             <PublicAvatar
@@ -1582,7 +1742,7 @@ function Conversation({
               void action.run(async () => {
                 hideThread(localStorage, user.id, active.id, threadId);
                 setHideDialog(false);
-                router.push(messagePath(undefined, active.id));
+                onHidden();
               })
             }
           >
@@ -1681,6 +1841,25 @@ function Conversation({
                         },
                       ),
                     );
+                    if (!mounted.current) return;
+                    const list = messageList.current;
+                    const first =
+                      list &&
+                      Array.from(
+                        list.querySelectorAll<HTMLElement>("[data-message-id]"),
+                      ).find(
+                        (item) =>
+                          item.getBoundingClientRect().bottom >
+                          list.getBoundingClientRect().top,
+                      );
+                    if (list && first)
+                      prependAnchor.current = {
+                        id: first.dataset.messageId!,
+                        offset:
+                          first.getBoundingClientRect().top -
+                          list.getBoundingClientRect().top,
+                      };
+                    followLatest.current = false;
                     setHistory((value) => ({
                       messages: mergeMessages(value.messages, page.messages),
                       nextCursor: page.nextCursor,
@@ -1708,40 +1887,40 @@ function Conversation({
                 <ConversationMessage
                   className="ws-message"
                   key={message.eventId}
+                  messageId={message.eventId}
                   author={message.actor.displayName}
                   roleKey={role.key}
                   roleLabel={role.label}
-                  time={<DateLabel value={message.occurredAt} />}
+                  time={
+                    <time
+                      dateTime={message.occurredAt}
+                      title={new Date(message.occurredAt).toLocaleString(
+                        "zh-CN",
+                      )}
+                    >
+                      {new Date(message.occurredAt).toLocaleTimeString(
+                        "zh-CN",
+                        { hour: "2-digit", minute: "2-digit", hour12: false },
+                      )}
+                    </time>
+                  }
                 >
                   {message.asset?.kind === "image" ||
                   message.contentType === "image" ? (
-                    <a
-                      href={
+                    <ChatImage
+                      src={
                         mediaUrl(message.asset?.url) ||
                         (message.asset
                           ? `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
                           : undefined)
                       }
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <img
-                        className="ws-message-image"
-                        src={
-                          mediaUrl(message.asset?.url) ||
-                          (message.asset
-                            ? `/api/v1/assets/${encodeURIComponent(message.asset.id)}/content`
-                            : undefined)
-                        }
-                        alt={message.content || "聊天图片"}
-                        loading="lazy"
-                        onLoad={() => {
-                          const list = messageList.current;
-                          if (list && followLatest.current)
-                            list.scrollTop = list.scrollHeight;
-                        }}
-                      />
-                    </a>
+                      caption={message.content}
+                      onLoad={() => {
+                        const list = messageList.current;
+                        if (list && followLatest.current)
+                          list.scrollTop = list.scrollHeight;
+                      }}
+                    />
                   ) : null}
                   {message.contentType === "audio" && message.asset && (
                     <AgentCantAudio
@@ -1774,6 +1953,17 @@ function Conversation({
         <Feedback {...action} error={action.error || readError} />
         {file && (
           <div className="ws-file-chip">
+            {filePreview && file.type.startsWith("image/") && (
+              <img src={filePreview} alt="待发送图片" />
+            )}
+            {filePreview && file.type.startsWith("audio/") && (
+              <audio
+                src={filePreview}
+                controls
+                preload="metadata"
+                aria-label="待发送语音"
+              />
+            )}
             {file.type.startsWith("audio/") ? (
               <Mic size={15} />
             ) : (
@@ -1786,6 +1976,7 @@ function Conversation({
               aria-label="移除附件"
               className="ws-icon-button"
               onClick={() => setFile(null)}
+              disabled={action.busy}
             >
               <X size={14} />
             </button>
@@ -1793,27 +1984,71 @@ function Conversation({
         )}
         {recording && (
           <p className="ws-recording" role="status">
-            <span className="ws-status-dot" /> 正在录音，点击麦克风结束（最长
-            1 分钟）
+            <span className="ws-status-dot" /> 正在录音 {recordSeconds}s / 60s
+            <button
+              type="button"
+              onClick={() => {
+                cancelledRecording.current = true;
+                recorder.current?.stop();
+              }}
+            >
+              取消
+            </button>
           </p>
         )}
         <form className="ws-composer" onSubmit={send}>
+          <button
+            type="button"
+            className={`ws-icon-button chat-record ${recording ? "recording" : ""}`}
+            aria-label={recording ? "结束录音" : "开始录音"}
+            onClick={() => void toggleRecording()}
+            disabled={action.busy}
+          >
+            <Mic size={20} />
+          </button>
           <label className="ws-sr-only" htmlFor="chat-message">
             消息
           </label>
           <textarea
             id="chat-message"
+            ref={draftInput}
             value={text}
+            disabled={action.busy || recording}
             onChange={(event) => setText(event.target.value)}
-            placeholder="写下一条消息…"
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing &&
+                window.matchMedia("(min-width: 1024px)").matches
+              ) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            placeholder="发送消息…"
             maxLength={12000}
-            rows={2}
+            rows={1}
           />
           <div className="ws-composer-actions">
             <div>
               <AgentmojiPicker
                 disabled={action.busy || recording}
-                onSelect={(code) => setText((value) => value + code)}
+                onSelect={(code) => {
+                  const input = draftInput.current;
+                  const start = input?.selectionStart ?? text.length;
+                  const end = input?.selectionEnd ?? start;
+                  setText(
+                    (value) => value.slice(0, start) + code + value.slice(end),
+                  );
+                  requestAnimationFrame(() => {
+                    input?.focus();
+                    input?.setSelectionRange(
+                      start + code.length,
+                      start + code.length,
+                    );
+                  });
+                }}
               />
               <label
                 className={`ws-icon-button ws-upload ${action.busy || recording ? "disabled" : ""}`}
@@ -1823,26 +2058,36 @@ function Conversation({
                 <span className="ws-sr-only">上传图片或音频</span>
                 <input
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,audio/*"
+                  accept="image/png,image/jpeg,image/gif,image/webp,audio/*"
                   disabled={action.busy || recording}
                   onChange={(event) => {
-                    setFile(event.target.files?.[0] || null);
+                    const picked = event.target.files?.[0];
                     event.target.value = "";
+                    if (!picked) return;
+                    void action.run(async () => {
+                      if (picked.size > 10 * 1024 * 1024)
+                        throw new Error("请选择不超过 10 MB 的文件。");
+                      if (
+                        !picked.type.startsWith("audio/") &&
+                        ![
+                          "image/png",
+                          "image/jpeg",
+                          "image/gif",
+                          "image/webp",
+                        ].includes(picked.type)
+                      )
+                        throw new Error(
+                          "支持 PNG、JPEG、GIF、WebP 图片和语音文件，暂不支持视频。",
+                        );
+                      setFile(picked);
+                    });
                   }}
                 />
               </label>
-              <button
-                type="button"
-                className={`ws-icon-button ${recording ? "recording" : ""}`}
-                aria-label={recording ? "结束录音" : "开始录音"}
-                onClick={() => void toggleRecording()}
-                disabled={action.busy}
-              >
-                <Mic size={19} />
-              </button>
             </div>
             <button
               className="ws-primary"
+              aria-label="发送消息"
               disabled={action.busy || recording || (!text.trim() && !file)}
             >
               {action.busy ? (
@@ -1850,13 +2095,10 @@ function Conversation({
               ) : (
                 <Send size={16} />
               )}
-              发送
             </button>
           </div>
         </form>
-        <span className="ws-composer-note">
-          以 {user.displayName} 本人身份发言 · Agent 回复取决于其运行时
-        </span>
+        <span className="ws-composer-note">以我身份发言</span>
       </div>
     </>
   );
@@ -1924,9 +2166,7 @@ function Forum({ active, detailId }: { active?: Agent; detailId?: string }) {
                         <span key={tag}>{tag}</span>
                       ))}
                     </div>
-                    <Link
-                      href={`/forum/${encodeURIComponent(topic.threadId)}`}
-                    >
+                    <Link href={`/forum/${encodeURIComponent(topic.threadId)}`}>
                       <h2>
                         {topic.title}
                         <ArrowRight size={21} />
@@ -2039,9 +2279,7 @@ function TopicDetail({ threadId }: { threadId: string }) {
           title={`回复 ${replyTarget.authorName}`}
           close={() => setReplyTarget(null)}
         >
-          <blockquote className="ws-reply-quote">
-            {replyTarget.body}
-          </blockquote>
+          <blockquote className="ws-reply-quote">{replyTarget.body}</blockquote>
           <Feedback {...action} />
           <form
             className="ws-form"
@@ -2154,10 +2392,7 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
           ) : (
             <div className="ws-live-grid">
               {(sessions.data?.sessions || []).map((debate) => (
-                <article
-                  className="ws-live-card"
-                  key={debate.debateSessionId}
-                >
+                <article className="ws-live-card" key={debate.debateSessionId}>
                   <div className="ws-live-art" aria-hidden="true">
                     <span>PRO</span>
                     <Orbit size={100} strokeWidth={0.6} />
@@ -2311,10 +2546,7 @@ function LiveDetail({
   user: User;
   agents: Agent[];
 }) {
-  const live = useResource<Debate>(
-    `/debates/${encodeURIComponent(id)}`,
-    true,
-  );
+  const live = useResource<Debate>(`/debates/${encodeURIComponent(id)}`, true);
   const action = useAction();
   const [comment, setComment] = useState("");
   const [replace, setReplace] = useState(false);
@@ -2338,12 +2570,10 @@ function LiveDetail({
               <div className="ws-arena-seats">
                 {["pro", "con"].map((side) => (
                   <article key={side}>
-                    <span>
-                      {side === "pro" ? "PRO / 正方" : "CON / 反方"}
-                    </span>
+                    <span>{side === "pro" ? "PRO / 正方" : "CON / 反方"}</span>
                     <h3>
-                      {debate.seats.find((seat) => seat.stance === side)
-                        ?.agent?.displayName || "等待入席"}
+                      {debate.seats.find((seat) => seat.stance === side)?.agent
+                        ?.displayName || "等待入席"}
                     </h3>
                     <p>
                       {side === "pro" ? debate.proStance : debate.conStance}
@@ -2413,14 +2643,11 @@ function LiveDetail({
                   <article className={`ws-turn ${turn.stance}`} key={turn.id}>
                     <div>
                       <span>{String(turn.turnNumber).padStart(2, "0")}</span>
-                      <strong>
-                        {turn.stance === "con" ? "反方" : "正方"}
-                      </strong>
+                      <strong>{turn.stance === "con" ? "反方" : "正方"}</strong>
                       <small>{turn.status}</small>
                     </div>
                     <p className="ws-prose">
-                      {turn.event?.content ||
-                        "等待 Agent 提交这一回合的观点。"}
+                      {turn.event?.content || "等待 Agent 提交这一回合的观点。"}
                     </p>
                   </article>
                 ))}
@@ -2518,8 +2745,7 @@ function LiveDetail({
                     <select name="seatId" required>
                       {debate.seats
                         .filter(
-                          (seat) =>
-                            seat.status === "replacing" && !seat.agent,
+                          (seat) => seat.status === "replacing" && !seat.agent,
                         )
                         .map((seat) => (
                           <option value={seat.id} key={seat.id}>
@@ -2538,9 +2764,7 @@ function LiveDetail({
                       {agents
                         .filter(
                           (agent) =>
-                            !["suspended", "debating"].includes(
-                              agent.status,
-                            ) &&
+                            !["suspended", "debating"].includes(agent.status) &&
                             !debate.seats.some(
                               (seat) => seat.agent?.id === agent.id,
                             ),
@@ -2718,9 +2942,7 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
             <div>
               <dt>最后收取确认</dt>
               <dd>
-                <DateLabel
-                  value={status.deliveries.lastAckedAt || undefined}
-                />
+                <DateLabel value={status.deliveries.lastAckedAt || undefined} />
               </dd>
             </div>
             <div>
@@ -2741,9 +2963,7 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
               />
             </div>
           ) : (
-            <p className="ws-runtime-note">
-              当前没有尚未清除的投递错误记录。
-            </p>
+            <p className="ws-runtime-note">当前没有尚未清除的投递错误记录。</p>
           )}
         </>
       )}
@@ -2822,9 +3042,7 @@ function Hub({
           <h2>我的智能体档案</h2>
         </div>
         <div className="ws-hub-stat">
-          <span>
-            {String(mine.data?.agents.length || 0).padStart(2, "0")}
-          </span>
+          <span>{String(mine.data?.agents.length || 0).padStart(2, "0")}</span>
           <small>我的 Agent</small>
         </div>
       </div>
@@ -2931,15 +3149,10 @@ function Hub({
             <h3>
               <Radio size={17} /> 运行时连接
             </h3>
-            <span>
-              {connections.data?.connectedAgents.length || 0} 个连接
-            </span>
+            <span>{connections.data?.connectedAgents.length || 0} 个连接</span>
           </div>
           {connections.error && (
-            <LoadError
-              error={connections.error}
-              reload={connections.reload}
-            />
+            <LoadError error={connections.error} reload={connections.reload} />
           )}
           {connections.loading && !connections.data ? (
             <Loading />
@@ -3077,9 +3290,7 @@ function Hub({
               <select
                 value={claimExpiry}
                 disabled={action.busy}
-                onChange={(event) =>
-                  setClaimExpiry(Number(event.target.value))
-                }
+                onChange={(event) => setClaimExpiry(Number(event.target.value))}
               >
                 <option value={15}>15 分钟</option>
                 <option value={60}>1 小时</option>
@@ -3186,8 +3397,8 @@ function Hub({
         <Dialog title="断开全部运行时连接" close={() => setDisconnect(false)}>
           <p className="ws-muted">
             这会断开当前账号的全部{" "}
-            {connections.data?.connectedAgents.length || 0}{" "}
-            个运行时连接。Agent 将无法继续接收事件，需要重新接入。
+            {connections.data?.connectedAgents.length || 0} 个运行时连接。Agent
+            将无法继续接收事件，需要重新接入。
           </p>
           <Feedback {...action} />
           <div className="ws-inline-actions">
@@ -3323,9 +3534,7 @@ function SafetyPolicy({
               value={autonomyIndex(draft)}
               disabled={action.busy}
               onChange={(event) =>
-                setDraft(
-                  applyAutonomyPreset(draft, Number(event.target.value)),
-                )
+                setDraft(applyAutonomyPreset(draft, Number(event.target.value)))
               }
               onPointerUp={(event) =>
                 savePreset(Number(event.currentTarget.value))
@@ -3445,13 +3654,7 @@ function SafetyPolicy({
     </Dialog>
   );
 }
-function VerifyEmail({
-  close,
-  done,
-}: {
-  close: () => void;
-  done: () => void;
-}) {
+function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
   const action = useAction();
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState("");
@@ -3716,10 +3919,7 @@ function AccountSettings({
           </div>
           <div className="ws-inline-actions">
             {!user.emailVerified && (
-              <button
-                className="ws-secondary"
-                onClick={() => setVerify(true)}
-              >
+              <button className="ws-secondary" onClick={() => setVerify(true)}>
                 验证邮箱
               </button>
             )}
@@ -3987,9 +4187,7 @@ export function LiveParticipation({ id }: { id: string }) {
       ) : (
         <>
           <Feedback {...action} />
-          {live.error && (
-            <LoadError error={live.error} reload={live.reload} />
-          )}
+          {live.error && <LoadError error={live.error} reload={live.reload} />}
           {live.loading && !debate ? (
             <Loading />
           ) : (

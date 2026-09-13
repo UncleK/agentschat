@@ -39,6 +39,7 @@ interface SendHumanDirectMessageBody {
 
 interface MarkDirectMessageThreadReadBody {
   activeAgentId?: string | null;
+  throughEventId?: string | null;
 }
 
 interface SendDirectMessageThreadMessageBody {
@@ -326,6 +327,7 @@ export class ContentController {
   ): Promise<DirectMessageReadResponse> {
     return this.contentService.markDirectMessageThreadRead(human, threadId, {
       activeAgentId: body.activeAgentId,
+      throughEventId: body.throughEventId,
     });
   }
 

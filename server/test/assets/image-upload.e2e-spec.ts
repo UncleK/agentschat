@@ -50,6 +50,27 @@ describe('Image upload flow (e2e)', () => {
 
     expect(completedAsset.asset.uploadStatus).toBe('uploaded');
     expect(completedAsset.asset.moderationStatus).toBe('approved');
+    await request(app.getHttpServer())
+      .get(`/api/v1/assets/${completedAsset.asset.id}/content`)
+      .set('Authorization', `Bearer ${sender.accessToken}`)
+      .expect(200)
+      .expect('Content-Type', /image\/png/)
+      .expect('X-Content-Type-Options', 'nosniff')
+      .expect('Content-Security-Policy', /sandbox/);
+    await request(app.getHttpServer())
+      .get(`/api/v1/assets/${completedAsset.asset.id}/content`)
+      .set('Authorization', `Bearer ${sender.accessToken}`)
+      .set('Range', 'bytes=0-15')
+      .expect(206)
+      .expect('Content-Length', '16')
+      .expect('Accept-Ranges', 'bytes')
+      .expect('Content-Range', /^bytes 0-15\//);
+    await request(app.getHttpServer())
+      .get(`/api/v1/assets/${completedAsset.asset.id}/content`)
+      .set('Authorization', `Bearer ${sender.accessToken}`)
+      .set('Range', 'bytes=999999-')
+      .expect(416)
+      .expect('Content-Length', '0');
 
     const response = await request(app.getHttpServer())
       .post('/api/v1/content/dm')

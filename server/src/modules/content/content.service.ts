@@ -782,7 +782,9 @@ export class ContentService {
   async markDirectMessageThreadRead(
     human: AuthenticatedHuman,
     threadId: string,
-    input: Pick<DirectMessageReadInput, 'activeAgentId'>,
+    input: Pick<DirectMessageReadInput, 'activeAgentId'> & {
+      throughEventId?: string | null;
+    },
   ) {
     const activeAgentId = await this.requireOwnedActiveAgentContext(
       human,
@@ -797,6 +799,60 @@ export class ContentService {
       this.dataSource.manager,
       normalizedThreadId,
     );
+    if (input.throughEventId != null) {
+      const boundaryId = this.requiredString(
+        input.throughEventId,
+        'throughEventId',
+      );
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          boundaryId,
+        )
+      ) {
+        throw new BadRequestException('throughEventId must be a message UUID.');
+      }
+      const boundary = await this.dataSource.query<Array<{ id: string }>>(
+        `SELECT id FROM events WHERE id = $1 AND thread_id = ANY($2::uuid[])
+          AND event_type = 'dm.send' AND NOT (${this.directMessageNoReplySql('content')})`,
+        [boundaryId, scope.threadIds],
+      );
+      if (!boundary.length)
+        throw new NotFoundException(
+          'The read boundary message was not found in this conversation.',
+        );
+      // Use the same global timeline boundary for every physical thread in a
+      // canonical conversation. Compare inside UPDATE so late requests cannot regress it.
+      await this.dataSource.query(
+        `UPDATE thread_participants participant
+         SET last_read_at = boundary.occurred_at, last_read_event_id = boundary.id
+         FROM events boundary
+         WHERE boundary.id = $1 AND participant.thread_id = ANY($2::uuid[])
+           AND participant.participant_type = $3 AND participant.participant_subject_id = $4
+           AND participant.role = $5
+           AND (participant.last_read_at IS NULL OR participant.last_read_at < boundary.occurred_at
+             OR (participant.last_read_at = boundary.occurred_at
+               AND (participant.last_read_event_id IS NULL OR participant.last_read_event_id < boundary.id)))`,
+        [
+          boundaryId,
+          scope.threadIds,
+          SubjectType.Agent,
+          activeAgentId,
+          ThreadParticipantRole.Member,
+        ],
+      );
+      const counts = await this.readDirectMessageUnreadCounts(
+        human.id,
+        activeAgentId,
+        scope.threadIds,
+      );
+      return {
+        threadId: scope.canonicalThreadId,
+        unreadCount: [...counts.values()].reduce(
+          (sum, count) => sum + count,
+          0,
+        ),
+      };
+    }
     const memberships = await this.threadParticipantRepository.findBy({
       threadId: In(scope.threadIds),
       participantType: SubjectType.Agent,
@@ -836,15 +892,19 @@ export class ContentService {
         continue;
       }
 
-      await this.threadParticipantRepository.update(
-        {
-          id: participant.id,
-        },
-        {
+      await this.threadParticipantRepository
+        .createQueryBuilder()
+        .update()
+        .set({
           lastReadEventId: latestEvent.eventId,
           lastReadAt: nextLastReadAt,
-        },
-      );
+        })
+        .where('id = :id', { id: participant.id })
+        .andWhere(
+          '(last_read_at IS NULL OR last_read_at < :at OR (last_read_at = :at AND (last_read_event_id IS NULL OR last_read_event_id < :eventId)))',
+          { at: nextLastReadAt, eventId: latestEvent.eventId },
+        )
+        .execute();
     }
 
     return {

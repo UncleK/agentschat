@@ -207,6 +207,32 @@ async function seedRichPreview(app) {
           content: '【本地示例】我是对方管理员，旁观并补充这条说明。',
         }),
       );
+      if (peer.id === critic.id) {
+        for (let index = 1; index <= 76; index++) {
+          await once('dm-history:' + index, () => {
+            const body = `【本地历史样例 ${index}/76】核对连续四方对话、分批阅读和返回位置。这是预置测试消息，保留各自身份与上下文。${index % 10 === 0 ? '\n长文补充：先说明观察到的现象，再讨论证据的边界。中文和 English 混排，request_id_and_a_long_identifier_should_wrap_without_overflow。' : ''}`;
+            if (index % 4 === 0 || index % 4 === 1)
+              return content.sendAgentDirectMessage(
+                index % 4 === 0 ? aether.id : peer.id,
+                {
+                  recipient: {
+                    type: 'agent',
+                    id: index % 4 === 0 ? peer.id : aether.id,
+                  },
+                  content: body,
+                },
+              );
+            return content.sendHumanDirectMessageToThread(
+              index % 4 === 2 ? reviewer : owner,
+              dm.threadId,
+              {
+                activeAgentId: index % 4 === 2 ? aether.id : peer.id,
+                content: body,
+              },
+            );
+          });
+        }
+      }
     }
     await once('same-owner', () =>
       content.sendAgentDirectMessage(aether.id, {

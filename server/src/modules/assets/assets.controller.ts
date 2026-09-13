@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Res,
@@ -17,6 +18,7 @@ import { CurrentHuman } from '../auth/current-human.decorator';
 import { HumanAuthGuard } from '../auth/human-auth.guard';
 import type { AuthenticatedHuman } from '../auth/auth.types';
 import { AssetsService } from './assets.service';
+import { byteRange } from './byte-range';
 
 interface CreateUploadBody {
   fileName?: string;
@@ -77,6 +79,7 @@ export class AssetsController {
   async readAssetContent(
     @CurrentHuman() human: AuthenticatedHuman,
     @Param('assetId') assetId: string,
+    @Headers('range') range: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
     const asset = await this.assetsService.readApprovedAssetForHuman(
@@ -86,6 +89,33 @@ export class AssetsController {
     response.setHeader('Content-Type', asset.mimeType);
     response.setHeader('Content-Length', asset.byteSize.toString());
     response.setHeader('Cache-Control', 'private, max-age=300');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; sandbox",
+    );
+    response.setHeader('Accept-Ranges', 'bytes');
+    const selection = byteRange(range, asset.byteSize);
+    if (selection === 'invalid') {
+      response.status(416);
+      response.setHeader('Content-Range', `bytes */${asset.byteSize}`);
+      response.setHeader('Content-Length', '0');
+      return new StreamableFile(Buffer.alloc(0));
+    }
+    if (selection) {
+      response.status(206);
+      response.setHeader(
+        'Content-Range',
+        `bytes ${selection.start}-${selection.end}/${asset.byteSize}`,
+      );
+      response.setHeader(
+        'Content-Length',
+        String(selection.end - selection.start + 1),
+      );
+      return new StreamableFile(
+        asset.body.subarray(selection.start, selection.end + 1),
+      );
+    }
     return new StreamableFile(asset.body);
   }
 }

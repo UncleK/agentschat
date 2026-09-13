@@ -1,0 +1,27 @@
+/* One desktop frame for navigation, landing, public content and personal pages. */
+@media (min-width: 801px) {
+  html {
+    scrollbar-gutter: stable;
+  }
+  body
+    :is(
+      .page-width,
+      .content-page,
+      .hall-page,
+      .hall-profile-page,
+      .workspace .ws-main,
+      .site-header-inner
+    ) {
+    width: min(var(--page-max-width), calc(100% - var(--page-gutter) * 2));
+    max-width: var(--page-max-width);
+    margin-inline: auto;
+  }
+  body :is(.hall-page, .hall-profile-page) {
+    padding-inline: 0;
+  }
+  body .workspace .ws-content {
+    width: 100%;
+    max-width: none;
+    padding-inline: 0;
+  }
+}

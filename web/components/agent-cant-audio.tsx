@@ -11,10 +11,7 @@ import {
 import { AgentmojiText } from "./agentmoji";
 
 function clock(seconds: number) {
-  const value = Math.max(
-    0,
-    Math.floor(Number.isFinite(seconds) ? seconds : 0),
-  );
+  const value = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
   return `${Math.floor(value / 60)
     .toString()
     .padStart(2, "0")}:${(value % 60).toString().padStart(2, "0")}`;
@@ -34,6 +31,8 @@ export function AgentCantAudio({
   source?: string;
 }) {
   const audio = useRef<HTMLAudioElement>(null);
+  const wantsPlayback = useRef(false);
+  const requestId = useRef(0);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -41,37 +40,71 @@ export function AgentCantAudio({
   const [position, setPosition] = useState(0);
   useEffect(() => {
     const player = audio.current;
+    const stop = () => {
+      wantsPlayback.current = false;
+      requestId.current += 1;
+      player?.pause();
+      setLoading(false);
+      setPlaying(false);
+    };
     const pauseOther = (event: Event) => {
       if (
         event.target instanceof HTMLAudioElement &&
         event.target !== audio.current
       )
-        audio.current?.pause();
+        stop();
+    };
+    const visibility = () => {
+      if (document.visibilityState !== "visible") stop();
     };
     document.addEventListener("play", pauseOther, true);
+    document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("pagehide", stop);
     return () => {
+      wantsPlayback.current = false;
+      requestId.current += 1;
       document.removeEventListener("play", pauseOther, true);
+      document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("pagehide", stop);
       player?.pause();
+      if (player && !player.isConnected) {
+        player.removeAttribute("src");
+        player.load();
+      }
     };
-  }, []);
+  }, [src]);
   async function toggle() {
     const player = audio.current;
     if (!player) return;
-    if (loading || !player.paused) {
+    if (wantsPlayback.current || !player.paused) {
+      wantsPlayback.current = false;
+      requestId.current += 1;
       player.pause();
+      setPlaying(false);
       setLoading(false);
       return;
     }
     setLoading(true);
     setError("");
+    wantsPlayback.current = true;
+    const attempt = ++requestId.current;
     try {
       if (player.error) player.load();
+      if (player.ended) {
+        player.currentTime = 0;
+        setPosition(0);
+      }
       await player.play();
     } catch (cause) {
-      if (!(cause instanceof DOMException && cause.name === "AbortError"))
+      if (
+        attempt === requestId.current &&
+        !(cause instanceof DOMException && cause.name === "AbortError")
+      ) {
+        wantsPlayback.current = false;
         setError("语音暂时无法播放，请重试。");
+      }
     } finally {
-      setLoading(false);
+      if (attempt === requestId.current) setLoading(false);
     }
   }
   return (
@@ -81,17 +114,24 @@ export function AgentCantAudio({
         src={src}
         preload="none"
         onPlaying={() => {
+          if (!wantsPlayback.current) {
+            audio.current?.pause();
+            return;
+          }
           setPlaying(true);
           setLoading(false);
         }}
         onPause={() => {
+          if (audio.current && !audio.current.paused) return;
+          wantsPlayback.current = false;
           setPlaying(false);
           setLoading(false);
         }}
-        onWaiting={() => setLoading(true)}
+        onWaiting={() => setLoading(wantsPlayback.current)}
         onEnded={() => {
+          wantsPlayback.current = false;
           setPlaying(false);
-          setPosition(0);
+          setPosition(audio.current?.duration || duration);
         }}
         onTimeUpdate={() => setPosition(audio.current?.currentTime || 0)}
         onLoadedMetadata={() => {
@@ -99,6 +139,7 @@ export function AgentCantAudio({
           if (value && Number.isFinite(value)) setDuration(value);
         }}
         onError={() => {
+          wantsPlayback.current = false;
           setLoading(false);
           setPlaying(false);
           setError("语音暂时无法播放，请重试。");
@@ -132,7 +173,13 @@ export function AgentCantAudio({
                 : "Agent Cant"}
           </span>
         </div>
-        <time>{clock(playing ? position : duration)}</time>
+        <time
+          className="cant-remaining"
+          aria-label={`剩余 ${clock(Math.ceil(duration - position))}，总时长 ${clock(Math.ceil(duration))}`}
+        >
+          <span>剩余 {clock(Math.ceil(duration - position))}</span>
+          <small>共 {clock(Math.ceil(duration))}</small>
+        </time>
       </div>
       <div
         className={`cant-wave ${playing ? "is-playing" : ""}`}

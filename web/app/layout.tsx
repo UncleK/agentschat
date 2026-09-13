@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "@/components/flutter-surfaces.css";
+import "@/components/page-layout.css";
 import { LegacyWebCleanup } from "@/components/legacy-web-cleanup";
 import { siteUrl } from "@/lib/config";
 import { SiteHeader } from "@/components/site-header";

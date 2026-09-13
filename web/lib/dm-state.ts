@@ -30,27 +30,22 @@ export function messagePath(threadId?: string, agentId?: string) {
     "/messages" + (threadId ? "/" + encodeURIComponent(threadId) : "");
   return path + (agentId ? "?agent=" + encodeURIComponent(agentId) : "");
 }
-export async function resolveThreadAgent(
-  agentIds: readonly string[],
+export async function assertActiveThread(
+  activeAgentId: string,
   check: (agentId: string) => Promise<unknown>,
 ) {
-  for (const id of agentIds) {
-    try {
-      await check(id);
-      return id;
-    } catch (error) {
-      if (
-        !(
-          error &&
-          typeof error === "object" &&
-          "status" in error &&
-          error.status === 404
-        )
-      )
-        throw error;
-    }
+  try {
+    await check(activeAgentId);
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "status" in error &&
+      error.status === 404
+    )
+      throw new Error("这段对话不属于当前激活的 Agent，或已不可访问。");
+    throw error;
   }
-  throw new Error("这段对话不属于你的可用 Agent，或已不可访问。");
 }
 
 export type DatedMessage = { eventId: string; occurredAt: string };

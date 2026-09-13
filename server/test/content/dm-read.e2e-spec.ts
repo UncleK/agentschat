@@ -1236,6 +1236,79 @@ describe('DM read models (e2e)', () => {
     );
   });
 
+  it('marks only rendered messages read and never regresses the boundary on late requests', async () => {
+    const owner = await registerHuman(
+      app,
+      'bounded-read-owner@example.com',
+      'Bounded Owner',
+    );
+    const remote = await registerHuman(
+      app,
+      'bounded-read-peer@example.com',
+      'Bounded Peer',
+    );
+    const localAgent = await importHumanOwnedAgent(
+      owner.accessToken,
+      'bounded-local',
+      'Bounded Local',
+    );
+    const peer = await importHumanOwnedAgent(
+      remote.accessToken,
+      'bounded-peer',
+      'Bounded Peer',
+    );
+    for (const agent of [localAgent, peer])
+      await policyService.upsertAgentSafetyPolicy(agent.id, {
+        dmAcceptanceMode: AgentDmAcceptanceMode.Open,
+      });
+    const first = await sendDirectMessage(remote.accessToken, {
+      activeAgentId: peer.id,
+      recipientType: 'agent',
+      recipientAgentId: localAgent.id,
+      content: 'Already rendered.',
+    });
+    await pause();
+    const second = await sendDirectMessage(remote.accessToken, {
+      activeAgentId: peer.id,
+      recipientType: 'agent',
+      recipientAgentId: localAgent.id,
+      content: 'Arrived after the page loaded.',
+    });
+    const mark = (id: string) =>
+      request(app.getHttpServer())
+        .post(`/api/v1/content/dm/threads/${first.threadId}/read`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .send({ activeAgentId: localAgent.id, throughEventId: id });
+    expect((await mark(first.eventId).expect(200)).body).toMatchObject({
+      unreadCount: 1,
+    });
+    expect((await mark(second.eventId).expect(200)).body).toMatchObject({
+      unreadCount: 0,
+    });
+    expect((await mark(first.eventId).expect(200)).body).toMatchObject({
+      unreadCount: 0,
+    });
+    const participant = await participantRepository.findOneByOrFail({
+      threadId: first.threadId,
+      participantSubjectId: localAgent.id,
+      role: ThreadParticipantRole.Member,
+    });
+    expect(participant.lastReadEventId).toBe(second.eventId);
+    await mark('invalid-id').expect(400);
+    await mark('00000000-0000-4000-8000-000000000001').expect(404);
+    // Equal timestamps must still compare event IDs, including concurrent requests.
+    const sameTime = new Date('2030-01-01T00:00:00.000Z');
+    await eventRepository.update([first.eventId, second.eventId], {
+      occurredAt: sameTime,
+    });
+    const [low, high] = [first.eventId, second.eventId].sort();
+    await Promise.all([mark(high).expect(200), mark(low).expect(200)]);
+    expect(
+      (await participantRepository.findOneByOrFail({ id: participant.id }))
+        .lastReadEventId,
+    ).toBe(high);
+  });
+
   async function importHumanOwnedAgent(
     accessToken: string,
     handle: string,

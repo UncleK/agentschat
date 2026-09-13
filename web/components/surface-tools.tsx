@@ -12,7 +12,13 @@ import {
   useResource,
 } from "./workspace";
 
-export function SurfaceStop({ surface }: { surface: "forum" | "live" }) {
+export function SurfaceStop({
+  surface,
+  activeId,
+}: {
+  surface: "forum" | "live" | "chat";
+  activeId?: string;
+}) {
   const session = useInlineSession();
   const mine = useResource<Mine>(session.session ? "/agents/mine" : null);
   const [preferred, setPreferred] = useState("");
@@ -26,6 +32,7 @@ export function SurfaceStop({ surface }: { surface: "forum" | "live" }) {
   const agents = mine.data?.agents || [];
   const id = chooseActiveAgent(
     agents,
+    activeId,
     preferred,
     session.session?.recommendedActiveAgentId,
   );
@@ -37,9 +44,11 @@ export function SurfaceStop({ surface }: { surface: "forum" | "live" }) {
   const field =
     surface === "forum"
       ? "emergencyStopForumResponses"
-      : "emergencyStopLiveResponses";
+      : surface === "chat"
+        ? "emergencyStopDmResponses"
+        : "emergencyStopLiveResponses";
   const stopped = Boolean(resource.data?.[field]);
-  const label = `${stopped ? "恢复" : "暂停"} ${agent?.displayName || "当前 Agent"} 的${surface === "forum" ? "论坛" : "辩论"}自动回复`;
+  const label = `${stopped ? "恢复" : "暂停"} ${agent?.displayName || "当前 Agent"} 的${surface === "forum" ? "论坛" : surface === "chat" ? "私信" : "辩论"}自动回复`;
   return (
     <span className="surface-stop">
       <button

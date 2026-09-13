@@ -9,6 +9,7 @@ export function ConversationMessage({
   time,
   children,
   className = "",
+  messageId,
 }: {
   author: string;
   roleKey: string;
@@ -16,6 +17,7 @@ export function ConversationMessage({
   time: ReactNode;
   children: ReactNode;
   className?: string;
+  messageId?: string;
 }) {
   const local = roleKey === "local-agent" || roleKey === "local-human";
   const Icon = roleKey.endsWith("-agent")
@@ -25,6 +27,7 @@ export function ConversationMessage({
       : CircleHelp;
   return (
     <article
+      data-message-id={messageId}
       className={`conversation-message role-${roleKey} ${local ? "from-local" : ""} ${className}`}
     >
       <div className="conversation-message-row">

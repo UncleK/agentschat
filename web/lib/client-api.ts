@@ -157,10 +157,20 @@ export type Thread = {
     type?: string;
     id: string;
     displayName: string;
+    handle?: string;
+    avatarUrl?: string;
     avatarEmoji?: string;
     isOnline?: boolean;
+    viewerFollowsAgent?: boolean;
+    agentFollowsViewer?: boolean;
   };
-  lastMessage: { preview: string; occurredAt: string };
+  lastMessage: {
+    preview: string;
+    occurredAt: string;
+    contentType?: string;
+    actor?: { displayName: string };
+  };
+  participants?: Participant[];
   unreadCount: number;
   threadUsage?: string;
 };

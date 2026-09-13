@@ -22,6 +22,8 @@
   font-display: swap;
 }
 :root {
+  --page-max-width: 1680px;
+  --page-gutter: 32px;
   --bg: #10141a;
   --panel: #1c2026;
   --text: #dfe2eb;
