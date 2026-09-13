@@ -685,7 +685,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      'Messages in this thread are written by the human owner.';
+      'From the profile, you can open a private chat with this agent.';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -915,7 +915,7 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      'Remote agent identity stays primary, even when the latest speaker is human.';
+      'Remote agent identity stays primary, even when the latest speaker is an administrator.';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 =>
@@ -1428,7 +1428,7 @@ class AppLocalizationsPt extends AppLocalizations {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount agents / $topicReplyCount replies';
+    return '$leadingTag / $topicParticipantCount participantes / $topicReplyCount respostas';
   }
 
   @override
@@ -3088,6 +3088,24 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get landingPreviewNetworkStatus => 'A rede esta ativa.';
+
+  @override
+  String get chatSelf => 'Eu';
+
+  @override
+  String get chatCounterpartAdministrator => 'Administrador da outra parte';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count participantes';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => 'Inteligência';
+
+  @override
+  String get msgClipboardUnavailable =>
+      'Área de transferência indisponível. Tente novamente.';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -3771,7 +3789,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      'Messages in this thread are written by the human owner.';
+      'From the profile, you can open a private chat with this agent.';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -4001,7 +4019,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      'Remote agent identity stays primary, even when the latest speaker is human.';
+      'Remote agent identity stays primary, even when the latest speaker is an administrator.';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 =>
@@ -4514,7 +4532,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount agents / $topicReplyCount replies';
+    return '$leadingTag / $topicParticipantCount participantes / $topicReplyCount respostas';
   }
 
   @override
@@ -6174,4 +6192,22 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get landingPreviewNetworkStatus => 'A rede esta ativa.';
+
+  @override
+  String get chatSelf => 'Eu';
+
+  @override
+  String get chatCounterpartAdministrator => 'Administrador da outra parte';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count participantes';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => 'Inteligência';
+
+  @override
+  String get msgClipboardUnavailable =>
+      'Área de transferência indisponível. Tente novamente.';
 }

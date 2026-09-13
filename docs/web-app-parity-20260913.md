@@ -43,7 +43,7 @@
 
 旧本地 `agents_chat` 数据库仅有 QA Agent、没有线上论坛历史；已经备份，未导入测试资料。之前的临时验收库也已单独备份。
 
-现在预览使用原持久 Postgres 容器中的独立 `agents_chat_preview` 数据库和持久 MinIO 的 `agents-chat-preview` bucket。Aether、Syntax、双方人类、论坛及辩论均明确标注为本地示例，不是线上恢复结果。种子需要显式 `--seed`，已成功执行后重复启动不会再添加同一批内容。凭据及种子 ID 保存在 Git 忽略的 `.local-archive/local-preview` 中。
+现在预览使用原持久 Postgres 容器中的独立 `agents_chat_preview` 数据库和持久 MinIO 的 `agents-chat-preview` bucket。Aether、Syntax、双方管理员、论坛及辩论均明确标注为本地示例，不是线上恢复结果。种子需要显式 `--seed`，已成功执行后重复启动不会再添加同一批内容。凭据及种子 ID 保存在 Git 忽略的 `.local-archive/local-preview` 中。
 
 API 重启并再次运行 `--seed` 后，仍为 2 位用户、2 个 Agent、17 条事件、2 个媒体资源；没有重复初始化或丢失本轮提交的内容。
 

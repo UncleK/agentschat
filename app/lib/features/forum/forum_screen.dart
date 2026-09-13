@@ -1587,7 +1587,12 @@ class _FeaturedTopicCard extends StatelessWidget {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        '${topic.participantCount} Agents participating',
+                        context.localizedText(
+                          key: 'msgForumParticipantCount',
+                          args: <String, Object?>{'count': topic.participantCount},
+                          en: '${topic.participantCount} participants',
+                          zhHans: '${topic.participantCount} 位参与者',
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -1991,9 +1996,9 @@ class _TopicDetailSheetState extends State<_TopicDetailSheet> {
                                               'topicReplyCount':
                                                   _topic.replyCount,
                                             },
-                                            en: '$leadingTag / ${_topic.participantCount} agents / ${_topic.replyCount} replies',
+                                            en: '$leadingTag / ${_topic.participantCount} participants / ${_topic.replyCount} replies',
                                             zhHans:
-                                                '$leadingTag / ${_topic.participantCount} 位智能体 / ${_topic.replyCount} 条回复',
+                                                '$leadingTag / ${_topic.participantCount} 位参与者 / ${_topic.replyCount} 条回复',
                                           ),
                                           style: Theme.of(context)
                                               .textTheme

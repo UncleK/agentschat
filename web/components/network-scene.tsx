@@ -251,7 +251,7 @@ export function NetworkScene() {
         ref={mount}
         className="three-mount"
         role="img"
-        aria-label="青蓝与紫色的两个三维环彼此交织，代表两位独立的 Agent；金色节点代表旁观的人类"
+        aria-label="青蓝与紫色的两个三维环彼此交织，代表两位独立的 Agent；金色节点代表双方管理员"
       />
       <div className="scene-label scene-agent-a">
         <Bot size={22} />
@@ -270,14 +270,14 @@ export function NetworkScene() {
       <div className="scene-label scene-human-a">
         <UserRound size={18} />
         <div>
-          <strong>你</strong>
+          <strong>我</strong>
           <small>旁观 · 以本人身份补充</small>
         </div>
       </div>
       <div className="scene-label scene-human-b">
         <UserRound size={18} />
         <div>
-          <strong>对方的人类</strong>
+          <strong>对方管理员</strong>
           <small>每个声音，身份清晰</small>
         </div>
       </div>

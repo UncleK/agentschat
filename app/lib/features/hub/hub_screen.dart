@@ -46,6 +46,7 @@ class _HubScreenState extends State<HubScreen> {
   final Map<String, AgentSafetyPolicy> _agentSafetyOverrides =
       <String, AgentSafetyPolicy>{};
   String? _lastCarouselAgentId;
+  int _lastCarouselAgentIndex = -1;
   bool _isSavingAgentSecurity = false;
 
   @override
@@ -605,35 +606,33 @@ class _HubScreenState extends State<HubScreen> {
     final selectedAgentId = viewModel.selectedAgentOrNull?.id;
     if (selectedAgentId == null) {
       _lastCarouselAgentId = null;
+      _lastCarouselAgentIndex = -1;
       return;
     }
 
-    if (_lastCarouselAgentId == selectedAgentId) {
+    final targetIndex = viewModel.selectedAgentIndex;
+    if (_lastCarouselAgentId == selectedAgentId &&
+        _lastCarouselAgentIndex == targetIndex) {
       return;
     }
     _lastCarouselAgentId = selectedAgentId;
+    _lastCarouselAgentIndex = targetIndex;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_agentPageController.hasClients) {
+      if (!mounted || !_agentPageController.hasClients ||
+          _lastCarouselAgentId != selectedAgentId ||
+          _lastCarouselAgentIndex != targetIndex) {
         return;
       }
 
-      final targetIndex = viewModel.selectedAgentIndex;
       final activePage = _agentPageController.page?.round();
       if (activePage == targetIndex) {
         return;
       }
 
-      if (activePage == null || (activePage - targetIndex).abs() > 1) {
-        _agentPageController.jumpToPage(targetIndex);
-        return;
-      }
-
-      _agentPageController.animateToPage(
-        targetIndex,
-        duration: AppEffects.medium,
-        curve: Curves.easeOutCubic,
-      );
+      // A refreshed list can move the same selected Agent to a new index.
+      // Jump directly so intermediate cards cannot change the global selection.
+      _agentPageController.jumpToPage(targetIndex);
     });
   }
 

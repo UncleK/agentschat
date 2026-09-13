@@ -1050,6 +1050,9 @@ svg {
   grid-template-columns: 210px 1fr;
   gap: 65px;
 }
+.docs-layout > * {
+  min-width: 0;
+}
 .docs-layout aside {
   position: sticky;
   top: 35px;
@@ -1090,6 +1093,8 @@ svg {
 }
 .docs-layout table {
   width: 100%;
+  table-layout: fixed;
+  overflow-wrap: anywhere;
   border-collapse: collapse;
   margin: 20px 0;
   font-size: 12px;
@@ -2291,66 +2296,222 @@ body {
   }
 }
 .conversation-illustration {
-  padding: 28px;
+  min-width: 0;
   border: 1px solid #41475480;
-  border-radius: 28px;
-  background: linear-gradient(140deg, #262a31b8, #181c22);
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at 0 0, #00daf308, transparent 65%), #10141a;
   box-shadow: 0 25px 60px #0003;
+  overflow: hidden;
 }
 .illustration-heading {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #c1c6d7;
-  padding-bottom: 24px;
+  padding: 20px 24px;
+  background: #181c2290;
   border-bottom: 1px solid #41475460;
+}
+.illustration-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #00daf330;
+  border-radius: 50%;
+  background: #00daf309;
+  color: #00daf3;
+}
+.illustration-heading strong {
+  display: block;
+  color: #00daf3;
   font-size: 14px;
+}
+.illustration-heading div > span {
+  display: block;
+  font-size: 10px;
+  color: #aeb5c7;
+  margin-top: 4px;
 }
 .illustration-heading small {
   margin-left: auto;
+  white-space: nowrap;
   font-size: 10px;
-  color: #8b90a0;
+  color: #aeb5c7;
 }
-.illustration-message {
-  width: 85%;
-  padding: 18px 20px;
-  margin-top: 24px;
-  border-radius: 18px;
+.illustration-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 22px 24px;
+}
+.illustration-marker {
+  align-self: center;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: #aeb5c7;
   background: #1c2026;
+  border-radius: 99px;
+  padding: 6px 13px;
+  text-align: center;
+  margin-bottom: 2px;
 }
-.illustration-message strong {
-  font-size: 12px;
+.illustration-open {
   display: flex;
-  gap: 8px;
   align-items: center;
-}
-.illustration-message p {
-  margin-top: 12px;
-  font-size: 14px;
-  color: #c1c6d7;
-}
-.agent-left {
-  border-left: 3px solid #a855f7;
-  background: #a855f70c;
-}
-.agent-left strong {
-  color: #c084fc;
-}
-.agent-right {
-  margin-left: auto;
-  border-right: 3px solid #00daf3;
-  background: #00daf308;
-}
-.agent-right strong {
-  color: #00daf3;
-}
-.illustration-observers {
-  display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 35px;
-  color: #ffc857;
+  padding: 18px 24px;
+  border-top: 1px solid #41475460;
+  color: #00daf3;
+  font-size: 12px;
+  background: #181c22;
+}
+.illustration-open:hover {
+  background: #00daf310;
+}
+/* Stitch's shared timeline: avatars at the outside edge, identity inside the
+   bubble, timestamps below. Used by both the example and actual messages. */
+.conversation-message {
+  --voice-color: #aeb5c7;
+  max-width: 88%;
+  min-width: 0;
+  align-self: flex-start;
+}
+.conversation-message.role-local-agent {
+  --voice-color: #00daf3;
+}
+.conversation-message.role-remote-agent {
+  --voice-color: #c084fc;
+}
+.conversation-message.role-local-human,
+.conversation-message.role-remote-human {
+  --voice-color: #ffc857;
+}
+.conversation-message.from-local {
+  align-self: flex-end;
+}
+.conversation-message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.conversation-message.from-local .conversation-message-row {
+  flex-direction: row-reverse;
+}
+.conversation-message-avatar {
+  font-size: 10px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 1px solid color-mix(in srgb, var(--voice-color) 35%, transparent);
+  border-radius: 50%;
+  color: var(--voice-color);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--voice-color) 15%, #1c2026),
+    #1c2026
+  );
+}
+.conversation-message-body {
+  min-width: 0;
+  padding: 13px 16px;
+  background: #1c2026;
+  border: 1px solid #41475435;
+  border-left: 3px solid var(--voice-color);
+  border-radius: 16px 16px 16px 0;
+  box-shadow: 0 5px 18px #0002;
+  overflow-wrap: anywhere;
+}
+.conversation-message.role-remote-agent .conversation-message-body {
+  border-left-color: #a855f7;
+}
+.conversation-message.from-local .conversation-message-body {
+  background: #2b2f37;
+  border-left: 1px solid #41475435;
+  border-right: 3px solid var(--voice-color);
+  border-radius: 16px 16px 0 16px;
+}
+.conversation-message-byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  margin-bottom: 7px;
+  color: var(--voice-color);
   font-size: 11px;
+}
+.conversation-message-byline strong {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+.conversation-message.from-local .conversation-message-byline {
+  justify-content: flex-end;
+}
+.conversation-message-role {
+  font-size: 10px;
+}
+.conversation-message.role-local-human .conversation-message-role,
+.conversation-message.role-remote-human .conversation-message-role {
+  padding: 2px 7px;
+  background: #ffc85720;
+  border-radius: 99px;
+}
+.conversation-message-body p {
+  margin: 0;
+  color: #dfe2eb;
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+.conversation-message-time {
+  margin: 5px 0 0 40px;
+  color: #8b90a0;
+  font-size: 9px;
+}
+.conversation-message.from-local .conversation-message-time {
+  text-align: right;
+  margin: 5px 40px 0 0;
+}
+@media (max-width: 800px) {
+  .illustration-heading {
+    padding: 16px;
+    gap: 9px;
+  }
+  .illustration-timeline {
+    padding: 20px 16px;
+  }
+  .illustration-open {
+    padding: 16px;
+  }
+  .conversation-message {
+    max-width: 92%;
+  }
+  .conversation-message-row {
+    gap: 8px;
+  }
+  .conversation-message-avatar {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+  .conversation-message-body {
+    padding: 12px;
+  }
+  .conversation-message-body p {
+    font-size: 13px;
+  }
+  .conversation-message-time {
+    margin-left: 36px;
+  }
+  .conversation-message.from-local .conversation-message-time {
+    margin-right: 36px;
+  }
 }
 .human-copy h2,
 .connect-section h2 {
@@ -2510,5 +2671,70 @@ body {
   }
   .debate-positions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* Flutter App content hierarchy, with native Web reading widths. */
+.app-hall-page .public-card,
+.app-forum-page .public-card,
+.app-live-page .public-card {
+  background: #1c2026;
+  border-color: #41475470;
+  border-radius: 22px;
+}
+.app-hall-page .public-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+.app-hall-page .public-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app-directory-count {
+  text-align: center;
+  margin: 28px auto;
+}
+.app-forum-page .public-grid,
+.app-live-page .public-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.app-forum-page .public-card {
+  padding: 28px;
+  gap: 20px;
+}
+.app-forum-page .public-card p {
+  padding: 18px;
+  border-left: 2px solid var(--mint);
+  border-radius: 18px;
+  background: #181c22;
+  line-height: 1.8;
+}
+@media (max-width: 800px) {
+  .app-hall-page .public-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .app-hall-page .public-card {
+    padding: 14px;
+    gap: 10px;
+    border-radius: 20px;
+  }
+  .app-hall-page .agent-card-identity {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .app-hall-page .public-card h2 {
+    font-size: 18px;
+  }
+  .app-hall-page .public-card p {
+    font-size: 12px;
+    line-height: 1.65;
+  }
+  .app-hall-page .agent-message-button {
+    font-size: 12px;
+    padding: 10px;
+  }
+  .app-forum-page .public-grid,
+  .app-live-page .public-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

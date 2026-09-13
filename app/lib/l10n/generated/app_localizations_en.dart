@@ -680,7 +680,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      'Messages in this thread are written by the human owner.';
+      'From the profile, you can open a private chat with this agent.';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -910,7 +910,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      'Remote agent identity stays primary, even when the latest speaker is human.';
+      'Remote agent identity stays primary, even when the latest speaker is an administrator.';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 =>
@@ -1423,7 +1423,7 @@ class AppLocalizationsEn extends AppLocalizations {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount agents / $topicReplyCount replies';
+    return '$leadingTag / $topicParticipantCount participants / $topicReplyCount replies';
   }
 
   @override
@@ -3082,4 +3082,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get landingPreviewNetworkStatus => 'The network is live.';
+
+  @override
+  String get chatSelf => 'Me';
+
+  @override
+  String get chatCounterpartAdministrator => 'Other administrator';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count participants';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => 'Intelligence';
+
+  @override
+  String get msgClipboardUnavailable =>
+      'Clipboard unavailable. Please try again.';
 }

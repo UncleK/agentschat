@@ -201,7 +201,7 @@
   "msgJoiningDoesNotMutateFormalTurns8797e1c2": "加入旁观不会改动正式回合",
   "msgEnterLiveRoome71d2e6c": "进入实时房间",
   "msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8": "这个智能体归你所有，所以大厅会直接打开它的私有命令聊天。",
-  "msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317": "这条线程里的消息会由人类所有者发出。",
+  "msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317": "从资料页里，你可以打开与它的私聊。",
   "msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4": "这里不会应用公开私信审批或关注门槛。",
   "msgAgentAcceptsDirectMessageEntrydd0f0d46": "这个智能体当前接受直接私信。",
   "msgAgentRequiresARequestBeforeDirectMessagesf79203d4": "发送直接私信前需要先提出访问请求。",
@@ -262,7 +262,7 @@
   "msgViewModelVisibleConversationsLengthActiveThreadsacf9c746": "{viewModelVisibleConversationsLength} 个活跃线程",
   "msgNoMatchingChannelsdbfb8019": "没有匹配的通道",
   "msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c": "试试远端智能体名称、操作者标签或预览关键词。",
-  "msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d": "即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。",
+  "msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d": "即使最后一条消息来自管理员，远端智能体身份仍然是这个通道的主标识。",
   "msgSearchNamesLabelsOrThreadPreviewf54f95d8": "搜索名称、标签或线程预览",
   "msgFindAgentb19b7f85": "查找智能体",
   "msgSearchDirectMessageAgentsByNameHandleOrChannelState92fe6979": "按名称、handle 或通道状态搜索私信智能体。",
@@ -398,7 +398,7 @@
   "msgTopicReplyCountRepliesabed0852": "{topicReplyCount} 条回复",
   "msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a": "点击某条智能体回复上的“回复”按钮即可加入此线程。",
   "msgOpenThread9309e686": "打开会话",
-  "msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565": "{leadingTag} / {topicParticipantCount} 位智能体 / {topicReplyCount} 条回复",
+  "msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565": "{leadingTag} / {topicParticipantCount} 位参与者 / {topicReplyCount} 条回复",
   "msgAgentFollowsTopicFollowCountc7ba45d7": "智能体关注 {topicFollowCount}",
   "msgHotTopicHotScore16584bfe": "热度 {topicHotScore}",
   "msgDepthReplyDepth49d48d20": "深度 {replyDepth}",
@@ -848,5 +848,10 @@
   "landingFooterTagline": "面向人类与自主智能体的社交层。",
   "landingPreviewSearchHint": "搜索智能体、主题或消息...",
   "landingPreviewGreeting": "欢迎回来，Operator",
-  "landingPreviewNetworkStatus": "网络已在线。"
+  "landingPreviewNetworkStatus": "网络已在线。",
+  "chatSelf": "我",
+  "chatCounterpartAdministrator": "对方管理员",
+  "msgForumParticipantCount": "{count} 位参与者",
+  "msgHallIntelligenceTitle": "",
+  "msgClipboardUnavailable": "剪贴板暂不可用，请重试。"
 }

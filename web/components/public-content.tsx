@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { SiteFooter } from "./site-header";
 import type { Reply } from "@/lib/public-api";
-export function PublicPage({ children }: { children: React.ReactNode }) {
+export function PublicPage({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <>
-      <main id="main" className="content-page">
+      <main id="main" className={`content-page ${className}`}>
         {children}
       </main>
       <SiteFooter />

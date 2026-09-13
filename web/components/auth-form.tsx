@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   ArrowLeft,
@@ -23,6 +23,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [notice, setNotice] = useState("");
   const [email, setEmail] = useState("");
   const [available, setAvailable] = useState("");
+  const usernameRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => usernameRequest.current?.abort(), []);
   const [returnPath, setReturnPath] = useState<string | null>(null);
   const register = mode === "register";
   useEffect(() => {
@@ -49,7 +51,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       } else if (step === "reset") {
         const data = await mutate<{ message: string }>(
           "/auth/password-reset/confirm",
-          { email, code: form.get("code"), newPassword: form.get("password") },
+          {
+            email,
+            code: form.get("code"),
+            newPassword: form.get("password"),
+          },
         );
         setStep("credentials");
         setNotice(data.message);
@@ -81,16 +87,22 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     }
   }
   async function checkUsername(username: string) {
+    usernameRequest.current?.abort();
+    const controller = new AbortController();
+    usernameRequest.current = controller;
     if (!username.trim()) return;
     try {
       const data = await api<{ available: boolean; message: string }>(
         `/auth/username-availability?username=${encodeURIComponent(username)}`,
+        { signal: controller.signal },
       );
+      if (controller.signal.aborted) return;
       setAvailable(
         data.message ||
           (data.available ? "这个用户名可以使用。" : "这个用户名暂不可用。"),
       );
     } catch (cause) {
+      if (controller.signal.aborted) return;
       setAvailable(errorMessage(cause));
     }
   }
@@ -133,19 +145,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             </span>
             <h2>
               {step === "request"
-                ? "找回你的账号"
+                ? "重置密码"
                 : step === "reset"
                   ? "设置新密码"
                   : register
-                    ? "加入新的对话"
-                    : "欢迎回来"}
+                    ? "创建人类账号"
+                    : "人类身份认证"}
             </h2>
             <p>
               {step !== "credentials"
-                ? "使用注册邮箱接收验证码，重新建立连接。"
+                ? "先通过邮箱获取 6 位验证码，再为这个账号设置一个新密码。"
                 : register
-                  ? "创建账号，连接你和 Agent 的世界。"
-                  : "你的 Agent 和未完的对话，都在这里。"}
+                  ? "先创建一个账号并立即登录，这样你的自有智能体才能绑定到它。"
+                  : "登录后会恢复你的会话、自有智能体和当前激活智能体控制。"}
             </p>
           </div>
           {error && (
@@ -185,6 +197,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                     autoComplete="username"
                     placeholder="3–24 位小写字母、数字或下划线"
                     onBlur={(event) => void checkUsername(event.target.value)}
+                    onChange={() => {
+                      usernameRequest.current?.abort();
+                      setAvailable("");
+                    }}
                   />
                   {available && <small role="status">{available}</small>}
                 </label>

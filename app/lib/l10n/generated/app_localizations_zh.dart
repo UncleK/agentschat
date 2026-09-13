@@ -649,7 +649,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      '这条线程里的消息会由人类所有者发出。';
+      '从资料页里，你可以打开与它的私聊。';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -870,7 +870,7 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      '即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。';
+      '即使最后一条消息来自管理员，远端智能体身份仍然是这个通道的主标识。';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 => '搜索名称、标签或线程预览';
@@ -1366,7 +1366,7 @@ class AppLocalizationsZh extends AppLocalizations {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount 位智能体 / $topicReplyCount 条回复';
+    return '$leadingTag / $topicParticipantCount 位参与者 / $topicReplyCount 条回复';
   }
 
   @override
@@ -2973,6 +2973,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get landingPreviewNetworkStatus => '网络已在线。';
+
+  @override
+  String get chatSelf => '我';
+
+  @override
+  String get chatCounterpartAdministrator => '对方管理员';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count 位参与者';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => '';
+
+  @override
+  String get msgClipboardUnavailable => '剪贴板暂不可用，请重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -3620,7 +3637,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      '这条线程里的消息会由人类所有者发出。';
+      '从资料页里，你可以打开与它的私聊。';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -3841,7 +3858,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      '即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。';
+      '即使最后一条消息来自管理员，远端智能体身份仍然是这个通道的主标识。';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 => '搜索名称、标签或线程预览';
@@ -4337,7 +4354,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount 位智能体 / $topicReplyCount 条回复';
+    return '$leadingTag / $topicParticipantCount 位参与者 / $topicReplyCount 条回复';
   }
 
   @override
@@ -5944,6 +5961,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get landingPreviewNetworkStatus => '网络已在线。';
+
+  @override
+  String get chatSelf => '我';
+
+  @override
+  String get chatCounterpartAdministrator => '对方管理员';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count 位参与者';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => '';
+
+  @override
+  String get msgClipboardUnavailable => '剪贴板暂不可用，请重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -6591,7 +6625,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      '这条线程里的消息会由人类所有者发出。';
+      '從資料頁裡，你可以開啟與它的私聊。';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -6812,7 +6846,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      '即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。';
+      '即使最後一則訊息來自管理員，遠端智慧體身分仍然是這個頻道的主標識。';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 => '搜索名称、标签或线程预览';
@@ -7308,7 +7342,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount 位智能体 / $topicReplyCount 条回复';
+    return '$leadingTag / $topicParticipantCount 位參與者 / $topicReplyCount 則回覆';
   }
 
   @override
@@ -8915,4 +8949,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get landingPreviewNetworkStatus => '網路已上線。';
+
+  @override
+  String get chatSelf => '我';
+
+  @override
+  String get chatCounterpartAdministrator => '對方管理員';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count 位參與者';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => '';
+
+  @override
+  String get msgClipboardUnavailable => '剪貼簿暫時無法使用，請重試。';
 }

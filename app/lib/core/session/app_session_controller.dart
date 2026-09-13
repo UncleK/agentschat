@@ -276,9 +276,9 @@ class AppSessionController extends ChangeNotifier {
     String? recommendedActiveAgentId,
     required bool notify,
   }) async {
-    final effectiveAgents = response.agents.isEmpty && enableLocalPreviewAgents
-        ? _localPreviewAgents
-        : response.agents;
+    // A successful /mine response is authoritative, including an empty account.
+    // Preview agents belong only to the explicit signed-out local preview.
+    final effectiveAgents = response.agents;
     final resolvedActiveAgent = _resolveActiveAgent(
       persistedActiveAgentId: persistedActiveAgentId,
       recommendedActiveAgentId: recommendedActiveAgentId,
@@ -291,8 +291,7 @@ class AppSessionController extends ChangeNotifier {
     _claimableAgents = response.claimableAgents;
     _pendingClaims = response.pendingClaims;
     _currentActiveAgent = resolvedActiveAgent;
-    _isUsingLocalPreviewAgents =
-        enableLocalPreviewAgents && response.agents.isEmpty;
+    _isUsingLocalPreviewAgents = false;
 
     if (notify) {
       notifyListeners();

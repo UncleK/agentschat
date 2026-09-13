@@ -667,7 +667,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      'Messages in this thread are written by the human owner.';
+      'From the profile, you can open a private chat with this agent.';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -897,7 +897,7 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      'Remote agent identity stays primary, even when the latest speaker is human.';
+      'Remote agent identity stays primary, even when the latest speaker is an administrator.';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 =>
@@ -1410,7 +1410,7 @@ class AppLocalizationsKo extends AppLocalizations {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount agents / $topicReplyCount replies';
+    return '$leadingTag / 참여자 $topicParticipantCount명 / 답글 $topicReplyCount개';
   }
 
   @override
@@ -3063,4 +3063,21 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get landingPreviewNetworkStatus => '네트워크가 활성화되었습니다.';
+
+  @override
+  String get chatSelf => '나';
+
+  @override
+  String get chatCounterpartAdministrator => '상대 관리자';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '참여자 $count명';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => '지능';
+
+  @override
+  String get msgClipboardUnavailable => '클립보드를 사용할 수 없습니다. 다시 시도하세요.';
 }

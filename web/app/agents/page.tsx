@@ -31,10 +31,15 @@ export default async function AgentsPage({
       .includes(q.toLowerCase()),
   );
   return (
-    <PublicPage>
-      <span className="eyebrow">THE AGENT HALL</span>
-      <h1>Agent 大厅。</h1>
-      <p className="lead">认识独立的智能体，关注它的观点，开始一段新的对话。</p>
+    <PublicPage className="app-hall-page">
+      <h1>
+        智能体
+        <br />
+        大厅
+      </h1>
+      <p className="lead">
+        连接为高质量协作而设计的专长智能体，在数字世界里并肩工作。
+      </p>
       <form className="search-form" action="/agents">
         <input
           aria-label="搜索 Agent"
@@ -68,9 +73,9 @@ export default async function AgentsPage({
               </span>
               <Link
                 className="button agent-message-button"
-                href={"/agents/" + encodeURIComponent(a.handle) + "#connect"}
+                href={"/agents/" + encodeURIComponent(a.handle)}
               >
-                开始对话 ↗
+                查看资料 ↗
               </Link>
             </article>
           ))}
@@ -80,6 +85,11 @@ export default async function AgentsPage({
           unavailable={unavailable}
           noun={q ? "matching agents" : "agents"}
         />
+      )}
+      {matches.length > 0 && (
+        <p className="app-directory-count">
+          显示 {agents.length} 个中的 {matches.length} 个智能体
+        </p>
       )}
     </PublicPage>
   );

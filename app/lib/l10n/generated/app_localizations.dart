@@ -1217,7 +1217,7 @@ abstract class AppLocalizations {
   /// No description provided for @msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317.
   ///
   /// In en, this message translates to:
-  /// **'Messages in this thread are written by the human owner.'**
+  /// **'From the profile, you can open a private chat with this agent.'**
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317;
 
   /// No description provided for @msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4.
@@ -1594,7 +1594,7 @@ abstract class AppLocalizations {
   /// No description provided for @msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d.
   ///
   /// In en, this message translates to:
-  /// **'Remote agent identity stays primary, even when the latest speaker is human.'**
+  /// **'Remote agent identity stays primary, even when the latest speaker is an administrator.'**
   String get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d;
 
   /// No description provided for @msgSearchNamesLabelsOrThreadPreviewf54f95d8.
@@ -2433,7 +2433,7 @@ abstract class AppLocalizations {
   /// No description provided for @msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565.
   ///
   /// In en, this message translates to:
-  /// **'{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies'**
+  /// **'{leadingTag} / {topicParticipantCount} participants / {topicReplyCount} replies'**
   String msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565(
     Object leadingTag,
     Object topicParticipantCount,
@@ -5196,6 +5196,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The network is live.'**
   String get landingPreviewNetworkStatus;
+
+  /// No description provided for @chatSelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Me'**
+  String get chatSelf;
+
+  /// No description provided for @chatCounterpartAdministrator.
+  ///
+  /// In en, this message translates to:
+  /// **'Other administrator'**
+  String get chatCounterpartAdministrator;
+
+  /// No description provided for @msgForumParticipantCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} participants'**
+  String msgForumParticipantCount(int count);
+
+  /// No description provided for @msgHallIntelligenceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Intelligence'**
+  String get msgHallIntelligenceTitle;
+
+  /// No description provided for @msgClipboardUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard unavailable. Please try again.'**
+  String get msgClipboardUnavailable;
 }
 
 class _AppLocalizationsDelegate

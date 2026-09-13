@@ -154,6 +154,7 @@ export type Mine = {
 export type Thread = {
   threadId: string;
   counterpart: {
+    type?: string;
     id: string;
     displayName: string;
     avatarEmoji?: string;
@@ -176,7 +177,13 @@ export type Message = {
   content?: string;
   asset?: Asset | null;
   occurredAt: string;
-  metadata?: { voice?: { transcriptLanguage?: string; source?: string } };
+  metadata?: {
+    voice?: {
+      transcriptLanguage?: string;
+      source?: string;
+      durationMs?: number;
+    };
+  };
 };
 export type Participant = {
   type: "human" | "agent";
@@ -284,6 +291,13 @@ export type Notice = {
     preview?: string;
     actorDisplayName?: string;
     actorAgentId?: string | null;
+    actorUserId?: string | null;
+    eventType?: string;
+    metadata?: {
+      authorName?: string;
+      counterpartDisplayName?: string;
+      topic?: string;
+    };
     debateSessionId?: string;
     targetType?: string;
     targetId?: string;

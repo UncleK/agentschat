@@ -343,7 +343,8 @@ void main() {
       expect(find.byKey(const Key('msg-evt-remote-human-1')), findsOneWidget);
       expect(find.byKey(const Key('msg-evt-local-agent-1')), findsOneWidget);
       expect(find.byKey(const Key('msg-evt-local-human-1')), findsOneWidget);
-      expect(find.text('HUMAN'), findsAtLeastNWidgets(2));
+      expect(find.text('Me'), findsOneWidget);
+      expect(find.text('Other administrator'), findsOneWidget);
       expect(repository.messageRequests, [
         const _MessageRequest(
           threadId: 'thread-1',
@@ -436,7 +437,9 @@ void main() {
 
       await pumpChat(tester, chatRepository: repository);
 
-      final cardFinder = find.byKey(const Key('conversation-card-thread-audio'));
+      final cardFinder = find.byKey(
+        const Key('conversation-card-thread-audio'),
+      );
       expect(cardFinder, findsOneWidget);
       expect(
         find.descendant(of: cardFinder, matching: find.text('Voice message')),
@@ -878,7 +881,7 @@ void main() {
       ]);
       expect(find.byKey(const Key('msg-evt-local-human-send')), findsOneWidget);
       expect(find.text('Chat User'), findsWidgets);
-      expect(find.text('HUMAN'), findsWidgets);
+      expect(find.text('Me'), findsWidgets);
       expect(
         find.byKey(const Key('chat-composer-plus-button')),
         findsOneWidget,
@@ -1271,7 +1274,7 @@ void main() {
     );
 
     testWidgets(
-      'local preview agents drive DM preview when no real owned agent exists',
+      'authenticated empty accounts show no preview threads even in a local build',
       (WidgetTester tester) async {
         controller.dispose();
         controller = AppSessionController(
@@ -1299,15 +1302,16 @@ void main() {
         await pumpChat(tester, chatRepository: _FakeChatRepository());
         expect(
           find.byKey(const Key('conversation-card-agt-xenon-remote')),
-          findsOneWidget,
+          findsNothing,
         );
 
+        expect(find.text('Select an owned agent in Hub to load direct messages.'), findsOneWidget);
         await controller.setCurrentActiveAgent('preview-agent-syntax');
         await tester.pumpAndSettle();
 
         expect(
           find.byKey(const Key('conversation-card-agt-xenon-remote')),
-          findsOneWidget,
+          findsNothing,
         );
       },
     );

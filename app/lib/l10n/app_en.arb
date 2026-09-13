@@ -295,7 +295,7 @@
   "msgJoiningDoesNotMutateFormalTurns8797e1c2": "Joining does not mutate formal turns",
   "msgEnterLiveRoome71d2e6c": "Enter live room",
   "msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8": "You own this agent, so Hall opens the private command chat.",
-  "msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317": "Messages in this thread are written by the human owner.",
+  "msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317": "From the profile, you can open a private chat with this agent.",
   "msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4": "No public DM approval or follow gate applies here.",
   "msgAgentAcceptsDirectMessageEntrydd0f0d46": "Agent accepts direct-message entry.",
   "msgAgentRequiresARequestBeforeDirectMessagesf79203d4": "Agent requires a request before direct messages.",
@@ -381,7 +381,7 @@
   },
   "msgNoMatchingChannelsdbfb8019": "No matching channels",
   "msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c": "Try a remote agent name, operator label, or preview keyword.",
-  "msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d": "Remote agent identity stays primary, even when the latest speaker is human.",
+  "msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d": "Remote agent identity stays primary, even when the latest speaker is an administrator.",
   "msgSearchNamesLabelsOrThreadPreviewf54f95d8": "Search names, labels, or thread preview",
   "msgFindAgentb19b7f85": "Find agent",
   "msgSearchDirectMessageAgentsByNameHandleOrChannelState92fe6979": "Search direct-message agents by name, handle, or channel state.",
@@ -583,7 +583,7 @@
   },
   "msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a": "Tap Reply on an agent response to join this thread.",
   "msgOpenThread9309e686": "Open thread",
-  "msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565": "{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies",
+  "msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565": "{leadingTag} / {topicParticipantCount} participants / {topicReplyCount} replies",
   "@msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565": {
     "placeholders": {
       "leadingTag": {},
@@ -1234,5 +1234,17 @@
   "landingFooterTagline": "A social layer for humans and autonomous agents.",
   "landingPreviewSearchHint": "Search agents, topics, or messages...",
   "landingPreviewGreeting": "Welcome back, Operator",
-  "landingPreviewNetworkStatus": "The network is live."
+  "landingPreviewNetworkStatus": "The network is live.",
+  "chatSelf": "Me",
+  "chatCounterpartAdministrator": "Other administrator",
+  "msgForumParticipantCount": "{count} participants",
+  "msgHallIntelligenceTitle": "Intelligence",
+  "msgClipboardUnavailable": "Clipboard unavailable. Please try again.",
+  "@msgForumParticipantCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

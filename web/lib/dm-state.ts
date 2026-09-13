@@ -9,7 +9,9 @@ export function readActiveAgent(): string {
 }
 export function rememberActiveAgent(id: string) {
   try {
+    if (sessionStorage.getItem(ACTIVE_AGENT_KEY) === id) return;
     sessionStorage.setItem(ACTIVE_AGENT_KEY, id);
+    window.dispatchEvent(new Event("agents-chat:active-agent-changed"));
   } catch {}
 }
 export function chooseActiveAgent(

@@ -444,7 +444,10 @@ export class ContentService {
           activeAgentId,
           humanViewerId,
         );
-        if (threadUsageFilter !== 'all' && threadUsage !== threadUsageFilter) {
+        if (
+          threadUsageFilter !== 'all' &&
+          threadUsage !== threadUsageFilter
+        ) {
           continue;
         }
         if (scopeByLogicalKey.has(scope.logicalKey)) {
@@ -501,7 +504,8 @@ export class ContentService {
             ),
           )
           .filter(
-            (participant) => participant.participantType === SubjectType.Agent,
+            (participant) =>
+              participant.participantType === SubjectType.Agent,
           )
           .map((participant) => participant.participantSubjectId),
       ),
@@ -646,7 +650,9 @@ export class ContentService {
     };
 
     await this.moderationService.assertActorAllowed(actor);
-    const authoredContent = await this.normalizeContentInput(input, { actor });
+    const authoredContent = await this.normalizeContentInput(input, {
+      actor,
+    });
 
     const result = await this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
@@ -965,7 +971,10 @@ export class ContentService {
       );
     }
     const page = await topicQuery
-      .addSelect(publicCursorTimeSql('topicView.lastActivityAt'), 'cursorTime')
+      .addSelect(
+        publicCursorTimeSql('topicView.lastActivityAt'),
+        'cursorTime',
+      )
       .addSelect('CAST(topicView.threadId AS text)', 'cursorId')
       .orderBy('topicView.lastActivityAt', 'DESC')
       .addOrderBy('topicView.threadId', 'DESC')
@@ -1125,7 +1134,10 @@ export class ContentService {
     const viewerLikeKey =
       viewerLikeActor == null
         ? null
-        : this.forumReplyLikeSubject(viewerLikeActor.type, viewerLikeActor.id);
+        : this.forumReplyLikeSubject(
+            viewerLikeActor.type,
+            viewerLikeActor.id,
+          );
     const replies = this.buildForumReplyTree(
       events.filter((event) => event.id !== rootEvent.id),
       rootEvent.id,
@@ -1207,7 +1219,9 @@ export class ContentService {
 
     const title = this.requiredString(input.title, 'title');
     const tags = this.normalizeTags(input.tags);
-    const authoredContent = await this.normalizeContentInput(input, { actor });
+    const authoredContent = await this.normalizeContentInput(input, {
+      actor,
+    });
 
     return this.dataSource.transaction(async (manager) => {
       const threadRepository = manager.getRepository(ThreadEntity);
@@ -1323,7 +1337,9 @@ export class ContentService {
       parentEvent,
     );
 
-    const authoredContent = await this.normalizeContentInput(input, { actor });
+    const authoredContent = await this.normalizeContentInput(input, {
+      actor,
+    });
 
     const result = await this.dataSource.transaction(async (manager) => {
       const topicViewRepository = manager.getRepository(ForumTopicViewEntity);
@@ -1382,9 +1398,12 @@ export class ContentService {
 
     return this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
-      const replyEvent = await eventRepository.findOneBy({
-        id: normalizedReplyEventId,
-        eventType: 'forum.reply.create',
+      const replyEvent = await eventRepository.findOne({
+        where: {
+          id: normalizedReplyEventId,
+          eventType: 'forum.reply.create',
+        },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!replyEvent) {
@@ -1404,7 +1423,9 @@ export class ContentService {
       }
 
       const likeSubjects = new Set(
-        this.normalizeForumReplyLikeSubjects(replyEvent.metadata?.likeSubjects),
+        this.normalizeForumReplyLikeSubjects(
+          replyEvent.metadata?.likeSubjects,
+        ),
       );
       const viewerHasLiked = likeSubjects.has(viewerLikeKey);
       if (viewerHasLiked) {
@@ -1418,7 +1439,15 @@ export class ContentService {
         likeSubjects: [...likeSubjects],
         likeCount: likeSubjects.size,
       };
-      await eventRepository.save(replyEvent);
+      // Only mutate likes. Unloaded nullable relations must not clear the author
+      // or asset, and the row lock keeps concurrent toggles from losing likes.
+      await eventRepository
+        .createQueryBuilder()
+        .update(EventEntity)
+        .set({ metadata: () => 'CAST(:metadata AS jsonb)' })
+        .where('id = :id', { id: replyEvent.id })
+        .setParameter('metadata', JSON.stringify(replyEvent.metadata))
+        .execute();
 
       return {
         replyId: replyEvent.id,
@@ -1547,7 +1576,9 @@ export class ContentService {
         debateSessionId,
       );
 
-    const authoredContent = await this.normalizeContentInput(input, { actor });
+    const authoredContent = await this.normalizeContentInput(input, {
+      actor,
+    });
 
     const result = await this.dataSource.transaction(async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
@@ -1776,7 +1807,10 @@ export class ContentService {
         'Agent emergency stop blocks direct-message responses.',
       );
     }
-    if (surface === 'live' && metadata['emergencyStopLiveResponses'] === true) {
+    if (
+      surface === 'live' &&
+      metadata['emergencyStopLiveResponses'] === true
+    ) {
       throw new ForbiddenException(
         'Agent emergency stop blocks live responses.',
       );
@@ -2611,7 +2645,9 @@ ${selfAuthoredFilter}
       );
 
     if (!counterpart) {
-      throw new NotFoundException('Direct message counterpart was not found.');
+      throw new NotFoundException(
+        'Direct message counterpart was not found.',
+      );
     }
 
     return counterpart;
@@ -2655,7 +2691,8 @@ ${selfAuthoredFilter}
   ): DirectMessageCounterpartDto {
     if (counterpart.participantType === SubjectType.Agent) {
       const agentId = counterpart.participantSubjectId;
-      const avatarEmojiValue = counterpart.agent?.profileMetadata?.avatarEmoji;
+      const avatarEmojiValue =
+        counterpart.agent?.profileMetadata?.avatarEmoji;
       return {
         type: SubjectType.Agent,
         id: agentId,
@@ -2691,7 +2728,8 @@ ${selfAuthoredFilter}
     participant: ThreadParticipantEntity,
   ): DirectMessageThreadParticipantDto {
     if (participant.participantType === SubjectType.Agent) {
-      const avatarEmojiValue = participant.agent?.profileMetadata?.avatarEmoji;
+      const avatarEmojiValue =
+        participant.agent?.profileMetadata?.avatarEmoji;
       return {
         type: SubjectType.Agent,
         id: participant.participantSubjectId,
@@ -2745,7 +2783,9 @@ ${selfAuthoredFilter}
       actor: this.serializeDirectMessageActor(event),
       contentType: event.contentType,
       content: event.content,
-      asset: event.asset ? this.serializeDirectMessageAsset(event.asset) : null,
+      asset: event.asset
+        ? this.serializeDirectMessageAsset(event.asset)
+        : null,
       metadata: event.metadata ?? {},
       occurredAt: event.occurredAt.toISOString(),
     };
@@ -2770,7 +2810,9 @@ ${selfAuthoredFilter}
       };
     }
 
-    throw new NotFoundException('Direct message actor could not be resolved.');
+    throw new NotFoundException(
+      'Direct message actor could not be resolved.',
+    );
   }
 
   private serializeDirectMessageAsset(
@@ -2797,10 +2839,13 @@ ${selfAuthoredFilter}
 
     if (contentType === EventContentType.Image) {
       if (!assetId) {
-        throw new BadRequestException('assetId is required for image content.');
+        throw new BadRequestException(
+          'assetId is required for image content.',
+        );
       }
 
-      const asset = await this.assetsService.requireApprovedImageAsset(assetId);
+      const asset =
+        await this.assetsService.requireApprovedImageAsset(assetId);
       if (!options.actor) {
         throw new ForbiddenException(
           'An authenticated asset author is required.',
@@ -2993,7 +3038,10 @@ ${selfAuthoredFilter}
           user: true,
         },
       });
-    const participantsByThreadId = new Map<string, ThreadParticipantEntity[]>();
+    const participantsByThreadId = new Map<
+      string,
+      ThreadParticipantEntity[]
+    >();
 
     for (const participant of participants) {
       const threadParticipants =
@@ -3208,7 +3256,9 @@ ${selfAuthoredFilter}
     const requestedParticipants =
       preloadedParticipants ??
       (
-        await this.readDirectMessageParticipantsByThreadId(manager, [threadId])
+        await this.readDirectMessageParticipantsByThreadId(manager, [
+          threadId,
+        ])
       ).get(threadId) ??
       [];
     const memberAgentIds = this.resolveNetworkDirectMessageMemberAgentIds(
@@ -3336,10 +3386,11 @@ ${selfAuthoredFilter}
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [this.buildNetworkDirectMessageLogicalKey(networkMemberAgentIds)],
       );
-      const canonicalScope = await this.findCanonicalNetworkDirectMessageScope(
-        manager,
-        networkMemberAgentIds,
-      );
+      const canonicalScope =
+        await this.findCanonicalNetworkDirectMessageScope(
+          manager,
+          networkMemberAgentIds,
+        );
 
       if (canonicalScope) {
         await this.ensureDirectMessageOwnerSpectators(
@@ -3362,16 +3413,18 @@ ${selfAuthoredFilter}
     );
 
     if (candidateThreadIds.length > 0) {
-      const candidateThreads = await manager.getRepository(ThreadEntity).find({
-        where: {
-          id: In(candidateThreadIds),
-          contextType: ThreadContextType.DirectMessage,
-        },
-        order: {
-          createdAt: 'ASC',
-          id: 'ASC',
-        },
-      });
+      const candidateThreads = await manager
+        .getRepository(ThreadEntity)
+        .find({
+          where: {
+            id: In(candidateThreadIds),
+            contextType: ThreadContextType.DirectMessage,
+          },
+          order: {
+            createdAt: 'ASC',
+            id: 'ASC',
+          },
+        });
 
       if (candidateThreads.length > 0) {
         const participants = await participantRepository.findBy({

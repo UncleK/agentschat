@@ -5,6 +5,9 @@ import 'package:flutter/widgets.dart';
 const Map<String, Map<String, String>>
 _runtimeMessageCatalog = <String, Map<String, String>>{
   'de': <String, String>{
+    'msgForumParticipantCount': '{count} Teilnehmende',
+    'msgHallIntelligenceTitle': 'Intelligenz',
+    'msgClipboardUnavailable': 'Zwischenablage nicht verfügbar. Bitte erneut versuchen.',
     'appTitle': 'Agents Chat',
     'commonBack': 'Zurück',
     'commonLanguageSystem': 'System',
@@ -250,7 +253,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -338,7 +341,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -528,8 +531,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} Teilnehmende / {topicReplyCount} Antworten',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -1089,8 +1091,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': 'Administrator der Gegenseite',
+    'chatSelf': 'Ich',
   },
   'en': <String, String>{
+    'msgForumParticipantCount': '{count} participants',
+    'msgHallIntelligenceTitle': 'Intelligence',
+    'msgClipboardUnavailable': 'Clipboard unavailable. Please try again.',
     'appTitle': 'Agents Chat',
     'commonBack': 'Back',
     'commonLanguageSystem': 'System',
@@ -1333,7 +1340,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -1421,7 +1428,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -1611,8 +1618,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} participants / {topicReplyCount} replies',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -2172,8 +2178,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': 'Other administrator',
+    'chatSelf': 'Me',
   },
   'es': <String, String>{
+    'msgForumParticipantCount': '{count} participantes',
+    'msgHallIntelligenceTitle': 'Inteligencia',
+    'msgClipboardUnavailable': 'Portapapeles no disponible. Inténtalo de nuevo.',
     'appTitle': 'Agents Chat',
     'commonBack': 'Volver',
     'commonLanguageSystem': 'Sistema',
@@ -2418,7 +2429,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -2506,7 +2517,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -2696,8 +2707,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} participantes / {topicReplyCount} respuestas',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -3257,8 +3267,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': 'Administrador de la otra parte',
+    'chatSelf': 'Yo',
   },
   'es-419': <String, String>{
+    'msgForumParticipantCount': '{count} participantes',
+    'msgHallIntelligenceTitle': 'Inteligencia',
+    'msgClipboardUnavailable': 'Portapapeles no disponible. Inténtalo de nuevo.',
     'appTitle': 'Agents Chat',
     'commonBack': 'Volver',
     'commonLanguageSystem': 'Sistema',
@@ -3503,7 +3518,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -3591,7 +3606,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -3781,8 +3796,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} participantes / {topicReplyCount} respuestas',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -4342,8 +4356,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': 'Administrador de la otra parte',
+    'chatSelf': 'Yo',
   },
   'fr': <String, String>{
+    'msgForumParticipantCount': '{count} participants',
+    'msgHallIntelligenceTitle': 'Intelligence',
+    'msgClipboardUnavailable': 'Presse-papiers indisponible. Réessayez.',
     'appTitle': 'Agents Chat',
     'commonBack': 'Retour',
     'commonLanguageSystem': 'Système',
@@ -4589,7 +4608,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -4677,7 +4696,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -4867,8 +4886,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} participants / {topicReplyCount} réponses',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -5428,8 +5446,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': 'Administrateur de l’autre agent',
+    'chatSelf': 'Moi',
   },
   'id': <String, String>{
+    'msgForumParticipantCount': '{count} peserta',
+    'msgHallIntelligenceTitle': 'Kecerdasan',
+    'msgClipboardUnavailable': 'Papan klip tidak tersedia. Coba lagi.',
     'appTitle': 'Agents Chat',
     'commonBack': 'Kembali',
     'commonLanguageSystem': 'Sistem',
@@ -5673,7 +5696,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -5761,7 +5784,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -5951,8 +5974,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} peserta / {topicReplyCount} balasan',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -6512,8 +6534,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': 'Administrator pihak lain',
+    'chatSelf': 'Saya',
   },
   'ja': <String, String>{
+    'msgForumParticipantCount': '参加者 {count} 人',
+    'msgHallIntelligenceTitle': '知能',
+    'msgClipboardUnavailable': 'クリップボードを利用できません。もう一度お試しください。',
     'appTitle': 'Agents Chat',
     'commonBack': '戻る',
     'commonLanguageSystem': 'システム',
@@ -6743,7 +6770,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -6831,7 +6858,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -7021,8 +7048,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / 参加者 {topicParticipantCount} 人 / 返信 {topicReplyCount} 件',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -7582,8 +7608,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': '相手の管理者',
+    'chatSelf': '自分',
   },
   'ko': <String, String>{
+    'msgForumParticipantCount': '참여자 {count}명',
+    'msgHallIntelligenceTitle': '지능',
+    'msgClipboardUnavailable': '클립보드를 사용할 수 없습니다. 다시 시도하세요.',
     'appTitle': 'Agents Chat',
     'commonBack': '뒤로',
     'commonLanguageSystem': '시스템',
@@ -7813,7 +7844,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -7901,7 +7932,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -8091,8 +8122,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / 참여자 {topicParticipantCount}명 / 답글 {topicReplyCount}개',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -8652,8 +8682,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': '상대 관리자',
+    'chatSelf': '나',
   },
   'pt': <String, String>{
+    'msgForumParticipantCount': '{count} participantes',
+    'msgHallIntelligenceTitle': 'Inteligência',
+    'msgClipboardUnavailable': 'Área de transferência indisponível. Tente novamente.',
     'appTitle': 'Agents Chat',
     'commonBack': 'Voltar',
     'commonLanguageSystem': 'Sistema',
@@ -8896,7 +8931,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -8984,7 +9019,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -9174,8 +9209,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} participantes / {topicReplyCount} respostas',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -9735,8 +9769,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': 'Administrador da outra parte',
+    'chatSelf': 'Eu',
   },
   'pt-BR': <String, String>{
+    'msgForumParticipantCount': '{count} participantes',
+    'msgHallIntelligenceTitle': 'Inteligência',
+    'msgClipboardUnavailable': 'Área de transferência indisponível. Tente novamente.',
     'appTitle': 'Agents Chat',
     'commonBack': 'Voltar',
     'commonLanguageSystem': 'Sistema',
@@ -9979,7 +10018,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         'You own this agent, so Hall opens the private command chat.',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        'Messages in this thread are written by the human owner.',
+        'From the profile, you can open a private chat with this agent.',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         'No public DM approval or follow gate applies here.',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46':
@@ -10067,7 +10106,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         'Try a remote agent name, operator label, or preview keyword.',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        'Remote agent identity stays primary, even when the latest speaker is human.',
+        'Remote agent identity stays primary, even when the latest speaker is an administrator.',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8':
         'Search names, labels, or thread preview',
     'msgFindAgentb19b7f85': 'Find agent',
@@ -10257,8 +10296,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         'Tap Reply on an agent response to join this thread.',
     'msgOpenThread9309e686': 'Open thread',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} agents / {topicReplyCount} replies',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} participantes / {topicReplyCount} respostas',
     'msgAgentFollowsTopicFollowCountc7ba45d7':
         'Agent follows {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': 'Hot {topicHotScore}',
@@ -10818,8 +10856,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': 'Runtime',
     'msgForumOpenThreadTag': 'Open thread',
     'msgHubLiveConnectionStatus': 'Live',
+    'chatCounterpartAdministrator': 'Administrador da outra parte',
+    'chatSelf': 'Eu',
   },
   'zh': <String, String>{
+    'msgForumParticipantCount': '{count} 位参与者',
+    'msgHallIntelligenceTitle': '',
+    'msgClipboardUnavailable': '剪贴板暂不可用，请重试。',
     'appTitle': 'Agents Chat',
     'commonBack': '返回',
     'commonLanguageSystem': '跟随系统',
@@ -11030,7 +11073,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         '这个智能体归你所有，所以大厅会直接打开它的私有命令聊天。',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        '这条线程里的消息会由人类所有者发出。',
+        '从资料页里，你可以打开与它的私聊。',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         '这里不会应用公开私信审批或关注门槛。',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46': '这个智能体当前接受直接私信。',
@@ -11106,7 +11149,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         '试试远端智能体名称、操作者标签或预览关键词。',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        '即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。',
+        '即使最后一条消息来自管理员，远端智能体身份仍然是这个通道的主标识。',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8': '搜索名称、标签或线程预览',
     'msgFindAgentb19b7f85': '查找智能体',
     'msgSearchDirectMessageAgentsByNameHandleOrChannelState92fe6979':
@@ -11267,8 +11310,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         '点击某条智能体回复上的“回复”按钮即可加入此线程。',
     'msgOpenThread9309e686': '打开会话',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} 位智能体 / {topicReplyCount} 条回复',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} 位参与者 / {topicReplyCount} 条回复',
     'msgAgentFollowsTopicFollowCountc7ba45d7': '智能体关注 {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': '热度 {topicHotScore}',
     'msgDepthReplyDepth49d48d20': '深度 {replyDepth}',
@@ -11772,8 +11814,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': '运行环境',
     'msgForumOpenThreadTag': '公开线程',
     'msgHubLiveConnectionStatus': '在线',
+    'chatCounterpartAdministrator': '对方管理员',
+    'chatSelf': '我',
   },
   'zh-Hans': <String, String>{
+    'msgForumParticipantCount': '{count} 位参与者',
+    'msgHallIntelligenceTitle': '',
+    'msgClipboardUnavailable': '剪贴板暂不可用，请重试。',
     'appTitle': 'Agents Chat',
     'commonBack': '返回',
     'commonLanguageSystem': '跟随系统',
@@ -11984,7 +12031,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         '这个智能体归你所有，所以大厅会直接打开它的私有命令聊天。',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        '这条线程里的消息会由人类所有者发出。',
+        '从资料页里，你可以打开与它的私聊。',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         '这里不会应用公开私信审批或关注门槛。',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46': '这个智能体当前接受直接私信。',
@@ -12060,7 +12107,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         '试试远端智能体名称、操作者标签或预览关键词。',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        '即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。',
+        '即使最后一条消息来自管理员，远端智能体身份仍然是这个通道的主标识。',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8': '搜索名称、标签或线程预览',
     'msgFindAgentb19b7f85': '查找智能体',
     'msgSearchDirectMessageAgentsByNameHandleOrChannelState92fe6979':
@@ -12221,8 +12268,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         '点击某条智能体回复上的“回复”按钮即可加入此线程。',
     'msgOpenThread9309e686': '打开会话',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} 位智能体 / {topicReplyCount} 条回复',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} 位参与者 / {topicReplyCount} 条回复',
     'msgAgentFollowsTopicFollowCountc7ba45d7': '智能体关注 {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': '热度 {topicHotScore}',
     'msgDepthReplyDepth49d48d20': '深度 {replyDepth}',
@@ -12726,8 +12772,13 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': '运行环境',
     'msgForumOpenThreadTag': '公开线程',
     'msgHubLiveConnectionStatus': '在线',
+    'chatCounterpartAdministrator': '对方管理员',
+    'chatSelf': '我',
   },
   'zh-Hant': <String, String>{
+    'msgForumParticipantCount': '{count} 位參與者',
+    'msgHallIntelligenceTitle': '',
+    'msgClipboardUnavailable': '剪貼簿暫時無法使用，請重試。',
     'appTitle': 'Agents Chat',
     'commonBack': '返回',
     'commonLanguageSystem': '跟隨系統',
@@ -12938,7 +12989,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgYouOwnThisAgentSoHallOpensThePrivateCommand13202cb8':
         '这个智能体归你所有，所以大厅会直接打开它的私有命令聊天。',
     'msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317':
-        '这条线程里的消息会由人类所有者发出。',
+        '從資料頁裡，你可以開啟與它的私聊。',
     'msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4':
         '这里不会应用公开私信审批或关注门槛。',
     'msgAgentAcceptsDirectMessageEntrydd0f0d46': '这个智能体当前接受直接私信。',
@@ -13014,7 +13065,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTryARemoteAgentNameOperatorLabelOrPreviewKeyword91a5173c':
         '试试远端智能体名称、操作者标签或预览关键词。',
     'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d':
-        '即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。',
+        '即使最後一則訊息來自管理員，遠端智慧體身分仍然是這個頻道的主標識。',
     'msgSearchNamesLabelsOrThreadPreviewf54f95d8': '搜索名称、标签或线程预览',
     'msgFindAgentb19b7f85': '查找智能体',
     'msgSearchDirectMessageAgentsByNameHandleOrChannelState92fe6979':
@@ -13175,8 +13226,7 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgTapReplyOnAnAgentResponseToJoinThisThread14756a1a':
         '点击某条智能体回复上的“回复”按钮即可加入此线程。',
     'msgOpenThread9309e686': '打开会话',
-    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565':
-        '{leadingTag} / {topicParticipantCount} 位智能体 / {topicReplyCount} 条回复',
+    'msgLeadingTagTopicParticipantCountAgentsTopicReplyCountReplies8e475565': '{leadingTag} / {topicParticipantCount} 位參與者 / {topicReplyCount} 則回覆',
     'msgAgentFollowsTopicFollowCountc7ba45d7': '智能体关注 {topicFollowCount}',
     'msgHotTopicHotScore16584bfe': '热度 {topicHotScore}',
     'msgDepthReplyDepth49d48d20': '深度 {replyDepth}',
@@ -13680,6 +13730,8 @@ _runtimeMessageCatalog = <String, Map<String, String>>{
     'msgAgentsHallRuntimeEnvironment': '运行环境',
     'msgForumOpenThreadTag': '公开线程',
     'msgHubLiveConnectionStatus': '在线',
+    'chatCounterpartAdministrator': '對方管理員',
+    'chatSelf': '我',
   },
 };
 

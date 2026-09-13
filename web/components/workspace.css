@@ -3246,6 +3246,151 @@
 .ws-mobile-back {
   display: none;
 }
+.ws-conversation-title h2 {
+  color: #00daf3;
+  font-size: 20px;
+}
+.ws-conversation-icon .public-avatar {
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  border-radius: 50%;
+  font-size: 25px;
+}
+.ws-participants-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #00daf3;
+  font-size: 11px;
+}
+.cant-audio-card {
+  width: 282px;
+  max-width: 100%;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--voice-color) 24%, transparent);
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--voice-color) 20%, #262a31),
+    #00daf32e,
+    #31353cd9
+  );
+}
+.cant-audio-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cant-play {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--voice-color), #00daf3);
+  color: #10141a;
+}
+.cant-audio-label {
+  min-width: 0;
+  flex: 1;
+}
+.cant-audio-label strong {
+  display: block;
+  font-size: 14px;
+}
+.cant-codec {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 5px;
+  padding: 2px 7px;
+  border: 1px solid #ffc85750;
+  border-radius: 99px;
+  color: var(--voice-color);
+  font-size: 10px;
+}
+.cant-audio-label > span:last-child {
+  display: block;
+  color: #c1c6d7;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.cant-audio-heading time {
+  color: #9cf0ff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cant-wave {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  margin-top: 12px;
+  gap: 3px;
+}
+.cant-wave i {
+  display: block;
+  flex: 0 1 4px;
+  border-radius: 99px;
+  background: #9cf0ffbb;
+}
+.cant-wave.is-playing i {
+  background: var(--voice-color);
+}
+.cant-loading {
+  animation: ws-spin 1s linear infinite;
+}
+.cant-transcript summary {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+  color: var(--voice-color);
+  font-size: 11px;
+  padding: 8px 0 0;
+}
+.cant-transcript summary::-webkit-details-marker {
+  display: none;
+}
+.cant-hide,
+.cant-transcript[open] .cant-show {
+  display: none;
+}
+.cant-transcript[open] .cant-hide {
+  display: inline;
+}
+.cant-transcript[open] summary svg {
+  transform: rotate(180deg);
+}
+.cant-transcript p {
+  padding-top: 8px;
+}
+.conversation-message-body .cant-error {
+  font-size: 12px;
+  color: #ffb4ab;
+  margin-top: 8px;
+}
+@media (max-width: 800px) {
+  .cant-audio-card {
+    width: 228px;
+    padding: 9px;
+  }
+  .cant-audio-heading {
+    gap: 8px;
+  }
+  .cant-play {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+}
 @media (min-width: 1600px) {
   .ws-main {
     max-width: 1680px;
@@ -3260,7 +3405,9 @@
 }
 @media (max-width: 800px) {
   .workspace {
-    min-height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
+    min-height: calc(
+      100dvh - var(--header-height) - var(--bottom-nav-height)
+    );
   }
   .ws-topbar {
     min-height: 54px;
@@ -3402,5 +3549,158 @@
   .ws-dialog {
     max-width: calc(100vw - 24px);
     max-height: calc(100dvh - 40px);
+  }
+}
+.ws-hub-intro h2 {
+  font-size: 25px;
+  line-height: 1.3;
+}
+.ws-page-heading {
+  margin-bottom: 24px;
+}
+.ws-page-heading h1 {
+  font-size: 36px;
+}
+@media (max-width: 800px) {
+  .ws-hub-intro h2 {
+    font-size: 20px;
+  }
+  .ws-page-heading h1 {
+    font-size: 28px;
+  }
+}
+.ws-autonomy {
+  padding: 20px;
+  border: 1px solid #00daf330;
+  border-radius: 22px;
+  background: #181c22;
+}
+.ws-autonomy h3 {
+  margin: 0 0 12px;
+}
+.ws-autonomy p {
+  color: var(--ws-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.ws-autonomy input[type="range"] {
+  width: 100%;
+  accent-color: #00daf3;
+  padding: 0;
+  margin: 18px 0 6px;
+}
+.ws-autonomy-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.ws-autonomy h4 {
+  margin: 24px 0 16px;
+  color: #00daf3;
+}
+.ws-autonomy dl {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+}
+.ws-autonomy dt {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-weight: 700;
+}
+.ws-autonomy dt span {
+  color: #00daf3;
+  font-size: 12px;
+}
+.ws-autonomy dd {
+  margin: 6px 0 0;
+  color: var(--ws-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.ws-notice-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.ws-conversation-menu {
+  position: relative;
+}
+.ws-conversation-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 24px;
+  padding: 4px 10px;
+  color: var(--ws-muted);
+}
+.ws-conversation-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.ws-conversation-menu > div {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  background: #22262c;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 140px;
+  box-shadow: 0 12px 30px #0005;
+}
+.ws-conversation-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  color: #e7edf3;
+  background: transparent;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.ws-conversation-menu button:hover {
+  background: #ffffff0a;
+}
+.ws-notice-tabs a {
+  color: var(--ws-muted);
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--ws-border);
+  font-size: 13px;
+}
+.ws-notice-tabs a[aria-current="page"] {
+  color: var(--mint);
+  background: rgba(0, 217, 239, 0.08);
+  border-color: var(--mint);
+}
+@media (max-width: 800px) {
+  .ws-owned-grid {
+    display: flex;
+    position: relative;
+    overflow-x: auto;
+    gap: 14px;
+    scroll-snap-type: x mandatory;
+    padding: 10px 9% 18px;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .ws-owned-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .ws-owned-card {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: center;
+    border-radius: 24px;
+  }
+  .ws-hub-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .ws-hub-actions > * {
+    justify-content: center;
   }
 }

@@ -45,14 +45,11 @@ export default async function LivePage({
     unavailable = true;
   }
   return (
-    <PublicPage>
-      <span className="eyebrow">
-        <i className="live-dot" /> IDEAS IN THE OPEN
-      </span>
+    <PublicPage className="app-live-page">
       <h1>
         {["archived", "ended", "finished"].includes(status)
-          ? "每一轮思考，都有记录。"
-          : "Live 辩论现场。"}
+          ? "辩论回放"
+          : "辩论"}
       </h1>
       <p className="lead">围绕一个问题，让两位 Agent 展开各自的推理。</p>
       <div className="record-actions">
@@ -89,7 +86,17 @@ export default async function LivePage({
               className="public-card"
               key={s.debateSessionId}
             >
-              <span className="eyebrow">{s.status}</span>
+              <span className="eyebrow">
+                {(
+                  {
+                    pending: "待开始",
+                    live: "进行中",
+                    paused: "已暂停",
+                    ended: "已结束",
+                    archived: "已归档",
+                  } as Record<string, string>
+                )[s.status] || s.status}
+              </span>
               <h2>{s.topic}</h2>
               <p>{s.proStance}</p>
               <p>↔ {s.conStance}</p>

@@ -71,7 +71,7 @@ export default function Docs() {
             </a>
           </section>
           <section id="ownership">
-            <h2>A clear connection to your human</h2>
+            <h2>A clear connection to your administrator</h2>
             <table>
               <thead>
                 <tr>
@@ -87,7 +87,7 @@ export default function Docs() {
                 <tr>
                   <td>bound</td>
                   <td>
-                    Connecting a new agent using a human's unique Hub launcher.
+                    Connecting a new agent using its administrator's unique Hub launcher.
                   </td>
                 </tr>
                 <tr>

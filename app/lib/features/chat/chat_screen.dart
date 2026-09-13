@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData, PlatformException;
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:just_audio/just_audio.dart';
@@ -109,6 +109,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Duration _voiceRecordingDuration = Duration.zero;
   String? _currentAudioMessageId;
   String? _loadingAudioMessageId;
+  int _audioPlaybackRequestId = 0;
+  StreamSubscription<PlayerState>? _audioStateSubscription;
   final Set<String> _expandedTranscriptMessageIds = <String>{};
   int _handledConversationRequestId = 0;
   Set<String> _dismissedConversationIds = <String>{};
@@ -136,14 +138,17 @@ class _ChatScreenState extends State<ChatScreen> {
     _threadRefreshTimer = Timer.periodic(_threadRefreshInterval, (_) {
       unawaited(_refreshSelectedConversationSilently());
     });
-    _audioPlayer.playerStateStream.listen((state) {
+    _audioStateSubscription = _audioPlayer.playerStateStream.listen((state) {
       if (!mounted) {
         return;
       }
       if (state.processingState == ProcessingState.completed) {
-        unawaited(_audioPlayer.seek(Duration.zero));
+        // just_audio keeps `playing` true at completion; seeking here replays
+        // the message forever. The next explicit play will load it from zero.
+        if (state.playing) unawaited(_audioPlayer.pause());
         setState(() {
           _currentAudioMessageId = null;
+          _loadingAudioMessageId = null;
         });
         return;
       }
@@ -212,6 +217,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _audioPlaybackRequestId += 1;
+    unawaited(_audioStateSubscription?.cancel() ?? Future<void>.value());
     final onSearchActionChanged = widget.onSearchActionChanged;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       onSearchActionChanged?.call(null);
@@ -584,6 +591,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _invalidateLiveRequests() {
+    _audioPlaybackRequestId += 1;
+    _currentAudioMessageId = null;
+    _loadingAudioMessageId = null;
+    unawaited(_audioPlayer.stop());
     _threadsRequestId += 1;
     _messagesRequestId += 1;
     _readRequestId += 1;
@@ -658,9 +669,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     final shouldForceScroll =
         _viewModel.selectedConversationId != conversation.id;
-    if (shouldForceScroll && _currentAudioMessageId != null) {
+    if (shouldForceScroll) {
+      _audioPlaybackRequestId += 1;
       unawaited(_audioPlayer.stop());
       _currentAudioMessageId = null;
+      _loadingAudioMessageId = null;
     }
     _forceScrollToBottomOnNextMessageLoad = shouldForceScroll;
     setState(() {
@@ -1074,32 +1087,38 @@ class _ChatScreenState extends State<ChatScreen> {
         _threadSearchFocusNode.requestFocus();
         return;
       case ChatThreadMenuAction.shareConversation:
-        final shareDraft = _viewModel.shareDraftForSelectedConversation();
-        setState(() {
-          _lastShareAnnouncement = context.localizedText(
-            key: 'msgSharedShareDraftEntryPoint26d2ba6c',
-            args: <String, Object?>{
-              'shareDraftEntryPoint': shareDraft.entryPoint,
-            },
-            en: 'Shared ${shareDraft.entryPoint}',
-            zhHans: '已分享 ${shareDraft.entryPoint}',
-          );
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              context.localizedText(
-                key: 'msgSharedShareDraftEntryPoint26d2ba6c',
-                args: <String, Object?>{
-                  'shareDraftEntryPoint': shareDraft.entryPoint,
-                },
-                en: 'Shared ${shareDraft.entryPoint}',
-                zhHans: '已分享 ${shareDraft.entryPoint}',
-              ),
+        unawaited(_copyConversationEntryPoint());
+        return;
+    }
+  }
+
+  Future<void> _copyConversationEntryPoint() async {
+    final draft = _viewModel.shareDraftForSelectedConversation();
+    try {
+      await Clipboard.setData(ClipboardData(text: draft.shareText));
+      if (!mounted) return;
+      final message = context.localizedText(
+        key: 'msgConnectionEndpointCopied87e4bf4c',
+        en: 'Connection endpoint copied.',
+        zhHans: '连接端点已复制。',
+      );
+      setState(() => _lastShareAnnouncement = message);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } on PlatformException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.localizedText(
+              key: 'msgClipboardUnavailable',
+              en: 'Clipboard unavailable. Please try again.',
+              zhHans: '剪贴板暂不可用，请重试。',
             ),
           ),
-        );
-        return;
+        ),
+      );
     }
   }
 
@@ -2186,48 +2205,43 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    if (_loadingAudioMessageId == message.id) {
+      final cancelRequestId = ++_audioPlaybackRequestId;
+      await _audioPlayer.stop();
+      if (mounted && cancelRequestId == _audioPlaybackRequestId) {
+        setState(() => _loadingAudioMessageId = null);
+      }
+      return;
+    }
     if (_currentAudioMessageId == message.id && _audioPlayer.playing) {
       await _audioPlayer.pause();
-      if (!mounted) {
-        return;
-      }
-      setState(() {});
       return;
     }
-
-    if (_currentAudioMessageId == message.id && !_audioPlayer.playing) {
-      await _audioPlayer.play();
-      if (!mounted) {
-        return;
-      }
-      setState(() {});
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _loadingAudioMessageId = message.id;
-      });
-    }
-
+    final requestId = ++_audioPlaybackRequestId;
+    bool isCurrent() => mounted && requestId == _audioPlaybackRequestId;
     try {
-      await _audioPlayer.stop();
-      final bytes = await _readAuthenticatedAudioBytes(audioUrl);
-      await _audioPlayer.setAudioSource(
-        _InMemoryAudioSource(bytes, contentType: 'audio/wav'),
-      );
+      if (_currentAudioMessageId != message.id) {
+        setState(() {
+          _loadingAudioMessageId = message.id;
+          _currentAudioMessageId = null;
+        });
+        await _audioPlayer.stop();
+        final bytes = await _readAuthenticatedAudioBytes(audioUrl);
+        if (!isCurrent()) return;
+        await _audioPlayer.setAudioSource(
+          _InMemoryAudioSource(bytes, contentType: 'audio/wav'),
+        );
+        if (!isCurrent()) return;
+        setState(() {
+          _currentAudioMessageId = message.id;
+          _loadingAudioMessageId = null;
+        });
+      }
+      // play() completes on pause/end, not when playback starts. Publish the
+      // loaded state first so pause remains available throughout playback.
       await _audioPlayer.play();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _currentAudioMessageId = message.id;
-        _loadingAudioMessageId = null;
-      });
     } on ApiException catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted || !isCurrent()) return;
       setState(() {
         _loadingAudioMessageId = null;
         _currentAudioMessageId = null;
@@ -2236,9 +2250,7 @@ class _ChatScreenState extends State<ChatScreen> {
         SnackBar(content: Text(error.message)),
       );
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted || !isCurrent()) return;
       setState(() {
         _loadingAudioMessageId = null;
         _currentAudioMessageId = null;
@@ -2675,8 +2687,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                           _cancelVoiceRecording,
                                       onToggleAudioPlayback:
                                           _toggleAudioPlayback,
-                                      activeAudioMessageId:
-                                          _currentAudioMessageId,
+                                      activeAudioMessageId: _audioPlayer.playing
+                                          ? _currentAudioMessageId
+                                          : null,
                                       loadingAudioMessageId:
                                           _loadingAudioMessageId,
                                       isTranscriptExpanded:
@@ -2750,7 +2763,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                    onCancelRecording: _cancelVoiceRecording,
                                    onToggleAudioPlayback:
                                        _toggleAudioPlayback,
-                                   activeAudioMessageId: _currentAudioMessageId,
+                                   activeAudioMessageId: _audioPlayer.playing ? _currentAudioMessageId : null,
                                    loadingAudioMessageId:
                                        _loadingAudioMessageId,
                                    isTranscriptExpanded:
@@ -2895,8 +2908,8 @@ class _ConversationRail extends StatelessWidget {
                   context.localizedText(
                     key:
                         'msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d',
-                    en: 'Remote agent identity stays primary, even when the latest speaker is human.',
-                    zhHans: '即使最后一条消息来自人类，远端智能体身份仍然是这个通道的主标识。',
+                    en: 'Remote agent identity stays primary, even when the latest speaker is an administrator.',
+                    zhHans: '即使最后一条消息来自管理员，远端智能体身份仍然是这个通道的主标识。',
                   ),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -6496,7 +6509,8 @@ class _MessageBubbleBody extends StatelessWidget {
                                 letterSpacing: 0.5,
                               ),
                         ),
-                        if (message.isHuman) const _HumanIdentityBadge(),
+                        if (message.isHuman)
+                          _AdministratorIdentityBadge(side: message.side),
                       ],
                     ),
                     const SizedBox(height: 5),
@@ -6662,8 +6676,10 @@ class _AgentBracketPainter extends CustomPainter {
   }
 }
 
-class _HumanIdentityBadge extends StatelessWidget {
-  const _HumanIdentityBadge();
+class _AdministratorIdentityBadge extends StatelessWidget {
+  const _AdministratorIdentityBadge({required this.side});
+
+  final ChatActorSide side;
 
   @override
   Widget build(BuildContext context) {
@@ -6682,11 +6698,17 @@ class _HumanIdentityBadge extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              context.localizedText(
-                key: 'msgHUMAN72ba091a',
-                en: 'HUMAN',
-                zhHans: '人类',
-              ),
+              side == ChatActorSide.local
+                  ? context.localizedText(
+                      key: 'chatSelf',
+                      en: 'Me',
+                      zhHans: '我',
+                    )
+                  : context.localizedText(
+                      key: 'chatCounterpartAdministrator',
+                      en: 'Other administrator',
+                      zhHans: '对方管理员',
+                    ),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: AppColors.warning,
                 fontSize: 8,

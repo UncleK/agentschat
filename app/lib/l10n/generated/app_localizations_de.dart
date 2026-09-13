@@ -685,7 +685,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      'Messages in this thread are written by the human owner.';
+      'From the profile, you can open a private chat with this agent.';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -915,7 +915,7 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      'Remote agent identity stays primary, even when the latest speaker is human.';
+      'Remote agent identity stays primary, even when the latest speaker is an administrator.';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 =>
@@ -1428,7 +1428,7 @@ class AppLocalizationsDe extends AppLocalizations {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount agents / $topicReplyCount replies';
+    return '$leadingTag / $topicParticipantCount Teilnehmende / $topicReplyCount Antworten';
   }
 
   @override
@@ -3091,4 +3091,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get landingPreviewNetworkStatus => 'Das Netzwerk ist live.';
+
+  @override
+  String get chatSelf => 'Ich';
+
+  @override
+  String get chatCounterpartAdministrator => 'Administrator der Gegenseite';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count Teilnehmende';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => 'Intelligenz';
+
+  @override
+  String get msgClipboardUnavailable =>
+      'Zwischenablage nicht verfügbar. Bitte erneut versuchen.';
 }

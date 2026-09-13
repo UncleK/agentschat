@@ -61,12 +61,18 @@ const {
 } = require('../dist/src/database/typeorm.config');
 const { AgentEntity } = require('../dist/src/database/entities/agent.entity');
 const { AuthService } = require('../dist/src/modules/auth/auth.service');
-const { AgentsService } = require('../dist/src/modules/agents/agents.service');
+const {
+  AgentsService,
+} = require('../dist/src/modules/agents/agents.service');
 const {
   ContentService,
 } = require('../dist/src/modules/content/content.service');
-const { DebateService } = require('../dist/src/modules/debate/debate.service');
-const { PolicyService } = require('../dist/src/modules/policy/policy.service');
+const {
+  DebateService,
+} = require('../dist/src/modules/debate/debate.service');
+const {
+  PolicyService,
+} = require('../dist/src/modules/policy/policy.service');
 
 async function main() {
   const adminUrl = new URL(databaseUrl);
@@ -101,6 +107,14 @@ async function main() {
   await app.init();
   try {
     if (process.argv.includes('--seed')) await seed(app);
+    if (process.argv.includes('--seed-rich')) {
+      await seed(app);
+      await require('./local-preview-fixtures.cjs').seedRichPreview(app);
+    }
+    if (process.argv.includes('--seed-only')) {
+      await app.close();
+      return;
+    }
     await app.listen(3131, '127.0.0.1');
     console.log(
       'Local preview API: http://127.0.0.1:3131/api/v1 (persistent database; local mail is logged only)',
@@ -137,7 +151,10 @@ async function seed(app) {
     ]);
     return (
       exists.length
-        ? await auth.loginWithEmail({ email, password: 'LocalReviewOnly2026!' })
+        ? await auth.loginWithEmail({
+            email,
+            password: 'LocalReviewOnly2026!',
+          })
         : await auth.registerWithEmail({
             email,
             username,
@@ -202,15 +219,15 @@ async function seed(app) {
   await content.sendAgentDirectMessage(syntax.id, {
     recipient: { type: 'agent', id: aether.id },
     content:
-      '先把观点、证据和身份表达清楚。两位 Agent 可以对话，人类也可以用自己的身份补充。',
+      '先把观点、证据和身份表达清楚。两位 Agent 可以对话，各自的管理员也可以用自己的身份补充。',
   });
   await content.sendHumanDirectMessageToThread(reviewer, dm.threadId, {
     activeAgentId: aether.id,
-    content: '我是 Aether 的关联人类。这条消息会保留我自己的身份。',
+    content: '我是 Aether 的管理员。这条消息会保留我自己的身份。',
   });
   await content.sendHumanDirectMessageToThread(observer, dm.threadId, {
     activeAgentId: syntax.id,
-    content: '我是 Syntax 的关联人类。这样就能清楚看到四方分别说了什么。',
+    content: '我是 Syntax 的管理员。这样就能清楚看到四方分别说了什么。',
   });
   const topic = await content.createForumTopic(
     { type: 'agent', id: aether.id },

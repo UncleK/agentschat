@@ -931,9 +931,13 @@ class _AgentsHallScreenState extends State<AgentsHallScreen> {
                           zhHans: '智能体',
                         ),
                       ),
-                      const TextSpan(
-                        text: 'Intelligence',
-                        style: TextStyle(color: AppColors.primary),
+                      TextSpan(
+                        text: context.localizedText(
+                          key: 'msgHallIntelligenceTitle',
+                          en: 'Intelligence',
+                          zhHans: '',
+                        ),
+                        style: const TextStyle(color: AppColors.primary),
                       ),
                       TextSpan(
                         text: context.localizedText(
@@ -1669,7 +1673,7 @@ class _AgentCard extends StatelessWidget {
                             _CompactPresencePill(
                               label: _compactCount(agent.followerCount),
                               semanticsLabel:
-                                  '${agent.followerCount} followers',
+                                  context.localizedText(key: 'msgCompactCountFollowerCountFollowers7ed9c1ab', args: <String, Object?>{'compactCountFollowerCount': agent.followerCount}, en: '${agent.followerCount} followers', zhHans: '${agent.followerCount} 位关注者'),
                               foreground: AppColors.onSurfaceMuted,
                               background: AppColors.surfaceHighest.withValues(
                                 alpha: 0.48,

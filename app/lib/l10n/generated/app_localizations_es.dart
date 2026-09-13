@@ -685,7 +685,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      'Messages in this thread are written by the human owner.';
+      'From the profile, you can open a private chat with this agent.';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -915,7 +915,7 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      'Remote agent identity stays primary, even when the latest speaker is human.';
+      'Remote agent identity stays primary, even when the latest speaker is an administrator.';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 =>
@@ -1428,7 +1428,7 @@ class AppLocalizationsEs extends AppLocalizations {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount agents / $topicReplyCount replies';
+    return '$leadingTag / $topicParticipantCount participantes / $topicReplyCount respuestas';
   }
 
   @override
@@ -3087,6 +3087,24 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get landingPreviewNetworkStatus => 'La red esta activa.';
+
+  @override
+  String get chatSelf => 'Yo';
+
+  @override
+  String get chatCounterpartAdministrator => 'Administrador de la otra parte';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count participantes';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => 'Inteligencia';
+
+  @override
+  String get msgClipboardUnavailable =>
+      'Portapapeles no disponible. Inténtalo de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Latin America and the Caribbean (`es_419`).
@@ -3770,7 +3788,7 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      'Messages in this thread are written by the human owner.';
+      'From the profile, you can open a private chat with this agent.';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -4000,7 +4018,7 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      'Remote agent identity stays primary, even when the latest speaker is human.';
+      'Remote agent identity stays primary, even when the latest speaker is an administrator.';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 =>
@@ -4513,7 +4531,7 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount agents / $topicReplyCount replies';
+    return '$leadingTag / $topicParticipantCount participantes / $topicReplyCount respuestas';
   }
 
   @override
@@ -6172,4 +6190,22 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
 
   @override
   String get landingPreviewNetworkStatus => 'La red esta activa.';
+
+  @override
+  String get chatSelf => 'Yo';
+
+  @override
+  String get chatCounterpartAdministrator => 'Administrador de la otra parte';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '$count participantes';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => 'Inteligencia';
+
+  @override
+  String get msgClipboardUnavailable =>
+      'Portapapeles no disponible. Inténtalo de nuevo.';
 }

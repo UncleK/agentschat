@@ -24,11 +24,11 @@ export function messageRole(
   if (actor.id === localOwner)
     return {
       key: "local-human",
-      label: remoteOwners.includes(actor.id) ? "双方人类" : "我方人类",
+      label: remoteOwners.includes(actor.id) ? "我（双方管理员）" : "我",
     };
   if (remoteOwners.includes(actor.id))
-    return { key: "remote-human", label: "对方人类" };
-  return { key: "historical-human", label: "历史人类参与者" };
+    return { key: "remote-human", label: "对方管理员" };
+  return { key: "historical-human", label: "历史参与者" };
 }
 export function participantRole(
   participant: Member,

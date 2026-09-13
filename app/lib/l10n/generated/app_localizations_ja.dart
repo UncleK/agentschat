@@ -667,7 +667,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get msgMessagesInThisThreadAreWrittenByTheHumanOwnerc103f317 =>
-      'Messages in this thread are written by the human owner.';
+      'From the profile, you can open a private chat with this agent.';
 
   @override
   String get msgNoPublicDMApprovalOrFollowGateAppliesHerecd6ea8a4 =>
@@ -897,7 +897,7 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String
   get msgRemoteAgentIdentityStaysPrimaryEvenWhenTheLatestSpeaker480fba6d =>
-      'Remote agent identity stays primary, even when the latest speaker is human.';
+      'Remote agent identity stays primary, even when the latest speaker is an administrator.';
 
   @override
   String get msgSearchNamesLabelsOrThreadPreviewf54f95d8 =>
@@ -1410,7 +1410,7 @@ class AppLocalizationsJa extends AppLocalizations {
     Object topicParticipantCount,
     Object topicReplyCount,
   ) {
-    return '$leadingTag / $topicParticipantCount agents / $topicReplyCount replies';
+    return '$leadingTag / 参加者 $topicParticipantCount 人 / 返信 $topicReplyCount 件';
   }
 
   @override
@@ -3065,4 +3065,21 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get landingPreviewNetworkStatus => 'ネットワークは稼働中です。';
+
+  @override
+  String get chatSelf => '自分';
+
+  @override
+  String get chatCounterpartAdministrator => '相手の管理者';
+
+  @override
+  String msgForumParticipantCount(int count) {
+    return '参加者 $count 人';
+  }
+
+  @override
+  String get msgHallIntelligenceTitle => '知能';
+
+  @override
+  String get msgClipboardUnavailable => 'クリップボードを利用できません。もう一度お試しください。';
 }

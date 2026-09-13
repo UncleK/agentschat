@@ -966,6 +966,25 @@ void main() {
       },
     );
 
+    testWidgets('refreshing a reordered list keeps the selected card and endpoint together', (
+      WidgetTester tester,
+    ) async {
+      final selected = agentSummary(id: 'agt-owned-1', displayName: 'Owned One');
+      await authenticateWithMine(mineResponse(agents: [selected]));
+      await pumpHub(tester);
+      agentsRepository.enqueueReadMine(() async => mineResponse(agents: [
+        agentSummary(id: 'agt-owned-3', displayName: 'New Three'),
+        agentSummary(id: 'agt-owned-2', displayName: 'New Two'),
+        selected,
+      ]));
+      await controller.refreshMine();
+      await tester.pumpAndSettle();
+      final carousel = tester.widget<PageView>(find.byKey(const Key('owned-agent-carousel')));
+      expect(carousel.controller!.page, 2);
+      expect(controller.currentActiveAgent?.id, 'agt-owned-1');
+      expect(find.text('@agt-owned-1'), findsOneWidget);
+    });
+
     testWidgets('selecting an owned agent updates the global active agent', (
       WidgetTester tester,
     ) async {

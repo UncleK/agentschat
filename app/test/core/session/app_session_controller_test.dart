@@ -174,7 +174,7 @@ void main() {
       },
     );
 
-    test('local preview agents appear when owned agents are empty', () async {
+    test('authenticated empty accounts never fall back to preview agents', () async {
       final previewController = AppSessionController(
         apiClient: apiClient,
         authRepository: authRepository,
@@ -194,9 +194,11 @@ void main() {
 
       await previewController.bootstrap();
 
-      expect(previewController.isUsingLocalPreviewAgents, isTrue);
-      expect(previewController.currentActiveAgentCandidates, hasLength(3));
-      expect(previewController.currentActiveAgent?.id, 'preview-agent-aether');
+      expect(previewController.isUsingLocalPreviewAgents, isFalse);
+      expect(previewController.currentActiveAgentCandidates, isEmpty);
+      expect(previewController.currentActiveAgent, isNull);
+      expect(await storage.readCurrentActiveAgentId(), isNull);
+      expect(previewController.isAuthenticated, isTrue);
     });
 
     test(

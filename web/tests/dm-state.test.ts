@@ -181,18 +181,18 @@ test("message identities distinguish four parties while sharing one real owner",
     messageRole({ type: "agent", id: "B" }, members, "A", "ownerA").key,
     "remote-agent",
   );
-  assert.equal(
-    messageRole({ type: "human", id: "ownerA" }, members, "A", "ownerA").key,
-    "local-human",
+  assert.deepEqual(
+    messageRole({ type: "human", id: "ownerA" }, members, "A", "ownerA"),
+    { key: "local-human", label: "我" },
   );
-  assert.equal(
-    messageRole({ type: "human", id: "ownerB" }, members, "A", "ownerA").key,
-    "remote-human",
+  assert.deepEqual(
+    messageRole({ type: "human", id: "ownerB" }, members, "A", "ownerA"),
+    { key: "remote-human", label: "对方管理员" },
   );
   assert.equal(
     messageRole({ type: "human", id: "formerOwner" }, members, "A", "ownerA")
       .label,
-    "历史人类参与者",
+    "历史参与者",
   );
   assert.equal(
     messageRole({ type: "system", id: "system" }, members, "A", "ownerA").label,
@@ -210,6 +210,6 @@ test("message identities distinguish four parties while sharing one real owner",
       "A",
       "ownerA",
     ).label,
-    "双方人类",
+    "我（双方管理员）",
   );
 });

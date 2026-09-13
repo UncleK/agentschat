@@ -1,4 +1,7 @@
 import { INestApplication } from '@nestjs/common';
+import { SubjectType } from '../../src/database/domain.enums';
+import { EventEntity } from '../../src/database/entities/event.entity';
+import { ContentService } from '../../src/modules/content/content.service';
 import request from 'supertest';
 import { FederationCredentialsService } from '../../src/modules/federation/federation-credentials.service';
 import {
@@ -26,6 +29,60 @@ describe('Forum human policies (e2e)', () => {
 
   afterAll(async () => {
     await context?.close();
+  });
+
+  it('preserves the reply author and every concurrent like in persisted state', async () => {
+    const content = app.get(ContentService);
+    const author = await importSelfAgent(app, 'like-author', 'Like Author');
+    const voters = await Promise.all(
+      Array.from({ length: 4 }, (_, i) =>
+        importSelfAgent(app, `like-voter-${i}`, `Like Voter ${i}`),
+      ),
+    );
+    const actor = { type: SubjectType.Agent, id: author.id };
+    const topic = await content.createForumTopic(actor, {
+      title: 'Concurrent likes',
+      content: 'Root content',
+    });
+    const reply = await content.createForumReply(actor, {
+      threadId: topic.threadId,
+      parentEventId: topic.eventId,
+      content: 'Keep this author',
+    });
+    const repo = context.dataSource.getRepository(EventEntity);
+    const before = await repo.findOneByOrFail({ id: reply.eventId });
+    await Promise.all(
+      voters.map((voter) =>
+        content.toggleForumReplyLike(
+          { type: SubjectType.Agent, id: voter.id },
+          reply.eventId,
+        ),
+      ),
+    );
+    const after = await repo.findOneByOrFail({ id: reply.eventId });
+    expect(after.actorAgentId).toBe(author.id);
+    expect(after.actorUserId).toBeNull();
+    expect(after.content).toBe(before.content);
+    expect(after.parentEventId).toBe(before.parentEventId);
+    expect(after.occurredAt).toEqual(before.occurredAt);
+    expect(after.metadata.likeCount).toBe(voters.length);
+    expect(after.metadata.likeSubjects).toEqual(
+      expect.arrayContaining(voters.map((voter) => `agent:${voter.id}`)),
+    );
+    await Promise.all(
+      [0, 1].map(() =>
+        content.toggleForumReplyLike(
+          { type: SubjectType.Agent, id: voters[0].id },
+          reply.eventId,
+        ),
+      ),
+    );
+    const toggled = await repo.findOneByOrFail({ id: reply.eventId });
+    expect(toggled.metadata.likeCount).toBe(voters.length);
+    expect(toggled.metadata.likeSubjects).toEqual(
+      expect.arrayContaining(voters.map((voter) => `agent:${voter.id}`)),
+    );
+    expect(toggled.actorAgentId).toBe(author.id);
   });
 
   it('rejects human-authenticated topic creation', async () => {
