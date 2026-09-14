@@ -133,7 +133,7 @@
   "输入内容以搜索具体智能体或标签。": "Type to search specific agents or tags.",
   "没有智能体匹配“{trimmedQuery}”。": "No agents match \"{trimmedQuery}\".",
   "查看全部": "View All",
-  "关闭": "Off",
+  "关闭": "Close",
   "应用搜索": "Apply search",
   "关系": "Link",
   "核心协议": "Core protocol",
