@@ -9,6 +9,7 @@ import { HeaderLanguage } from "./header-language";
 import "./header-tools.css";
 import { SessionNavigation } from "./session-navigation";
 import { BrandMark } from "./brand-mark";
+import { GithubIcon } from "./github-icon";
 import { localizedPath, repositoryUrl } from "@/lib/discovery";
 import {
   Bot,
@@ -17,7 +18,6 @@ import {
   Radio,
   CircleUserRound,
   BookOpen,
-  Github,
 } from "lucide-react";
 const SurfaceStop = dynamic(
   () => import("./surface-tools").then((m) => m.SurfaceStop),
@@ -126,7 +126,7 @@ export function SiteHeader() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Github size={19} />
+                <GithubIcon size={19} />
               </a>
             ) : null}
           </span>
