@@ -1,0 +1,395 @@
+/* Homepage composition stays inside the shared page frame. */
+.home-page .product-entries {
+  padding-bottom: 36px;
+}
+
+.home-page .product-entry small {
+  font-size: 13px;
+}
+
+.home-page .product-entry > span {
+  color: #aeb5c7;
+  font-size: 12px;
+}
+
+.home-page .human-section {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(32px, 4vw, 72px);
+  padding-block: 56px;
+  border-bottom: 0;
+}
+
+.home-page .human-copy {
+  min-width: 0;
+  max-width: 540px;
+}
+
+.home-page .human-copy h2,
+.home-page .connect-section h2,
+.home-page .faq-section h2 {
+  font-size: clamp(32px, 3.1vw, 48px);
+  line-height: 1.22;
+  letter-spacing: -0.035em;
+  margin: 16px 0 0;
+  text-wrap: balance;
+}
+
+.home-page .human-copy > p,
+.home-page .connect-copy > p {
+  max-width: 510px;
+  margin: 20px 0 0;
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.home-page .human-copy ul {
+  margin: 24px 0;
+  gap: 0;
+}
+
+.home-page .human-copy li {
+  padding-block: 12px;
+  border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.home-page .human-copy li:first-child {
+  padding-top: 0;
+}
+
+.home-page .human-copy li svg {
+  margin-top: 3px;
+}
+
+.home-page .human-copy li strong,
+.home-page .human-copy li span {
+  display: block;
+}
+
+.home-page .human-copy li strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.home-page .human-copy li span {
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.home-page .text-link {
+  font-size: 14px;
+}
+
+.home-page .conversation-illustration {
+  width: 100%;
+  max-width: 740px;
+  justify-self: end;
+  border-radius: 20px;
+}
+
+.home-page .illustration-heading {
+  padding: 16px 20px;
+}
+
+.home-page .illustration-heading div > span,
+.home-page .illustration-heading small {
+  font-size: 11px;
+}
+
+.home-page .illustration-timeline {
+  gap: 12px;
+  padding: 20px;
+}
+
+.home-page .conversation-message {
+  max-width: 94%;
+}
+
+.home-page .conversation-message-body {
+  padding: 10px 14px;
+}
+
+.home-page .conversation-message-byline {
+  margin-bottom: 5px;
+}
+
+.home-page .conversation-message-time {
+  font-size: 10px;
+}
+
+.home-page .illustration-open {
+  padding: 14px 20px;
+  font-size: 13px;
+}
+
+.home-page .connect-section {
+  display: block;
+  padding-block: 8px 48px;
+}
+
+.home-page .connect-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: clamp(28px, 4vw, 64px);
+  padding: clamp(24px, 3vw, 48px);
+  border: 1px solid #41475480;
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at top left, #00daf309, transparent 60%),
+    #181d24;
+}
+
+.home-page .connect-copy {
+  min-width: 0;
+}
+
+.home-page .connect-section h2 {
+  font-size: clamp(30px, 2.7vw, 42px);
+}
+
+.home-page .connect-copy .button {
+  margin-top: 24px;
+}
+
+.home-page .terminal-card {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  border-radius: 14px;
+  background: #0e1319;
+}
+
+.home-page .terminal-head {
+  padding: 14px 20px;
+  font-size: 12px;
+  color: #b9c4d3;
+}
+
+.home-page .terminal-head > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-page .terminal-card pre {
+  margin: 0;
+  padding: 24px 20px;
+  font-size: 13px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+
+.home-page .terminal-card > a {
+  margin: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  justify-content: space-between;
+}
+
+.home-page .faq-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  align-items: start;
+  gap: clamp(32px, 5vw, 80px);
+  padding-block: 16px 48px;
+}
+
+.home-page .faq-intro {
+  max-width: 360px;
+  padding-top: 20px;
+}
+
+.home-page .faq-intro > p {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.home-page .faq-intro > a {
+  margin-top: 22px;
+}
+
+.home-page .faq-list {
+  min-width: 0;
+  width: 100%;
+  max-width: 1000px;
+  justify-self: end;
+  border-top: 1px solid var(--border);
+}
+
+.home-page .faq-list details {
+  padding: 0;
+}
+
+.home-page .faq-list summary {
+  min-height: 64px;
+  gap: 24px;
+  padding-block: 18px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.home-page .faq-list summary:hover {
+  color: var(--mint);
+}
+
+.home-page .faq-list summary span {
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+  font-weight: 400;
+}
+
+.home-page .faq-list details p {
+  max-width: 66ch;
+  margin: 0;
+  padding: 0 40px 22px 0;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.home-page + .site-footer {
+  width: min(var(--page-max-width), calc(100% - var(--page-gutter) * 2));
+  padding-block: 28px;
+  border-top: 1px solid var(--border);
+}
+
+.home-page + .site-footer p {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.home-page + .site-footer nav {
+  font-size: 12px;
+}
+
+@media (max-width: 1000px) {
+  .home-page .human-section,
+  .home-page .connect-panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .home-page .human-copy {
+    max-width: 620px;
+  }
+
+  .home-page .human-copy > p {
+    max-width: none;
+  }
+
+  .home-page .conversation-illustration {
+    max-width: none;
+  }
+
+  .home-page .faq-section {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 32px;
+  }
+}
+
+@media (max-width: 600px) {
+  .home-page .human-section {
+    padding-block: 32px;
+  }
+
+  .home-page .human-copy > p,
+  .home-page .connect-copy > p {
+    font-size: 15px;
+    margin-top: 16px;
+  }
+
+  .home-page .human-copy h2,
+  .home-page .connect-section h2,
+  .home-page .faq-section h2 {
+    font-size: clamp(26px, 7vw, 34px);
+  }
+
+  .home-page .human-copy .eyebrow {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+
+  .home-page .illustration-heading,
+  .home-page .illustration-open {
+    padding: 14px;
+  }
+
+  .home-page .illustration-timeline {
+    padding: 16px 12px;
+    gap: 12px;
+  }
+
+  .home-page .conversation-message {
+    max-width: 100%;
+  }
+
+  .home-page .conversation-message-body {
+    padding: 10px;
+  }
+
+  .home-page .illustration-heading div > span {
+    font-size: 10px;
+  }
+
+  .home-page .connect-section {
+    padding-block: 0 32px;
+  }
+
+  .home-page .connect-panel {
+    padding: 20px;
+    border-radius: 20px;
+    gap: 24px;
+  }
+
+  .home-page .connect-copy .button {
+    margin-top: 20px;
+  }
+
+  .home-page .terminal-card pre {
+    padding: 18px 14px;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .home-page .terminal-head,
+  .home-page .terminal-card > a {
+    padding: 12px 14px;
+    font-size: 12px;
+  }
+
+  .home-page .faq-section {
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: 0 28px;
+    gap: 24px;
+  }
+
+  .home-page .faq-intro {
+    padding: 0;
+    max-width: none;
+  }
+
+  .home-page .faq-list summary {
+    gap: 16px;
+    font-size: 15px;
+  }
+
+  .home-page .faq-list details p {
+    padding-right: 16px;
+    font-size: 14px;
+  }
+
+  .home-page + .site-footer {
+    width: calc(100% - 48px);
+    padding-block: 24px;
+  }
+}

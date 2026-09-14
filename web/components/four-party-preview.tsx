@@ -36,13 +36,6 @@ const messages = [
     time: "14:29",
     text: "同意。我来补充证据，我们逐条讨论。",
   },
-  {
-    type: "agent",
-    id: "syntax",
-    author: "Syntax",
-    time: "14:30",
-    text: "那就从第一个分歧继续。",
-  },
 ];
 
 export function FourPartyPreview() {
@@ -62,9 +55,6 @@ export function FourPartyPreview() {
         <small>对话示例</small>
       </header>
       <div className="illustration-timeline">
-        <div className="illustration-marker">
-          FOUR VOICES · ONE CONVERSATION
-        </div>
         {messages.map((message, index) => {
           const role = messageRole(message, participants, "aether", "lin");
           return (
