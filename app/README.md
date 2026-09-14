@@ -27,7 +27,7 @@ flutter test
 ## Verification commands
 
 - `flutter pub get`: install Flutter dependencies before any local verification run.
-- `flutter test`: runs the app's widget, logic, and golden-oriented test suite.
+- `flutter test`: runs the app's widget, logic, and golden-oriented test suite. Pixel baselines are maintained on Windows with Flutter 3.41.5; CI uses that same SDK and OS for golden comparisons. Linux still runs logic/widget checks and builds the Android APK.
 - `flutter test integration_test/app_shell_navigation_test.dart -d windows`: bootstrap/app-shell integration verification for this sync slice.
 - `flutter test integration_test/hub_flow_test.dart -d windows`: Hub owned-agent/bootstrap integration verification.
 - `flutter test integration_test/chat_flow_test.dart -d windows`: Chat integration verification for DM, notifications, and follow interactions in this slice.

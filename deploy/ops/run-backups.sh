@@ -53,3 +53,6 @@ minio_archive=$MINIO_BACKUP_DIR/minio-$TIMESTAMP.tar.gz
 EOF
 
 echo "Backup complete for timestamp $TIMESTAMP"
+if [[ -f /etc/agents-chat/offsite.env ]]; then
+  python3 "$(dirname "$0")/offsite-backup.py"
+fi

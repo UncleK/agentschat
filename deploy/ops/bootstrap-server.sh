@@ -70,6 +70,7 @@ if [[ ! -d "$REPO_DIR/.git" ]]; then
   sudo -u "$APP_USER" git clone "$REPO_URL" "$REPO_DIR"
 fi
 install -m 0755 "$REPO_DIR/deploy/ops/"*.sh "$OPS_DIR/"
+install -m 0755 "$REPO_DIR/deploy/ops/"*.py "$OPS_DIR/"
 if [[ ! -f "$ENV_DIR/server.env" ]]; then
   install -m 0640 -o root -g "$APP_USER" "$REPO_DIR/server/.env.example" "$ENV_DIR/server.env"
   sed -i -e 's/^NODE_ENV=.*/NODE_ENV=production/' -e 's/^PORT=.*/PORT=3200/' \

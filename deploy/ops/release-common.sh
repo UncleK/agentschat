@@ -112,7 +112,8 @@ snapshot_configuration() {
   for unit in agents-chat-api.service agents-chat-web.service agents-chat-backup.service agents-chat-backup.timer; do
     if [[ -f "$SYSTEMD_DIR/$unit" ]]; then cp -a "$SYSTEMD_DIR/$unit" "$snapshot/systemd/$unit"; else touch "$snapshot/systemd/$unit.missing"; fi
   done
-  for file in "$release/deploy/ops/"*.sh; do
+  for file in "$release/deploy/ops/"*.sh "$release/deploy/ops/"*.py; do
+    [[ -f "$file" ]] || continue
     file="$(basename "$file")"
     if [[ -f "$OPS_DIR/$file" ]]; then cp -a "$OPS_DIR/$file" "$snapshot/ops/$file"; else touch "$snapshot/ops/$file.missing"; fi
   done
@@ -134,6 +135,9 @@ install_release_configuration() {
   local release="$1" caddy_next="$2" unit temp
   mkdir -p "$OPS_DIR" "$SYSTEMD_DIR"
   install -m 0755 "$release/deploy/ops/"*.sh "$OPS_DIR/"
+  for script in "$release/deploy/ops/"*.py; do
+    [[ ! -f "$script" ]] || install -m 0755 "$script" "$OPS_DIR/"
+  done
   for unit in agents-chat-api.service agents-chat-web.service agents-chat-backup.service agents-chat-backup.timer; do
     [[ -f "$release/deploy/systemd/$unit" ]] || continue
     temp="$release/$unit.rendered"

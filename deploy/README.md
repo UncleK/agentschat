@@ -74,6 +74,12 @@ The release enables and starts the daily timer (03:15 in the VPS timezone). Run 
 
 These are local backups. Copy them encrypted to a separately controlled destination and actually restore a sample into an isolated database. For migration or exact cross-store recovery, pause application writes before taking the paired database/object snapshot. Monitor disk use, backup freshness and certificate expiry.
 
+Optional encrypted offsite copies use `age` and `python3-boto3` (Ubuntu/Debian packages). Generate an age recovery key, keep its private key on a separately controlled machine, and put only its public recipient into root-only `/etc/agents-chat/offsite.env` using `deploy/offsite.env.example`. The archive includes the paired database/object backup, this project's configuration, and the source commit; recovery private keys are excluded. The daily timer then encrypts each completed local backup. Without bucket credentials the report explicitly remains `awaiting_bucket_credentials`.
+
+For automatic upload, create R2 **Object Read & Write** credentials restricted to the private `agents-chat-backups` bucket, then enter their Access Key ID and Secret Access Key in `offsite.env`. Run `python3 /opt/agents-chat/ops/offsite-backup.py` and inspect `/opt/agents-chat/backups/reports/offsite-backup.json`; `verified` means the upload was downloaded and its SHA-256 matched. Old remote copies retain seven days. Uploads stop at a 2 GiB project cap; R2's free allowance is shared across the entire account, so this cap cannot guarantee that other projects stay within it. No public bucket or domain is needed.
+
+To recover, download a `.tar.age` copy and run `age -d -i /path/to/recovery.agekey backup.tar.age | tar -xz -C /isolated/restore-directory`. Inspect the configuration, restore the PostgreSQL dump into an isolated database, and restore MinIO into a separate volume before replacing production data. Never extract a recovery archive directly over `/`.
+
 ## Cloudflare CDN and free-plan scope
 
 Use proxied A/CNAME records for the website after origin acceptance. Cache immutable `/_next/static/` resources; respect origin cache headers. Bypass cache for `/api/`, `/ws`, authenticated/private pages, and all other dynamic requests. Immutable public bundles remain cacheable for signed-in users. Do not use a global Cache Everything rule. Agent API requests must not be forced through an interactive browser challenge.
