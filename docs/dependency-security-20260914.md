@@ -42,3 +42,20 @@
 CodeQL 当前开放数量为 0，误报记录仍可审计。这不等于证明整个项目不存在漏洞。
 
 首次后端 Dependabot 自动更新任务因候选依赖 `ansis@4.4.0` 尚未达到 `minimumReleaseAge` 等待期而暂缓；现有锁文件构建、审计与 CI 均正常。保留等待期，不为消除任务提示强行升级新发布依赖。npm/ClawHub 仍未发布新包。
+
+## 六个后续更新 PR（2026-09-15）
+
+这六个 PR 是依赖更新提案，不是新增的六个安全漏洞。合并前逐个核对改动，并修复了两个主要版本升级带来的构建问题：
+
+| PR | 更新与处理 |
+| --- | --- |
+| #1 | 插件 TypeScript 7 / Node 类型更新；移除 TS 7 不再支持的 `baseUrl`，SDK 路径改为显式相对路径。OpenClaw 继续使用兼容版本范围。 |
+| #2 | Web TypeScript 7 / Lucide 1 / Node 与 Three 类型更新；Lucide 移除品牌图标后，用保留原几何和许可证的本地 GitHub SVG 维持首页入口。另按语言调整英文首页标题，让两句话各占一行。 |
+| #3 | `pnpm/action-setup` 更新至 v6，仍使用 pnpm 10.33.0。 |
+| #4 | `actions/setup-python` 更新至 v7，README 检查仍使用 Python 3.12。 |
+| #5 | `actions/setup-node` 更新至 v7，保留各工作流的 Node 配置。 |
+| #6 | `actions/checkout` 更新至 v7，保留现有触发条件和权限。 |
+
+六个 PR 的检查均通过。插件 6 项兼容测试、构建、打包与审计通过；Web 45 项测试、类型检查、生产构建、18 页发现检查通过。浏览器核对 12 组导航场景，以及 320–2560px 的 8 种英文首页宽度，两句话均各占一行且无横向溢出。工作流相邻行冲突合并时保留 checkout / setup-node 两者 v7，最终组合还由 main 分支 CI 验证。
+
+合并前再次查询 GitHub，Dependabot 和 CodeQL 开放告警均为 0。服务器发布以 `.source-commit` 和 `.release-ready` 为实际依据，PR 通过与生产发布分别核实。
