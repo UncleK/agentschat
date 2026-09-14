@@ -15,7 +15,6 @@ import '../../core/network/chat_repository.dart';
 import '../../core/session/app_session_controller.dart';
 import '../../core/session/app_session_scope.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_effects.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/glass_panel.dart';
@@ -572,12 +571,13 @@ class _HubScreenState extends State<HubScreen> {
     } on ApiException catch (error) {
       if (error.isUnauthorized) {
         await session.handleUnauthorized();
-        if (mounted)
+        if (mounted) {
           setState(() {
             _isSavingAgentSecurity = false;
             _globalAgentSafetyDraft = null;
             _agentSafetyOverrides.clear();
           });
+        }
         return;
       }
       await _restoreAgentSecurityState(session);
@@ -1529,9 +1529,14 @@ class _OwnedAgentCard extends StatelessWidget {
       alignment: Alignment.center,
       transform: Matrix4.identity()
         ..setEntry(3, 2, 0.00125)
-        ..translate(-lane * 30, 0.0, -depth * 65)
+        ..translateByDouble(-lane * 30, 0.0, -depth * 65, 1.0)
         ..rotateY(-lane * .52)
-        ..scale((1 - depth * .2).clamp(.6, 1.0)),
+        ..scaleByDouble(
+          (1 - depth * .2).clamp(.6, 1.0),
+          (1 - depth * .2).clamp(.6, 1.0),
+          (1 - depth * .2).clamp(.6, 1.0),
+          1.0,
+        ),
       child: Opacity(
         opacity: (1 - depth * .6).clamp(.18, 1.0),
         child: Semantics(
@@ -1604,7 +1609,7 @@ class _OwnedAgentCard extends StatelessWidget {
                               ? Image.network(
                                   agent.avatarUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => fallback,
+                                  errorBuilder: (_, _, _) => fallback,
                                 )
                               : fallback,
                         ),
@@ -2326,8 +2331,9 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     if (threadId == null ||
         cursor == null ||
         _isLoadingOlder ||
-        _isRefreshingThread)
+        _isRefreshingThread) {
       return;
+    }
     final oldExtent = _threadScrollController.hasClients
         ? _threadScrollController.position.maxScrollExtent
         : 0.0;
@@ -2365,7 +2371,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
         }
       });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _sendError = localizedAppText(
             key: 'msgHubOlderMessagesFailed',
@@ -2373,6 +2379,7 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
             zhHans: '暂时无法读取更早消息，请重试。',
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => _isLoadingOlder = false);
     }
@@ -4805,14 +4812,12 @@ class _AgentAutonomyPresetSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final capabilities = preset.capabilities;
-    return DecoratedBox(
+    return Material(
       key: cardKey,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLow.withValues(alpha: 0.86),
+      color: AppColors.surfaceLow.withValues(alpha: 0.86),
+      shape: RoundedRectangleBorder(
         borderRadius: AppRadii.large,
-        border: Border.all(
-          color: AppColors.primaryFixed.withValues(alpha: 0.16),
-        ),
+        side: BorderSide(color: AppColors.primaryFixed.withValues(alpha: 0.16)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),

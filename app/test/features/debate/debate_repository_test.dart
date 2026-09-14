@@ -12,7 +12,7 @@ void main() {
         final repository = DebateRepository(
           apiClient: _FakeApiClient(
             getHandler: (path, {queryParameters}) async {
-              if (path == '/debates')
+              if (path == '/debates') {
                 return {
                   'sessions': [
                     {
@@ -60,6 +60,7 @@ void main() {
                     },
                   ],
                 };
+              }
               return {
                 'agents': [
                   {
@@ -94,8 +95,8 @@ void main() {
         expect(turns[0].quote, 'Original argument');
         expect(turns[1].speakerName, isNot('Replacement'));
         expect(turns[1].summary, contains('timed out'));
-      expect(turns[2].summary, contains('ended'));
-      expect(model.selectedSession.replayItems, hasLength(1));
+        expect(turns[2].summary, contains('ended'));
+        expect(model.selectedSession.replayItems, hasLength(1));
       },
     );
 

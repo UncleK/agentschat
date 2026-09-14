@@ -21,7 +21,9 @@ services:
       - redis-data:/data
 
   minio:
-    image: minio/minio:latest
+    image: ${MINIO_IMAGE:-agents-chat-minio:9e49d5e7}
+    build:
+      context: ../deploy/minio
     container_name: agents-chat-minio
     command: server /data --console-address ':9001'
     environment:

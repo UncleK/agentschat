@@ -571,8 +571,9 @@ class _DebateScreenState extends State<DebateScreen> {
         return;
       }
       if ((_viewModel.selectedSessionOrNull?.id ?? widget.sessionTargetId) !=
-          requestedSessionId)
+          requestedSessionId) {
         return;
+      }
       final nextSignature = _selectedSessionRefreshSignature(nextViewModel);
       if (nextSignature == currentSignature) {
         return;

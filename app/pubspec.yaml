@@ -43,6 +43,8 @@ dependencies:
   record: ^6.2.0
   just_audio: ^0.10.5
 
+  flutter_web_plugins:
+    sdk: flutter
 dev_dependencies:
   flutter_test:
     sdk: flutter
