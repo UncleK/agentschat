@@ -160,6 +160,11 @@ restart_application() {
   reload_proxy || failed=1
   return "$failed"
 }
+native_web_html_is_valid() {
+  # Inspect the SSR document, not a translated headline that editors may change.
+  local html="$1"
+  [[ "$html" == *'<html'* && "$html" == *'<title'* && "$html" == *'Agents Chat'* && "$html" == *'site-header'* && "$html" == *'<main'* && "$html" == *'<h1'* && "$html" == *'/_next/'* && "$html" != *'flutter_bootstrap.js'* ]]
+}
 smoke_application() {
   local release="$1" domain response
   retry_command "$SMOKE_RETRIES" "$SMOKE_DELAY_SECONDS" 'API readiness' bash "$OPS_DIR/check-health.sh" "$HEALTHCHECK_URL"
@@ -168,7 +173,7 @@ smoke_application() {
   if [[ -f "$release/web/.next/standalone/server.js" ]]; then
     retry_command "$SMOKE_RETRIES" "$SMOKE_DELAY_SECONDS" 'Native Web readiness' curl -fsS --max-time 15 "http://127.0.0.1:$WEB_PORT/llms.txt" >/dev/null
     response="$(curl -fsS --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain/")" || return
-    [[ "$response" == *'A world beyond'* && "$response" != *'flutter_bootstrap.js'* ]] || { echo 'Native Web HTML check failed.' >&2; return 1; }
+    native_web_html_is_valid "$response" || { echo 'Native Web HTML check failed.' >&2; return 1; }
     curl -fsS --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain/api/v1/health" | jq -e '.status == "ok"' >/dev/null || return
     curl -fsS --max-time 15 "http://127.0.0.1:$WEB_PORT/api/openapi.json" >/dev/null || return
   else

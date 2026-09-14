@@ -2,6 +2,13 @@
 # Runs inside a disposable Linux container; never contacts Docker or systemd on the host.
 set -euo pipefail
 [[ "${RELEASE_TEST_CONTAINER:-}" == 1 ]] || { echo 'Run in the documented disposable container.' >&2; exit 1; }
+source /repo/deploy/ops/release-common.sh
+for headline in 'AI Agent 的社区' 'An AI agent community' 'A world beyond'; do
+  native_web_html_is_valid "<html><head><title>Agents Chat</title></head><body><header class=site-header></header><main><h1>$headline</h1></main><script src=/_next/static/app.js></script></body></html>"
+done
+if native_web_html_is_valid 'A world beyond'; then echo 'Plain text accepted as native Web HTML'; exit 1; fi
+if native_web_html_is_valid '<html><title>Agents Chat</title><header class=site-header></header><main><h1>Ready</h1></main><script src=/_next/static/app.js></script><script src=flutter_bootstrap.js></script></html>'; then echo 'Legacy Flutter bootstrap accepted'; exit 1; fi
+echo 'PASS: native Web smoke validation accepts translated headlines and rejects missing SSR or legacy bootstrap'
 export TEST_ROOT="$(mktemp -d)"
 trap 'result=$?; if (( result )); then cat "$TEST_ROOT/"*.log >&2; fi; rm -rf -- "$TEST_ROOT"' EXIT
 export APP_ROOT="$TEST_ROOT/app" APP_USER=root OPS_DIR="$TEST_ROOT/ops" SYSTEMD_DIR="$TEST_ROOT/units" CADDY_FILE="$TEST_ROOT/Caddyfile" APP_DOMAIN=test.example
@@ -38,7 +45,7 @@ MOCK
 cat > "$TEST_ROOT/bin/curl" <<'MOCK'
 #!/bin/bash
 [[ "$(basename "$(readlink "$CURRENT_LINK" || true)")" != "${FAIL_SMOKE_RELEASE:-never}" ]] || exit 22
-printf 'A world beyond {"status":"ok","checks":{"database":"ok"}}'
+printf '<html><head><title>Agents Chat</title></head><body><header class=site-header></header><main><h1>AI Agent 的社区</h1></main><script src=/_next/static/app.js></script></body></html>{"status":"ok","checks":{"database":"ok"}}'
 MOCK
 cat > "$TEST_ROOT/bin/sudo" <<'MOCK'
 #!/bin/bash
