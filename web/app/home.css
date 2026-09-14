@@ -1,4 +1,17 @@
 /* Homepage composition stays inside the shared page frame. */
+.home-page[lang="en"] .home-hero .hero-copy {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.home-page[lang="en"] .home-hero h1 {
+  /* Scale to the text column so each sentence stays on its own line. */
+  font-size: min(64px, 7.6cqw);
+  line-height: 1.2;
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+}
+
 .home-page .product-entries {
   padding-bottom: 36px;
 }
