@@ -1,3 +1,4 @@
+import { readRuntimeConfig, mutateChannelConfig } from "./runtime-config.js";
 import { resolve as resolvePath } from "node:path";
 
 import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
@@ -342,10 +343,6 @@ function buildBaseAccount(input: ConnectAccountInput): AgentsChatAccountConfig {
   };
 }
 
-async function writeConfig(runtimeContext: AgentsChatRuntimeContext, cfg: OpenClawConfig): Promise<void> {
-  await runtimeContext.runtime.config.writeConfigFile(cfg);
-}
-
 function effectiveActivityLevel(policy: {
   activityLevel?: AgentsChatActivityLevel;
   allowProactiveInteractions?: boolean;
@@ -421,7 +418,7 @@ async function handleConnect(
   opts: ConnectAccountInput,
   ctx: OpenClawPluginCliContext
 ): Promise<void> {
-  const cfg = runtimeContext.runtime.config.loadConfig();
+  const cfg = readRuntimeConfig(runtimeContext.runtime);
   const launcherValues = opts.launcherUrl ? parseLauncherUrl(opts.launcherUrl) : null;
   if (launcherValues?.mode === "claim") {
     const requestedClaimSlot = normalizeOptionalString(opts.slot) ?? normalizeOptionalString(launcherValues.slot);
@@ -490,8 +487,7 @@ async function handleConnect(
     );
   }
 
-  const nextCfg = upsertAgentsChatAccount(runtimeContext.runtime.config.loadConfig(), account);
-  await writeConfig(runtimeContext, nextCfg);
+  await mutateChannelConfig(runtimeContext.runtime, (draft) => upsertAgentsChatAccount(draft, account));
 
   clearWorkerConflict(account.slot);
   const nextState = await connectAccount(account, loadSlotState(account.slot, runtimeContext.stateStore), ctx.logger);
@@ -504,8 +500,7 @@ async function handleConnect(
     profileTags: nextState.profileTags ?? account.profileTags,
     avatarEmoji: nextState.avatarEmoji ?? account.avatarEmoji
   };
-  const syncedCfg = upsertAgentsChatAccount(runtimeContext.runtime.config.loadConfig(), persistedAccount);
-  await writeConfig(runtimeContext, syncedCfg);
+  await mutateChannelConfig(runtimeContext.runtime, (draft) => upsertAgentsChatAccount(draft, persistedAccount));
   if (account.autoStart !== false) {
     await reconcileManagedAccounts(runtimeContext, ctx.logger);
   }
@@ -528,7 +523,7 @@ async function handleConnect(
 }
 
 async function handleStatus(runtimeContext: AgentsChatRuntimeContext): Promise<void> {
-  const cfg = runtimeContext.runtime.config.loadConfig();
+  const cfg = readRuntimeConfig(runtimeContext.runtime);
   const accounts = listAgentsChatAccounts(cfg);
   const enrichedAccounts = [];
 
@@ -625,8 +620,7 @@ async function handleDisconnect(
   const normalizedSlot = normalizeSlot(slot);
   await disconnectAccount(normalizedSlot, runtimeContext);
   if (removeConfig) {
-    const nextCfg = removeAgentsChatAccount(runtimeContext.runtime.config.loadConfig(), normalizedSlot);
-    await writeConfig(runtimeContext, nextCfg);
+    await mutateChannelConfig(runtimeContext.runtime, (draft) => removeAgentsChatAccount(draft, normalizedSlot));
   }
   console.log(
     asJson({
@@ -760,7 +754,7 @@ async function handleDoctor(
   runtimeContext: AgentsChatRuntimeContext,
   slot: string | undefined
 ): Promise<void> {
-  const cfg = runtimeContext.runtime.config.loadConfig();
+  const cfg = readRuntimeConfig(runtimeContext.runtime);
   const accounts = slot
     ? [findAgentsChatAccount(cfg, normalizeSlot(slot))].filter(Boolean) as AgentsChatAccountConfig[]
     : listAgentsChatAccounts(cfg);

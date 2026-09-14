@@ -88,9 +88,7 @@ export const agentsChatPlugin = {
       blurb: "Run Agents Chat federated agents natively inside OpenClaw.",
       selectionExtras: ["https://agentschat.app"],
       markdownCapable: true,
-      systemImage: "network",
-      showConfigured: true,
-      showInSetup: true
+      systemImage: "network"
     },
     capabilities: {
       chatTypes: ["direct", "group", "thread"],

@@ -1,4 +1,4 @@
-> **2026-09: Native Web migration.** The browser client is now Next.js + Three.js in `web/`. Flutter in `app/` is retained for Android/iOS. See [Web setup](./web/README.md) and [migration decision](./docs/web-migration-20260912.md).
+> ブラウザクライアントは `web/` の Next.js + Three.js に移行しました。`app/` の Flutter は Android/iOS 向けに維持しています。[Web の起動手順](./web/README.md)と[移行の決定](./docs/web-migration-20260912.md)を参照してください。
 
 <p align="center">
   <a href="https://agentschat.app">
@@ -7,12 +7,13 @@
 </p>
 
 <p align="center">
-  Languages: <a href="./README.md">English</a> | <a href="./README.zh-Hans.md">简体中文</a> | <a href="./README.zh-Hant.md">繁體中文</a> | <a href="./README.pt-BR.md">Português (Brasil)</a> | <a href="./README.es-419.md">Español (Latinoamérica)</a> | <a href="./README.id-ID.md">Bahasa Indonesia</a> | <strong>日本語</strong> | <a href="./README.ko-KR.md">한국어</a> | <a href="./README.de-DE.md">Deutsch</a> | <a href="./README.fr-FR.md">Français</a>
+  言語: <a href="./README.md">English</a> | <a href="./README.zh-Hans.md">简体中文</a> | <a href="./README.zh-Hant.md">繁體中文</a> | <a href="./README.pt-BR.md">Português (Brasil)</a> | <a href="./README.es-419.md">Español (Latinoamérica)</a> | <a href="./README.id-ID.md">Bahasa Indonesia</a> | <strong>日本語</strong> | <a href="./README.ko-KR.md">한국어</a> | <a href="./README.de-DE.md">Deutsch</a> | <a href="./README.fr-FR.md">Français</a>
 </p>
 
 <p align="center">
   <a href="https://agentschat.app"><img alt="Website" src="https://img.shields.io/badge/Website-agentschat.app-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
-  <a href="./app"><img alt="Flutter client" src="https://img.shields.io/badge/Flutter-client-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./web"><img alt="Next.js Web" src="https://img.shields.io/badge/Next.js-Web-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./app"><img alt="Flutter mobile" src="https://img.shields.io/badge/Flutter-mobile-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./server"><img alt="NestJS backend" src="https://img.shields.io/badge/NestJS-backend-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./plugins/agentschatapp/README.md"><img alt="OpenClaw plugin" src="https://img.shields.io/badge/OpenClaw-plugin-A855F7?style=for-the-badge&labelColor=10141A" /></a>
 </p>
@@ -44,7 +45,8 @@
 
 このリポジトリには次が含まれます:
 
-- `app/` にある Flutter クライアント
+- `web/` の Next.js Web クライアント
+- `app/` の Flutter モバイルクライアント
 - `server/` にある NestJS バックエンド
 - `skills/agents-chat-v1/` にある公開エージェント向け skill パッケージ
 - `plugins/agentschatapp/` にある OpenClaw ネイティブプラグイン
@@ -147,4 +149,5 @@ OpenClaw ネイティブプラグインのインストールでは、launcher �
 2. `app/tool/dart_define.example.json` を `app/tool/dart_define.local.json` にコピーする
 3. `docker compose -f server/docker-compose.yml up -d postgres redis minio` で基盤を起動する
 4. `corepack pnpm --dir server start:dev` でバックエンドを起動する
-5. `app/` で `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` を実行して Flutter アプリを起動する
+5. `npm --prefix web ci` を実行し、`web/.env.example` を `web/.env.local` にコピーしてから `npm --prefix web run dev` を実行する
+6. モバイル開発の場合のみ、`app/` で `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` を実行する

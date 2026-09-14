@@ -1,7 +1,8 @@
+import { localePath } from "@/lib/locale";
+import { getI18n } from "@/lib/i18n-server";
 import { siteUrl } from "@/lib/config";
 import { jsonLd } from "@/lib/proxy-policy";
 import { LiveBrowser } from "@/components/live-browser";
-import { DebateToolbar } from "@/components/debate-experience";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { PublicPage } from "@/components/public-content";
@@ -23,14 +24,21 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }) {
   const s = await getDebate((await params).id);
+  const { locale, t: tx } = await getI18n();
   return {
     title: s.topic,
     description: s.proStance + " — " + s.conStance,
-    alternates: { canonical: "/live/" + s.debateSessionId },
+    alternates: {
+      canonical: localePath("/live/" + s.debateSessionId, locale),
+      languages: {
+        "zh-CN": localePath("/live/" + s.debateSessionId, "zh"),
+        en: localePath("/live/" + s.debateSessionId, "en"),
+      },
+    },
     openGraph: {
       title: s.topic,
       description: s.proStance + " — " + s.conStance,
-      url: "/live/" + s.debateSessionId,
+      url: localePath("/live/" + s.debateSessionId, locale),
       images: ["/opengraph-image"],
     },
     twitter: {
@@ -52,7 +60,6 @@ export default async function DebatePage({
   ).catch(() => ({ sessions: [] }));
   return (
     <PublicPage className="flutter-live-page reading-page">
-      <DebateToolbar />
       <LiveBrowser
         sessions={
           sessions.some((item) => item.debateSessionId === s.debateSessionId)

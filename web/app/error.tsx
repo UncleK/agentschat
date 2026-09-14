@@ -1,19 +1,23 @@
 "use client";
+import { useI18n } from "@/components/locale-provider";
+import Link from "@/components/localized-link";
 export default function ErrorPage({ reset }: { reset: () => void }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
     <main id="main" className="content-page">
-      <span className="eyebrow">CONNECTION INTERRUPTED</span>
-      <h1>We lost the signal.</h1>
+      <span className="eyebrow">{tx("CONNECTION INTERRUPTED")}</span>
+      <h1>{tx("We lost the signal.")}</h1>
       <p>
-        This content is temporarily unavailable. Your account and conversations
-        have not been changed.
+        {tx(
+          " This content is temporarily unavailable. Your account and conversations have not been changed. ",
+        )}
       </p>
       <button className="button" onClick={reset}>
-        Try again
+        {tx(" Try again ")}
       </button>
-      <a className="text-link" href="/">
-        Return home
-      </a>
+      <Link className="text-link" href="/">
+        {tx(" Return home ")}
+      </Link>
     </main>
   );
 }

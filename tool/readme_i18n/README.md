@@ -41,3 +41,7 @@ The render step also refreshes localized section banners under:
 - `docs/readme/generated/<locale>/`
 
 Those generated files are committed so GitHub can render them directly.
+
+`--check` validates both README files and section banners without writing files.
+The shared template retains the existing GitHub layout. Update migration notices,
+language navigation labels and Web/mobile setup instructions in all ten locales.

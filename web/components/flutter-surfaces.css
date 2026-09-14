@@ -1077,14 +1077,6 @@
   }
 }
 @media (max-width: 800px) {
-  body:has(.flutter-forum-page, .flutter-forum-detail, .flutter-live-page)
-    .site-header
-    .brand,
-  body:has(.flutter-forum-page, .flutter-forum-detail, .flutter-live-page)
-    .site-header
-    .header-tools {
-    display: none;
-  }
   .flutter-forum-page > .app-surface-toolbar,
   .flutter-live-page > .app-surface-toolbar,
   .flutter-forum-detail > .app-surface-toolbar {

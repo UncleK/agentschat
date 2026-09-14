@@ -1,5 +1,5 @@
 "use client";
-
+import { useI18n } from "@/components/locale-provider";
 import {
   useCallback,
   useEffect,
@@ -7,17 +7,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-link";
 import { ArrowUp, ExternalLink } from "lucide-react";
 import { api, errorMessage } from "@/lib/client-api";
 import "./reading-workspace.css";
-
+import { basePath, localePath } from "@/lib/locale";
 export function useReadingSelection<T>(
   surface: "forum" | "live",
   initialId: string,
   firstId: string,
   initialRecord: T | null,
 ) {
+  const { locale: uiLocale } = useI18n();
   const [id, setId] = useState(initialId);
   const [record, setRecord] = useState({ id: initialId, value: initialRecord });
   const [failure, setFailure] = useState<{
@@ -31,25 +32,22 @@ export function useReadingSelection<T>(
   useEffect(() => {
     setId(initialId);
   }, [initialId]);
-
   useEffect(() => {
     if (!id && firstId) setId(firstId);
   }, [id, firstId]);
-
   useEffect(() => {
     if (initialId === currentId.current && initialRecord) {
       setRecord({ id: initialId, value: initialRecord });
       setFailure(null);
     }
   }, [initialId, initialRecord]);
-
   useEffect(() => {
     const readLocation = () => {
       const url = new URL(window.location.href);
       const explicit = url.searchParams.get(
         surface === "forum" ? "topic" : "session",
       );
-      const fromPath = url.pathname.match(
+      const fromPath = basePath(url.pathname).match(
         new RegExp(`^/${surface}/([0-9a-f-]{36})$`, "i"),
       )?.[1];
       setId(explicit || fromPath || firstId);
@@ -57,7 +55,6 @@ export function useReadingSelection<T>(
     window.addEventListener("popstate", readLocation);
     return () => window.removeEventListener("popstate", readLocation);
   }, [surface, firstId]);
-
   useEffect(() => {
     if (!id) return;
     const abort = new AbortController();
@@ -66,7 +63,12 @@ export function useReadingSelection<T>(
       if (inFlight) return;
       inFlight = true;
       try {
-        const result = await api<T | { topic: T }>(
+        const result = await api<
+          | T
+          | {
+              topic: T;
+            }
+        >(
           surface === "forum"
             ? `/content/public/forum/topics/${encodeURIComponent(id)}`
             : `/debates/${encodeURIComponent(id)}`,
@@ -79,7 +81,11 @@ export function useReadingSelection<T>(
           id,
           value:
             surface === "forum"
-              ? (result as { topic: T }).topic
+              ? (
+                  result as {
+                    topic: T;
+                  }
+                ).topic
               : (result as T),
         });
         setFailure(null);
@@ -106,13 +112,12 @@ export function useReadingSelection<T>(
     // record is deliberately not a dependency: a successful load must not restart it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, surface, revision]);
-
   const select = useCallback(
     (nextId: string) => {
       if (!window.matchMedia("(min-width: 1024px)").matches) return false;
       if (nextId !== currentId.current) {
         const url = new URL(window.location.href);
-        url.pathname = `/${surface}`;
+        url.pathname = localePath(`/${surface}`, uiLocale);
         url.searchParams.set(surface === "forum" ? "topic" : "session", nextId);
         url.hash = "";
         window.history.pushState(null, "", url);
@@ -121,7 +126,7 @@ export function useReadingSelection<T>(
       }
       return true;
     },
-    [surface],
+    [surface, uiLocale],
   );
   return {
     id,
@@ -131,12 +136,12 @@ export function useReadingSelection<T>(
     reload,
   };
 }
-
 export function ReadingWorkspace({
   surface,
   selectedId,
   detailHref,
   primary,
+  primaryActions,
   children,
   mobileDetail = false,
 }: {
@@ -144,9 +149,11 @@ export function ReadingWorkspace({
   selectedId: string;
   detailHref?: string;
   primary: ReactNode;
+  primaryActions?: ReactNode;
   children: ReactNode;
   mobileDetail?: boolean;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const left = useRef<HTMLElement>(null);
   const right = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -154,6 +161,18 @@ export function ReadingWorkspace({
       right.current?.scrollTo({ top: 0, behavior: "instant" });
   }, [selectedId]);
   const toTop = (element: HTMLElement | null) => {
+    if (element && !window.matchMedia("(min-width: 1024px)").matches) {
+      window.scrollTo({
+        top: Math.max(
+          0,
+          element.getBoundingClientRect().top + window.scrollY - 64,
+        ),
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
+      return;
+    }
     element?.scrollTo({
       top: 0,
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -168,36 +187,46 @@ export function ReadingWorkspace({
       <section
         className="reading-pane reading-primary"
         ref={left}
-        aria-label={surface === "forum" ? "论坛主题列表" : "辩论主题列表"}
+        aria-label={
+          surface === "forum" ? tx("论坛主题列表") : tx("辩论主题列表")
+        }
         tabIndex={0}
       >
         <header className="reading-pane-header">
-          <strong>{surface === "forum" ? "话题" : "全部辩论"}</strong>
-          <button onClick={() => toTop(left.current)} aria-label="左栏回到顶部">
-            <ArrowUp size={16} /> 回到顶部
-          </button>
+          <strong>{surface === "forum" ? tx("话题") : tx("全部辩论")}</strong>
+          <div>
+            {primaryActions}
+            <button
+              onClick={() => toTop(left.current)}
+              aria-label={tx("左栏回到顶部")}
+            >
+              <ArrowUp size={16} />
+              {tx("回到顶部")}
+            </button>
+          </div>
         </header>
         <div className="reading-pane-content">{primary}</div>
       </section>
       <section
         className="reading-pane reading-details"
         ref={right}
-        aria-label="当前主题详情"
+        aria-label={tx("当前主题详情")}
         tabIndex={0}
       >
         <header className="reading-pane-header">
-          <strong>当前主题详情</strong>
+          <strong>{tx("当前主题详情")}</strong>
           <div>
             {detailHref && (
-              <Link href={detailHref} aria-label="打开当前主题独立页面">
+              <Link href={detailHref} aria-label={tx("打开当前主题独立页面")}>
                 <ExternalLink size={15} />
               </Link>
             )}
             <button
               onClick={() => toTop(right.current)}
-              aria-label="右栏回到顶部"
+              aria-label={tx("右栏回到顶部")}
             >
-              <ArrowUp size={16} /> 回到顶部
+              <ArrowUp size={16} />
+              {tx("回到顶部")}
             </button>
           </div>
         </header>
@@ -208,7 +237,6 @@ export function ReadingWorkspace({
     </div>
   );
 }
-
 export function ReadingLoading({
   error,
   retry,
@@ -216,16 +244,17 @@ export function ReadingLoading({
   error: string;
   retry: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
     <div className="reading-loading" role={error ? "alert" : "status"}>
       {error ? (
         <>
-          <p>这个主题暂时无法加载。</p>
-          <p>{error}</p>
-          <button onClick={retry}>重新加载</button>
+          <p>{tx("这个主题暂时无法加载。")}</p>
+          <p>{tx(error)}</p>
+          <button onClick={retry}>{tx("重新加载")}</button>
         </>
       ) : (
-        <p>正在加载主题详情…</p>
+        <p>{tx("正在加载主题详情…")}</p>
       )}
     </div>
   );

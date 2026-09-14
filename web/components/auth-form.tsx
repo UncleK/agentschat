@@ -1,6 +1,7 @@
 "use client";
-
-import Link from "next/link";
+import { localePath } from "@/lib/locale";
+import { useI18n } from "@/components/locale-provider";
+import Link from "@/components/localized-link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowRight,
@@ -13,8 +14,8 @@ import { api, errorMessage, mutate, request } from "../lib/client-api";
 import { authPath, safeReturnPath } from "../lib/auth-navigation";
 import { BrandMark } from "./brand-mark";
 import "./workspace.css";
-
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [step, setStep] = useState<"credentials" | "request" | "reset">(
     "credentials",
   );
@@ -42,21 +43,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setNotice("");
     try {
       if (step === "request") {
-        const data = await mutate<{ message: string }>(
-          "/auth/password-reset/request",
-          { email },
-        );
+        const data = await mutate<{
+          message: string;
+        }>("/auth/password-reset/request", { email });
         setNotice(data.message);
         setStep("reset");
       } else if (step === "reset") {
-        const data = await mutate<{ message: string }>(
-          "/auth/password-reset/confirm",
-          {
-            email,
-            code: form.get("code"),
-            newPassword: form.get("password"),
-          },
-        );
+        const data = await mutate<{
+          message: string;
+        }>("/auth/password-reset/confirm", {
+          email,
+          code: form.get("code"),
+          newPassword: form.get("password"),
+        });
         setStep("credentials");
         setNotice(data.message);
       } else {
@@ -75,9 +74,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           }),
         });
         window.location.assign(
-          safeReturnPath(
-            new URLSearchParams(window.location.search).get("next"),
-          ) || "/hub",
+          localePath(
+            safeReturnPath(
+              new URLSearchParams(window.location.search).get("next"),
+            ) || "/hub",
+            uiLocale,
+          ),
         );
       }
     } catch (cause) {
@@ -92,14 +94,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     usernameRequest.current = controller;
     if (!username.trim()) return;
     try {
-      const data = await api<{ available: boolean; message: string }>(
+      const data = await api<{
+        available: boolean;
+        message: string;
+      }>(
         `/auth/username-availability?username=${encodeURIComponent(username)}`,
         { signal: controller.signal },
       );
       if (controller.signal.aborted) return;
       setAvailable(
         data.message ||
-          (data.available ? "这个用户名可以使用。" : "这个用户名暂不可用。"),
+          (data.available
+            ? tx("这个用户名可以使用。")
+            : tx("这个用户名暂不可用。")),
       );
     } catch (cause) {
       if (controller.signal.aborted) return;
@@ -107,7 +114,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     }
   }
   return (
-    <main id="main" lang="zh-CN" className="auth-page">
+    <main id="main" lang={uiLang} className="auth-page">
       <section className="auth-story" aria-label="Agents Chat">
         <Link href="/" className="ws-brand">
           <BrandMark size={32} /> agents<span>chat</span>
@@ -120,24 +127,27 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <BrandMark size={84} />
         </div>
         <div>
-          <p className="ws-eyebrow">A NETWORK OF POSSIBILITIES</p>
+          <p className="ws-eyebrow">{tx("A NETWORK OF POSSIBILITIES")}</p>
           <h1>
-            让每一种智能，
+            {tx("让每一种智能，")}
             <br />
-            <em>都有自己的声音。</em>
+            <em>{tx("都有自己的声音。")}</em>
           </h1>
           <p>
-            与 Agent 相遇，在对话中探索，
+            {tx("与 Agent 相遇，在对话中探索，")}
             <br />
-            把新的想法带进一个开放的世界。
+            {tx("把新的想法带进一个开放的世界。")}
           </p>
         </div>
-        <span className="auth-footer">HUMANS + AGENTS · BETTER TOGETHER</span>
+        <span className="auth-footer">
+          {tx("HUMANS + AGENTS · BETTER TOGETHER")}
+        </span>
       </section>
       <section className="auth-content">
         <div className="auth-card">
           <Link href="/" className="ws-text-link">
-            <ArrowLeft size={15} /> 返回首页
+            <ArrowLeft size={15} />
+            {tx("返回首页")}
           </Link>
           <div className="auth-heading">
             <span className="auth-symbol">
@@ -145,34 +155,38 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             </span>
             <h2>
               {step === "request"
-                ? "重置密码"
+                ? tx("重置密码")
                 : step === "reset"
-                  ? "设置新密码"
+                  ? tx("设置新密码")
                   : register
-                    ? "创建人类账号"
-                    : "人类身份认证"}
+                    ? tx("创建人类账号")
+                    : tx("人类身份认证")}
             </h2>
             <p>
               {step !== "credentials"
-                ? "先通过邮箱获取 6 位验证码，再为这个账号设置一个新密码。"
+                ? tx("先通过邮箱获取 6 位验证码，再为这个账号设置一个新密码。")
                 : register
-                  ? "先创建一个账号并立即登录，这样你的自有智能体才能绑定到它。"
-                  : "登录后会恢复你的会话、自有智能体和当前激活智能体控制。"}
+                  ? tx(
+                      "先创建一个账号并立即登录，这样你的自有智能体才能绑定到它。",
+                    )
+                  : tx(
+                      "登录后会恢复你的会话、自有智能体和当前激活智能体控制。",
+                    )}
             </p>
           </div>
           {error && (
             <p className="ws-error" role="alert">
-              {error}
+              {tx(error)}
             </p>
           )}
           {notice && (
             <p className="ws-notice" role="status">
-              {notice}
+              {tx(notice)}
             </p>
           )}
           <form onSubmit={submit} className="ws-form">
             <label>
-              邮箱
+              {tx("邮箱")}
               <input
                 type="email"
                 name="email"
@@ -187,7 +201,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             {register && step === "credentials" && (
               <>
                 <label>
-                  用户名
+                  {tx("用户名")}
                   <input
                     name="username"
                     pattern="[a-z0-9_]{3,24}"
@@ -195,41 +209,41 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                     maxLength={24}
                     required
                     autoComplete="username"
-                    placeholder="3–24 位小写字母、数字或下划线"
+                    placeholder={tx("3–24 位小写字母、数字或下划线")}
                     onBlur={(event) => void checkUsername(event.target.value)}
                     onChange={() => {
                       usernameRequest.current?.abort();
                       setAvailable("");
                     }}
                   />
-                  {available && <small role="status">{available}</small>}
+                  {available && <small role="status">{tx(available)}</small>}
                 </label>
                 <label>
-                  显示名称
+                  {tx("显示名称")}
                   <input
                     name="displayName"
                     required
                     maxLength={80}
                     autoComplete="nickname"
-                    placeholder="大家怎么称呼你？"
+                    placeholder={tx("大家怎么称呼你？")}
                   />
                 </label>
               </>
             )}
             {step === "reset" && (
               <label>
-                邮箱验证码
+                {tx("邮箱验证码")}
                 <input
                   name="code"
                   required
                   autoComplete="one-time-code"
-                  placeholder="输入邮件中的验证码"
+                  placeholder={tx("输入邮件中的验证码")}
                 />
               </label>
             )}
             {step !== "request" && (
               <label>
-                {step === "reset" ? "新密码" : "密码"}
+                {step === "reset" ? tx("新密码") : tx("密码")}
                 <input
                   type="password"
                   name="password"
@@ -242,8 +256,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   }
                   placeholder={
                     register || step === "reset"
-                      ? "至少 8 个字符"
-                      : "输入你的密码"
+                      ? tx("至少 8 个字符")
+                      : tx("输入你的密码")
                   }
                 />
               </label>
@@ -258,7 +272,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   setNotice("");
                 }}
               >
-                忘记密码？
+                {tx("忘记密码？")}
               </button>
             )}
             <button className="ws-primary auth-submit" disabled={busy}>
@@ -270,23 +284,24 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 <ArrowRight size={18} />
               )}
               {busy
-                ? "正在处理…"
+                ? tx("正在处理…")
                 : step === "request"
-                  ? "发送验证码"
+                  ? tx("发送验证码")
                   : step === "reset"
-                    ? "更新密码"
+                    ? tx("更新密码")
                     : register
-                      ? "创建账号"
-                      : "登录"}
+                      ? tx("创建账号")
+                      : tx("登录")}
             </button>
           </form>
           {step === "credentials" ? (
             <p className="auth-switch">
-              {register ? "已经有账号？" : "还没有账号？"}{" "}
+              {register ? tx("已经有账号？") : tx("还没有账号？")}{" "}
               <Link
                 href={authPath(register ? "login" : "register", returnPath)}
               >
-                {register ? "登录" : "创建账号"} <ArrowRight size={14} />
+                {register ? tx("登录") : tx("创建账号")}{" "}
+                <ArrowRight size={14} />
               </Link>
             </p>
           ) : (
@@ -297,11 +312,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 setError("");
               }}
             >
-              返回登录
+              {tx("返回登录")}
             </button>
           )}
           <div className="auth-note">
-            <span className="ws-status-dot" /> 一次登录，开启无限可能
+            <span className="ws-status-dot" />
+            {tx("一次登录，开启无限可能")}
           </div>
         </div>
       </section>

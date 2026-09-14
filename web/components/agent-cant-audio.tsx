@@ -1,5 +1,5 @@
 "use client";
-
+import { useI18n } from "@/components/locale-provider";
 import { useEffect, useRef, useState } from "react";
 import {
   AudioLines,
@@ -9,14 +9,12 @@ import {
   Play,
 } from "lucide-react";
 import { AgentmojiText } from "./agentmoji";
-
 function clock(seconds: number) {
   const value = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
   return `${Math.floor(value / 60)
     .toString()
     .padStart(2, "0")}:${(value % 60).toString().padStart(2, "0")}`;
 }
-
 export function AgentCantAudio({
   src,
   author,
@@ -30,6 +28,7 @@ export function AgentCantAudio({
   durationMs?: number;
   source?: string;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const audio = useRef<HTMLAudioElement>(null);
   const wantsPlayback = useRef(false);
   const requestId = useRef(0);
@@ -101,7 +100,7 @@ export function AgentCantAudio({
         !(cause instanceof DOMException && cause.name === "AbortError")
       ) {
         wantsPlayback.current = false;
-        setError("语音暂时无法播放，请重试。");
+        setError(tx("语音暂时无法播放，请重试。"));
       }
     } finally {
       if (attempt === requestId.current) setLoading(false);
@@ -142,7 +141,7 @@ export function AgentCantAudio({
           wantsPlayback.current = false;
           setLoading(false);
           setPlaying(false);
-          setError("语音暂时无法播放，请重试。");
+          setError(tx("语音暂时无法播放，请重试。"));
         }}
       />
       <div className="cant-audio-heading">
@@ -150,7 +149,11 @@ export function AgentCantAudio({
           type="button"
           className="cant-play"
           onClick={() => void toggle()}
-          aria-label={`${playing || loading ? "暂停" : "播放"} ${author} 的语音`}
+          aria-label={tx(
+            "{0} {1} 的语音",
+            playing || loading ? tx("暂停") : tx("播放"),
+            author,
+          )}
         >
           {loading ? (
             <LoaderCircle size={21} className="cant-loading" />
@@ -161,24 +164,29 @@ export function AgentCantAudio({
           )}
         </button>
         <div className="cant-audio-label">
-          <strong>Agent Cant</strong>
+          <strong>{tx("Agent Cant")}</strong>
           <span className="cant-codec">
-            <AudioLines size={12} /> CANT
+            <AudioLines size={12} />
+            {tx(" CANT ")}
           </span>
           <span>
             {source === "human_stt"
-              ? "人声已转为 Agent Cant"
+              ? tx("人声已转为 Agent Cant")
               : source === "agent_text"
-                ? "Agent 回复已转为 Cant"
+                ? tx("Agent 回复已转为 Cant")
                 : "Agent Cant"}
           </span>
         </div>
         <time
           className="cant-remaining"
-          aria-label={`剩余 ${clock(Math.ceil(duration - position))}，总时长 ${clock(Math.ceil(duration))}`}
+          aria-label={tx(
+            "剩余 {0}，总时长 {1}",
+            clock(Math.ceil(duration - position)),
+            clock(Math.ceil(duration)),
+          )}
         >
-          <span>剩余 {clock(Math.ceil(duration - position))}</span>
-          <small>共 {clock(Math.ceil(duration))}</small>
+          <span>{tx("剩余{0}", clock(Math.ceil(duration - position)))}</span>
+          <small>{tx("共{0}", clock(Math.ceil(duration)))}</small>
         </time>
       </div>
       <div
@@ -194,15 +202,15 @@ export function AgentCantAudio({
       </div>
       {error && (
         <p className="cant-error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       )}
       {transcript?.trim() && (
         <details className="cant-transcript">
           <summary>
             <ChevronDown size={14} />
-            <span className="cant-show">查看原文</span>
-            <span className="cant-hide">隐藏原文</span>
+            <span className="cant-show">{tx("查看原文")}</span>
+            <span className="cant-hide">{tx("隐藏原文")}</span>
           </summary>
           <p>
             <AgentmojiText text={transcript} />

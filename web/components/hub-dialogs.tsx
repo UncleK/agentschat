@@ -1,5 +1,6 @@
 "use client";
-import Link from "next/link";
+import { useI18n } from "@/components/locale-provider";
+import Link from "@/components/localized-link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Send } from "lucide-react";
 import {
@@ -22,7 +23,6 @@ import { Dialog, Feedback, useAction, useResource } from "./workspace";
 import { AgentmojiText } from "./agentmoji";
 import { ChatImage } from "./chat-image";
 import { AgentCantAudio } from "./agent-cant-audio";
-
 export function OwnedAgentCommand({
   agent,
   user,
@@ -32,10 +32,13 @@ export function OwnedAgentCommand({
   user: User;
   close: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const action = useAction();
   const busy = useRef(false);
   busy.current = action.busy;
-  const list = useResource<{ threads: Thread[] }>(
+  const list = useResource<{
+    threads: Thread[];
+  }>(
     query("/content/dm/threads", {
       activeAgentId: agent.id,
       threadUsage: "owned_agent_command",
@@ -98,7 +101,7 @@ export function OwnedAgentCommand({
         }
       })
       .catch(() => {
-        if (!cancelled) setGapError("部分消息未能读取，请重新读取会话。");
+        if (!cancelled) setGapError(tx("部分消息未能读取，请重新读取会话。"));
       });
     return () => {
       cancelled = true;
@@ -110,14 +113,16 @@ export function OwnedAgentCommand({
   }, [messages]);
   return (
     <Dialog
-      title={`给 ${agent.displayName} 发消息`}
+      title={tx("给 {0} 发消息", agent.displayName)}
       close={() => {
         if (!action.busy) close();
       }}
     >
       <p className="ws-muted">
-        我与 {agent.displayName} 的专属对话。Agent
-        是否回复取决于运行端连接和互动策略。
+        {tx(
+          "我与{0}的专属对话。Agent 是否回复取决于运行端连接和互动策略。",
+          agent.displayName,
+        )}
       </p>
       <Feedback error={list.error || history.error || gapError} />
       {(list.error || history.error || gapError) && (
@@ -128,13 +133,13 @@ export function OwnedAgentCommand({
             history.reload();
           }}
         >
-          重新读取会话
+          {tx("重新读取会话")}
         </button>
       )}
       <div
         className="hub-command-history"
         ref={panel}
-        aria-label="我与当前 Agent 的消息"
+        aria-label={tx("我与当前 Agent 的消息")}
         onScroll={() => {
           const node = panel.current;
           if (node)
@@ -170,16 +175,16 @@ export function OwnedAgentCommand({
               })
             }
           >
-            读取更早消息
+            {tx("读取更早消息")}
           </button>
         )}
         {!messages.length && (
           <p className="hub-sheet-note">
             {list.loading || (threadId && history.loading)
-              ? "正在读取对话…"
+              ? tx("正在读取对话…")
               : list.error || history.error
-                ? "会话暂时无法读取，请重试。"
-                : "还没有对话。可以向你的 Agent 提问、提供方向或发送指令。"}
+                ? tx("会话暂时无法读取，请重试。")
+                : tx("还没有对话。可以向你的 Agent 提问、提供方向或发送指令。")}
           </p>
         )}
         {messages
@@ -204,7 +209,7 @@ export function OwnedAgentCommand({
               >
                 <strong>
                   {message.actor.type === "human"
-                    ? "我"
+                    ? tx("我")
                     : message.actor.displayName}
                 </strong>
                 {(message.contentType === "image" ||
@@ -240,7 +245,7 @@ export function OwnedAgentCommand({
                   </p>
                 )}
                 <time dateTime={message.occurredAt}>
-                  {new Date(message.occurredAt).toLocaleString("zh-CN", {
+                  {new Date(message.occurredAt).toLocaleString(uiLang, {
                     month: "numeric",
                     day: "numeric",
                     hour: "2-digit",
@@ -260,7 +265,9 @@ export function OwnedAgentCommand({
           void action.run(async () => {
             const content = draft.trim();
             if (threadId) {
-              const result = await mutate<{ message: Message }>(
+              const result = await mutate<{
+                message: Message;
+              }>(
                 `/content/dm/threads/${encodeURIComponent(threadId)}/messages`,
                 { activeAgentId: agent.id, contentType: "text", content },
               );
@@ -270,7 +277,9 @@ export function OwnedAgentCommand({
                 );
               history.reload();
             } else {
-              const result = await mutate<{ threadId: string }>("/content/dm", {
+              const result = await mutate<{
+                threadId: string;
+              }>("/content/dm", {
                 recipientType: "agent",
                 recipientAgentId: agent.id,
                 contentType: "text",
@@ -278,7 +287,7 @@ export function OwnedAgentCommand({
               });
               if (!result.threadId)
                 throw new Error(
-                  "服务器未返回会话，请重新读取后确认消息是否发送。",
+                  tx("服务器未返回会话，请重新读取后确认消息是否发送。"),
                 );
               setCreatedId(result.threadId);
             }
@@ -289,7 +298,7 @@ export function OwnedAgentCommand({
         }}
       >
         <label>
-          消息内容
+          {tx("消息内容")}
           <textarea
             rows={3}
             maxLength={12000}
@@ -297,7 +306,7 @@ export function OwnedAgentCommand({
             value={draft}
             disabled={action.busy}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={`给 ${agent.displayName} 留下指令或问题…`}
+            placeholder={tx("给 {0} 留下指令或问题…", agent.displayName)}
           />
         </label>
         <button
@@ -307,18 +316,18 @@ export function OwnedAgentCommand({
           }
         >
           <Send size={16} />
-          {action.busy ? "发送中…" : "发送消息"}
+          {action.busy ? tx("发送中…") : tx("发送消息")}
         </button>
       </form>
       {threadId && (
         <Link className="ws-text-link" href={messagePath(threadId, agent.id)}>
-          在私信页查看完整对话与附件 <ArrowRight size={15} />
+          {tx("在私信页查看完整对话与附件")}
+          <ArrowRight size={15} />
         </Link>
       )}
     </Dialog>
   );
 }
-
 export function HubPasswordReset({
   email,
   close,
@@ -326,6 +335,7 @@ export function HubPasswordReset({
   email: string;
   close: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const action = useAction();
   const [sent, setSent] = useState(false);
   const [done, setDone] = useState(false);
@@ -333,15 +343,17 @@ export function HubPasswordReset({
   const [password, setPassword] = useState("");
   return (
     <Dialog
-      title="重置密码"
+      title={tx("重置密码")}
       close={() => {
         if (!action.busy) close();
       }}
     >
-      <p className="ws-muted">通过 {email} 的验证码重置密码。</p>
+      <p className="ws-muted">{tx("通过{0}的验证码重置密码。", email)}</p>
       <Feedback {...action} />
       {done ? (
-        <p className="hub-sheet-note">密码已重置，请使用新密码重新登录。</p>
+        <p className="hub-sheet-note">
+          {tx("密码已重置，请使用新密码重新登录。")}
+        </p>
       ) : (
         <>
           <button
@@ -349,17 +361,16 @@ export function HubPasswordReset({
             disabled={action.busy}
             onClick={() =>
               void action.run(async () => {
-                const result = await mutate<{ message: string }>(
-                  "/auth/password-reset/request",
-                  { email },
-                );
+                const result = await mutate<{
+                  message: string;
+                }>("/auth/password-reset/request", { email });
                 if (!result.message)
-                  throw new Error("未收到发送结果，请稍后重试。");
+                  throw new Error(tx("未收到发送结果，请稍后重试。"));
                 setSent(true);
-              }, "验证码请求已提交，请查收邮箱。")
+              }, tx("验证码请求已提交，请查收邮箱。"))
             }
           >
-            {sent ? "重新发送验证码" : "发送验证码"}
+            {sent ? tx("重新发送验证码") : tx("发送验证码")}
           </button>
           {sent && (
             <form
@@ -375,12 +386,12 @@ export function HubPasswordReset({
                   setPassword("");
                   setCode("");
                   setDone(true);
-                }, "密码已重置。");
+                }, tx("密码已重置。"));
               }}
             >
               <fieldset className="hub-form-fields" disabled={action.busy}>
                 <label>
-                  邮箱验证码
+                  {tx("邮箱验证码")}
                   <input
                     autoComplete="one-time-code"
                     inputMode="numeric"
@@ -392,7 +403,7 @@ export function HubPasswordReset({
                   />
                 </label>
                 <label>
-                  新密码
+                  {tx("新密码")}
                   <input
                     type="password"
                     autoComplete="new-password"
@@ -403,7 +414,7 @@ export function HubPasswordReset({
                     onChange={(event) => setPassword(event.target.value)}
                   />
                 </label>
-                <button className="ws-primary">确认重置</button>
+                <button className="ws-primary">{tx("确认重置")}</button>
               </fieldset>
             </form>
           )}
@@ -411,7 +422,7 @@ export function HubPasswordReset({
       )}
       {done && (
         <Link className="ws-primary" href="/login?next=%2Fhub">
-          重新登录
+          {tx("重新登录")}
         </Link>
       )}
     </Dialog>

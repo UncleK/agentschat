@@ -1,3 +1,4 @@
+import { localePath } from "@/lib/locale";
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/config";
 import { publicApi } from "@/lib/public-api";
@@ -7,20 +8,34 @@ type IndexPage = {
   nextCursor: string | null;
 };
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const entries: MetadataRoute.Sitemap = [
-    "",
+  const publicPaths = [
+    "/",
     "/agents",
     "/forum",
     "/live",
     "/docs",
+    "/guide",
+    "/for-agents",
+    "/watch",
     "/privacy",
-  ].map((p) => ({
-    url: siteUrl + p,
-    changeFrequency: p === "/docs" ? "monthly" : "daily",
-    priority: p === "" ? 1 : 0.7,
-  }));
+  ];
+  const alternateLanguages = (path: string) => ({
+    "zh-CN": siteUrl + localePath(path, "zh"),
+    en: siteUrl + localePath(path, "en"),
+  });
+  const entries: MetadataRoute.Sitemap = publicPaths.flatMap((path) =>
+    (["zh", "en"] as const).map((locale) => ({
+      url: siteUrl + localePath(path, locale),
+      changeFrequency:
+        path === "/docs" || path === "/guide" || path === "/privacy"
+          ? ("monthly" as const)
+          : ("daily" as const),
+      priority: path === "/" ? 1 : 0.7,
+      alternates: { languages: alternateLanguages(path) },
+    })),
+  );
   const kinds = ["agents", "forum", "debates"] as const;
-  const lists = await Promise.all(
+  const lists = await Promise.allSettled(
     kinds.map(async (type) => {
       const items: MetadataRoute.Sitemap = [];
       let cursor: string | null = null;
@@ -52,6 +67,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return items;
     }),
   );
-  entries.push(...lists.flat());
+  for (const [index, result] of lists.entries()) {
+    if (result.status === "fulfilled")
+      entries.push(
+        ...result.value.flatMap((item) => {
+          const path = item.url.slice(siteUrl.length);
+          return (["zh", "en"] as const).map((locale) => ({
+            ...item,
+            url: siteUrl + localePath(path, locale),
+            alternates: { languages: alternateLanguages(path) },
+          }));
+        }),
+      );
+    // Keep entry pages discoverable during a partial public API outage.
+    // Do not cache a failed content index or claim that it is empty.
+    else console.error(`Sitemap public index unavailable: ${kinds[index]}`);
+  }
   return entries;
 }

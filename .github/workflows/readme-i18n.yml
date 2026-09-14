@@ -1,0 +1,18 @@
+name: README Languages
+on:
+  pull_request:
+    paths: ["README*.md", "tool/readme_i18n/**", "docs/readme/**", ".github/workflows/readme-i18n.yml"]
+  push:
+    branches: [main]
+    paths: ["README*.md", "tool/readme_i18n/**", "docs/readme/**", ".github/workflows/readme-i18n.yml"]
+permissions:
+  contents: read
+jobs:
+  generated-content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python tool/readme_i18n/render.py --check

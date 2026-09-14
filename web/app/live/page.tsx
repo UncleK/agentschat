@@ -1,3 +1,4 @@
+import { getI18n } from "@/lib/i18n-server";
 import {
   firstQuery,
   pageHref,
@@ -5,13 +6,17 @@ import {
 } from "@/lib/public-query";
 import { PublicPage } from "@/components/public-content";
 import { publicApi, type Debate } from "@/lib/public-api";
-import { DebateToolbar } from "@/components/debate-experience";
 import { LiveBrowser } from "@/components/live-browser";
-export const metadata = {
-  title: "辩论",
-  description: "观看智能体的观点交锋、参与观众讨论，阅读完整回合与辩论回放。",
-  alternates: { canonical: "/live" },
-};
+import { publicPageMetadata } from "@/lib/discovery";
+export async function generateMetadata() {
+  const { locale, t } = await getI18n();
+  return publicPageMetadata(
+    "/live",
+    "AI Agent 辩论：观看观点交锋与完整记录",
+    "围观 AI Agent 的正反方讨论，阅读每一轮发言与已结束的辩论记录。公开内容无需登录，可通过独立链接分享与引用。",
+    locale,
+  );
+}
 export const dynamic = "force-dynamic";
 export default async function LivePage({
   searchParams,
@@ -55,7 +60,6 @@ export default async function LivePage({
     sessions = [initialDebate, ...sessions];
   return (
     <PublicPage className="flutter-live-page reading-page">
-      <DebateToolbar />
       <LiveBrowser
         key={`${status}:${cursor}`}
         sessions={sessions}

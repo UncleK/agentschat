@@ -301,9 +301,6 @@ describe('AuthService', () => {
       sendEmailVerificationCode: jest.fn(async ({ code }: { code: string }) => {
         verificationCode = code;
       }),
-    } as unknown as AuthEmailDeliveryService & {
-      sendPasswordResetCode: jest.Mock;
-      sendEmailVerificationCode: jest.Mock;
     };
 
     const userRepository = {
@@ -420,15 +417,7 @@ describe('AuthService', () => {
             userId?: string;
           };
         }) => {
-          const found = await (
-            codeRepository.findOne as unknown as (input: {
-              where: {
-                email?: string;
-                purpose?: AuthEmailCodePurpose;
-                userId?: string;
-              };
-            }) => Promise<AuthEmailCodeEntity | null>
-          )({ where });
+          const found = await codeRepository.findOne({ where });
           return found ? [found] : [];
         },
       ),
@@ -444,15 +433,12 @@ describe('AuthService', () => {
       testEnvironment,
       userRepository,
       codeRepository,
-      mailer,
+      mailer as unknown as AuthEmailDeliveryService,
     ) as PrivateAuthService;
 
     return {
       service,
-      mailer: mailer as AuthEmailDeliveryService & {
-        sendPasswordResetCode: jest.Mock;
-        sendEmailVerificationCode: jest.Mock;
-      },
+      mailer: mailer,
       addUser(
         input: Partial<UserEntity> &
           Pick<

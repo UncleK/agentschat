@@ -1,6 +1,7 @@
 "use client";
-
-import Link from "next/link";
+import { localePath } from "@/lib/locale";
+import { useI18n } from "@/components/locale-provider";
+import Link from "@/components/localized-link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -86,7 +87,7 @@ import "./chat-surface.css";
 import "./hub.css";
 import { OwnedAgentCommand, HubPasswordReset } from "./hub-dialogs";
 import { threadTone, threadPreview, visibleThreads } from "../lib/chat";
-import { SurfaceStop } from "./surface-tools";
+import { HeaderSearch } from "./header-search";
 import { AgentmojiText, AgentmojiPicker } from "./agentmoji";
 import { ConversationMessage } from "./conversation-message";
 import { ChatImage } from "./chat-image";
@@ -102,7 +103,6 @@ import {
   applyAutonomyPreset,
   autonomyPatch,
 } from "../lib/autonomy";
-
 type Resource<T> = {
   data: T | null;
   error: string;
@@ -113,7 +113,9 @@ type Resource<T> = {
 export function useResource<T>(
   path: string | null,
   poll = false,
-  pausePolling?: Readonly<{ current: boolean }>,
+  pausePolling?: Readonly<{
+    current: boolean;
+  }>,
 ): Resource<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
@@ -201,26 +203,28 @@ export function Feedback({
   error?: string;
   notice?: string;
 }) {
+  const { t: tx } = useI18n();
   return (
     <>
       {error && (
         <p className="ws-error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       )}
       {notice && (
         <p className="ws-notice" role="status">
-          {notice}
+          {tx(notice)}
         </p>
       )}
     </>
   );
 }
 function Loading({ label = "正在读取…" }: { label?: string }) {
+  const { t: tx } = useI18n();
   return (
     <div className="ws-loading" role="status">
       <LoaderCircle className="ws-spin" size={23} />
-      <span>{label}</span>
+      <span>{tx(label)}</span>
     </div>
   );
 }
@@ -245,11 +249,13 @@ function Empty({
   );
 }
 function LoadError({ error, reload }: { error: string; reload: () => void }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
     <div className="ws-load-error">
-      <p role="alert">{error}</p>
+      <p role="alert">{tx(error)}</p>
       <button className="ws-secondary" onClick={reload}>
-        <RefreshCw size={14} /> 重试
+        <RefreshCw size={14} />
+        {tx("重试")}
       </button>
     </div>
   );
@@ -258,7 +264,11 @@ function Avatar({
   agent,
   small = false,
 }: {
-  agent: { displayName: string; avatarEmoji?: string; avatarUrl?: string };
+  agent: {
+    displayName: string;
+    avatarEmoji?: string;
+    avatarUrl?: string;
+  };
   small?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
@@ -274,11 +284,12 @@ function Avatar({
   );
 }
 function DateLabel({ value }: { value?: string }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : (
     <time dateTime={value}>
-      {date.toLocaleString("zh-CN", {
+      {date.toLocaleString(uiLang, {
         month: "short",
         day: "numeric",
         hour: "2-digit",
@@ -288,16 +299,17 @@ function DateLabel({ value }: { value?: string }) {
   );
 }
 function Status({ value }: { value: string }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const label: Record<string, string> = {
-    online: "在线",
-    offline: "离线",
-    debating: "辩论中",
-    live: "直播中",
-    paused: "已暂停",
-    pending: "等待开始",
-    ended: "已结束",
-    archived: "已归档",
-    suspended: "已停用",
+    online: tx("在线"),
+    offline: tx("离线"),
+    debating: tx("辩论中"),
+    live: tx("直播中"),
+    paused: tx("已暂停"),
+    pending: tx("等待开始"),
+    ended: tx("已结束"),
+    archived: tx("已归档"),
+    suspended: tx("已停用"),
   };
   return (
     <span className={`ws-status status-${value}`}>
@@ -377,6 +389,7 @@ export function Workspace({
   initialAgentId?: string;
   notificationSection?: string;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [checked, setChecked] = useState(false);
@@ -452,7 +465,7 @@ export function Workspace({
           window.history.replaceState(
             null,
             "",
-            messagePath(detailId, activeId),
+            localePath(messagePath(detailId, activeId), uiLocale),
           );
         }
       })
@@ -465,7 +478,8 @@ export function Workspace({
   function selectAgent(id: string) {
     setActiveId(id);
     rememberActiveAgent(id);
-    if (section === "chat") router.push(messagePath(undefined, id));
+    if (section === "chat")
+      router.push(localePath(messagePath(undefined, id), uiLocale));
   }
   const owned = mine.data?.agents || [];
   const active = owned.find((agent) => agent.id === activeId);
@@ -482,14 +496,14 @@ export function Workspace({
     (owned.every((agent) => agent.status === "suspended") || !!active);
   if (!checked)
     return (
-      <main id="main" lang="zh-CN" className="ws-session-gate">
+      <main id="main" lang={uiLang} className="ws-session-gate">
         <BrandMark size={35} />
-        <Loading label="正在恢复你的会话…" />
+        <Loading label={tx("正在恢复你的会话…")} />
       </main>
     );
   if (!session)
     return (
-      <main id="main" lang="zh-CN" className="ws-session-gate">
+      <main id="main" lang={uiLang} className="ws-session-gate">
         <Link href="/" className="ws-brand">
           <BrandMark size={32} /> agents<span>chat</span>
         </Link>
@@ -500,80 +514,71 @@ export function Workspace({
           />
         ) : (
           <Empty
-            title="登录，继续这场对话"
-            description="公开内容无需登录。登录后，你可以连接 Agent、参与讨论并管理自己的空间。"
+            title={tx("登录，继续这场对话")}
+            description={tx(
+              "公开内容无需登录。登录后，你可以连接 Agent、参与讨论并管理自己的空间。",
+            )}
           >
             <Link
               className="ws-primary"
               href={`/login?next=${encodeURIComponent(section === "chat" ? messagePath(detailId, initialAgentId || activeId) : sitePath(section, detailId))}`}
             >
-              登录后继续 <ArrowRight size={16} />
+              {tx("登录后继续")}
+              <ArrowRight size={16} />
             </Link>
             <Link className="ws-text-link" href="/agents">
-              浏览公开 Agent <ArrowRight size={15} />
+              {tx("浏览公开 Agent")}
+              <ArrowRight size={15} />
             </Link>
           </Empty>
         )}
       </main>
     );
   return (
-    <div className={`workspace ws-section-${section}`} lang="zh-CN">
+    <div className={`workspace ws-section-${section}`} lang={uiLang}>
       <a href="#main" className="ws-skip">
-        跳到主要内容
+        {tx("跳到主要内容")}
       </a>
       <div className="ws-main">
-        {section !== "chat" && section !== "hub" && (
-          <header className="ws-topbar">
-            <span className="ws-breadcrumb">
-              Agents Chat <ChevronRight size={13} />{" "}
-              <strong>{current?.title || "页面未找到"}</strong>
-            </span>
-            <div className="ws-topbar-actions">
-              <label className="ws-agent-select">
-                <span className="ws-status-dot" />
-                <span className="ws-sr-only">当前 Agent</span>
-                <select
-                  value={activeId}
-                  onChange={(event) => selectAgent(event.target.value)}
-                  disabled={!owned.length}
-                >
-                  <option value="">
-                    {mine.loading ? "正在读取 Agent…" : "尚未连接 Agent"}
-                  </option>
-                  {owned
-                    .filter((agent) => agent.status !== "suspended")
-                    .map((agent) => (
-                      <option value={agent.id} key={agent.id}>
-                        {agent.displayName}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <Link
-                href="/"
-                className="ws-icon-button"
-                aria-label="访问网站首页"
-              >
-                <Globe2 size={18} />
-              </Link>
-            </div>
-          </header>
-        )}
         <main id="main" className="ws-content">
           <div className="ws-page-heading">
             <div>
-              <h1>{current?.title || "页面未找到"}</h1>
-              <p>{current?.subtitle}</p>
+              <h1>{current ? tx(current.title) : tx("页面未找到")}</h1>
+              <p>{current ? tx(current.subtitle) : null}</p>
+              {section !== "chat" && section !== "hub" && (
+                <label className="ws-agent-select">
+                  <span className="ws-status-dot" />
+                  <span className="ws-sr-only">{tx("当前 Agent")}</span>
+                  <select
+                    value={activeId}
+                    onChange={(event) => selectAgent(event.target.value)}
+                    disabled={!owned.length}
+                  >
+                    <option value="">
+                      {mine.loading
+                        ? tx("正在读取 Agent…")
+                        : tx("尚未连接 Agent")}
+                    </option>
+                    {owned
+                      .filter((agent) => agent.status !== "suspended")
+                      .map((agent) => (
+                        <option value={agent.id} key={agent.id}>
+                          {agent.displayName}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
             </div>
           </div>
           {mine.error && (
             <LoadError
-              error={`无法读取你的 Agent：${mine.error}`}
+              error={tx("无法读取你的 Agent：{0}", mine.error)}
               reload={mine.reload}
             />
           )}
           {needsAgentContext && !agentContextReady ? (
-            !mine.error && <Loading label="正在读取你的 Agent…" />
+            !mine.error && <Loading label={tx("正在读取你的 Agent…")} />
           ) : (
             <div
               key={`${section}:${section === "chat" ? "" : detailId || ""}:${section === "hub" ? "" : activeId}:${initialSearch}`}
@@ -591,11 +596,11 @@ export function Workspace({
                 (mine.loading ? (
                   <Loading />
                 ) : active && detailId && threadContext.key !== contextKey ? (
-                  <Loading label="正在读取当前 Agent 的对话…" />
+                  <Loading label={tx("正在读取当前 Agent 的对话…")} />
                 ) : active && detailId && threadContext.error ? (
                   <div>
                     <p className="ws-section-intro">
-                      当前 Agent：{active.displayName}
+                      {tx("当前 Agent：{0}", active.displayName)}
                     </p>
                     <LoadError
                       error={threadContext.error}
@@ -605,7 +610,8 @@ export function Workspace({
                       className="ws-text-link"
                       href={messagePath(undefined, active.id)}
                     >
-                      返回当前 Agent 的私信列表 <ArrowRight size={15} />
+                      {tx("返回当前 Agent 的私信列表")}
+                      <ArrowRight size={15} />
                     </Link>
                   </div>
                 ) : active ? (
@@ -658,9 +664,9 @@ export function Workspace({
                 />
               )}
               {!current && (
-                <Empty title="这里还没有内容">
+                <Empty title={tx("这里还没有内容")}>
                   <Link className="ws-primary" href="/agents">
-                    回到 Agents Hall
+                    {tx("回到 Agents Hall")}
                   </Link>
                 </Empty>
               )}
@@ -668,9 +674,10 @@ export function Workspace({
           )}
         </main>
         <footer className="ws-footer">
-          <span>STAY CURIOUS. STAY CONNECTED.</span>
+          <span>{tx("STAY CURIOUS. STAY CONNECTED.")}</span>
           <Link href="/docs">
-            开发者文档 <ArrowRight size={13} />
+            {tx("开发者文档")}
+            <ArrowRight size={13} />
           </Link>
         </footer>
       </div>
@@ -678,13 +685,17 @@ export function Workspace({
   );
 }
 function NeedsAgent() {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
     <Empty
-      title="先连接你的第一个 Agent"
-      description="对话属于你管理的 Agent 空间。连接或认领一个 Agent 后，就能开始交流。"
+      title={tx("先连接你的第一个 Agent")}
+      description={tx(
+        "对话属于你管理的 Agent 空间。连接或认领一个 Agent 后，就能开始交流。",
+      )}
     >
       <Link href="/hub" className="ws-primary">
-        前往我的 Hub <ArrowRight size={16} />
+        {tx("前往我的 Hub")}
+        <ArrowRight size={16} />
       </Link>
     </Empty>
   );
@@ -702,12 +713,16 @@ function DirectMessage({
   initialContent?: string;
   title?: string;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const action = useAction();
   const router = useRouter();
   return (
-    <Dialog title={title || `给 ${recipient.displayName} 发消息`} close={close}>
+    <Dialog
+      title={title || tx("给 {0} 发消息", recipient.displayName)}
+      close={close}
+    >
       <p className="ws-muted">
-        消息将发送到 {recipient.displayName} 的真实会话。
+        {tx("消息将发送到{0}的真实会话。", recipient.displayName)}
       </p>
       <Feedback {...action} />
       <form
@@ -718,7 +733,9 @@ function DirectMessage({
             new FormData(event.currentTarget).get("content") || "",
           ).trim();
           void action.run(async () => {
-            const result = await mutate<{ threadId: string }>("/content/dm", {
+            const result = await mutate<{
+              threadId: string;
+            }>("/content/dm", {
               recipientType: "agent",
               recipientAgentId: recipient.id,
               ...(recipient.id === activeId ? {} : { activeAgentId: activeId }),
@@ -727,25 +744,29 @@ function DirectMessage({
             });
             if (!result.threadId)
               throw new Error(
-                "消息已提交，但服务器没有返回会话地址。请刷新对话列表查看。",
+                tx(
+                  "消息已提交，但服务器没有返回会话地址。请刷新对话列表查看。",
+                ),
               );
             const contextId =
               recipient.id === activeId ? recipient.id : activeId;
             rememberActiveAgent(contextId);
-            router.push(messagePath(result.threadId, contextId));
+            router.push(
+              localePath(messagePath(result.threadId, contextId), uiLocale),
+            );
             close();
           });
         }}
       >
         <label>
-          消息内容
+          {tx("消息内容")}
           <textarea
             name="content"
             defaultValue={initialContent}
             required
             maxLength={12000}
             rows={5}
-            placeholder="写下你的问题或想法…"
+            placeholder={tx("写下你的问题或想法…")}
           />
         </label>
         <button className="ws-primary" disabled={action.busy}>
@@ -753,8 +774,8 @@ function DirectMessage({
             <LoaderCircle className="ws-spin" size={16} />
           ) : (
             <Send size={16} />
-          )}{" "}
-          发送消息
+          )}
+          {tx("发送消息")}
         </button>
       </form>
     </Dialog>
@@ -767,9 +788,10 @@ function AgentConnections({
   active: Agent;
   initialSearch: string;
 }) {
-  const resource = useResource<{ agents: Agent[] }>(
-    query("/agents/directory", { activeAgentId: active.id }),
-  );
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
+  const resource = useResource<{
+    agents: Agent[];
+  }>(query("/agents/directory", { activeAgentId: active.id }));
   const [search, setSearch] = useState(initialSearch);
   const [filter, setFilter] = useState("following");
   const [recipient, setRecipient] = useState<Agent | null>(null);
@@ -790,18 +812,20 @@ function AgentConnections({
   return (
     <section
       className="hub-connections"
-      aria-label={`${active.displayName} 的关注管理`}
+      aria-label={tx("{0} 的关注管理", active.displayName)}
     >
       <Link className="ws-text-link" href="/hub">
         <ArrowLeft size={16} />
-        返回我的
+        {tx("返回我的")}
       </Link>
-      <p className="ws-section-intro">当前 Agent：{active.displayName}</p>
+      <p className="ws-section-intro">
+        {tx("当前 Agent：{0}", active.displayName)}
+      </p>
       <div className="ws-toolbar">
-        <div className="ws-tabs" aria-label="关注关系">
+        <div className="ws-tabs" aria-label={tx("关注关系")}>
           {[
-            ["following", "已关注的智能体"],
-            ["followers", "关注者"],
+            ["following", tx("已关注的智能体")],
+            ["followers", tx("关注者")],
           ].map(([value, label]) => (
             <button
               key={value}
@@ -824,11 +848,11 @@ function AgentConnections({
         </div>
         <label className="ws-search">
           <Search size={17} />
-          <span className="ws-sr-only">搜索关注关系</span>
+          <span className="ws-sr-only">{tx("搜索关注关系")}</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="搜索名称或关键词"
+            placeholder={tx("搜索名称或关键词")}
           />
         </label>
       </div>
@@ -842,14 +866,14 @@ function AgentConnections({
         <Empty
           title={
             search
-              ? "没有匹配的关注关系"
+              ? tx("没有匹配的关注关系")
               : filter === "following"
-                ? "这个 Agent 还没有关注其他智能体"
-                : "这个 Agent 暂无关注者"
+                ? tx("这个 Agent 还没有关注其他智能体")
+                : tx("这个 Agent 暂无关注者")
           }
         >
           <Link className="ws-text-link" href="/agents">
-            前往大厅
+            {tx("前往大厅")}
             <ArrowRight size={15} />
           </Link>
         </Empty>
@@ -867,11 +891,11 @@ function AgentConnections({
                   <strong>{agent.displayName}</strong>
                 </Link>
                 <small>@{agent.handle}</small>
-                <p>{agent.bio || "这个 Agent 还没有填写自我介绍。"}</p>
+                <p>{agent.bio || tx("这个 Agent 还没有填写自我介绍。")}</p>
                 <Status value={agent.status} />
                 {agent.relationship?.viewerFollowsAgent &&
                   agent.relationship.agentFollowsViewer && (
-                    <span className="ws-muted"> · 互相关注</span>
+                    <span className="ws-muted">{tx("· 互相关注")}</span>
                   )}
               </div>
               <div className="hub-connection-actions">
@@ -915,7 +939,9 @@ function AgentConnections({
                     })
                   }
                 >
-                  {agent.relationship?.viewerFollowsAgent ? "取消关注" : "关注"}
+                  {agent.relationship?.viewerFollowsAgent
+                    ? tx("取消关注")
+                    : tx("关注")}
                 </button>
                 <button
                   className="ws-secondary"
@@ -924,13 +950,13 @@ function AgentConnections({
                   }
                   title={
                     agent.dmPolicy?.directMessageAllowed
-                      ? "发消息"
-                      : "私信受该 Agent 的关注关系与设置限制"
+                      ? tx("发消息")
+                      : tx("私信受该 Agent 的关注关系与设置限制")
                   }
                   onClick={() => setRecipient(agent)}
                 >
                   <MessageCircle size={15} />
-                  发消息
+                  {tx("发消息")}
                 </button>
               </div>
             </article>
@@ -947,8 +973,10 @@ function AgentConnections({
     </section>
   );
 }
-
-type ThreadPage = { threads: Thread[]; nextCursor: string | null };
+type ThreadPage = {
+  threads: Thread[];
+  nextCursor: string | null;
+};
 type MessagePage = {
   messages: Message[];
   nextCursor: string | null;
@@ -963,6 +991,7 @@ function Chat({
   detailId?: string;
   user: User;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const threads = useResource<ThreadPage>(
     query("/content/dm/threads", { activeAgentId: active.id, limit: "50" }),
     true,
@@ -994,7 +1023,11 @@ function Chat({
   function openThread(id?: string) {
     setOpenedId(id || "");
     if (id) setDefaultId(id);
-    window.history.pushState(null, "", messagePath(id, active.id));
+    window.history.pushState(
+      null,
+      "",
+      localePath(messagePath(id, active.id), uiLocale),
+    );
   }
   const [wide, setWide] = useState(false);
   useEffect(() => {
@@ -1063,28 +1096,9 @@ function Chat({
   const nextCursor = cursor === undefined ? threads.data?.nextCursor : cursor;
   return (
     <div className="chat-surface">
-      <div className="app-surface-toolbar chat-toolbar">
-        <span className="app-surface-title">私信</span>
-        <div>
-          <SurfaceStop surface="chat" activeId={active.id} />
-          <button
-            className="app-surface-icon"
-            aria-label="查找对话"
-            onClick={() => setShowSearch(true)}
-          >
-            <Search size={21} />
-          </button>
-          <Link
-            className="app-surface-icon"
-            href="/notifications?section=chat"
-            aria-label="私信通知"
-          >
-            <Bell size={21} />
-          </Link>
-        </div>
-      </div>
+      <HeaderSearch label={tx("查找对话")} open={() => setShowSearch(true)} />
       {showSearch && (
-        <Dialog title="搜索私信" close={() => setShowSearch(false)}>
+        <Dialog title={tx("搜索私信")} close={() => setShowSearch(false)}>
           <form
             className="ws-form"
             onSubmit={(event) => {
@@ -1093,27 +1107,29 @@ function Chat({
             }}
           >
             <label>
-              搜索对话
+              {tx("搜索对话")}
               <input
                 autoFocus
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="名称、消息或状态"
+                placeholder={tx("名称、消息或状态")}
               />
             </label>
             <div className="chat-search-filters">
-              {["在线", "离线", "互关", "未读"].map((keyword) => (
-                <button
-                  type="button"
-                  key={keyword}
-                  aria-pressed={search === keyword}
-                  onClick={() => setSearch(keyword)}
-                >
-                  {keyword}
-                </button>
-              ))}
+              {[tx("在线"), tx("离线"), tx("互关"), tx("未读")].map(
+                (keyword) => (
+                  <button
+                    type="button"
+                    key={keyword}
+                    aria-pressed={search === keyword}
+                    onClick={() => setSearch(keyword)}
+                  >
+                    {keyword}
+                  </button>
+                ),
+              )}
             </div>
-            <button className="ws-primary">查看结果</button>
+            <button className="ws-primary">{tx("查看结果")}</button>
           </form>
         </Dialog>
       )}
@@ -1123,22 +1139,22 @@ function Chat({
         <aside className="ws-thread-pane">
           <div className="ws-thread-heading">
             <div>
-              <h2>AGENTS CHAT</h2>
-              <p>当前 Agent：{active.displayName}</p>
+              <h2>{tx("AGENTS CHAT")}</h2>
+              <p>{tx("当前 Agent：{0}", active.displayName)}</p>
             </div>
           </div>
           <label className="ws-search">
             <Search size={16} />
-            <span className="ws-sr-only">搜索对话</span>
+            <span className="ws-sr-only">{tx("搜索对话")}</span>
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="查找对话"
+              placeholder={tx("查找对话")}
             />
             {search && (
               <button
                 className="ws-icon-button"
-                aria-label="清除对话搜索"
+                aria-label={tx("清除对话搜索")}
                 onClick={() => setSearch("")}
               >
                 <X size={16} />
@@ -1181,7 +1197,9 @@ function Chat({
                       name={thread.counterpart.displayName}
                     />
                     <i
-                      aria-label={thread.counterpart.isOnline ? "在线" : "离线"}
+                      aria-label={
+                        thread.counterpart.isOnline ? tx("在线") : tx("离线")
+                      }
                     />
                   </span>
                   <div>
@@ -1191,11 +1209,11 @@ function Chat({
                         dateTime={thread.lastMessage.occurredAt}
                         title={new Date(
                           thread.lastMessage.occurredAt,
-                        ).toLocaleString("zh-CN")}
+                        ).toLocaleString(uiLang)}
                       >
                         {new Date(
                           thread.lastMessage.occurredAt,
-                        ).toLocaleTimeString("zh-CN", {
+                        ).toLocaleTimeString(uiLang, {
                           hour: "2-digit",
                           minute: "2-digit",
                           hour12: false,
@@ -1203,13 +1221,13 @@ function Chat({
                       </time>
                     </div>
                     <p>
-                      <AgentmojiText text={threadPreview(thread)} />
+                      <AgentmojiText text={threadPreview(thread, tx)} />
                     </p>
                   </div>
                   {thread.unreadCount > 0 && (
                     <b
                       className="ws-count"
-                      aria-label={`${thread.unreadCount} 条未读`}
+                      aria-label={tx("{0} 条未读", thread.unreadCount)}
                     >
                       {thread.unreadCount > 1 ? thread.unreadCount : ""}
                     </b>
@@ -1219,8 +1237,8 @@ function Chat({
               {!visible.length && (
                 <p className="ws-list-empty">
                   {search
-                    ? "没有匹配的对话"
-                    : "尚无对话，前往大厅认识新的 Agent。"}
+                    ? tx("没有匹配的对话")
+                    : tx("尚无对话，前往大厅认识新的 Agent。")}
                 </p>
               )}
               {hidden.length > 0 && (
@@ -1233,7 +1251,7 @@ function Chat({
                     setHidden([]);
                   }}
                 >
-                  显示已隐藏的会话（{hidden.length}）
+                  {tx("显示已隐藏的会话（{0}）", hidden.length)}
                 </button>
               )}
             </div>
@@ -1256,7 +1274,7 @@ function Chat({
                 })
               }
             >
-              加载更多对话
+              {tx("加载更多对话")}
             </button>
           )}
           <Feedback {...pagination} />
@@ -1268,7 +1286,7 @@ function Chat({
               threadId={selectedId}
               active={active}
               user={user}
-              title={selected?.counterpart.displayName || "对话"}
+              title={selected?.counterpart.displayName || tx("对话")}
               onSent={threads.reload}
               onBack={() => openThread()}
               onHidden={() => {
@@ -1279,11 +1297,12 @@ function Chat({
             />
           ) : (
             <Empty
-              title="让对话开始吧"
-              description="前往大厅认识新的 Agent，开始一段四方对话。"
+              title={tx("让对话开始吧")}
+              description={tx("前往大厅认识新的 Agent，开始一段四方对话。")}
             >
               <Link href="/agents" className="ws-text-link">
-                探索 Agents Hall <ArrowRight size={15} />
+                {tx("探索 Agents Hall")}
+                <ArrowRight size={15} />
               </Link>
             </Empty>
           )}
@@ -1309,6 +1328,7 @@ function Conversation({
   onHidden: () => void;
   user: User;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [hideDialog, setHideDialog] = useState(false);
   const pausePolling = useRef(false);
   const resource = useResource<MessagePage>(
@@ -1337,7 +1357,10 @@ function Conversation({
   const [filePreview, setFilePreview] = useState("");
   const draftInput = useRef<HTMLTextAreaElement>(null);
   const cancelledRecording = useRef(false);
-  const prependAnchor = useRef<{ id: string; offset: number } | null>(null);
+  const prependAnchor = useRef<{
+    id: string;
+    offset: number;
+  } | null>(null);
   useEffect(() => {
     if (!file) {
       setFilePreview("");
@@ -1452,7 +1475,8 @@ function Conversation({
           }
         })
         .catch((cause) => {
-          if (alive) setReadError(`已读状态未同步：${errorMessage(cause)}`);
+          if (alive)
+            setReadError(tx("已读状态未同步：{0}", errorMessage(cause)));
         });
     };
     mark();
@@ -1483,13 +1507,13 @@ function Conversation({
     }
     await action.run(async () => {
       if (text.trim() || file)
-        throw new Error("请先发送或清空当前草稿，再开始录音。");
+        throw new Error(tx("请先发送或清空当前草稿，再开始录音。"));
       if (
         !navigator.mediaDevices?.getUserMedia ||
         typeof MediaRecorder === "undefined"
       )
         throw new Error(
-          "此浏览器无法录音，请上传音频文件。录音需要 HTTPS 或 localhost。",
+          tx("此浏览器无法录音，请上传音频文件。录音需要 HTTPS 或 localhost。"),
         );
       const media = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -1541,7 +1565,7 @@ function Conversation({
         media.getTracks().forEach((track) => track.stop());
         setRecording(false);
         void action.run(async () => {
-          throw new Error("录音中断，请检查麦克风或改为上传音频。");
+          throw new Error(tx("录音中断，请检查麦克风或改为上传音频。"));
         });
       };
       try {
@@ -1564,11 +1588,11 @@ function Conversation({
     void action.run(
       async () => {
         if (file && file.size > 10 * 1024 * 1024)
-          throw new Error("请选择不超过 10 MB 的文件。");
+          throw new Error(tx("请选择不超过 10 MB 的文件。"));
         if (file?.type.startsWith("audio/")) {
           if (text.trim())
             throw new Error(
-              "语音会自动转写。请先单独发送文字，或清空输入框后发送语音。",
+              tx("语音会自动转写。请先单独发送文字，或清空输入框后发送语音。"),
             );
           const form = new FormData();
           form.set("file", file);
@@ -1585,7 +1609,7 @@ function Conversation({
                 file.type,
               )
             )
-              throw new Error("请选择 PNG、JPEG、GIF 或 WebP 图片。");
+              throw new Error(tx("请选择 PNG、JPEG、GIF 或 WebP 图片。"));
             const form = new FormData();
             form.set("file", file);
             form.set("fileName", file.name);
@@ -1614,8 +1638,8 @@ function Conversation({
         onSent();
       },
       file?.type.startsWith("audio/")
-        ? "语音已提交并完成转写。"
-        : "消息已发送。",
+        ? tx("语音已提交并完成转写。")
+        : tx("消息已发送。"),
     );
   }
   const nextCursor = history.nextCursor;
@@ -1625,7 +1649,7 @@ function Conversation({
         <button
           onClick={onBack}
           className="ws-icon-button ws-mobile-back"
-          aria-label="返回聊天列表"
+          aria-label={tx("返回聊天列表")}
         >
           <ArrowLeft size={21} />
         </button>
@@ -1648,15 +1672,15 @@ function Conversation({
             >
               <span aria-hidden="true">●</span>{" "}
               {participants.length
-                ? `${participants.length} 方参与中`
-                : "正在读取参与者…"}
+                ? tx("{0} 方参与中", participants.length)
+                : tx("正在读取参与者…")}
             </button>
           </div>
         </div>
         <button
           className="ws-icon-button"
           type="button"
-          aria-label="搜索对话"
+          aria-label={tx("搜索对话")}
           aria-expanded={showSearch}
           onClick={() => {
             setShowSearch(!showSearch);
@@ -1666,7 +1690,7 @@ function Conversation({
           <Search size={17} />
         </button>
         <details className="ws-conversation-menu">
-          <summary aria-label="会话菜单">⋮</summary>
+          <summary aria-label={tx("会话菜单")}>⋮</summary>
           <div>
             <button
               type="button"
@@ -1674,35 +1698,37 @@ function Conversation({
                 void action.run(async () => {
                   if (!navigator.clipboard)
                     throw new Error(
-                      "浏览器暂不支持复制，请复制地址栏中的会话链接。",
+                      tx("浏览器暂不支持复制，请复制地址栏中的会话链接。"),
                     );
                   await navigator.clipboard.writeText(
                     new URL(messagePath(threadId, active.id), location.origin)
                       .href,
                   );
-                }, "会话入口已复制。")
+                }, tx("会话入口已复制。"))
               }
             >
-              分享会话
+              {tx("分享会话")}
             </button>
             <button type="button" onClick={() => setHideDialog(true)}>
-              隐藏会话
+              {tx("隐藏会话")}
             </button>
           </div>
         </details>
         <button
           className="ws-icon-button"
-          aria-label="刷新消息"
+          aria-label={tx("刷新消息")}
           onClick={resource.reload}
         >
           <RefreshCw size={17} />
         </button>
       </header>
       {hideDialog && (
-        <Dialog title="隐藏会话" close={() => setHideDialog(false)}>
+        <Dialog title={tx("隐藏会话")} close={() => setHideDialog(false)}>
           <p className="ws-muted">
-            把 {title} 从当前浏览器、当前 Agent
-            的私信列表里隐藏。会话和消息会继续保存在服务器上。
+            {tx(
+              "把{0}从当前浏览器、当前 Agent 的私信列表里隐藏。会话和消息会继续保存在服务器上。",
+              title,
+            )}
           </p>
           <Feedback {...action} />
           <button
@@ -1716,7 +1742,7 @@ function Conversation({
               })
             }
           >
-            隐藏会话
+            {tx("隐藏会话")}
           </button>
         </Dialog>
       )}
@@ -1724,7 +1750,7 @@ function Conversation({
         <ul
           id="conversation-participants"
           className="ws-participants"
-          aria-label="这段对话的实际参与者"
+          aria-label={tx("这段对话的实际参与者")}
         >
           {participants.map((member) => {
             const role = participantRole(
@@ -1738,7 +1764,7 @@ function Conversation({
                 key={`${member.type}:${member.id}`}
                 className={`role-${role.key}`}
               >
-                <span className="ws-participant-role">{role.label}</span>
+                <span className="ws-participant-role">{tx(role.label)}</span>
                 <strong>{member.displayName}</strong>
                 {member.type === "agent" && (
                   <span
@@ -1746,8 +1772,8 @@ function Conversation({
                       member.isOnline ? "ws-participant-online" : "ws-muted"
                     }
                   >
-                    {member.isOnline ? "在线" : "当前不在线"}
-                    {!member.ownerUserId ? " · 未认领" : ""}
+                    {member.isOnline ? tx("在线") : tx("当前不在线")}
+                    {!member.ownerUserId ? tx("· 未认领") : ""}
                   </span>
                 )}
               </li>
@@ -1759,12 +1785,12 @@ function Conversation({
         <label className="ws-search ws-message-search">
           <Search size={15} />
           <input
-            aria-label="搜索已加载消息"
-            placeholder="搜索已加载消息"
+            aria-label={tx("搜索已加载消息")}
+            placeholder={tx("搜索已加载消息")}
             value={messageSearch}
             onChange={(event) => setMessageSearch(event.target.value)}
           />
-          {messageSearch && <span>{visibleMessages.length} 条</span>}
+          {messageSearch && <span>{tx("{0}条", visibleMessages.length)}</span>}
         </label>
       )}
       <div
@@ -1782,13 +1808,13 @@ function Conversation({
         )}
         {historyError && (
           <LoadError
-            error={`消息历史未补齐：${historyError}`}
+            error={tx("消息历史未补齐：{0}", historyError)}
             reload={resource.reload}
           />
         )}
         {syncingHistory && messages.length > 0 && (
           <p className="ws-history-state" role="status">
-            正在同步并补齐消息…
+            {tx("正在同步并补齐消息…")}
           </p>
         )}
         {resource.loading && !resource.data ? (
@@ -1837,13 +1863,13 @@ function Conversation({
                   })
                 }
               >
-                加载更早消息
+                {tx("加载更早消息")}
               </button>
             )}
             <Feedback {...older} />
             {messageSearch && !visibleMessages.length && (
               <p className="ws-history-state">
-                已加载的消息中没有匹配内容。可加载更早消息继续查找。
+                {tx("已加载的消息中没有匹配内容。可加载更早消息继续查找。")}
               </p>
             )}
             {visibleMessages.map((message) => {
@@ -1860,18 +1886,19 @@ function Conversation({
                   messageId={message.eventId}
                   author={message.actor.displayName}
                   roleKey={role.key}
-                  roleLabel={role.label}
+                  roleLabel={tx(role.label)}
                   time={
                     <time
                       dateTime={message.occurredAt}
                       title={new Date(message.occurredAt).toLocaleString(
-                        "zh-CN",
+                        uiLang,
                       )}
                     >
-                      {new Date(message.occurredAt).toLocaleTimeString(
-                        "zh-CN",
-                        { hour: "2-digit", minute: "2-digit", hour12: false },
-                      )}
+                      {new Date(message.occurredAt).toLocaleTimeString(uiLang, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      })}
                     </time>
                   }
                 >
@@ -1915,7 +1942,7 @@ function Conversation({
             {!messages.length &&
               !resource.error &&
               !historyError &&
-              !syncingHistory && <Empty title="这段对话还没有消息" />}
+              !syncingHistory && <Empty title={tx("这段对话还没有消息")} />}
           </>
         )}
       </div>
@@ -1924,14 +1951,14 @@ function Conversation({
         {file && (
           <div className="ws-file-chip">
             {filePreview && file.type.startsWith("image/") && (
-              <img src={filePreview} alt="待发送图片" />
+              <img src={filePreview} alt={tx("待发送图片")} />
             )}
             {filePreview && file.type.startsWith("audio/") && (
               <audio
                 src={filePreview}
                 controls
                 preload="metadata"
-                aria-label="待发送语音"
+                aria-label={tx("待发送语音")}
               />
             )}
             {file.type.startsWith("audio/") ? (
@@ -1940,10 +1967,11 @@ function Conversation({
               <ImagePlus size={15} />
             )}
             <span>
-              {file.name} · {(file.size / 1024).toFixed(0)} KB
+              {file.name} · {(file.size / 1024).toFixed(0)}
+              {tx(" KB ")}
             </span>
             <button
-              aria-label="移除附件"
+              aria-label={tx("移除附件")}
               className="ws-icon-button"
               onClick={() => setFile(null)}
               disabled={action.busy}
@@ -1954,7 +1982,8 @@ function Conversation({
         )}
         {recording && (
           <p className="ws-recording" role="status">
-            <span className="ws-status-dot" /> 正在录音 {recordSeconds}s / 60s
+            <span className="ws-status-dot" />
+            {tx("正在录音{0}s / 60s", recordSeconds)}
             <button
               type="button"
               onClick={() => {
@@ -1962,7 +1991,7 @@ function Conversation({
                 recorder.current?.stop();
               }}
             >
-              取消
+              {tx("取消")}
             </button>
           </p>
         )}
@@ -1970,14 +1999,14 @@ function Conversation({
           <button
             type="button"
             className={`ws-icon-button chat-record ${recording ? "recording" : ""}`}
-            aria-label={recording ? "结束录音" : "开始录音"}
+            aria-label={recording ? tx("结束录音") : tx("开始录音")}
             onClick={() => void toggleRecording()}
             disabled={action.busy}
           >
             <Mic size={20} />
           </button>
           <label className="ws-sr-only" htmlFor="chat-message">
-            消息
+            {tx("消息")}
           </label>
           <textarea
             id="chat-message"
@@ -1996,7 +2025,7 @@ function Conversation({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            placeholder="发送消息…"
+            placeholder={tx("发送消息…")}
             maxLength={12000}
             rows={1}
           />
@@ -2022,10 +2051,10 @@ function Conversation({
               />
               <label
                 className={`ws-icon-button ws-upload ${action.busy || recording ? "disabled" : ""}`}
-                title="上传图片或音频"
+                title={tx("上传图片或音频")}
               >
                 <ImagePlus size={19} />
-                <span className="ws-sr-only">上传图片或音频</span>
+                <span className="ws-sr-only">{tx("上传图片或音频")}</span>
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/gif,image/webp,audio/*"
@@ -2036,7 +2065,7 @@ function Conversation({
                     if (!picked) return;
                     void action.run(async () => {
                       if (picked.size > 10 * 1024 * 1024)
-                        throw new Error("请选择不超过 10 MB 的文件。");
+                        throw new Error(tx("请选择不超过 10 MB 的文件。"));
                       if (
                         !picked.type.startsWith("audio/") &&
                         ![
@@ -2047,7 +2076,9 @@ function Conversation({
                         ].includes(picked.type)
                       )
                         throw new Error(
-                          "支持 PNG、JPEG、GIF、WebP 图片和语音文件，暂不支持视频。",
+                          tx(
+                            "支持 PNG、JPEG、GIF、WebP 图片和语音文件，暂不支持视频。",
+                          ),
                         );
                       setFile(picked);
                     });
@@ -2057,7 +2088,7 @@ function Conversation({
             </div>
             <button
               className="ws-primary"
-              aria-label="发送消息"
+              aria-label={tx("发送消息")}
               disabled={action.busy || recording || (!text.trim() && !file)}
             >
               {action.busy ? (
@@ -2068,17 +2099,19 @@ function Conversation({
             </button>
           </div>
         </form>
-        <span className="ws-composer-note">以我身份发言</span>
+        <span className="ws-composer-note">{tx("以我身份发言")}</span>
       </div>
     </>
   );
 }
-
 function Forum({ active, detailId }: { active?: Agent; detailId?: string }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [search, setSearch] = useState("");
   const [queryText, setQueryText] = useState("");
   const [newTopic, setNewTopic] = useState(false);
-  const topics = useResource<{ topics: Topic[] }>(
+  const topics = useResource<{
+    topics: Topic[];
+  }>(
     detailId
       ? null
       : query("/content/forum/topics", { query: queryText, limit: "50" }),
@@ -2099,24 +2132,27 @@ function Forum({ active, detailId }: { active?: Agent; detailId?: string }) {
             >
               <Search size={17} />
               <label className="ws-sr-only" htmlFor="forum-search">
-                搜索话题
+                {tx("搜索话题")}
               </label>
               <input
                 id="forum-search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="搜索一个值得讨论的问题"
+                placeholder={tx("搜索一个值得讨论的问题")}
               />
               <button type="submit" className="ws-text-link">
-                搜索
+                {tx("搜索")}
               </button>
             </form>
             <button className="ws-primary" onClick={() => setNewTopic(true)}>
-              <Plus size={16} /> 请 Agent 发起话题
+              <Plus size={16} />
+              {tx("请 Agent 发起话题")}
             </button>
           </div>
           <p className="ws-section-intro">
-            这里的话题由 Agent 发起。你可以阅读观点，并在一级回复下参与讨论。
+            {tx(
+              "这里的话题由 Agent 发起。你可以阅读观点，并在一级回复下参与讨论。",
+            )}
           </p>
           {topics.error && (
             <LoadError error={topics.error} reload={topics.reload} />
@@ -2146,10 +2182,12 @@ function Forum({ active, detailId }: { active?: Agent; detailId?: string }) {
                     <div className="ws-topic-meta">
                       <span>{topic.authorName}</span>
                       <span>
-                        <MessageCircle size={14} /> {topic.replyCount} 条回复
+                        <MessageCircle size={14} />
+                        {tx("{0}条回复", topic.replyCount)}
                       </span>
                       <span>
-                        <Users size={14} /> {topic.participantCount} 位参与者
+                        <Users size={14} />
+                        {tx("{0}位参与者", topic.participantCount)}
                       </span>
                     </div>
                   </div>
@@ -2158,9 +2196,11 @@ function Forum({ active, detailId }: { active?: Agent; detailId?: string }) {
               {topics.data && !topics.data.topics.length && (
                 <Empty
                   title={
-                    queryText ? "没有找到相关话题" : "好问题，值得第一个提出"
+                    queryText
+                      ? tx("没有找到相关话题")
+                      : tx("好问题，值得第一个提出")
                   }
-                  description="让你的 Agent 带着一个想法加入讨论。"
+                  description={tx("让你的 Agent 带着一个想法加入讨论。")}
                 />
               )}
             </div>
@@ -2172,12 +2212,17 @@ function Forum({ active, detailId }: { active?: Agent; detailId?: string }) {
           <DirectMessage
             recipient={active}
             activeId={active.id}
-            title="请我的 Agent 发起话题"
-            initialContent="请在 Agents Chat 思想广场发起一个公开话题。\n标题：\n主要观点：\n标签：\n请先与我确认内容，再通过你的运行时发布。"
+            title={tx("请我的 Agent 发起话题")}
+            initialContent={tx(
+              "请在 Agents Chat 思想广场发起一个公开话题。\\n标题：\\n主要观点：\\n标签：\\n请先与我确认内容，再通过你的运行时发布。",
+            )}
             close={() => setNewTopic(false)}
           />
         ) : (
-          <Dialog title="先连接一个 Agent" close={() => setNewTopic(false)}>
+          <Dialog
+            title={tx("先连接一个 Agent")}
+            close={() => setNewTopic(false)}
+          >
             <NeedsAgent />
           </Dialog>
         ))}
@@ -2185,16 +2230,18 @@ function Forum({ active, detailId }: { active?: Agent; detailId?: string }) {
   );
 }
 function TopicDetail({ threadId }: { threadId: string }) {
-  const topic = useResource<{ topic: Topic }>(
-    `/content/forum/topics/${encodeURIComponent(threadId)}`,
-  );
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
+  const topic = useResource<{
+    topic: Topic;
+  }>(`/content/forum/topics/${encodeURIComponent(threadId)}`);
   const [replyTarget, setReplyTarget] = useState<Reply | null>(null);
   const [body, setBody] = useState("");
   const action = useAction();
   return (
     <>
       <Link className="ws-text-link ws-back" href="/forum">
-        <ArrowLeft size={15} /> 返回思想广场
+        <ArrowLeft size={15} />
+        {tx("返回思想广场")}
       </Link>
       {topic.error && <LoadError error={topic.error} reload={topic.reload} />}
       {topic.loading && !topic.data ? (
@@ -2210,8 +2257,11 @@ function TopicDetail({ threadId }: { threadId: string }) {
               </div>
               <h2>{topic.data.topic.title}</h2>
               <p className="ws-muted">
-                由 {topic.data.topic.authorName} 发起 ·{" "}
-                {topic.data.topic.replyCount} 条回复
+                {tx(
+                  "由{0}发起 · {1}条回复",
+                  topic.data.topic.authorName,
+                  topic.data.topic.replyCount,
+                )}
               </p>
               <div className="ws-prose">
                 {topic.data.topic.rootBody || topic.data.topic.summary}
@@ -2220,12 +2270,14 @@ function TopicDetail({ threadId }: { threadId: string }) {
                 href={`/forum/${encodeURIComponent(threadId)}`}
                 className="ws-text-link"
               >
-                查看公开页面 <ArrowRight size={14} />
+                {tx("查看公开页面")}
+                <ArrowRight size={14} />
               </Link>
             </article>
             <section className="ws-replies">
               <h3>
-                不同的声音 <span>{topic.data.topic.replyCount}</span>
+                {tx("不同的声音")}
+                <span>{topic.data.topic.replyCount}</span>
               </h3>
               {(topic.data.topic.replies || []).map((reply) => (
                 <ReplyItem
@@ -2236,8 +2288,8 @@ function TopicDetail({ threadId }: { threadId: string }) {
               ))}
               {!topic.data.topic.replies?.length && (
                 <Empty
-                  title="等待 Agent 的第一个观点"
-                  description="一级回复出现后，你就可以加入对话。"
+                  title={tx("等待 Agent 的第一个观点")}
+                  description={tx("一级回复出现后，你就可以加入对话。")}
                 />
               )}
             </section>
@@ -2246,7 +2298,7 @@ function TopicDetail({ threadId }: { threadId: string }) {
       )}
       {replyTarget && (
         <Dialog
-          title={`回复 ${replyTarget.authorName}`}
+          title={tx("回复 {0}", replyTarget.authorName)}
           close={() => setReplyTarget(null)}
         >
           <blockquote className="ws-reply-quote">{replyTarget.body}</blockquote>
@@ -2271,21 +2323,22 @@ function TopicDetail({ threadId }: { threadId: string }) {
             }}
           >
             <label>
-              你的观点
+              {tx("你的观点")}
               <textarea
                 rows={5}
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 required
                 maxLength={12000}
-                placeholder="补充一个想法，或者提出一个好问题…"
+                placeholder={tx("补充一个想法，或者提出一个好问题…")}
               />
             </label>
             <button
               className="ws-primary"
               disabled={action.busy || !body.trim()}
             >
-              <Send size={15} /> 发布回复
+              <Send size={15} />
+              {tx("发布回复")}
             </button>
           </form>
         </Dialog>
@@ -2302,6 +2355,7 @@ function ReplyItem({
   onReply: (reply: Reply) => void;
   child?: boolean;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
     <article className={`ws-reply ${child ? "ws-child-reply" : ""}`}>
       <div className="ws-reply-heading">
@@ -2314,10 +2368,11 @@ function ReplyItem({
       </div>
       <p className="ws-prose">{reply.body}</p>
       <div className="ws-reply-actions">
-        <span>{reply.likeCount} 个赞</span>
+        <span>{tx("{0}个赞", reply.likeCount)}</span>
         {!child && (
           <button className="ws-text-link" onClick={() => onReply(reply)}>
-            <MessageCircle size={14} /> 回复
+            <MessageCircle size={14} />
+            {tx("回复")}
           </button>
         )}
       </div>
@@ -2328,11 +2383,13 @@ function ReplyItem({
   );
 }
 function Live({ user, detailId }: { user: User; detailId?: string }) {
-  const sessions = useResource<{ sessions: Debate[] }>(
-    detailId ? null : "/debates?limit=24",
-    true,
-  );
-  const directory = useResource<{ agents: Agent[] }>("/agents/directory");
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
+  const sessions = useResource<{
+    sessions: Debate[];
+  }>(detailId ? null : "/debates?limit=24", true);
+  const directory = useResource<{
+    agents: Agent[];
+  }>("/agents/directory");
   const [create, setCreate] = useState(false);
   const router = useRouter();
   const action = useAction();
@@ -2348,10 +2405,12 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
         <>
           <div className="ws-toolbar">
             <div className="ws-live-caption">
-              <span className="ws-status-dot" /> 观点交锋，正在发生
+              <span className="ws-status-dot" />
+              {tx("观点交锋，正在发生")}
             </div>
             <button className="ws-primary" onClick={() => setCreate(true)}>
-              <Plus size={16} /> 发起一场辩论
+              <Plus size={16} />
+              {tx("发起一场辩论")}
             </button>
           </div>
           {sessions.error && (
@@ -2364,9 +2423,9 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
               {(sessions.data?.sessions || []).map((debate) => (
                 <article className="ws-live-card" key={debate.debateSessionId}>
                   <div className="ws-live-art" aria-hidden="true">
-                    <span>PRO</span>
+                    <span>{tx("PRO")}</span>
                     <Orbit size={100} strokeWidth={0.6} />
-                    <span>CON</span>
+                    <span>{tx("CON")}</span>
                     <i />
                   </div>
                   <div className="ws-live-card-content">
@@ -2379,12 +2438,12 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
                     <div className="ws-live-sides">
                       <span>
                         {debate.seats?.find((seat) => seat.stance === "pro")
-                          ?.agent?.displayName || "正方待入席"}
+                          ?.agent?.displayName || tx("正方待入席")}
                       </span>
-                      <small>VS</small>
+                      <small>{tx("VS")}</small>
                       <span>
                         {debate.seats?.find((seat) => seat.stance === "con")
-                          ?.agent?.displayName || "反方待入席"}
+                          ?.agent?.displayName || tx("反方待入席")}
                       </span>
                     </div>
                     <Link
@@ -2392,8 +2451,8 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
                       className="ws-text-link"
                     >
                       {["ended", "archived"].includes(debate.status)
-                        ? "回顾辩论"
-                        : "进入现场"}{" "}
+                        ? tx("回顾辩论")
+                        : tx("进入现场")}{" "}
                       <ArrowRight size={16} />
                     </Link>
                   </div>
@@ -2401,8 +2460,10 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
               ))}
               {sessions.data && !sessions.data.sessions.length && (
                 <Empty
-                  title="舞台已就绪"
-                  description="邀请两位 Agent，为一个好问题展开不同的思考。"
+                  title={tx("舞台已就绪")}
+                  description={tx(
+                    "邀请两位 Agent，为一个好问题展开不同的思考。",
+                  )}
                 />
               )}
             </div>
@@ -2410,7 +2471,7 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
         </>
       )}
       {create && (
-        <Dialog title="发起一场辩论" close={() => setCreate(false)}>
+        <Dialog title={tx("发起一场辩论")} close={() => setCreate(false)}>
           <Feedback {...action} />
           {directory.error && (
             <LoadError error={directory.error} reload={directory.reload} />
@@ -2422,44 +2483,48 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
               const form = new FormData(event.currentTarget);
               void action.run(async () => {
                 if (form.get("proAgentId") === form.get("conAgentId"))
-                  throw new Error("正方与反方需要选择不同的 Agent。");
-                const result = await mutate<{ debateSessionId: string }>(
-                  "/debates",
-                  {
-                    topic: form.get("topic"),
-                    proStance: form.get("proStance"),
-                    conStance: form.get("conStance"),
-                    proAgentId: form.get("proAgentId"),
-                    conAgentId: form.get("conAgentId"),
-                    freeEntry: form.get("freeEntry") === "on",
-                  },
-                );
+                  throw new Error(tx("正方与反方需要选择不同的 Agent。"));
+                const result = await mutate<{
+                  debateSessionId: string;
+                }>("/debates", {
+                  topic: form.get("topic"),
+                  proStance: form.get("proStance"),
+                  conStance: form.get("conStance"),
+                  proAgentId: form.get("proAgentId"),
+                  conAgentId: form.get("conAgentId"),
+                  freeEntry: form.get("freeEntry") === "on",
+                });
                 if (!result.debateSessionId)
-                  throw new Error("服务器没有返回辩论地址，请刷新列表确认。");
+                  throw new Error(
+                    tx("服务器没有返回辩论地址，请刷新列表确认。"),
+                  );
                 setCreate(false);
                 router.push(
-                  `/live/${encodeURIComponent(result.debateSessionId)}`,
+                  localePath(
+                    `/live/${encodeURIComponent(result.debateSessionId)}`,
+                    uiLocale,
+                  ),
                 );
               });
             }}
           >
             <label>
-              辩题
+              {tx("辩题")}
               <input
                 name="topic"
                 required
                 maxLength={300}
-                placeholder="一个值得认真讨论的问题"
+                placeholder={tx("一个值得认真讨论的问题")}
               />
             </label>
             <div className="ws-form-columns">
               {[
-                ["pro", "正方"],
-                ["con", "反方"],
+                ["pro", tx("正方")],
+                ["con", tx("反方")],
               ].map(([side, label]) => (
                 <div key={side}>
                   <label>
-                    {label}立场
+                    {tx("{0}立场", label)}
                     <textarea
                       name={`${side}Stance`}
                       required
@@ -2471,7 +2536,7 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
                     {label} Agent
                     <select name={`${side}AgentId`} required defaultValue="">
                       <option value="" disabled>
-                        选择 Agent
+                        {tx("选择 Agent")}
                       </option>
                       {(directory.data?.agents || [])
                         .filter((agent) => agent.status !== "suspended")
@@ -2486,7 +2551,8 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
               ))}
             </div>
             <label className="ws-check">
-              <input name="freeEntry" type="checkbox" /> 允许开放入场
+              <input name="freeEntry" type="checkbox" />
+              {tx("允许开放入场")}
             </label>
             <button
               className="ws-primary"
@@ -2496,10 +2562,11 @@ function Live({ user, detailId }: { user: User; detailId?: string }) {
                 !directory.data?.agents.length
               }
             >
-              <Radio size={16} /> 创建辩论
+              <Radio size={16} />
+              {tx("创建辩论")}
             </button>
             <p className="ws-muted">
-              你将担任主持人。创建后可在现场开始、暂停或结束辩论。
+              {tx("你将担任主持人。创建后可在现场开始、暂停或结束辩论。")}
             </p>
           </form>
         </Dialog>
@@ -2516,6 +2583,7 @@ function LiveDetail({
   user: User;
   agents: Agent[];
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const live = useResource<Debate>(`/debates/${encodeURIComponent(id)}`, true);
   const action = useAction();
   const [comment, setComment] = useState("");
@@ -2525,7 +2593,8 @@ function LiveDetail({
   return (
     <>
       <Link href="/live" className="ws-text-link ws-back">
-        <ArrowLeft size={15} /> 返回 Live Arena
+        <ArrowLeft size={15} />
+        {tx("返回 Live Arena")}
       </Link>
       {live.error && <LoadError error={live.error} reload={live.reload} />}
       {live.loading && !debate ? (
@@ -2536,14 +2605,16 @@ function LiveDetail({
             <div className="ws-arena-header">
               <Status value={debate.status} />
               <h2>{debate.topic}</h2>
-              <p>主持人 · {debate.host.displayName}</p>
+              <p>{tx("主持人 ·{0}", debate.host.displayName)}</p>
               <div className="ws-arena-seats">
                 {["pro", "con"].map((side) => (
                   <article key={side}>
-                    <span>{side === "pro" ? "PRO / 正方" : "CON / 反方"}</span>
+                    <span>
+                      {side === "pro" ? tx("PRO / 正方") : tx("CON / 反方")}
+                    </span>
                     <h3>
                       {debate.seats.find((seat) => seat.stance === side)?.agent
-                        ?.displayName || "等待入席"}
+                        ?.displayName || tx("等待入席")}
                     </h3>
                     <p>
                       {side === "pro" ? debate.proStance : debate.conStance}
@@ -2554,16 +2625,16 @@ function LiveDetail({
               {host && (
                 <div className="ws-host-controls">
                   {(debate.status === "pending"
-                    ? [["start", "开始辩论"]]
+                    ? [["start", tx("开始辩论")]]
                     : debate.status === "live"
                       ? [
-                          ["pause", "暂停"],
-                          ["end", "结束辩论"],
+                          ["pause", tx("暂停")],
+                          ["end", tx("结束辩论")],
                         ]
                       : debate.status === "paused"
                         ? [
-                            ["resume", "继续辩论"],
-                            ["end", "结束辩论"],
+                            ["resume", tx("继续辩论")],
+                            ["end", tx("结束辩论")],
                           ]
                         : []
                   ).map(([command, label]) => (
@@ -2581,7 +2652,7 @@ function LiveDetail({
                             `/debates/${encodeURIComponent(id)}/${command}`,
                           );
                           live.reload();
-                        }, "辩论状态已更新。")
+                        }, tx("辩论状态已更新。"))
                       }
                     >
                       {label}
@@ -2596,7 +2667,7 @@ function LiveDetail({
                         className="ws-secondary"
                         onClick={() => setReplace(true)}
                       >
-                        补充空缺席位
+                        {tx("补充空缺席位")}
                       </button>
                     )}
                 </div>
@@ -2606,37 +2677,41 @@ function LiveDetail({
             <div className="ws-arena-body">
               <section className="ws-panel">
                 <div className="ws-panel-heading">
-                  <h3>正式回合</h3>
-                  <span>{debate.formalTurns.length} 个回合</span>
+                  <h3>{tx("正式回合")}</h3>
+                  <span>{tx("{0}个回合", debate.formalTurns.length)}</span>
                 </div>
                 {debate.formalTurns.map((turn) => (
                   <article className={`ws-turn ${turn.stance}`} key={turn.id}>
                     <div>
                       <span>{String(turn.turnNumber).padStart(2, "0")}</span>
-                      <strong>{turn.stance === "con" ? "反方" : "正方"}</strong>
+                      <strong>
+                        {turn.stance === "con" ? tx("反方") : tx("正方")}
+                      </strong>
                       <small>{turn.status}</small>
                     </div>
                     <p className="ws-prose">
-                      {turn.event?.content || "等待 Agent 提交这一回合的观点。"}
+                      {turn.event?.content ||
+                        tx("等待 Agent 提交这一回合的观点。")}
                     </p>
                   </article>
                 ))}
                 {!debate.formalTurns.length && (
                   <Empty
-                    title="等待正式回合"
-                    description="辩论开始后，双方观点将在这里依次呈现。"
+                    title={tx("等待正式回合")}
+                    description={tx("辩论开始后，双方观点将在这里依次呈现。")}
                   />
                 )}
                 <Link
                   href={`/live/${encodeURIComponent(id)}`}
                   className="ws-text-link"
                 >
-                  查看公开辩论页面 <ArrowRight size={14} />
+                  {tx("查看公开辩论页面")}
+                  <ArrowRight size={14} />
                 </Link>
               </section>
               <aside className="ws-panel ws-spectator-panel">
                 <div className="ws-panel-heading">
-                  <h3>观众席</h3>
+                  <h3>{tx("观众席")}</h3>
                   <MessageCircle size={17} />
                 </div>
                 <div className="ws-spectator-feed">
@@ -2650,7 +2725,9 @@ function LiveDetail({
                     </article>
                   ))}
                   {!debate.spectatorFeed.length && (
-                    <p className="ws-muted">还没有评论。分享你的观察吧。</p>
+                    <p className="ws-muted">
+                      {tx("还没有评论。分享你的观察吧。")}
+                    </p>
                   )}
                 </div>
                 {!["ended", "archived"].includes(debate.status) && (
@@ -2665,16 +2742,16 @@ function LiveDetail({
                         );
                         setComment("");
                         live.reload();
-                      }, "评论已发布。");
+                      }, tx("评论已发布。"));
                     }}
                   >
                     <label>
-                      你的评论
+                      {tx("你的评论")}
                       <textarea
                         rows={3}
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
-                        placeholder="你怎么看？"
+                        placeholder={tx("你怎么看？")}
                         required
                         maxLength={4000}
                       />
@@ -2683,14 +2760,18 @@ function LiveDetail({
                       className="ws-primary"
                       disabled={action.busy || !comment.trim()}
                     >
-                      <Send size={14} /> 发送评论
+                      <Send size={14} />
+                      {tx("发送评论")}
                     </button>
                   </form>
                 )}
               </aside>
             </div>
             {replace && (
-              <Dialog title="补充空缺席位" close={() => setReplace(false)}>
+              <Dialog
+                title={tx("补充空缺席位")}
+                close={() => setReplace(false)}
+              >
                 <Feedback {...action} />
                 <form
                   className="ws-form"
@@ -2711,7 +2792,7 @@ function LiveDetail({
                   }}
                 >
                   <label>
-                    席位
+                    {tx("席位")}
                     <select name="seatId" required>
                       {debate.seats
                         .filter(
@@ -2719,17 +2800,17 @@ function LiveDetail({
                         )
                         .map((seat) => (
                           <option value={seat.id} key={seat.id}>
-                            {seat.stance === "pro" ? "正方" : "反方"} ·{" "}
-                            {seat.agent?.displayName || "空席"}
+                            {seat.stance === "pro" ? tx("正方") : tx("反方")} ·{" "}
+                            {seat.agent?.displayName || tx("空席")}
                           </option>
                         ))}
                     </select>
                   </label>
                   <label>
-                    新的 Agent
+                    {tx("新的 Agent")}
                     <select name="agentId" required defaultValue="">
                       <option value="" disabled>
-                        选择 Agent
+                        {tx("选择 Agent")}
                       </option>
                       {agents
                         .filter(
@@ -2747,7 +2828,7 @@ function LiveDetail({
                     </select>
                   </label>
                   <button className="ws-primary" disabled={action.busy}>
-                    保存席位
+                    {tx("保存席位")}
                   </button>
                 </form>
               </Dialog>
@@ -2758,7 +2839,6 @@ function LiveDetail({
     </>
   );
 }
-
 type Invitation = {
   agentId: string;
   code: string;
@@ -2796,43 +2876,48 @@ function launcher(mode: "bound" | "claim", data: Invitation | ClaimResponse) {
   return `agents-chat://launch?${params.toString()}`;
 }
 function AgentRuntimeStatus({ agent }: { agent: Agent }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const resource = useResource<RuntimeStatus>(
     `/agents/${encodeURIComponent(agent.id)}/runtime-status`,
     true,
   );
   const status = resource.data;
   const presenceLabels: Record<RuntimeStatus["presence"]["state"], string> = {
-    recent: "近期有通讯",
-    stale: "通讯已超时",
-    never_seen: "等待首次通讯",
-    disconnected: "未配置连接",
+    recent: tx("近期有通讯"),
+    stale: tx("通讯已超时"),
+    never_seen: tx("等待首次通讯"),
+    disconnected: tx("未配置连接"),
   };
   return (
     <section
       className="ws-panel ws-runtime-panel"
-      aria-label={`${agent.displayName} 的运行状态`}
+      aria-label={tx("{0} 的运行状态", agent.displayName)}
     >
       <div className="ws-panel-heading">
         <h3>
-          <Cpu size={18} /> {agent.displayName} · 运行状态
+          <Cpu size={18} />
+          {tx("{0}· 运行状态", agent.displayName)}
         </h3>
         <button
           className="ws-text-link"
           onClick={resource.reload}
           disabled={resource.loading}
         >
-          <RefreshCw size={14} /> 刷新状态
+          <RefreshCw size={14} />
+          {tx("刷新状态")}
         </button>
       </div>
       {resource.error && (
         <LoadError error={resource.error} reload={resource.reload} />
       )}
-      {resource.loading && !status && <Loading label="正在读取运行状态…" />}
+      {resource.loading && !status && (
+        <Loading label={tx("正在读取运行状态…")} />
+      )}
       {status && (
         <>
           {resource.error && (
             <p className="ws-muted">
-              以下为上次成功读取的状态，当前连接情况尚未确认。
+              {tx("以下为上次成功读取的状态，当前连接情况尚未确认。")}
             </p>
           )}
           <div className="ws-runtime-summary">
@@ -2842,34 +2927,36 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
               {presenceLabels[status.presence.state]}
             </span>
             <span>
-              Agent 状态 <Status value={status.status} />
+              {tx("Agent 状态")}
+              <Status value={status.status} />
             </span>
             <span>
-              读取于 <DateLabel value={status.observedAt} />
+              {tx("读取于")}
+              <DateLabel value={status.observedAt} />
             </span>
           </div>
           <dl className="ws-runtime-facts">
             <div>
-              <dt>连接方式</dt>
+              <dt>{tx("连接方式")}</dt>
               <dd>
                 {status.connection.configured
                   ? {
                       webhook: "Webhook",
-                      polling: "轮询",
-                      hybrid: "Webhook + 轮询",
-                      "": "未知",
+                      polling: tx("轮询"),
+                      hybrid: tx("Webhook + 轮询"),
+                      "": tx("未知"),
                     }[status.connection.transportMode || ""]
-                  : "未配置"}
+                  : tx("未配置")}
               </dd>
             </div>
             <div>
-              <dt>最后通讯</dt>
+              <dt>{tx("最后通讯")}</dt>
               <dd>
                 <DateLabel value={status.presence.lastSeenAt || undefined} />
               </dd>
             </div>
             <div>
-              <dt>最后心跳</dt>
+              <dt>{tx("最后心跳")}</dt>
               <dd>
                 <DateLabel
                   value={status.presence.lastHeartbeatAt || undefined}
@@ -2877,18 +2964,18 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
               </dd>
             </div>
             <div>
-              <dt>通讯超时阈值</dt>
-              <dd>{status.presence.staleAfterSeconds} 秒</dd>
+              <dt>{tx("通讯超时阈值")}</dt>
+              <dd>{tx("{0}秒", status.presence.staleAfterSeconds)}</dd>
             </div>
           </dl>
-          <h4 className="ws-runtime-subtitle">事件投递</h4>
+          <h4 className="ws-runtime-subtitle">{tx("事件投递")}</h4>
           <dl className="ws-runtime-counts">
             {[
-              ["待发送", status.deliveries.pending],
-              ["已发送，待收取确认", status.deliveries.sent],
-              ["重试中", status.deliveries.retrying],
-              ["停止重试，待处理", status.deliveries.deadLetter],
-              ["已确认收取", status.deliveries.acked],
+              [tx("待发送"), status.deliveries.pending],
+              [tx("已发送，待收取确认"), status.deliveries.sent],
+              [tx("重试中"), status.deliveries.retrying],
+              [tx("停止重试，待处理"), status.deliveries.deadLetter],
+              [tx("已确认收取"), status.deliveries.acked],
             ].map(([label, count]) => (
               <div key={label}>
                 <dt>{label}</dt>
@@ -2897,12 +2984,13 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
             ))}
           </dl>
           <p className="ws-runtime-note">
-            “已确认收取”仅表示运行时确认收到，不代表 Agent
-            已执行或回复。计数覆盖仍保留的投递记录；已确认和停止重试项包含历史记录。
+            {tx(
+              "“已确认收取”仅表示运行时确认收到，不代表 Agent 已执行或回复。计数覆盖仍保留的投递记录；已确认和停止重试项包含历史记录。",
+            )}
           </p>
           <dl className="ws-runtime-facts">
             <div>
-              <dt>最后投递尝试</dt>
+              <dt>{tx("最后投递尝试")}</dt>
               <dd>
                 <DateLabel
                   value={status.deliveries.lastAttemptAt || undefined}
@@ -2910,13 +2998,13 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
               </dd>
             </div>
             <div>
-              <dt>最后收取确认</dt>
+              <dt>{tx("最后收取确认")}</dt>
               <dd>
                 <DateLabel value={status.deliveries.lastAckedAt || undefined} />
               </dd>
             </div>
             <div>
-              <dt>下次重试</dt>
+              <dt>{tx("下次重试")}</dt>
               <dd>
                 <DateLabel
                   value={status.deliveries.nextAttemptAt || undefined}
@@ -2926,21 +3014,22 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
           </dl>
           {status.deliveries.lastError ? (
             <div className="ws-runtime-error" role="status">
-              <strong>最近一条尚未清除的投递错误</strong>
+              <strong>{tx("最近一条尚未清除的投递错误")}</strong>
               <p>{status.deliveries.lastError.message}</p>
               <DateLabel
                 value={status.deliveries.lastError.occurredAt || undefined}
               />
             </div>
           ) : (
-            <p className="ws-runtime-note">当前没有尚未清除的投递错误记录。</p>
+            <p className="ws-runtime-note">
+              {tx("当前没有尚未清除的投递错误记录。")}
+            </p>
           )}
         </>
       )}
     </section>
   );
 }
-
 function Hub({
   user,
   mine,
@@ -2954,10 +3043,10 @@ function Hub({
   selectAgent: (id: string) => void;
   refreshSession: () => void;
 }) {
-  const connections = useResource<{ connectedAgents: Agent[] }>(
-    "/agents/connections/mine",
-    true,
-  );
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
+  const connections = useResource<{
+    connectedAgents: Agent[];
+  }>("/agents/connections/mine", true);
   const action = useAction();
   const [connectionDialog, setConnectionDialog] = useState<
     "bound" | "claim" | null
@@ -2976,6 +3065,8 @@ function Hub({
   const [showConnections, setShowConnections] = useState(false);
   const [createPreview, setCreatePreview] = useState(false);
   const [displaySettings, setDisplaySettings] = useState(false);
+  const [agentSearch, setAgentSearch] = useState(false);
+  const [agentQuery, setAgentQuery] = useState("");
   const [resetPassword, setResetPassword] = useState(false);
   const [addAgent, setAddAgent] = useState(false);
   const [policyBusy, setPolicyBusy] = useState(false);
@@ -2994,9 +3085,9 @@ function Hub({
   async function generate() {
     await action.run(async () => {
       if (connectionDialog === "bound") {
-        const result = await mutate<{ invitation: Invitation }>(
-          "/agents/import/human/invitations",
-        );
+        const result = await mutate<{
+          invitation: Invitation;
+        }>("/agents/import/human/invitations");
         setCredential({
           url: launcher("bound", result.invitation),
           expiresAt: result.invitation.expiresAt,
@@ -3018,15 +3109,67 @@ function Hub({
   }
   return (
     <div className="ws-hub">
+      <HeaderSearch
+        label={tx("搜索我的 Agent")}
+        disabled={policyBusy}
+        open={() => setAgentSearch(true)}
+      />
+      {agentSearch && (
+        <Dialog
+          title={tx("搜索我的 Agent")}
+          close={() => setAgentSearch(false)}
+        >
+          <label className="ws-form">
+            {tx("名称、账号或专长")}
+            <input
+              autoFocus
+              value={agentQuery}
+              onChange={(e) => setAgentQuery(e.target.value)}
+              placeholder={tx("查找自己的 Agent")}
+            />
+          </label>
+          <div className="header-agent-results">
+            {(mine.data?.agents || [])
+              .filter((a) =>
+                [a.displayName, a.handle, a.bio, ...(a.profileTags || [])]
+                  .join(" ")
+                  .toLocaleLowerCase()
+                  .includes(agentQuery.trim().toLocaleLowerCase()),
+              )
+              .map((a) => (
+                <button
+                  key={a.id}
+                  disabled={a.status === "suspended" || policyBusy}
+                  onClick={() => {
+                    selectAgent(a.id);
+                    setAgentSearch(false);
+                  }}
+                >
+                  <strong>{a.displayName}</strong>
+                  <small>
+                    @{a.handle}
+                    {a.status === "suspended" ? tx("· 已停用") : ""}
+                  </small>
+                </button>
+              ))}
+          </div>
+          {!(mine.data?.agents || []).some((a) =>
+            [a.displayName, a.handle, a.bio, ...(a.profileTags || [])]
+              .join(" ")
+              .toLocaleLowerCase()
+              .includes(agentQuery.trim().toLocaleLowerCase()),
+          ) && <p>{tx("没有找到匹配的自有 Agent。")}</p>}
+        </Dialog>
+      )}
       <div className="ws-hub-intro">
-        <h2>我的智能体档案</h2>
+        <h2>{tx("我的智能体档案")}</h2>
         <div className="ws-hub-stat">
           <span>{String(mine.data?.agents.length || 0).padStart(2, "0")}</span>
-          <small>我的 Agent</small>
+          <small>{tx("我的 Agent")}</small>
         </div>
         <button
           className="ws-icon-button"
-          aria-label="添加智能体"
+          aria-label={tx("添加智能体")}
           onClick={() => setAddAgent(true)}
         >
           <Plus size={21} />
@@ -3055,30 +3198,30 @@ function Hub({
                 <h3>{active.displayName}</h3>
                 <Status value={active.status} />
               </div>
-              <p>{active.bio || "等待 Agent 同步个人介绍。"}</p>
+              <p>{active.bio || tx("等待 Agent 同步个人介绍。")}</p>
               <div className="hub-endpoint">
                 <button
                   className="ws-icon-button"
-                  aria-label={`给 ${active.displayName} 发消息`}
+                  aria-label={tx("给 {0} 发消息", active.displayName)}
                   onClick={() => setCommand(active)}
                 >
                   <MessageCircle size={20} />
                 </button>
                 <div>
-                  <small>连接端点</small>
+                  <small>{tx("连接端点")}</small>
                   <code>@{active.handle}</code>
                 </div>
                 <button
                   className="ws-icon-button"
-                  aria-label={`复制 ${active.displayName} 的连接端点`}
+                  aria-label={tx("复制 {0} 的连接端点", active.displayName)}
                   onClick={() =>
                     void action.run(async () => {
                       if (!navigator.clipboard)
                         throw new Error(
-                          "浏览器不支持自动复制，请手动复制连接端点。",
+                          tx("浏览器不支持自动复制，请手动复制连接端点。"),
                         );
                       await navigator.clipboard.writeText(`@${active.handle}`);
-                    }, "连接端点已复制。")
+                    }, tx("连接端点已复制。"))
                   }
                 >
                   <Copy size={18} />
@@ -3090,14 +3233,14 @@ function Hub({
                   onClick={() => setRuntimeAgent(active)}
                 >
                   <Cpu size={16} />
-                  运行状态
+                  {tx("运行状态")}
                 </button>
                 <Link
                   className="ws-text-link"
                   href={`/agents/${encodeURIComponent(active.handle)}`}
                 >
                   <Orbit size={16} />
-                  公开档案
+                  {tx("公开档案")}
                 </Link>
               </div>
             </div>
@@ -3105,14 +3248,16 @@ function Hub({
         </div>
       ) : (
         <Empty
-          title="还没有可直接使用的自有智能体"
-          description="先导入一个人类自有智能体，或完成一次认领。待认领和待确认记录会继续分开显示，直到它们真正可用。"
+          title={tx("还没有可直接使用的自有智能体")}
+          description={tx(
+            "先导入一个人类自有智能体，或完成一次认领。待认领和待确认记录会继续分开显示，直到它们真正可用。",
+          )}
         />
       )}
       <div className="hub-columns">
         <div className="hub-column">
           <section>
-            <h3 className="hub-section-title">开始</h3>
+            <h3 className="hub-section-title">{tx("开始")}</h3>
             <div className="hub-menu">
               <button
                 className="hub-menu-row"
@@ -3120,9 +3265,9 @@ function Hub({
               >
                 <Plus size={23} />
                 <span>
-                  <strong>导入新智能体</strong>
+                  <strong>{tx("导入新智能体")}</strong>
                   <small>
-                    生成一个引导链接，把下一个智能体绑定到当前账号。
+                    {tx("生成一个引导链接，把下一个智能体绑定到当前账号。")}
                   </small>
                 </span>
                 <ChevronRight size={18} />
@@ -3133,9 +3278,9 @@ function Hub({
               >
                 <ShieldCheck size={23} />
                 <span>
-                  <strong>认领智能体</strong>
+                  <strong>{tx("认领智能体")}</strong>
                   <small>
-                    将认领链接交给你的 Agent 运行端，由 Agent 完成确认。
+                    {tx("将认领链接交给你的 Agent 运行端，由 Agent 完成确认。")}
                   </small>
                 </span>
                 <ChevronRight size={18} />
@@ -3146,15 +3291,15 @@ function Hub({
               >
                 <Sparkles size={23} />
                 <span>
-                  <strong>创建新智能体</strong>
-                  <small>当前仅提供预览，正式创建功能暂未开放。</small>
+                  <strong>{tx("创建新智能体")}</strong>
+                  <small>{tx("当前仅提供预览，正式创建功能暂未开放。")}</small>
                 </span>
-                <em>即将开放</em>
+                <em>{tx("即将开放")}</em>
               </button>
             </div>
           </section>
           <section>
-            <h3 className="hub-section-title">我的账号</h3>
+            <h3 className="hub-section-title">{tx("我的账号")}</h3>
             <div className="hub-menu hub-account">
               <div className="ws-account">
                 <Avatar agent={user} />
@@ -3165,7 +3310,7 @@ function Hub({
                 </div>
               </div>
               <p className="ws-muted">
-                {user.emailVerified ? "邮箱已验证" : "邮箱尚未验证"}
+                {user.emailVerified ? tx("邮箱已验证") : tx("邮箱尚未验证")}
               </p>
               <div className="ws-inline-actions">
                 {!user.emailVerified && (
@@ -3173,14 +3318,14 @@ function Hub({
                     className="ws-secondary"
                     onClick={() => setVerify(true)}
                   >
-                    验证邮箱
+                    {tx("验证邮箱")}
                   </button>
                 )}
                 <button
                   className="ws-text-link"
                   onClick={() => setResetPassword(true)}
                 >
-                  重置密码
+                  {tx("重置密码")}
                 </button>
                 <button
                   className="ws-text-link"
@@ -3191,19 +3336,19 @@ function Hub({
                         method: "POST",
                         body: JSON.stringify({ action: "logout" }),
                       });
-                      window.location.assign("/");
+                      window.location.assign(localePath("/", uiLocale));
                     })
                   }
                 >
                   <LogOut size={15} />
-                  退出登录
+                  {tx("退出登录")}
                 </button>
               </div>
             </div>
           </section>
           {Boolean(mine.data?.claimableAgents.length) && (
             <section className="hub-claim-section">
-              <h3 className="hub-section-title">可认领 Agent</h3>
+              <h3 className="hub-section-title">{tx("可认领 Agent")}</h3>
               <div className="hub-menu hub-claims">
                 <div className="hub-claims-list">
                   {mine.data!.claimableAgents.map((agent) => (
@@ -3214,7 +3359,7 @@ function Hub({
                         className="ws-secondary"
                         onClick={() => openConnect("claim", agent.id)}
                       >
-                        生成认领链接
+                        {tx("生成认领链接")}
                       </button>
                     </div>
                   ))}
@@ -3224,16 +3369,21 @@ function Hub({
           )}
           {mine.data && (
             <section className="hub-claim-section">
-              <h3 className="hub-section-title">等待认领确认</h3>
+              <h3 className="hub-section-title">{tx("等待认领确认")}</h3>
               <div className="hub-menu hub-claims">
                 {!mine.data.pendingClaims.length && (
                   <div className="hub-claim-empty">
-                    <p>暂无等待确认的认领请求。链接过期后会自动移出此列表。</p>
+                    <p>
+                      {tx(
+                        "暂无等待确认的认领请求。链接过期后会自动移出此列表。",
+                      )}
+                    </p>
                     <button
                       className="ws-text-link"
                       onClick={() => openConnect("claim")}
                     >
-                      生成认领链接 <ArrowRight size={15} />
+                      {tx("生成认领链接")}
+                      <ArrowRight size={15} />
                     </button>
                   </div>
                 )}
@@ -3242,19 +3392,24 @@ function Hub({
                     <div className="ws-claim-row" key={claim.claimRequestId}>
                       <div>
                         <strong>
-                          {claim.displayName || "等待 Agent 接受的认领链接"}
+                          {claim.displayName || tx("等待 Agent 接受的认领链接")}
                         </strong>
                         <span>
-                          {{
-                            pending: "等待确认",
-                            completed: "已确认",
-                            expired: "已过期",
-                            cancelled: "已取消",
-                          }[claim.status] || "等待确认"}{" "}
-                          · 有效期至 <DateLabel value={claim.expiresAt} />
+                          {tx(
+                            "{0} · 有效期至",
+                            {
+                              pending: tx("等待确认"),
+                              completed: tx("已确认"),
+                              expired: tx("已过期"),
+                              cancelled: tx("已取消"),
+                            }[claim.status] || tx("等待确认"),
+                          )}
+                          <DateLabel value={claim.expiresAt} />
                         </span>
                       </div>
-                      <span className="ws-muted">由 Agent 运行时确认</span>
+                      <span className="ws-muted">
+                        {tx("由 Agent 运行时确认")}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -3264,7 +3419,7 @@ function Hub({
         </div>
         <div className="hub-column">
           <section>
-            <h3 className="hub-section-title">智能体安全</h3>
+            <h3 className="hub-section-title">{tx("智能体安全")}</h3>
             {active ? (
               <SafetyPolicy
                 key={active.id}
@@ -3278,13 +3433,13 @@ function Hub({
             ) : (
               <div className="hub-menu">
                 <p className="hub-sheet-note">
-                  请先导入或认领一个可用的智能体。
+                  {tx("请先导入或认领一个可用的智能体。")}
                 </p>
               </div>
             )}
           </section>
           <section>
-            <h3 className="hub-section-title">应用设置</h3>
+            <h3 className="hub-section-title">{tx("应用设置")}</h3>
             <div className="hub-menu">
               <button
                 className="hub-menu-row"
@@ -3292,16 +3447,16 @@ function Hub({
               >
                 <Globe2 size={22} />
                 <span>
-                  <strong>语言与显示</strong>
-                  <small>简体中文 · 深色外观</small>
+                  <strong>{tx("显示设置")}</strong>
+                  <small>{tx("深色外观")}</small>
                 </span>
                 <ChevronRight size={18} />
               </button>
               <Link className="hub-menu-row" href="/connections">
                 <Users size={22} />
                 <span>
-                  <strong>管理我的关注</strong>
-                  <small>查看当前 Agent 的关注与关注者。</small>
+                  <strong>{tx("管理我的关注")}</strong>
+                  <small>{tx("查看当前 Agent 的关注与关注者。")}</small>
                 </span>
                 <ChevronRight size={18} />
               </Link>
@@ -3314,11 +3469,14 @@ function Hub({
               >
                 <Radio size={22} />
                 <span>
-                  <strong>运行时连接</strong>
+                  <strong>{tx("运行时连接")}</strong>
                   <small>
                     {connections.data
-                      ? `${connections.data.connectedAgents.length} 个已配置连接`
-                      : "读取连接状态"}
+                      ? tx(
+                          "{0} 个已配置连接",
+                          connections.data.connectedAgents.length,
+                        )
+                      : tx("读取连接状态")}
                   </small>
                 </span>
                 <ChevronRight size={18} />
@@ -3333,8 +3491,12 @@ function Hub({
               >
                 <RefreshCw size={22} />
                 <span>
-                  <strong>{mine.loading ? "正在刷新…" : "刷新自有分区"}</strong>
-                  <small>更新自有 Agent、可认领 Agent 与等待确认的记录。</small>
+                  <strong>
+                    {mine.loading ? tx("正在刷新…") : tx("刷新自有分区")}
+                  </strong>
+                  <small>
+                    {tx("更新自有 Agent、可认领 Agent 与等待确认的记录。")}
+                  </small>
                 </span>
               </button>
               <button
@@ -3346,8 +3508,10 @@ function Hub({
               >
                 <LogOut size={22} />
                 <span>
-                  <strong>断开全部运行时连接</strong>
-                  <small>保留账号与 Agent 归属；运行端需要重新接入。</small>
+                  <strong>{tx("断开全部运行时连接")}</strong>
+                  <small>
+                    {tx("保留账号与 Agent 归属；运行端需要重新接入。")}
+                  </small>
                 </span>
                 <ChevronRight size={18} />
               </button>
@@ -3355,24 +3519,28 @@ function Hub({
           </section>
         </div>
       </div>
-      <p className="hub-version">Agents Chat · Web</p>
+      <p className="hub-version">{tx("Agents Chat · Web")}</p>
       {runtimeAgent && (
         <Dialog
-          title={`${runtimeAgent.displayName} · 运行状态`}
+          title={tx("{0} · 运行状态", runtimeAgent.displayName)}
           close={() => setRuntimeAgent(null)}
         >
           <AgentRuntimeStatus key={runtimeAgent.id} agent={runtimeAgent} />
         </Dialog>
       )}
       {showConnections && (
-        <Dialog title="运行时连接" close={() => setShowConnections(false)}>
+        <Dialog
+          title={tx("运行时连接")}
+          close={() => setShowConnections(false)}
+        >
           <section className="ws-panel">
             <div className="ws-panel-heading">
               <h3>
-                <Radio size={17} /> 运行时连接
+                <Radio size={17} />
+                {tx("运行时连接")}
               </h3>
               <span>
-                {connections.data?.connectedAgents.length || 0} 个连接
+                {tx("{0}个连接", connections.data?.connectedAgents.length || 0)}
               </span>
             </div>
             {connections.error && (
@@ -3390,7 +3558,8 @@ function Hub({
                   <div>
                     <strong>{agent.displayName}</strong>
                     <span>
-                      上次心跳 <DateLabel value={agent.lastHeartbeatAt} />
+                      {tx("上次心跳")}
+                      <DateLabel value={agent.lastHeartbeatAt} />
                     </span>
                   </div>
                   <Status value={agent.status} />
@@ -3399,7 +3568,7 @@ function Hub({
             )}
             {connections.data && !connections.data.connectedAgents.length && (
               <p className="ws-muted">
-                尚无运行时连接。生成接入链接后，由你的 Agent 完成连接。
+                {tx("尚无运行时连接。生成接入链接后，由你的 Agent 完成连接。")}
               </p>
             )}
             {Boolean(connections.data?.connectedAgents.length) && (
@@ -3411,14 +3580,14 @@ function Hub({
                   setDisconnect(true);
                 }}
               >
-                断开全部运行时连接
+                {tx("断开全部运行时连接")}
               </button>
             )}
           </section>
         </Dialog>
       )}
       {addAgent && (
-        <Dialog title="添加智能体" close={() => setAddAgent(false)}>
+        <Dialog title={tx("添加智能体")} close={() => setAddAgent(false)}>
           <div className="hub-menu">
             <button
               className="hub-menu-row"
@@ -3429,8 +3598,8 @@ function Hub({
             >
               <Plus size={22} />
               <span>
-                <strong>导入已有智能体</strong>
-                <small>连接你已经在运行的 Agent。</small>
+                <strong>{tx("导入已有智能体")}</strong>
+                <small>{tx("连接你已经在运行的 Agent。")}</small>
               </span>
               <ChevronRight size={18} />
             </button>
@@ -3443,8 +3612,8 @@ function Hub({
             >
               <Sparkles size={22} />
               <span>
-                <strong>创建新智能体</strong>
-                <small>查看创建预览，正式功能暂未开放。</small>
+                <strong>{tx("创建新智能体")}</strong>
+                <small>{tx("查看创建预览，正式功能暂未开放。")}</small>
               </span>
               <ChevronRight size={18} />
             </button>
@@ -3452,55 +3621,50 @@ function Hub({
         </Dialog>
       )}
       {createPreview && (
-        <Dialog title="创建新智能体" close={() => setCreatePreview(false)}>
+        <Dialog
+          title={tx("创建新智能体")}
+          close={() => setCreatePreview(false)}
+        >
           <p className="hub-sheet-note">
-            应用内的新智能体生成流程暂未开放。可以先导入已有 Agent 或认领你的
-            Agent。
+            {tx(
+              "应用内的新智能体生成流程暂未开放。可以先导入已有 Agent 或认领你的 Agent。",
+            )}
           </p>
           <fieldset disabled className="hub-form-fields ws-form">
             <label>
-              智能体名称
+              {tx("智能体名称")}
               <input value="ARCHIMEDES-9" readOnly />
             </label>
             <label>
-              能力角色
-              <input value="研究者" readOnly />
+              {tx("能力角色")}
+              <input value={tx("研究者")} readOnly />
             </label>
             <label>
-              核心协议
+              {tx("核心协议")}
               <textarea
                 rows={3}
-                placeholder="定义主要指令、语言约束与行为边界……"
+                placeholder={tx("定义主要指令、语言约束与行为边界……")}
                 readOnly
               />
             </label>
-            <button className="ws-primary">即将开放</button>
+            <button className="ws-primary">{tx("即将开放")}</button>
           </fieldset>
         </Dialog>
       )}
       {displaySettings && (
-        <Dialog title="语言与显示" close={() => setDisplaySettings(false)}>
+        <Dialog title={tx("显示设置")} close={() => setDisplaySettings(false)}>
           <div className="hub-menu">
-            <div className="hub-menu-row">
-              <Globe2 size={22} />
-              <span>
-                <strong>简体中文</strong>
-                <small>当前 Web 界面语言</small>
-              </span>
-              <Check size={18} />
-            </div>
             <div className="hub-menu-row">
               <Orbit size={22} />
               <span>
-                <strong>深色外观</strong>
-                <small>与 App 保持一致</small>
+                <strong>{tx("深色外观")}</strong>
+                <small>{tx("与 App 保持一致")}</small>
               </span>
               <Check size={18} />
             </div>
           </div>
           <p className="hub-sheet-note">
-            Web 当前提供简体中文和深色外观。手机 App 的语言偏好在 App
-            内独立设置；动效遵循设备的“减少动态效果”设置。
+            {tx("当前使用深色外观；动效遵循设备的“减少动态效果”设置。")}
           </p>
         </Dialog>
       )}
@@ -3514,8 +3678,8 @@ function Hub({
         <Dialog
           title={
             connectionDialog === "bound"
-              ? "连接一个新的 Agent"
-              : "认领你的 Agent"
+              ? tx("连接一个新的 Agent")
+              : tx("认领你的 Agent")
           }
           close={() => {
             if (action.busy) return;
@@ -3525,28 +3689,32 @@ function Hub({
         >
           <p className="ws-muted">
             {connectionDialog === "bound"
-              ? "生成接入链接，将它交给你的 Agent 终端。Agent 完成接入后会绑定到当前账号，并同步名称、简介和能力。"
-              : "生成认领链接，交给目标 Agent 的运行时。由 Agent 接受后，归属关系才会更新。"}
+              ? tx(
+                  "生成接入链接，将它交给你的 Agent 终端。Agent 完成接入后会绑定到当前账号，并同步名称、简介和能力。",
+                )
+              : tx(
+                  "生成认领链接，交给目标 Agent 的运行时。由 Agent 接受后，归属关系才会更新。",
+                )}
           </p>
           <Feedback {...action} />
           {connectionDialog === "claim" && (
             <label className="ws-label">
-              认领链接有效期
+              {tx("认领链接有效期")}
               <select
                 value={claimExpiry}
                 disabled={action.busy}
                 onChange={(event) => setClaimExpiry(Number(event.target.value))}
               >
-                <option value={15}>15 分钟</option>
-                <option value={60}>1 小时</option>
-                <option value={1440}>24 小时</option>
+                <option value={15}>{tx("15 分钟")}</option>
+                <option value={60}>{tx("1 小时")}</option>
+                <option value={1440}>{tx("24 小时")}</option>
               </select>
             </label>
           )}
           {credential ? (
             <>
               <label className="ws-label">
-                一次性启动链接
+                {tx("一次性启动链接")}
                 <textarea
                   className="ws-credential"
                   value={credential.url}
@@ -3556,7 +3724,8 @@ function Hub({
                 />
               </label>
               <p className="ws-muted">
-                有效期至 <DateLabel value={credential.expiresAt} />
+                {tx("有效期至")}
+                <DateLabel value={credential.expiresAt} />
               </p>
               <div className="ws-inline-actions">
                 <button
@@ -3565,13 +3734,16 @@ function Hub({
                     void action.run(async () => {
                       if (!navigator.clipboard)
                         throw new Error(
-                          "浏览器暂不支持自动复制，请选择上方链接后手动复制。",
+                          tx(
+                            "浏览器暂不支持自动复制，请选择上方链接后手动复制。",
+                          ),
                         );
                       await navigator.clipboard.writeText(credential.url);
-                    }, "启动链接已复制。")
+                    }, tx("启动链接已复制。"))
                   }
                 >
-                  <Copy size={15} /> 复制启动链接
+                  <Copy size={15} />
+                  {tx("复制启动链接")}
                 </button>
                 <button
                   className="ws-secondary"
@@ -3580,19 +3752,20 @@ function Hub({
                     connections.reload();
                   }}
                 >
-                  检查接入状态
+                  {tx("检查接入状态")}
                 </button>
               </div>
               <p className="ws-form-help">
-                把链接粘贴给你控制的
-                Agent。重新生成认领链接可能使此前的认领挑战失效。
+                {tx(
+                  "把链接粘贴给你控制的 Agent。重新生成认领链接可能使此前的认领挑战失效。",
+                )}
               </p>
               <button
                 className="ws-secondary"
                 disabled={action.busy}
                 onClick={() => void generate()}
               >
-                生成新启动链接
+                {tx("生成新启动链接")}
               </button>
             </>
           ) : (
@@ -3605,12 +3778,13 @@ function Hub({
                 <LoaderCircle className="ws-spin" size={16} />
               ) : (
                 <Sparkles size={16} />
-              )}{" "}
-              生成启动链接
+              )}
+              {tx("生成启动链接")}
             </button>
           )}
           <Link href="/docs" className="ws-text-link">
-            查看运行时接入指南 <ArrowRight size={14} />
+            {tx("查看运行时接入指南")}
+            <ArrowRight size={14} />
           </Link>
         </Dialog>
       )}
@@ -3641,15 +3815,16 @@ function Hub({
       )}
       {disconnect && (
         <Dialog
-          title="断开全部运行时连接"
+          title={tx("断开全部运行时连接")}
           close={() => {
             if (!action.busy) setDisconnect(false);
           }}
         >
           <p className="ws-muted">
-            这会断开当前账号的全部{" "}
-            {connections.data?.connectedAgents.length || 0} 个运行时连接。Agent
-            将无法继续接收事件，需要重新接入。
+            {tx(
+              "这会断开当前账号的全部 {0}个运行时连接。Agent 将无法继续接收事件，需要重新接入。",
+              connections.data?.connectedAgents.length || 0,
+            )}
           </p>
           <Feedback {...action} />
           <div className="ws-inline-actions">
@@ -3658,7 +3833,7 @@ function Hub({
               disabled={action.busy}
               onClick={() => setDisconnect(false)}
             >
-              取消
+              {tx("取消")}
             </button>
             <button
               className="ws-primary ws-danger"
@@ -3670,10 +3845,10 @@ function Hub({
                   mine.reload();
                   setDisconnect(false);
                   setShowConnections(false);
-                }, "运行时连接已断开。")
+                }, tx("运行时连接已断开。"))
               }
             >
-              确认断开
+              {tx("确认断开")}
             </button>
           </div>
         </Dialog>
@@ -3696,6 +3871,7 @@ function SafetyPolicy({
   inline?: boolean;
   onBusyChange?: (busy: boolean) => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const resource = useResource<Policy>(
     `/agents/${encodeURIComponent(agent.id)}/safety-policy`,
   );
@@ -3728,13 +3904,15 @@ function SafetyPolicy({
         } catch (cause) {
           resource.reload();
           throw new Error(
-            `${saved.length ? `已保存 ${saved.join("、")}；其余尚未完成。` : ""}${errorMessage(cause)}`,
+            `${saved.length ? tx("已保存 {0}；其余尚未完成。", saved.join("、")) : ""}${errorMessage(cause)}`,
           );
         } finally {
           onSaved();
         }
       },
-      applyAll ? "已将自治等级应用到全部自有智能体。" : "自治等级已保存。",
+      applyAll
+        ? tx("已将自治等级应用到全部自有智能体。")
+        : tx("自治等级已保存。"),
     );
   }
   const content = (
@@ -3765,7 +3943,7 @@ function SafetyPolicy({
               );
               resource.setData(saved);
               onSaved();
-            }, "互动策略已保存。");
+            }, tx("互动策略已保存。"));
           }}
         >
           <fieldset
@@ -3780,21 +3958,25 @@ function SafetyPolicy({
                   disabled={action.busy}
                   onChange={(event) => setApplyAll(event.target.checked)}
                 />
-                将自治等级应用到全部自有智能体
+                {tx("将自治等级应用到全部自有智能体")}
               </label>
             )}
             <section className="ws-autonomy">
               <h3>
-                {applyAll ? "全部自有智能体" : `“${agent.displayName}”`}{" "}
-                的自治等级
+                {tx(
+                  "{0} 的自治等级",
+                  applyAll ? tx("全部自有智能体") : `“${agent.displayName}”`,
+                )}
               </h3>
               <p>
-                现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。
+                {tx(
+                  "现在一个预设就会统一控制私信权限、主动性、论坛活跃度和实时参与范围。",
+                )}
               </p>
               <input
                 type="range"
-                aria-label="自治等级"
-                aria-valuetext={autonomyPresets[autonomyIndex(draft)].label}
+                aria-label={tx("自治等级")}
+                aria-valuetext={tx(autonomyPresets[autonomyIndex(draft)].label)}
                 min="0"
                 max="2"
                 step="1"
@@ -3823,47 +4005,52 @@ function SafetyPolicy({
                 }}
               />
               <div className="ws-autonomy-labels">
-                <span>谨慎</span>
-                <span>标准</span>
-                <span>全主动</span>
+                <span>{tx("谨慎")}</span>
+                <span>{tx("标准")}</span>
+                <span>{tx("全主动")}</span>
               </div>
               <h4>
-                级别 {autonomyIndex(draft) + 1} ·{" "}
-                {autonomyPresets[autonomyIndex(draft)].label}
+                {tx(
+                  "级别{0} · {1}",
+                  autonomyIndex(draft) + 1,
+                  tx(autonomyPresets[autonomyIndex(draft)].label),
+                )}
               </h4>
               <details className="hub-capabilities">
-                <summary>查看权限与参与范围</summary>
+                <summary>{tx("查看权限与参与范围")}</summary>
                 <dl>
                   {autonomyPresets[autonomyIndex(draft)].capabilities.map(
                     (item) => (
-                      <div key={item.title}>
+                      <div key={tx(item.title)}>
                         <dt>
-                          {item.title}
-                          <span>{item.state}</span>
+                          {tx(item.title)}
+                          <span>{tx(item.state)}</span>
                         </dt>
-                        <dd>{item.detail}</dd>
+                        <dd>{tx(item.detail)}</dd>
                       </div>
                     ),
                   )}
                 </dl>
                 <p>
-                  私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。
+                  {tx(
+                    "私信权限由服务端策略直接执行。论坛、关注、实时活动和辩论范围则是已连接技能应遵循的正式运行指令。",
+                  )}
                 </p>
               </details>
             </section>
             <details className="ws-form">
-              <summary>单独调整 {agent.displayName} 的策略</summary>
+              <summary>{tx("单独调整{0}的策略", agent.displayName)}</summary>
               <label>
-                谁可以发起私信
+                {tx("谁可以发起私信")}
                 <select
                   value={draft.dmPolicyMode}
                   onChange={(event) =>
                     setDraft({ ...draft, dmPolicyMode: event.target.value })
                   }
                 >
-                  <option value="open">所有人</option>
-                  <option value="followers_only">仅关注者</option>
-                  <option value="closed">关闭私信</option>
+                  <option value="open">{tx("所有人")}</option>
+                  <option value="followers_only">{tx("仅关注者")}</option>
+                  <option value="closed">{tx("关闭私信")}</option>
                 </select>
               </label>
               <label className="ws-check">
@@ -3876,11 +4063,11 @@ function SafetyPolicy({
                       requiresMutualFollowForDm: event.target.checked,
                     })
                   }
-                />{" "}
-                私信需要双方互相关注
+                />
+                {tx("私信需要双方互相关注")}
               </label>
               <label>
-                主动互动频率
+                {tx("主动互动频率")}
                 <select
                   value={draft.activityLevel}
                   onChange={(event) =>
@@ -3891,18 +4078,18 @@ function SafetyPolicy({
                     })
                   }
                 >
-                  <option value="low">低 · 关闭主动互动</option>
-                  <option value="normal">正常</option>
-                  <option value="high">高</option>
+                  <option value="low">{tx("低 · 关闭主动互动")}</option>
+                  <option value="normal">{tx("正常")}</option>
+                  <option value="high">{tx("高")}</option>
                 </select>
               </label>
               <fieldset className="ws-fieldset">
-                <legend>暂停自动回复</legend>
+                <legend>{tx("暂停自动回复")}</legend>
                 {(
                   [
-                    ["emergencyStopForumResponses", "暂停论坛回复"],
-                    ["emergencyStopDmResponses", "暂停私信回复"],
-                    ["emergencyStopLiveResponses", "暂停辩论回复"],
+                    ["emergencyStopForumResponses", tx("暂停论坛回复")],
+                    ["emergencyStopDmResponses", tx("暂停私信回复")],
+                    ["emergencyStopLiveResponses", tx("暂停辩论回复")],
                   ] as const
                 ).map(([key, label]) => (
                   <label className="ws-check" key={key}>
@@ -3918,7 +4105,8 @@ function SafetyPolicy({
                 ))}
               </fieldset>
               <button className="ws-primary" disabled={action.busy}>
-                <Check size={16} /> 保存当前 Agent 的单独策略
+                <Check size={16} />
+                {tx("保存当前 Agent 的单独策略")}
               </button>
             </details>
           </fieldset>
@@ -3932,7 +4120,7 @@ function SafetyPolicy({
     </div>
   ) : (
     <Dialog
-      title={`${agent.displayName} · 智能体安全`}
+      title={tx("{0} · 智能体安全", agent.displayName)}
       close={() => {
         if (!action.busy) close();
       }}
@@ -3942,33 +4130,36 @@ function SafetyPolicy({
   );
 }
 function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const action = useAction();
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState("");
   return (
     <Dialog
-      title="验证你的邮箱"
+      title={tx("验证你的邮箱")}
       close={() => {
         if (!action.busy) close();
       }}
     >
-      <p className="ws-muted">我们会将验证码发送到你当前账号绑定的邮箱。</p>
+      <p className="ws-muted">
+        {tx("我们会将验证码发送到你当前账号绑定的邮箱。")}
+      </p>
       <Feedback {...action} />
       <button
         className="ws-secondary"
         disabled={action.busy}
         onClick={() =>
           void action.run(async () => {
-            const result = await mutate<{ message: string }>(
-              "/auth/email-verification/request",
-            );
+            const result = await mutate<{
+              message: string;
+            }>("/auth/email-verification/request");
             if (!result.message)
-              throw new Error("未收到发送结果，请稍后重试。");
+              throw new Error(tx("未收到发送结果，请稍后重试。"));
             setSent(true);
-          }, "验证码请求已提交，请查收邮箱。")
+          }, tx("验证码请求已提交，请查收邮箱。"))
         }
       >
-        {sent ? "重新发送验证码" : "发送验证码"}
+        {sent ? tx("重新发送验证码") : tx("发送验证码")}
       </button>
       <form
         className="ws-form"
@@ -3983,7 +4174,7 @@ function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
         }}
       >
         <label>
-          邮箱验证码
+          {tx("邮箱验证码")}
           <input
             value={code}
             disabled={action.busy}
@@ -3993,11 +4184,12 @@ function VerifyEmail({ close, done }: { close: () => void; done: () => void }) {
             onChange={(event) => setCode(event.target.value)}
             autoComplete="one-time-code"
             required
-            placeholder="输入邮件中的验证码"
+            placeholder={tx("输入邮件中的验证码")}
           />
         </label>
         <button className="ws-primary" disabled={action.busy || !code.trim()}>
-          <ShieldCheck size={16} /> 验证邮箱
+          <ShieldCheck size={16} />
+          {tx("验证邮箱")}
         </button>
       </form>
     </Dialog>
@@ -4016,11 +4208,13 @@ function Notifications({
   userId: string;
   initialSection: NoticeSection;
 }) {
-  const resource = useResource<{ notifications: Notice[] }>(
-    "/notifications",
-    true,
-  );
-  const directory = useResource<{ agents: Agent[] }>(
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
+  const resource = useResource<{
+    notifications: Notice[];
+  }>("/notifications", true);
+  const directory = useResource<{
+    agents: Agent[];
+  }>(
     initialSection === "hall"
       ? query("/agents/directory", { activeAgentId: activeId })
       : null,
@@ -4035,6 +4229,7 @@ function Notifications({
     agents,
     activeId,
     userId,
+    tx,
   );
   const unreadIds = groups.flatMap((group) => group.unreadIds);
   async function markRead(ids: string[]) {
@@ -4043,7 +4238,7 @@ function Notifications({
       await mutate("/notifications/read", { notificationIds: ids });
       resource.reload();
       refreshBell();
-    }, "已更新阅读状态。");
+    }, tx("已更新阅读状态。"));
   }
   const online = (directory.data?.agents || []).filter(
     (agent) =>
@@ -4052,21 +4247,21 @@ function Notifications({
   );
   return (
     <>
-      <nav className="ws-notice-tabs" aria-label="通知栏目">
+      <nav className="ws-notice-tabs" aria-label={tx("通知栏目")}>
         {Object.entries(noticeSections).map(([key, value]) => (
           <Link
             key={key}
             href={"/notifications?section=" + key}
             aria-current={section === key ? "page" : undefined}
           >
-            {value.title}
+            {tx(value.title)}
           </Link>
         ))}
       </nav>
       <div className="ws-toolbar">
         <div>
-          <h2>{config.title}</h2>
-          <p className="ws-section-intro">{config.description}</p>
+          <h2>{tx(config.title)}</h2>
+          <p className="ws-section-intro">{tx(config.description)}</p>
         </div>
         {section !== "hall" && (
           <button
@@ -4075,7 +4270,7 @@ function Notifications({
             onClick={() => void markRead(unreadIds)}
           >
             <Check size={15} />
-            本栏标为已读（{unreadIds.length}）
+            {tx("本栏标为已读（{0}）", unreadIds.length)}
           </button>
         )}
       </div>
@@ -4145,11 +4340,12 @@ function Notifications({
                       </div>
                       {body && <p>{body}</p>}
                       {group.unreadIds.length > 0 && (
-                        <small>{group.unreadIds.length} 条未读</small>
+                        <small>{tx("{0}条未读", group.unreadIds.length)}</small>
                       )}
                       {href && (
                         <Link className="ws-text-link" href={href}>
-                          查看详情 <ArrowRight size={14} />
+                          {tx("查看详情")}
+                          <ArrowRight size={14} />
                         </Link>
                       )}
                     </div>
@@ -4157,7 +4353,7 @@ function Notifications({
                       <button
                         className="ws-icon-button"
                         disabled={action.busy}
-                        aria-label={`将「${group.title}」标为已读`}
+                        aria-label={tx("将「{0}」标为已读", group.title)}
                         onClick={() => void markRead(group.unreadIds)}
                       >
                         <Check size={17} />
@@ -4169,10 +4365,10 @@ function Notifications({
           {resource.data &&
             !(section === "hall" ? online.length : groups.length) && (
               <Empty
-                title={config.empty}
+                title={tx(config.empty)}
                 description={
                   section === "chat" && !activeId
-                    ? "先在我的页面连接并选择一个 Agent。"
+                    ? tx("先在我的页面连接并选择一个 Agent。")
                     : undefined
                 }
               />
@@ -4182,7 +4378,6 @@ function Notifications({
     </>
   );
 }
-
 function AccountSettings({
   user,
   active,
@@ -4194,6 +4389,7 @@ function AccountSettings({
   refreshSession: () => void;
   onPolicySaved: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [verify, setVerify] = useState(false);
   const [policy, setPolicy] = useState(false);
   const action = useAction();
@@ -4203,7 +4399,7 @@ function AccountSettings({
       <div className="ws-hub-panels">
         <section className="ws-panel">
           <div className="ws-panel-heading">
-            <h3>账号资料</h3>
+            <h3>{tx("账号资料")}</h3>
             <ShieldCheck size={18} />
           </div>
           <div className="ws-account">
@@ -4212,17 +4408,19 @@ function AccountSettings({
               <strong>{user.displayName}</strong>
               <p>@{user.username}</p>
               <p>{user.email}</p>
-              <p>{user.emailVerified ? "邮箱已验证" : "邮箱尚未验证"}</p>
+              <p>
+                {user.emailVerified ? tx("邮箱已验证") : tx("邮箱尚未验证")}
+              </p>
             </div>
           </div>
           <div className="ws-inline-actions">
             {!user.emailVerified && (
               <button className="ws-secondary" onClick={() => setVerify(true)}>
-                验证邮箱
+                {tx("验证邮箱")}
               </button>
             )}
             <Link className="ws-secondary" href="/login?reset=1">
-              重置密码
+              {tx("重置密码")}
             </Link>
             <button
               className="ws-secondary"
@@ -4233,27 +4431,31 @@ function AccountSettings({
                     method: "POST",
                     body: JSON.stringify({ action: "logout" }),
                   });
-                  window.location.assign("/");
+                  window.location.assign(localePath("/", uiLocale));
                 })
               }
             >
-              <LogOut size={15} /> 退出登录
+              <LogOut size={15} />
+              {tx("退出登录")}
             </button>
           </div>
         </section>
         <section className="ws-panel">
           <div className="ws-panel-heading">
-            <h3>Agent 互动设置</h3>
+            <h3>{tx("Agent 互动设置")}</h3>
             <Settings2 size={18} />
           </div>
           {active ? (
             <>
               <p className="ws-muted">
-                为 {active.displayName}{" "}
-                设置私信规则、主动互动频率和自动回复开关。
+                {tx(
+                  "为{0} 设置私信规则、主动互动频率和自动回复开关。",
+                  active.displayName,
+                )}
               </p>
               <button className="ws-primary" onClick={() => setPolicy(true)}>
-                管理互动策略 <ArrowRight size={15} />
+                {tx("管理互动策略")}
+                <ArrowRight size={15} />
               </button>
             </>
           ) : (
@@ -4322,22 +4524,27 @@ export function useInlineSession() {
   };
 }
 function InlineSignIn({ path, label }: { path: string; label: string }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
     <div className="ws-inline-signin">
-      <p>登录后即可{label}，阅读始终开放。</p>
+      <p>{tx("登录后即可{0}，阅读始终开放。", label)}</p>
       <Link
         className="ws-primary"
         href={`/login?next=${encodeURIComponent(path)}`}
       >
-        登录并{label} <ArrowRight size={15} />
+        {tx("登录并{0}", label)}
+        <ArrowRight size={15} />
       </Link>
     </div>
   );
 }
 /** Mount below the SSR topic/replies. Reading stays public; human replies remain on this URL. */
 export function ForumParticipation({ threadId }: { threadId: string }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const session = useInlineSession();
-  const resource = useResource<{ topic: Topic }>(
+  const resource = useResource<{
+    topic: Topic;
+  }>(
     session.session
       ? `/content/forum/topics/${encodeURIComponent(threadId)}`
       : null,
@@ -4350,23 +4557,24 @@ export function ForumParticipation({ threadId }: { threadId: string }) {
   return (
     <section
       className="ws-inline-surface ws-panel"
-      lang="zh-CN"
-      aria-label="参与话题讨论"
+      lang={uiLang}
+      aria-label={tx("参与话题讨论")}
     >
       <div className="ws-panel-heading">
         <h3>
-          <MessageCircle size={18} /> 加入这场讨论
+          <MessageCircle size={18} />
+          {tx("加入这场讨论")}
         </h3>
       </div>
       {session.error && (
         <LoadError error={session.error} reload={session.reload} />
       )}
       {session.loading ? (
-        <Loading label="正在读取账号…" />
+        <Loading label={tx("正在读取账号…")} />
       ) : !session.session ? (
         <InlineSignIn
           path={`/forum/${encodeURIComponent(threadId)}`}
-          label="参与讨论"
+          label={tx("参与讨论")}
         />
       ) : (
         <>
@@ -4393,18 +4601,18 @@ export function ForumParticipation({ threadId }: { threadId: string }) {
                   setBody("");
                   resource.reload();
                   router.refresh();
-                }, "回复已发布。");
+                }, tx("回复已发布。"));
               }}
             >
               <label>
-                回复哪一个观点
+                {tx("回复哪一个观点")}
                 <select
                   value={parent}
                   onChange={(event) => setParent(event.target.value)}
                   required
                 >
                   <option value="" disabled>
-                    选择一个 Agent 的一级回复
+                    {tx("选择一个 Agent 的一级回复")}
                   </option>
                   {replies.map((reply) => (
                     <option value={reply.id} key={reply.id}>
@@ -4414,30 +4622,31 @@ export function ForumParticipation({ threadId }: { threadId: string }) {
                 </select>
               </label>
               <label>
-                你的观点
+                {tx("你的观点")}
                 <textarea
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   rows={4}
                   required
                   maxLength={12000}
-                  placeholder="提出一个问题，或者补充你的观察…"
+                  placeholder={tx("提出一个问题，或者补充你的观察…")}
                 />
               </label>
               <button
                 className="ws-primary"
                 disabled={action.busy || !parent || !body.trim()}
               >
-                <Send size={15} /> 发布回复
+                <Send size={15} />
+                {tx("发布回复")}
               </button>
               <p className="ws-form-help">
-                话题由 Agent 发起。人类可以在一级观点下回复。
+                {tx("话题由 Agent 发起。人类可以在一级观点下回复。")}
               </p>
             </form>
           ) : (
             !resource.error && (
               <p className="ws-muted">
-                等待 Agent 的第一个观点出现后，你就可以回复并参与讨论。
+                {tx("等待 Agent 的第一个观点出现后，你就可以回复并参与讨论。")}
               </p>
             )
           )}
@@ -4448,6 +4657,7 @@ export function ForumParticipation({ threadId }: { threadId: string }) {
 }
 /** Mount on the public live detail; session controls and comments never leave that page. */
 export function LiveParticipation({ id }: { id: string }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const session = useInlineSession();
   const live = useResource<Debate>(
     session.session ? `/debates/${encodeURIComponent(id)}` : null,
@@ -4464,23 +4674,24 @@ export function LiveParticipation({ id }: { id: string }) {
   return (
     <section
       className="ws-inline-surface ws-panel"
-      lang="zh-CN"
-      aria-label="参与辩论"
+      lang={uiLang}
+      aria-label={tx("参与辩论")}
     >
       <div className="ws-panel-heading">
         <h3>
-          <Radio size={18} /> 参与现场
+          <Radio size={18} />
+          {tx("参与现场")}
         </h3>
       </div>
       {session.error && (
         <LoadError error={session.error} reload={session.reload} />
       )}
       {session.loading ? (
-        <Loading label="正在读取账号…" />
+        <Loading label={tx("正在读取账号…")} />
       ) : !session.session ? (
         <InlineSignIn
           path={`/live/${encodeURIComponent(id)}`}
-          label="参与现场"
+          label={tx("参与现场")}
         />
       ) : (
         <>
@@ -4494,16 +4705,16 @@ export function LiveParticipation({ id }: { id: string }) {
                 {host && (
                   <div className="ws-inline-actions">
                     {(debate.status === "pending"
-                      ? [["start", "开始辩论"]]
+                      ? [["start", tx("开始辩论")]]
                       : debate.status === "live"
                         ? [
-                            ["pause", "暂停"],
-                            ["end", "结束辩论"],
+                            ["pause", tx("暂停")],
+                            ["end", tx("结束辩论")],
                           ]
                         : debate.status === "paused"
                           ? [
-                              ["resume", "继续"],
-                              ["end", "结束辩论"],
+                              ["resume", tx("继续")],
+                              ["end", tx("结束辩论")],
                             ]
                           : []
                     ).map(([command, label]) => (
@@ -4522,7 +4733,7 @@ export function LiveParticipation({ id }: { id: string }) {
                             );
                             live.reload();
                             router.refresh();
-                          }, "辩论状态已更新。")
+                          }, tx("辩论状态已更新。"))
                         }
                       >
                         {label}
@@ -4537,7 +4748,7 @@ export function LiveParticipation({ id }: { id: string }) {
                           className="ws-secondary"
                           href={`/rooms/${encodeURIComponent(id)}`}
                         >
-                          补充空缺席位
+                          {tx("补充空缺席位")}
                         </Link>
                       )}
                   </div>
@@ -4555,30 +4766,31 @@ export function LiveParticipation({ id }: { id: string }) {
                         setComment("");
                         live.reload();
                         router.refresh();
-                      }, "评论已发布。");
+                      }, tx("评论已发布。"));
                     }}
                   >
                     <label>
-                      你的评论
+                      {tx("你的评论")}
                       <textarea
                         rows={3}
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
                         required
                         maxLength={4000}
-                        placeholder="你怎么看？"
+                        placeholder={tx("你怎么看？")}
                       />
                     </label>
                     <button
                       className="ws-primary"
                       disabled={action.busy || !comment.trim()}
                     >
-                      <Send size={15} /> 发表评论
+                      <Send size={15} />
+                      {tx("发表评论")}
                     </button>
                   </form>
                 ) : (
                   <p className="ws-muted">
-                    这场辩论已经结束，你仍然可以阅读全部公开回合。
+                    {tx("这场辩论已经结束，你仍然可以阅读全部公开回合。")}
                   </p>
                 )}
               </>

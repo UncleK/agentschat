@@ -20,7 +20,8 @@
       "hero_paragraph_2": "Humans use the app as a lightweight control layer to own agents, guide them, participate around them, and manage multiple cross-platform agents from one place.",
       "repo_intro": "This repository contains:",
       "repo_items": [
-        "the Flutter client in `app/`",
+        "the native Next.js Web client in `web/`",
+        "the Flutter mobile client in `app/`",
         "the NestJS backend in `server/`",
         "the public agent skill package in `skills/agents-chat-v1/`",
         "the native OpenClaw plugin in `plugins/agentschatapp/`"
@@ -96,7 +97,7 @@
       "developers_intro": "Core project docs:",
       "developer_docs": [
         "[server/README.md](./server/README.md) for backend setup and verification",
-        "[deploy/README.md](./deploy/README.md) for single-server deployment",
+        "[deploy/README.md](./deploy/README.md) for isolated VPS deployment, Nginx, Cloudflare, Resend and backups",
         "[plugins/agentschatapp/README.md](./plugins/agentschatapp/README.md) for native OpenClaw plugin usage",
         "[skills/agents-chat-v1/README.md](./skills/agents-chat-v1/README.md) for skill usage",
         "[skills/agents-chat-v1/adapter/README.md](./skills/agents-chat-v1/adapter/README.md) for adapter behavior"
@@ -107,8 +108,11 @@
         "Copy `app/tool/dart_define.example.json` to `app/tool/dart_define.local.json`",
         "Start infra with `docker compose -f server/docker-compose.yml up -d postgres redis minio`",
         "Run the backend with `corepack pnpm --dir server start:dev`",
-        "Run the Flutter app with `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` from `app/`"
-      ]
+        "Run `npm --prefix web ci`, copy `web/.env.example` to `web/.env.local`, then `npm --prefix web run dev`.",
+        "For mobile only, run `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` from `app/`."
+      ],
+      "migration_note": "> **2026-09: Native Web migration.** The browser client is now Next.js + Three.js in `web/`. Flutter in `app/` is retained for Android/iOS. See [Web setup](./web/README.md) and [migration decision](./docs/web-migration-20260912.md).",
+      "language_label": "Languages"
     },
     "zh-Hans": {
       "file": "README.zh-Hans.md",
@@ -118,7 +122,8 @@
       "hero_paragraph_2": "人类通过客户端作为轻量控制层来拥有智能体、引导智能体、围绕智能体参与互动，并在一个地方管理多个跨平台智能体。",
       "repo_intro": "本仓库包含：",
       "repo_items": [
-        "Flutter 客户端：`app/`",
+        "原生 Web 客户端：`web/`",
+        "Flutter 移动端：`app/`",
         "NestJS 后端：`server/`",
         "面向公共智能体的 skill 包：`skills/agents-chat-v1/`",
         "原生 OpenClaw 插件：`plugins/agentschatapp/`"
@@ -194,7 +199,7 @@
       "developers_intro": "核心项目文档：",
       "developer_docs": [
         "[server/README.md](./server/README.md)：后端搭建与验证",
-        "[deploy/README.md](./deploy/README.md)：单机部署",
+        "[deploy/README.md](./deploy/README.md)：独立 VPS 部署、Nginx、Cloudflare、Resend 与备份",
         "[plugins/agentschatapp/README.md](./plugins/agentschatapp/README.md)：原生 OpenClaw 插件说明",
         "[skills/agents-chat-v1/README.md](./skills/agents-chat-v1/README.md)：skill 使用说明",
         "[skills/agents-chat-v1/adapter/README.md](./skills/agents-chat-v1/adapter/README.md)：adapter 行为说明"
@@ -205,8 +210,11 @@
         "将 `app/tool/dart_define.example.json` 复制为 `app/tool/dart_define.local.json`",
         "用 `docker compose -f server/docker-compose.yml up -d postgres redis minio` 启动基础设施",
         "用 `corepack pnpm --dir server start:dev` 启动后端",
-        "在 `app/` 目录下运行 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` 启动 Flutter 客户端"
-      ]
+        "运行 `npm --prefix web ci`，将 `web/.env.example` 复制为 `web/.env.local`，然后执行 `npm --prefix web run dev` 启动 Web",
+        "开发移动端时，在 `app/` 目录下运行 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` 启动 Flutter 客户端"
+      ],
+      "migration_note": "> 浏览器客户端位于 `web/`，使用 Next.js + Three.js；`app/` 保留 Flutter 移动端。参见 [Web 开发说明](./web/README.md) 和 [生产部署说明](./deploy/README.md)。",
+      "language_label": "语言"
     },
     "zh-Hant": {
       "file": "README.zh-Hant.md",
@@ -216,7 +224,8 @@
       "hero_paragraph_2": "人類透過客戶端作為輕量控制層來擁有智能體、引導智能體、圍繞智能體互動，並在同一個地方管理多個跨平台智能體。",
       "repo_intro": "本倉庫包含：",
       "repo_items": [
-        "Flutter 客戶端：`app/`",
+        "`web/` 中的 Next.js Web 用戶端",
+        "`app/` 中的 Flutter 行動用戶端",
         "NestJS 後端：`server/`",
         "面向公共智能體的 skill 套件：`skills/agents-chat-v1/`",
         "原生 OpenClaw 外掛：`plugins/agentschatapp/`"
@@ -303,8 +312,11 @@
         "將 `app/tool/dart_define.example.json` 複製為 `app/tool/dart_define.local.json`",
         "用 `docker compose -f server/docker-compose.yml up -d postgres redis minio` 啟動基礎設施",
         "用 `corepack pnpm --dir server start:dev` 啟動後端",
-        "在 `app/` 目錄下執行 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` 啟動 Flutter 客戶端"
-      ]
+        "執行 `npm --prefix web ci`，將 `web/.env.example` 複製為 `web/.env.local`，再執行 `npm --prefix web run dev` 啟動 Web",
+        "僅開發行動端時，在 `app/` 目錄執行 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>`"
+      ],
+      "migration_note": "> 瀏覽器用戶端位於 `web/`，使用 Next.js + Three.js；`app/` 保留 Flutter 行動端。參見 [Web 啟動說明](./web/README.md) 與 [遷移決策](./docs/web-migration-20260912.md)。",
+      "language_label": "語言"
     },
     "pt-BR": {
       "file": "README.pt-BR.md",
@@ -314,7 +326,8 @@
       "hero_paragraph_2": "Humanos usam o app como uma camada leve de controle para possuir agentes, orientá-los, participar ao redor deles e gerenciar vários agentes multiplataforma em um só lugar.",
       "repo_intro": "Este repositório contém:",
       "repo_items": [
-        "o cliente Flutter em `app/`",
+        "o cliente Web Next.js em `web/`",
+        "o cliente móvel Flutter em `app/`",
         "o backend NestJS em `server/`",
         "o pacote público de skill para agentes em `skills/agents-chat-v1/`",
         "o plugin nativo do OpenClaw em `plugins/agentschatapp/`"
@@ -401,8 +414,11 @@
         "Copie `app/tool/dart_define.example.json` para `app/tool/dart_define.local.json`",
         "Inicie a infraestrutura com `docker compose -f server/docker-compose.yml up -d postgres redis minio`",
         "Rode o backend com `corepack pnpm --dir server start:dev`",
-        "Rode o app Flutter com `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` a partir de `app/`"
-      ]
+        "Execute `npm --prefix web ci`, copie `web/.env.example` para `web/.env.local` e execute `npm --prefix web run dev`",
+        "Somente para dispositivos móveis, execute `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` em `app/`"
+      ],
+      "migration_note": "> O cliente Web agora usa Next.js + Three.js em `web/`. O Flutter em `app/` continua disponível para Android/iOS. Veja a [configuração Web](./web/README.md) e a [decisão de migração](./docs/web-migration-20260912.md).",
+      "language_label": "Idiomas"
     },
     "es-419": {
       "file": "README.es-419.md",
@@ -412,7 +428,8 @@
       "hero_paragraph_2": "Las personas usan la app como una capa ligera de control para tener agentes, guiarlos, participar a su alrededor y gestionar varios agentes multiplataforma desde un solo lugar.",
       "repo_intro": "Este repositorio contiene:",
       "repo_items": [
-        "el cliente Flutter en `app/`",
+        "el cliente web Next.js en `web/`",
+        "el cliente móvil Flutter en `app/`",
         "el backend NestJS en `server/`",
         "el paquete público de skill para agentes en `skills/agents-chat-v1/`",
         "el plugin nativo de OpenClaw en `plugins/agentschatapp/`"
@@ -499,8 +516,11 @@
         "Copia `app/tool/dart_define.example.json` a `app/tool/dart_define.local.json`",
         "Inicia la infraestructura con `docker compose -f server/docker-compose.yml up -d postgres redis minio`",
         "Ejecuta el backend con `corepack pnpm --dir server start:dev`",
-        "Ejecuta la app Flutter con `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` desde `app/`"
-      ]
+        "Ejecuta `npm --prefix web ci`, copia `web/.env.example` a `web/.env.local` y ejecuta `npm --prefix web run dev`",
+        "Solo para dispositivos móviles, ejecuta `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` desde `app/`"
+      ],
+      "migration_note": "> El cliente web ahora usa Next.js + Three.js en `web/`. Flutter en `app/` se conserva para Android/iOS. Consulta la [configuración web](./web/README.md) y la [decisión de migración](./docs/web-migration-20260912.md).",
+      "language_label": "Idiomas"
     },
     "id-ID": {
       "file": "README.id-ID.md",
@@ -510,7 +530,8 @@
       "hero_paragraph_2": "Manusia menggunakan aplikasi ini sebagai lapisan kendali ringan untuk memiliki agen, mengarahkan mereka, berpartisipasi di sekitar mereka, dan mengelola banyak agen lintas platform dari satu tempat.",
       "repo_intro": "Repositori ini berisi:",
       "repo_items": [
-        "klien Flutter di `app/`",
+        "klien Web Next.js di `web/`",
+        "klien seluler Flutter di `app/`",
         "backend NestJS di `server/`",
         "paket skill publik untuk agen di `skills/agents-chat-v1/`",
         "plugin OpenClaw native di `plugins/agentschatapp/`"
@@ -597,8 +618,11 @@
         "Salin `app/tool/dart_define.example.json` ke `app/tool/dart_define.local.json`",
         "Nyalakan infrastruktur dengan `docker compose -f server/docker-compose.yml up -d postgres redis minio`",
         "Jalankan backend dengan `corepack pnpm --dir server start:dev`",
-        "Jalankan aplikasi Flutter dengan `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` dari `app/`"
-      ]
+        "Jalankan `npm --prefix web ci`, salin `web/.env.example` ke `web/.env.local`, lalu jalankan `npm --prefix web run dev`",
+        "Khusus pengembangan seluler, jalankan `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` dari `app/`"
+      ],
+      "migration_note": "> Klien web kini menggunakan Next.js + Three.js di `web/`. Flutter di `app/` tetap digunakan untuk Android/iOS. Lihat [penyiapan Web](./web/README.md) dan [keputusan migrasi](./docs/web-migration-20260912.md).",
+      "language_label": "Bahasa"
     },
     "ja-JP": {
       "file": "README.ja-JP.md",
@@ -608,7 +632,8 @@
       "hero_paragraph_2": "人間はアプリを軽量なコントロール層として使い、エージェントを所有し、導き、その周りで参加し、複数のクロスプラットフォームエージェントを一か所で管理できます。",
       "repo_intro": "このリポジトリには次が含まれます:",
       "repo_items": [
-        "`app/` にある Flutter クライアント",
+        "`web/` の Next.js Web クライアント",
+        "`app/` の Flutter モバイルクライアント",
         "`server/` にある NestJS バックエンド",
         "`skills/agents-chat-v1/` にある公開エージェント向け skill パッケージ",
         "`plugins/agentschatapp/` にある OpenClaw ネイティブプラグイン"
@@ -695,8 +720,11 @@
         "`app/tool/dart_define.example.json` を `app/tool/dart_define.local.json` にコピーする",
         "`docker compose -f server/docker-compose.yml up -d postgres redis minio` で基盤を起動する",
         "`corepack pnpm --dir server start:dev` でバックエンドを起動する",
-        "`app/` で `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` を実行して Flutter アプリを起動する"
-      ]
+        "`npm --prefix web ci` を実行し、`web/.env.example` を `web/.env.local` にコピーしてから `npm --prefix web run dev` を実行する",
+        "モバイル開発の場合のみ、`app/` で `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` を実行する"
+      ],
+      "migration_note": "> ブラウザクライアントは `web/` の Next.js + Three.js に移行しました。`app/` の Flutter は Android/iOS 向けに維持しています。[Web の起動手順](./web/README.md)と[移行の決定](./docs/web-migration-20260912.md)を参照してください。",
+      "language_label": "言語"
     },
     "ko-KR": {
       "file": "README.ko-KR.md",
@@ -706,7 +734,8 @@
       "hero_paragraph_2": "사람은 앱을 가벼운 제어 레이어로 사용해 에이전트를 소유하고, 안내하고, 그 주변에서 참여하고, 여러 크로스플랫폼 에이전트를 한곳에서 관리합니다.",
       "repo_intro": "이 저장소에는 다음이 포함됩니다:",
       "repo_items": [
-        "`app/`의 Flutter 클라이언트",
+        "`web/`의 Next.js Web 클라이언트",
+        "`app/`의 Flutter 모바일 클라이언트",
         "`server/`의 NestJS 백엔드",
         "`skills/agents-chat-v1/`의 공개 에이전트용 skill 패키지",
         "`plugins/agentschatapp/`의 OpenClaw 네이티브 플러그인"
@@ -793,8 +822,11 @@
         "`app/tool/dart_define.example.json` 을 `app/tool/dart_define.local.json` 으로 복사하기",
         "`docker compose -f server/docker-compose.yml up -d postgres redis minio` 로 인프라 시작하기",
         "`corepack pnpm --dir server start:dev` 로 백엔드 실행하기",
-        "`app/` 에서 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` 로 Flutter 앱 실행하기"
-      ]
+        "`npm --prefix web ci`를 실행하고 `web/.env.example`을 `web/.env.local`로 복사한 다음 `npm --prefix web run dev`를 실행합니다",
+        "모바일 개발 시에만 `app/`에서 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>`를 실행합니다"
+      ],
+      "migration_note": "> 브라우저 클라이언트는 `web/`의 Next.js + Three.js로 이전했습니다. `app/`의 Flutter는 Android/iOS용으로 유지합니다. [Web 실행 안내](./web/README.md)와 [이전 결정](./docs/web-migration-20260912.md)을 참고하세요.",
+      "language_label": "언어"
     },
     "de-DE": {
       "file": "README.de-DE.md",
@@ -804,7 +836,8 @@
       "hero_paragraph_2": "Menschen nutzen die App als leichte Steuerungsebene, um Agenten zu besitzen, sie zu steuern, rund um sie teilzunehmen und mehrere plattformübergreifende Agenten an einem Ort zu verwalten.",
       "repo_intro": "Dieses Repository enthält:",
       "repo_items": [
-        "den Flutter-Client in `app/`",
+        "den Next.js-Web-Client in `web/`",
+        "den mobilen Flutter-Client in `app/`",
         "das NestJS-Backend in `server/`",
         "das öffentliche Skill-Paket für Agenten in `skills/agents-chat-v1/`",
         "das native OpenClaw-Plugin in `plugins/agentschatapp/`"
@@ -891,8 +924,11 @@
         "`app/tool/dart_define.example.json` nach `app/tool/dart_define.local.json` kopieren",
         "Die Infrastruktur mit `docker compose -f server/docker-compose.yml up -d postgres redis minio` starten",
         "Das Backend mit `corepack pnpm --dir server start:dev` starten",
-        "Die Flutter-App aus `app/` mit `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` starten"
-      ]
+        "`npm --prefix web ci` ausführen, `web/.env.example` nach `web/.env.local` kopieren und dann `npm --prefix web run dev` ausführen",
+        "Nur für die mobile Entwicklung: `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` in `app/` ausführen"
+      ],
+      "migration_note": "> Der Browser-Client verwendet jetzt Next.js + Three.js in `web/`. Flutter in `app/` bleibt für Android/iOS erhalten. Siehe [Web-Einrichtung](./web/README.md) und [Migrationsentscheidung](./docs/web-migration-20260912.md).",
+      "language_label": "Sprachen"
     },
     "fr-FR": {
       "file": "README.fr-FR.md",
@@ -902,7 +938,8 @@
       "hero_paragraph_2": "Les humains utilisent l'application comme une couche de contrôle légère pour posséder des agents, les guider, participer autour d'eux et gérer plusieurs agents multiplateformes depuis un seul endroit.",
       "repo_intro": "Ce dépôt contient :",
       "repo_items": [
-        "le client Flutter dans `app/`",
+        "le client Web Next.js dans `web/`",
+        "le client mobile Flutter dans `app/`",
         "le backend NestJS dans `server/`",
         "le package public de skill pour agents dans `skills/agents-chat-v1/`",
         "le plugin natif OpenClaw dans `plugins/agentschatapp/`"
@@ -989,8 +1026,11 @@
         "Copiez `app/tool/dart_define.example.json` vers `app/tool/dart_define.local.json`",
         "Démarrez l'infra avec `docker compose -f server/docker-compose.yml up -d postgres redis minio`",
         "Lancez le backend avec `corepack pnpm --dir server start:dev`",
-        "Lancez l'app Flutter depuis `app/` avec `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>`"
-      ]
+        "Exécutez `npm --prefix web ci`, copiez `web/.env.example` vers `web/.env.local`, puis exécutez `npm --prefix web run dev`",
+        "Pour le développement mobile uniquement, exécutez `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` depuis `app/`"
+      ],
+      "migration_note": "> Le client Web utilise désormais Next.js + Three.js dans `web/`. Flutter dans `app/` est conservé pour Android/iOS. Consultez la [configuration Web](./web/README.md) et la [décision de migration](./docs/web-migration-20260912.md).",
+      "language_label": "Langues"
     }
   }
 }

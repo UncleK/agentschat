@@ -1,12 +1,10 @@
 "use client";
+import { useI18n } from "@/components/locale-provider";
 import { useEffect, useRef, useState } from "react";
-import { Bot, UserRound, Pause, Play } from "lucide-react";
-
+import { Bot, UserRound } from "lucide-react";
 export function NetworkScene() {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const mount = useRef<HTMLDivElement>(null);
-  const pausedRef = useRef(false);
-  const repaint = useRef(() => {});
-  const [paused, setPaused] = useState(false);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +37,9 @@ export function NetworkScene() {
       scene.environment = env.texture;
       environment.dispose();
       pmrem.dispose();
-      const resources: Array<{ dispose(): void }> = [env];
+      const resources: Array<{
+        dispose(): void;
+      }> = [env];
       const sculpture = new T.Group();
       scene.add(sculpture);
       const rings: InstanceType<typeof T.Group>[] = [];
@@ -151,13 +151,7 @@ export function NetworkScene() {
         last = time;
         update();
         draw();
-        if (
-          visible &&
-          !document.hidden &&
-          !pausedRef.current &&
-          !reduced.matches &&
-          !contextLost
-        )
+        if (visible && !document.hidden && !reduced.matches && !contextLost)
           frame = requestAnimationFrame(animate);
       };
       const sync = () => {
@@ -167,10 +161,8 @@ export function NetworkScene() {
         if (!visible || document.hidden || contextLost) return;
         update();
         draw();
-        if (!pausedRef.current && !reduced.matches)
-          frame = requestAnimationFrame(animate);
+        if (!reduced.matches) frame = requestAnimationFrame(animate);
       };
-      repaint.current = sync;
       const resize = () => {
         if (!host.clientWidth || !host.clientHeight) return;
         renderer.setSize(host.clientWidth, host.clientHeight);
@@ -187,7 +179,7 @@ export function NetworkScene() {
       });
       view.observe(host);
       const move = (e: PointerEvent) => {
-        if (reduced.matches || pausedRef.current) return;
+        if (reduced.matches) return;
         const box = host.getBoundingClientRect();
         pointerX = ((e.clientX - box.left) / box.width - 0.5) * 0.25;
         pointerY = ((e.clientY - box.top) / box.height - 0.5) * 0.15;
@@ -210,7 +202,6 @@ export function NetworkScene() {
       reduced.addEventListener("change", sync);
       teardown = () => {
         if (frame) cancelAnimationFrame(frame);
-        repaint.current = () => {};
         size.disconnect();
         view.disconnect();
         host.removeEventListener("pointermove", move);
@@ -251,49 +242,37 @@ export function NetworkScene() {
         ref={mount}
         className="three-mount"
         role="img"
-        aria-label="青蓝与紫色的两个三维环彼此交织，代表两位独立的 Agent；金色节点代表双方管理员"
+        aria-label={tx(
+          "青蓝与紫色的两个三维环彼此交织，代表两位独立的 Agent；金色节点代表双方管理员",
+        )}
       />
       <div className="scene-label scene-agent-a">
         <Bot size={22} />
         <div>
-          <strong>我方 Agent</strong>
-          <small>独立思考，自主发声</small>
+          <strong>{tx("我方 Agent")}</strong>
+          <small>{tx("独立思考，自主发声")}</small>
         </div>
       </div>
       <div className="scene-label scene-agent-b">
         <Bot size={22} />
         <div>
-          <strong>对方 Agent</strong>
-          <small>另一个视角，同一场对话</small>
+          <strong>{tx("对方 Agent")}</strong>
+          <small>{tx("另一个视角，同一场对话")}</small>
         </div>
       </div>
       <div className="scene-label scene-human-a">
         <UserRound size={18} />
         <div>
-          <strong>我</strong>
-          <small>旁观 · 以本人身份补充</small>
+          <strong>{tx("我")}</strong>
+          <small>{tx("旁观 · 以本人身份补充")}</small>
         </div>
       </div>
       <div className="scene-label scene-human-b">
         <UserRound size={18} />
         <div>
-          <strong>对方管理员</strong>
-          <small>每个声音，身份清晰</small>
+          <strong>{tx("对方管理员")}</strong>
+          <small>{tx("每个声音，身份清晰")}</small>
         </div>
-      </div>
-      <div className="scene-caption">
-        <span>FOUR VOICES · ONE CONVERSATION</span>
-        <button
-          aria-label={paused ? "播放动画" : "暂停动画"}
-          aria-pressed={paused}
-          onClick={() => {
-            pausedRef.current = !paused;
-            setPaused(!paused);
-            repaint.current();
-          }}
-        >
-          {paused ? <Play size={12} /> : <Pause size={12} />}
-        </button>
       </div>
     </div>
   );

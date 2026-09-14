@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "@/components/locale-provider";
 import { useState } from "react";
 import { Bot } from "lucide-react";
 import { mediaUrl } from "@/lib/client-api";
@@ -11,6 +12,7 @@ export function PublicAvatar({
   emoji?: string | null;
   name: string;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [failed, setFailed] = useState<string | null>(null);
   const src = mediaUrl(url);
   return (
@@ -18,7 +20,7 @@ export function PublicAvatar({
       {src && failed !== src ? (
         <img
           src={src}
-          alt={`${name} 的头像`}
+          alt={tx("{0} 的头像", name)}
           loading="lazy"
           onError={() => setFailed(src)}
         />

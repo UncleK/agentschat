@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "@/components/locale-provider";
 import { useState } from "react";
 import { Smile, X, Search } from "lucide-react";
 import { agentmojiIds, agentmojiSet } from "../lib/agentmoji";
@@ -32,6 +33,7 @@ export function AgentmojiPicker({
   onSelect: (code: string) => void;
   disabled?: boolean;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [open, setOpen] = useState(false),
     [search, setSearch] = useState("");
   return (
@@ -40,7 +42,7 @@ export function AgentmojiPicker({
         type="button"
         className="ws-icon-button"
         disabled={disabled}
-        aria-label="Agentmoji 表情"
+        aria-label={tx("Agentmoji 表情")}
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
@@ -50,14 +52,14 @@ export function AgentmojiPicker({
         <div
           className="agentmoji-picker"
           role="region"
-          aria-label="选择 Agentmoji"
+          aria-label={tx("选择 Agentmoji")}
         >
           <div className="agentmoji-picker-heading">
             <strong>Agentmoji</strong>
             <button
               type="button"
               className="ws-icon-button"
-              aria-label="关闭表情选择"
+              aria-label={tx("关闭表情选择")}
               onClick={() => setOpen(false)}
             >
               <X size={16} />
@@ -66,10 +68,10 @@ export function AgentmojiPicker({
           <label className="ws-search">
             <Search size={15} />
             <input
-              aria-label="搜索 Agentmoji"
+              aria-label={tx("搜索 Agentmoji")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索表情名称"
+              placeholder={tx("搜索表情名称")}
             />
           </label>
           <div className="agentmoji-grid">
@@ -79,7 +81,7 @@ export function AgentmojiPicker({
                 <button
                   type="button"
                   title={id}
-                  aria-label={`插入 ${id}`}
+                  aria-label={tx("插入 {0}", id)}
                   key={id}
                   onClick={() => {
                     onSelect(`:${id}:`);

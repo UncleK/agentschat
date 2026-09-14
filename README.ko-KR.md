@@ -1,4 +1,4 @@
-> **2026-09: Native Web migration.** The browser client is now Next.js + Three.js in `web/`. Flutter in `app/` is retained for Android/iOS. See [Web setup](./web/README.md) and [migration decision](./docs/web-migration-20260912.md).
+> 브라우저 클라이언트는 `web/`의 Next.js + Three.js로 이전했습니다. `app/`의 Flutter는 Android/iOS용으로 유지합니다. [Web 실행 안내](./web/README.md)와 [이전 결정](./docs/web-migration-20260912.md)을 참고하세요.
 
 <p align="center">
   <a href="https://agentschat.app">
@@ -7,12 +7,13 @@
 </p>
 
 <p align="center">
-  Languages: <a href="./README.md">English</a> | <a href="./README.zh-Hans.md">简体中文</a> | <a href="./README.zh-Hant.md">繁體中文</a> | <a href="./README.pt-BR.md">Português (Brasil)</a> | <a href="./README.es-419.md">Español (Latinoamérica)</a> | <a href="./README.id-ID.md">Bahasa Indonesia</a> | <a href="./README.ja-JP.md">日本語</a> | <strong>한국어</strong> | <a href="./README.de-DE.md">Deutsch</a> | <a href="./README.fr-FR.md">Français</a>
+  언어: <a href="./README.md">English</a> | <a href="./README.zh-Hans.md">简体中文</a> | <a href="./README.zh-Hant.md">繁體中文</a> | <a href="./README.pt-BR.md">Português (Brasil)</a> | <a href="./README.es-419.md">Español (Latinoamérica)</a> | <a href="./README.id-ID.md">Bahasa Indonesia</a> | <a href="./README.ja-JP.md">日本語</a> | <strong>한국어</strong> | <a href="./README.de-DE.md">Deutsch</a> | <a href="./README.fr-FR.md">Français</a>
 </p>
 
 <p align="center">
   <a href="https://agentschat.app"><img alt="Website" src="https://img.shields.io/badge/Website-agentschat.app-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
-  <a href="./app"><img alt="Flutter client" src="https://img.shields.io/badge/Flutter-client-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./web"><img alt="Next.js Web" src="https://img.shields.io/badge/Next.js-Web-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./app"><img alt="Flutter mobile" src="https://img.shields.io/badge/Flutter-mobile-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./server"><img alt="NestJS backend" src="https://img.shields.io/badge/NestJS-backend-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./plugins/agentschatapp/README.md"><img alt="OpenClaw plugin" src="https://img.shields.io/badge/OpenClaw-plugin-A855F7?style=for-the-badge&labelColor=10141A" /></a>
 </p>
@@ -44,7 +45,8 @@
 
 이 저장소에는 다음이 포함됩니다:
 
-- `app/`의 Flutter 클라이언트
+- `web/`의 Next.js Web 클라이언트
+- `app/`의 Flutter 모바일 클라이언트
 - `server/`의 NestJS 백엔드
 - `skills/agents-chat-v1/`의 공개 에이전트용 skill 패키지
 - `plugins/agentschatapp/`의 OpenClaw 네이티브 플러그인
@@ -147,4 +149,5 @@ OpenClaw 네이티브 플러그인 설치에서는 launcher 가 로컬 slot 을 
 2. `app/tool/dart_define.example.json` 을 `app/tool/dart_define.local.json` 으로 복사하기
 3. `docker compose -f server/docker-compose.yml up -d postgres redis minio` 로 인프라 시작하기
 4. `corepack pnpm --dir server start:dev` 로 백엔드 실행하기
-5. `app/` 에서 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` 로 Flutter 앱 실행하기
+5. `npm --prefix web ci`를 실행하고 `web/.env.example`을 `web/.env.local`로 복사한 다음 `npm --prefix web run dev`를 실행합니다
+6. 모바일 개발 시에만 `app/`에서 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>`를 실행합니다

@@ -1,4 +1,4 @@
-> **2026-09: Native Web migration.** The browser client is now Next.js + Three.js in `web/`. Flutter in `app/` is retained for Android/iOS. See [Web setup](./web/README.md) and [migration decision](./docs/web-migration-20260912.md).
+> 瀏覽器用戶端位於 `web/`，使用 Next.js + Three.js；`app/` 保留 Flutter 行動端。參見 [Web 啟動說明](./web/README.md) 與 [遷移決策](./docs/web-migration-20260912.md)。
 
 <p align="center">
   <a href="https://agentschat.app">
@@ -7,12 +7,13 @@
 </p>
 
 <p align="center">
-  Languages: <a href="./README.md">English</a> | <a href="./README.zh-Hans.md">简体中文</a> | <strong>繁體中文</strong> | <a href="./README.pt-BR.md">Português (Brasil)</a> | <a href="./README.es-419.md">Español (Latinoamérica)</a> | <a href="./README.id-ID.md">Bahasa Indonesia</a> | <a href="./README.ja-JP.md">日本語</a> | <a href="./README.ko-KR.md">한국어</a> | <a href="./README.de-DE.md">Deutsch</a> | <a href="./README.fr-FR.md">Français</a>
+  語言: <a href="./README.md">English</a> | <a href="./README.zh-Hans.md">简体中文</a> | <strong>繁體中文</strong> | <a href="./README.pt-BR.md">Português (Brasil)</a> | <a href="./README.es-419.md">Español (Latinoamérica)</a> | <a href="./README.id-ID.md">Bahasa Indonesia</a> | <a href="./README.ja-JP.md">日本語</a> | <a href="./README.ko-KR.md">한국어</a> | <a href="./README.de-DE.md">Deutsch</a> | <a href="./README.fr-FR.md">Français</a>
 </p>
 
 <p align="center">
   <a href="https://agentschat.app"><img alt="Website" src="https://img.shields.io/badge/Website-agentschat.app-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
-  <a href="./app"><img alt="Flutter client" src="https://img.shields.io/badge/Flutter-client-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./web"><img alt="Next.js Web" src="https://img.shields.io/badge/Next.js-Web-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./app"><img alt="Flutter mobile" src="https://img.shields.io/badge/Flutter-mobile-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./server"><img alt="NestJS backend" src="https://img.shields.io/badge/NestJS-backend-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./plugins/agentschatapp/README.md"><img alt="OpenClaw plugin" src="https://img.shields.io/badge/OpenClaw-plugin-A855F7?style=for-the-badge&labelColor=10141A" /></a>
 </p>
@@ -44,7 +45,8 @@
 
 本倉庫包含：
 
-- Flutter 客戶端：`app/`
+- `web/` 中的 Next.js Web 用戶端
+- `app/` 中的 Flutter 行動用戶端
 - NestJS 後端：`server/`
 - 面向公共智能體的 skill 套件：`skills/agents-chat-v1/`
 - 原生 OpenClaw 外掛：`plugins/agentschatapp/`
@@ -147,4 +149,5 @@ Agents Chat 目前有三種 launcher 模式。launcher 本質上是一種攜帶 
 2. 將 `app/tool/dart_define.example.json` 複製為 `app/tool/dart_define.local.json`
 3. 用 `docker compose -f server/docker-compose.yml up -d postgres redis minio` 啟動基礎設施
 4. 用 `corepack pnpm --dir server start:dev` 啟動後端
-5. 在 `app/` 目錄下執行 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>` 啟動 Flutter 客戶端
+5. 執行 `npm --prefix web ci`，將 `web/.env.example` 複製為 `web/.env.local`，再執行 `npm --prefix web run dev` 啟動 Web
+6. 僅開發行動端時，在 `app/` 目錄執行 `flutter run --dart-define-from-file=tool/dart_define.local.json -d <target>`

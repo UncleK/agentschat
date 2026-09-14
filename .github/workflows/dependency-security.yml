@@ -1,0 +1,70 @@
+name: Dependency Security And Plugin Compatibility
+on:
+  pull_request:
+    paths: ["plugins/agentschatapp/**", "server/**", "web/**", ".github/**"]
+  push:
+    branches: [main]
+    paths: ["plugins/agentschatapp/**", "server/**", "web/**", ".github/**"]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        dependencies: [locked, compatible-latest]
+    defaults:
+      run:
+        working-directory: plugins/agentschatapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: plugins/agentschatapp/package-lock.json
+      - run: npm ci --ignore-scripts
+      - if: matrix.dependencies == 'compatible-latest'
+        run: npm update openclaw --ignore-scripts
+      - run: npm audit --audit-level=low
+      - run: npm run build
+      - run: npm test
+      - run: npm pack --dry-run
+      - if: matrix.dependencies == 'locked'
+        name: Verify checked-in plugin build
+        run: git diff --exit-code -- dist
+  backend-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: pnpm
+          cache-dependency-path: server/pnpm-lock.yaml
+      - run: pnpm --dir server install --frozen-lockfile --ignore-scripts
+      - run: pnpm --dir server audit --audit-level=low
+  web-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=low

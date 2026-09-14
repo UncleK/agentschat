@@ -1,7 +1,7 @@
 "use client";
+import { useI18n } from "@/components/locale-provider";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Maximize2, Minimize2, X } from "lucide-react";
-
 export function ChatImage({
   src,
   caption,
@@ -11,6 +11,7 @@ export function ChatImage({
   caption?: string;
   onLoad: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -35,7 +36,7 @@ export function ChatImage({
   if (!src || failed)
     return (
       <div className="chat-image-error" role="status">
-        图片暂时无法加载
+        {tx("图片暂时无法加载")}
         {src && (
           <button
             type="button"
@@ -44,7 +45,7 @@ export function ChatImage({
               setAttempt((value) => value + 1);
             }}
           >
-            重试图片
+            {tx("重试图片")}
           </button>
         )}
       </div>
@@ -59,7 +60,7 @@ export function ChatImage({
             ? ({ "--chat-image-width": `${size.width}px` } as CSSProperties)
             : undefined
         }
-        aria-label={`查看完整图片：${caption || "聊天图片"}`}
+        aria-label={tx("查看完整图片：{0}", caption || tx("聊天图片"))}
         onClick={() => {
           setActualSize(longImage);
           setViewerFailed(false);
@@ -70,7 +71,7 @@ export function ChatImage({
           key={attempt}
           className="ws-message-image"
           src={src}
-          alt={caption || "聊天图片"}
+          alt={caption || tx("聊天图片")}
           loading="lazy"
           onLoad={(event) => {
             setSize({
@@ -85,13 +86,15 @@ export function ChatImage({
           }}
         />
         {longImage && (
-          <span className="chat-image-long-hint">长图 · 点击查看完整图片</span>
+          <span className="chat-image-long-hint">
+            {tx("长图 · 点击查看完整图片")}
+          </span>
         )}
       </button>
       <dialog
         ref={dialog}
         className="chat-image-dialog"
-        aria-label="查看完整图片"
+        aria-label={tx("查看完整图片")}
         onClose={() => setExpanded(false)}
         onClick={(event) => {
           if (event.target === event.currentTarget) setExpanded(false);
@@ -100,7 +103,9 @@ export function ChatImage({
         {expanded && (
           <>
             <header className="chat-image-viewer-toolbar">
-              <span title={caption || "聊天图片"}>{caption || "聊天图片"}</span>
+              <span title={caption || tx("聊天图片")}>
+                {caption || tx("聊天图片")}
+              </span>
               <button
                 type="button"
                 onClick={() => {
@@ -109,11 +114,11 @@ export function ChatImage({
                 }}
               >
                 {actualSize ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                {actualSize ? "适应窗口" : "原图尺寸"}
+                {actualSize ? tx("适应窗口") : tx("原图尺寸")}
               </button>
               <button
                 type="button"
-                aria-label="关闭图片"
+                aria-label={tx("关闭图片")}
                 onClick={() => setExpanded(false)}
               >
                 <X size={22} />
@@ -124,12 +129,12 @@ export function ChatImage({
               className={`chat-image-viewport ${actualSize ? "actual-size" : "fit-size"}`}
             >
               {viewerFailed ? (
-                <p role="alert">图片暂时无法加载，请关闭后重试。</p>
+                <p role="alert">{tx("图片暂时无法加载，请关闭后重试。")}</p>
               ) : (
                 <img
                   className="chat-image-full"
                   src={src}
-                  alt={caption || "聊天图片"}
+                  alt={caption || tx("聊天图片")}
                   onError={() => setViewerFailed(true)}
                 />
               )}

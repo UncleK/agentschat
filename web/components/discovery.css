@@ -1,0 +1,174 @@
+.discovery-page {
+  padding-bottom: 64px;
+}
+.discovery-language {
+  margin-bottom: 22px;
+}
+.discovery-page > h1 {
+  max-width: 1000px;
+  text-wrap: balance;
+}
+.discovery-page > .lead {
+  max-width: 850px;
+}
+.discovery-page .hero-actions {
+  flex-wrap: wrap;
+  margin-block: 28px 40px;
+}
+.discovery-section {
+  margin-block: 52px;
+}
+.discovery-section h2,
+.discovery-faq h2,
+.public-highlights h2 {
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: -0.035em;
+  margin-bottom: 16px;
+}
+.discovery-section > p,
+.public-highlights > p {
+  color: var(--muted);
+  max-width: 80ch;
+  margin-block: 12px 22px;
+}
+.discovery-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.discovery-cards article {
+  padding: 26px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  min-width: 0;
+}
+.discovery-cards h3 {
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+.discovery-cards p {
+  color: var(--muted);
+  margin-block: 14px 20px;
+}
+.discovery-cards .text-link {
+  font-size: 14px;
+}
+.discovery-steps {
+  padding-left: 24px;
+  max-width: 900px;
+}
+.discovery-steps li {
+  padding-left: 12px;
+  margin-bottom: 24px;
+}
+.discovery-steps h3 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+.discovery-steps p {
+  color: var(--muted);
+}
+.discovery-faq {
+  margin-block: 52px 24px;
+  max-width: 960px;
+}
+.discovery-faq details {
+  border-bottom: 1px solid var(--border);
+  padding-block: 18px;
+}
+.discovery-faq summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.discovery-faq details p {
+  color: var(--muted);
+  margin-top: 14px;
+  max-width: 85ch;
+}
+.discovery-callout {
+  border-left: 2px solid var(--mint);
+  padding: 12px 22px;
+  margin-block: 24px;
+  color: var(--muted);
+  max-width: 90ch;
+}
+.discovery-callout a,
+.discovery-section > p a {
+  color: var(--mint);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.public-highlights {
+  margin-block: 42px;
+}
+.public-highlights .discovery-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.public-highlights h3 {
+  margin-bottom: 18px;
+}
+.public-highlights ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+}
+.public-highlights li + li {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  margin-top: 18px;
+}
+.public-highlights li > a {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.public-highlights li > a:hover {
+  color: var(--mint);
+}
+.public-highlights li p {
+  margin-block: 8px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.public-highlights small {
+  color: var(--muted);
+}
+.home-discovery {
+  padding-block: 30px 40px;
+}
+.home-discovery > .discovery-section {
+  margin-block: 0 40px;
+}
+.home-discovery .discovery-cards h3 {
+  font-size: 22px;
+}
+.home-page .hero-copy .discovery-language {
+  margin-top: 12px;
+  font-size: 13px;
+}
+@media (max-width: 760px) {
+  .discovery-cards,
+  .public-highlights .discovery-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .discovery-cards article {
+    padding: 22px;
+  }
+  .discovery-section,
+  .discovery-faq {
+    margin-block: 36px;
+  }
+  .discovery-page .hero-actions {
+    align-items: flex-start;
+    gap: 18px;
+  }
+}
+
+.human-capabilities {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 700px) {
+  .human-capabilities {
+    grid-template-columns: 1fr;
+  }
+}

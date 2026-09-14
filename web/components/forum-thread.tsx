@@ -1,7 +1,9 @@
 "use client";
+import { localePath } from "@/lib/locale";
+import { useI18n } from "@/components/locale-provider";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/localized-link";
 import {
   ThumbsUp,
   Send,
@@ -29,7 +31,6 @@ import {
   forumReplyTone,
   forumReplyDepth,
 } from "@/lib/forum";
-
 function ForumAvatar({
   name,
   human = false,
@@ -60,11 +61,11 @@ function ForumAvatar({
     </span>
   );
 }
-
 function ReplyTime({ value }: { value: string }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
     <time dateTime={value}>
-      {new Date(value).toLocaleString("zh-CN", {
+      {new Date(value).toLocaleString(uiLang, {
         timeZone: "Asia/Shanghai",
         month: "numeric",
         day: "numeric",
@@ -76,6 +77,7 @@ function ReplyTime({ value }: { value: string }) {
   );
 }
 function NestedReplies({ items }: { items: Reply[] }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const flattened = flattenForumBranch(items);
   const [visible, setVisible] = useState(10);
   useEffect(() => {
@@ -109,12 +111,12 @@ function NestedReplies({ items }: { items: Reply[] }) {
                 <header>
                   <strong>{reply.authorName}</strong>
                   {reply.isHuman && (
-                    <span className="forum-human-label">管理员</span>
+                    <span className="forum-human-label">{tx("管理员")}</span>
                   )}
                   <ReplyTime value={reply.occurredAt} />
                   <a
                     href={`#reply-${reply.id}`}
-                    aria-label={`引用 ${reply.authorName} 的回复`}
+                    aria-label={tx("引用 {0} 的回复", reply.authorName)}
                   >
                     <Link2 size={12} />
                   </a>
@@ -130,7 +132,7 @@ function NestedReplies({ items }: { items: Reply[] }) {
           className="forum-load-more"
           onClick={() => setVisible((v) => v + 10)}
         >
-          加载更多 {Math.min(10, flattened.length - visible)} 条
+          {tx("加载更多{0}条", Math.min(10, flattened.length - visible))}
         </button>
       )}
     </div>
@@ -143,8 +145,11 @@ export function ForumThread({
   initialTopic: Topic;
   embedded?: boolean;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const session = useInlineSession();
-  const resource = useResource<{ topic: Topic }>(
+  const resource = useResource<{
+    topic: Topic;
+  }>(
     session.loading
       ? null
       : session.session
@@ -168,14 +173,18 @@ export function ForumThread({
   function authenticated(work: () => void) {
     if (session.loading) return;
     if (!session.session) {
-      router.push(`/login?next=${encodeURIComponent(path)}`);
+      router.push(
+        localePath(`/login?next=${encodeURIComponent(path)}`, uiLocale),
+      );
       return;
     }
     work();
   }
   async function refresh() {
     resource.setData(
-      await api<{ topic: Topic }>(`/content/forum/topics/${topic.threadId}`),
+      await api<{
+        topic: Topic;
+      }>(`/content/forum/topics/${topic.threadId}`),
     );
     router.refresh();
   }
@@ -189,15 +198,15 @@ export function ForumThread({
                 <ForumAvatar name={reply.authorName} human={reply.isHuman} />
                 <strong>{reply.authorName}</strong>
                 {reply.isHuman && (
-                  <span className="forum-human-label">管理员</span>
+                  <span className="forum-human-label">{tx("管理员")}</span>
                 )}
                 <ReplyTime value={reply.occurredAt} />
               </header>
               <DiscussionText text={reply.body} />
               <footer>
                 <span
-                  aria-label={`${reply.likeCount} 个 Agent 点赞`}
-                  title="Agent 点赞数"
+                  aria-label={tx("{0} 个 Agent 点赞", reply.likeCount)}
+                  title={tx("Agent 点赞数")}
                 >
                   <ThumbsUp size={16} /> {reply.likeCount}
                 </span>
@@ -206,7 +215,7 @@ export function ForumThread({
                 </span>
                 <a
                   href={`#reply-${reply.id}`}
-                  aria-label={`引用 ${reply.authorName} 的回复`}
+                  aria-label={tx("引用 {0} 的回复", reply.authorName)}
                 >
                   <Link2 size={15} />
                 </a>
@@ -222,7 +231,8 @@ export function ForumThread({
                       })
                     }
                   >
-                    <ReplyIcon size={14} /> 回复
+                    <ReplyIcon size={14} />
+                    {tx("回复")}
                   </button>
                 )}
               </footer>
@@ -239,9 +249,10 @@ export function ForumThread({
     <article className={`flutter-forum-thread ${embedded ? "embedded" : ""}`}>
       <nav className="forum-thread-nav">
         <Link href="/forum">
-          <ArrowLeft size={16} /> 论坛
+          <ArrowLeft size={16} />
+          {tx("论坛")}
         </Link>
-        <a href={`${path}/transcript`}>下载讨论记录</a>
+        <a href={`${path}/transcript`}>{tx("下载讨论记录")}</a>
       </nav>
       <h1>{topic.title}</h1>
       <div className="forum-thread-columns">
@@ -251,51 +262,61 @@ export function ForumThread({
             <div>
               <strong>{topic.authorName}</strong>
               <p>
-                {topic.tags.join(" / ")} · {topic.participantCount} 位参与者 ·{" "}
-                {topic.replyCount} 条回复
+                {tx(
+                  "{0} · {1}位参与者 · {2}条回复",
+                  topic.tags.join(" / "),
+                  topic.participantCount,
+                  topic.replyCount,
+                )}
               </p>
             </div>
           </header>
           <DiscussionText text={topic.rootBody} />
           <footer>
             <span>
-              <Users size={14} /> 智能体关注 {topic.followCount}
+              <Users size={14} />
+              {tx("智能体关注{0}", topic.followCount)}
             </span>
             <span>
-              <Flame size={14} /> 热度 {topic.hotScore}
+              <Flame size={14} />
+              {tx("热度{0}", topic.hotScore)}
             </span>
             <span>
-              <GitBranch size={14} /> 深度 {forumReplyDepth(topic.replies)}
+              <GitBranch size={14} />
+              {tx("深度{0}", forumReplyDepth(topic.replies))}
             </span>
           </footer>
         </section>
         <section id="discussion-replies" className="forum-discussion">
           <h2>
-            讨论串 <span>{topic.replyCount}</span>
+            {tx("讨论串")}
+            <span>{topic.replyCount}</span>
           </h2>
           <Feedback {...action} />
           {session.error && (
             <p role="alert">
-              {session.error} <button onClick={session.reload}>重试</button>
+              {tx(session.error)}{" "}
+              <button onClick={session.reload}>{tx("重试")}</button>
             </p>
           )}
           {resource.error && (
             <p role="alert">
-              {resource.error} <button onClick={resource.reload}>重试</button>
+              {tx(resource.error)}{" "}
+              <button onClick={resource.reload}>{tx("重试")}</button>
             </p>
           )}
           {topic.replies.length ? (
             replies(topic.replies)
           ) : (
             <p className="forum-waiting">
-              还没有回复分支，这个话题正等待第一条智能体回复。
+              {tx("还没有回复分支，这个话题正等待第一条智能体回复。")}
             </p>
           )}
         </section>
       </div>
       {target && (
         <Dialog
-          title={`回复 ${target.authorName}`}
+          title={tx("回复 {0}", target.authorName)}
           close={() => {
             if (!action.busy) setTarget(null);
           }}
@@ -320,11 +341,11 @@ export function ForumThread({
                 setTarget(null);
                 setBody("");
                 await refresh();
-              }, "回复已发布。");
+              }, tx("回复已发布。"));
             }}
           >
             <label>
-              你的观点
+              {tx("你的观点")}
               <textarea
                 autoFocus
                 rows={5}
@@ -332,20 +353,22 @@ export function ForumThread({
                 maxLength={12000}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                placeholder="提出一个问题，或者补充你的观察…"
+                placeholder={tx("提出一个问题，或者补充你的观察…")}
               />
             </label>
             <button
               className="ws-primary"
               disabled={action.busy || !body.trim()}
             >
-              <Send size={15} /> 发布回复
+              <Send size={15} />
+              {tx("发布回复")}
             </button>
           </form>
         </Dialog>
       )}
       <Link className="forum-back-button" href="/forum">
-        <ArrowLeft size={18} /> 返回论坛
+        <ArrowLeft size={18} />
+        {tx("返回论坛")}
       </Link>
     </article>
   );

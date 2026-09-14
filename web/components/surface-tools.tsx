@@ -1,7 +1,10 @@
 "use client";
+import { useI18n } from "@/components/locale-provider";
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Bell, Search, CircleStop, Play } from "lucide-react";
+import Link from "@/components/localized-link";
+import { localePath } from "@/lib/locale";
+import { HeaderSearch } from "./header-search";
+import { Search, CircleStop, Play } from "lucide-react";
 import { api, mutate, type Mine, type Policy } from "@/lib/client-api";
 import { chooseActiveAgent, readActiveAgent } from "@/lib/dm-state";
 import {
@@ -11,7 +14,6 @@ import {
   useInlineSession,
   useResource,
 } from "./workspace";
-
 export function SurfaceStop({
   surface,
   activeId,
@@ -19,6 +21,7 @@ export function SurfaceStop({
   surface: "forum" | "live" | "chat";
   activeId?: string;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const session = useInlineSession();
   const mine = useResource<Mine>(session.session ? "/agents/mine" : null);
   const [preferred, setPreferred] = useState("");
@@ -48,7 +51,16 @@ export function SurfaceStop({
         ? "emergencyStopDmResponses"
         : "emergencyStopLiveResponses";
   const stopped = Boolean(resource.data?.[field]);
-  const label = `${stopped ? "恢复" : "暂停"} ${agent?.displayName || "当前 Agent"} 的${surface === "forum" ? "论坛" : surface === "chat" ? "私信" : "辩论"}自动回复`;
+  const label = tx(
+    "{0} {1} 的{2}自动回复",
+    stopped ? tx("恢复") : tx("暂停"),
+    agent?.displayName || tx("当前 Agent"),
+    surface === "forum"
+      ? tx("论坛")
+      : surface === "chat"
+        ? tx("私信")
+        : tx("辩论"),
+  );
   return (
     <span className="surface-stop">
       <button
@@ -58,15 +70,20 @@ export function SurfaceStop({
         aria-pressed={stopped}
         disabled={!agent || !resource.data || resource.loading || action.busy}
         onClick={() =>
-          void action.run(async () => {
-            const current = await api<Policy>(`/agents/${id}/safety-policy`);
-            await mutate(
-              `/agents/${id}/safety-policy`,
-              { [field]: !current[field] },
-              "PATCH",
-            );
-            resource.setData(await api<Policy>(`/agents/${id}/safety-policy`));
-          }, label + "已保存。")
+          void action.run(
+            async () => {
+              const current = await api<Policy>(`/agents/${id}/safety-policy`);
+              await mutate(
+                `/agents/${id}/safety-policy`,
+                { [field]: !current[field] },
+                "PATCH",
+              );
+              resource.setData(
+                await api<Policy>(`/agents/${id}/safety-policy`),
+              );
+            },
+            label + tx("已保存。"),
+          )
         }
       >
         {stopped ? <Play size={21} /> : <CircleStop size={21} />}
@@ -83,46 +100,31 @@ export function SurfaceStop({
   );
 }
 export function ForumToolbar({ query = "" }: { query?: string }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [search, setSearch] = useState(false);
   return (
-    <div className="app-surface-toolbar">
-      <span className="app-surface-title">论坛</span>
-      <div>
-        <SurfaceStop surface="forum" />
-        <button
-          className="app-surface-icon"
-          aria-label="搜索话题"
-          onClick={() => setSearch(true)}
-        >
-          <Search size={21} />
-        </button>
-        <Link
-          href="/notifications?section=forum"
-          className="app-surface-icon"
-          aria-label="论坛通知"
-        >
-          <Bell size={21} />
-        </Link>
-      </div>
+    <>
+      <HeaderSearch label={tx("搜索话题")} open={() => setSearch(true)} />
       {search && (
-        <Dialog title="搜索话题" close={() => setSearch(false)}>
-          <form className="ws-form" action="/forum">
+        <Dialog title={tx("搜索话题")} close={() => setSearch(false)}>
+          <form className="ws-form" action={localePath("/forum", uiLocale)}>
             <label>
-              搜索讨论
+              {tx("搜索讨论")}
               <input
                 name="q"
                 autoFocus
                 defaultValue={query}
-                placeholder="输入话题或观点"
+                placeholder={tx("输入话题或观点")}
               />
             </label>
             <button className="ws-primary">
-              <Search size={16} /> 搜索
+              <Search size={16} />
+              {tx("搜索")}
             </button>
-            {query && <Link href="/forum">清除搜索</Link>}
+            {query && <Link href="/forum">{tx("清除搜索")}</Link>}
           </form>
         </Dialog>
       )}
-    </div>
+    </>
   );
 }

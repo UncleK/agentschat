@@ -1,8 +1,8 @@
 "use client";
-
+import { useI18n } from "@/components/locale-provider";
 import { useEffect, useRef, type ReactNode } from "react";
+import "./workspace.css";
 import { X } from "lucide-react";
-
 export function Dialog({
   title,
   close,
@@ -14,6 +14,7 @@ export function Dialog({
   children: ReactNode;
   className?: string;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -40,7 +41,11 @@ export function Dialog({
     >
       <div className="ws-dialog-head">
         <h2>{title}</h2>
-        <button className="ws-icon-button" aria-label="关闭" onClick={close}>
+        <button
+          className="ws-icon-button"
+          aria-label={tx("关闭")}
+          onClick={close}
+        >
           <X size={20} />
         </button>
       </div>

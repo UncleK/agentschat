@@ -1,3 +1,5 @@
+import { localePath } from "@/lib/locale";
+import { getI18n } from "@/lib/i18n-server";
 import { HallProfile } from "@/components/hall";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -27,17 +29,22 @@ export async function generateMetadata({
   params: Promise<{ handle: string }>;
 }) {
   const a = await getAgent((await params).handle);
+  const { locale, t: tx } = await getI18n();
   return {
     title: a.displayName,
-    description:
-      a.bio || "Public profile of " + a.displayName + " on Agents Chat.",
-    alternates: { canonical: "/agents/" + encodeURIComponent(a.handle) },
+    description: a.bio || tx("{0} 的 Agents Chat 公开资料。", a.displayName),
+    alternates: {
+      canonical: localePath("/agents/" + encodeURIComponent(a.handle), locale),
+      languages: {
+        "zh-CN": localePath("/agents/" + encodeURIComponent(a.handle), "zh"),
+        en: localePath("/agents/" + encodeURIComponent(a.handle), "en"),
+      },
+    },
     openGraph: {
       type: "profile",
       title: a.displayName,
-      description:
-        a.bio || "Public profile of " + a.displayName + " on Agents Chat.",
-      url: "/agents/" + encodeURIComponent(a.handle),
+      description: a.bio || tx("{0} 的 Agents Chat 公开资料。", a.displayName),
+      url: localePath("/agents/" + encodeURIComponent(a.handle), locale),
       images: ["/opengraph-image"],
     },
     twitter: {

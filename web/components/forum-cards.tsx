@@ -1,10 +1,11 @@
 "use client";
-import Link from "next/link";
+import { localePath } from "@/lib/locale";
+import { useI18n } from "@/components/locale-provider";
+import Link from "@/components/localized-link";
 import { useRouter } from "next/navigation";
 import { Flame, MessageCircle, UserRound } from "lucide-react";
 import type { Topic } from "@/lib/public-api";
 import { DiscussionText } from "./discussion-text";
-
 export function ForumCards({
   topics,
   selectedId,
@@ -14,6 +15,7 @@ export function ForumCards({
   selectedId?: string;
   onSelect?: (id: string) => boolean;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const router = useRouter();
   const selected = (event: React.MouseEvent, id: string) => {
     if (
@@ -39,13 +41,14 @@ export function ForumCards({
                 !window.getSelection()?.toString()
               )
                 if (!onSelect?.(topic.threadId))
-                  router.push(`/forum/${topic.threadId}`);
+                  router.push(localePath(`/forum/${topic.threadId}`, uiLocale));
             }}
           >
             <div className="forum-featured-badge">
               {topic.isHot && (
                 <span>
-                  <Flame size={14} /> HOT DISCUSSION
+                  <Flame size={14} />
+                  {tx(" HOT DISCUSSION ")}
                 </span>
               )}
             </div>
@@ -74,19 +77,19 @@ export function ForumCards({
                   <span>+{topic.participantCount - 3}</span>
                 )}
               </span>
-              <span>{topic.participantCount} 位参与者</span>
+              <span>{tx("{0}位参与者", topic.participantCount)}</span>
             </div>
             <div className="forum-featured-quote">
               <DiscussionText text={topic.rootBody} />
               <footer>
                 <strong>{topic.authorName}</strong>
-                <span>{topic.replyCount} 条回复</span>
+                <span>{tx("{0}条回复", topic.replyCount)}</span>
                 <Link
                   href={`/forum/${topic.threadId}`}
                   onClick={(e) => selected(e, topic.threadId)}
-                  aria-label={`展开讨论：${topic.title}`}
+                  aria-label={tx("展开讨论：{0}", topic.title)}
                 >
-                  展开讨论 →
+                  {tx("展开讨论 →")}
                 </Link>
               </footer>
             </div>
@@ -103,10 +106,11 @@ export function ForumCards({
             <p>{topic.summary}</p>
             <footer>
               <span>
-                <MessageCircle size={16} /> {topic.replyCount} 条回复
+                <MessageCircle size={16} />
+                {tx("{0}条回复", topic.replyCount)}
               </span>
               <span className={topic.isHot ? "hot" : ""}>
-                {topic.isHot ? "热门" : topic.authorName}
+                {topic.isHot ? tx("热门") : topic.authorName}
               </span>
             </footer>
           </Link>

@@ -1,3 +1,4 @@
+import { readRuntimeConfig } from "./runtime-config.js";
 import { decideDmReply, decideForumReply, decideLiveReply, ensurePersonalityInitialized, maybeRunDailyDream } from "./conversation-behavior.js";
 import { DEFAULT_DISCOVERY_INTERVAL_MS, DEFAULT_DISCOVERY_JITTER_MS, DEFAULT_MANAGER_INTERVAL_MS, DEFAULT_POLL_BACKOFF_SECONDS, DEFAULT_POLL_WAIT_SECONDS, DEFAULT_SAFETY_POLICY_REFRESH_MS } from "./constants.js";
 import { buildSessionKey, runEmbeddedReply } from "./embedded.js";
@@ -641,7 +642,7 @@ export async function stopAccountWorker(slot) {
     await existing.stop("manual stop");
 }
 export async function reconcileManagedAccounts(context = managerContext, logger = managerLogger ?? context.logger) {
-    const cfg = context.runtime.config.loadConfig();
+    const cfg = readRuntimeConfig(context.runtime);
     const desiredAccounts = listAgentsChatAccounts(cfg).filter((account) => account.autoStart !== false && isConfiguredAgentsChatAccount(account));
     const desiredSlots = new Set(desiredAccounts.map((account) => account.slot));
     for (const account of desiredAccounts) {

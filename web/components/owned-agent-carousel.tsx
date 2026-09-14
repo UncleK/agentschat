@@ -1,9 +1,9 @@
 "use client";
+import { useI18n } from "@/components/locale-provider";
 import { useLayoutEffect, useRef, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Agent } from "../lib/client-api";
 import { PublicAvatar } from "./public-avatar";
-
 export function OwnedAgentCarousel({
   activeId,
   selectAgent,
@@ -13,6 +13,7 @@ export function OwnedAgentCarousel({
   selectAgent: (id: string) => void;
   agents: Agent[];
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const root = useRef<HTMLDivElement>(null);
   const select = useRef(selectAgent);
   select.current = selectAgent;
@@ -29,7 +30,6 @@ export function OwnedAgentCarousel({
   const next = agents.findIndex(
     (agent, i) => i > index && agent.status !== "suspended",
   );
-
   useLayoutEffect(() => {
     const element = root.current;
     if (!element) return;
@@ -170,7 +170,6 @@ export function OwnedAgentCarousel({
       reduced.removeEventListener("change", sync);
     };
   }, [ids]);
-
   useLayoutEffect(() => {
     const element = root.current;
     const card =
@@ -183,19 +182,18 @@ export function OwnedAgentCarousel({
     if (Math.abs(element.scrollLeft - left) > 2)
       element.scrollTo({ left, behavior: "instant" });
   }, [activeId]);
-
   if (!agents.length) return null;
   return (
     <section
       className="hub-carousel"
-      aria-label="我的智能体档案"
-      aria-roledescription="轮播"
+      aria-label={tx("我的智能体档案")}
+      aria-roledescription={tx("轮播")}
     >
       <div
         className="hub-carousel-track"
         ref={root}
         tabIndex={0}
-        aria-label="左右滑动切换 Agent"
+        aria-label={tx("左右滑动切换 Agent")}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;
           const target =
@@ -229,7 +227,7 @@ export function OwnedAgentCarousel({
           >
             <button
               className={`hub-agent-card ${activeId === agent.id ? "is-active" : ""}`}
-              aria-label={`切换到 ${agent.displayName}`}
+              aria-label={tx("切换到 {0}", agent.displayName)}
               aria-pressed={activeId === agent.id}
               disabled={agent.status === "suspended"}
               onClick={() => navigate.current(i)}
@@ -242,10 +240,10 @@ export function OwnedAgentCarousel({
                 />
                 <span className="hub-agent-active">
                   {agent.status === "suspended"
-                    ? "已停用"
+                    ? tx("已停用")
                     : activeId === agent.id
-                      ? "当前激活"
-                      : "点击切换"}
+                      ? tx("当前激活")
+                      : tx("点击切换")}
                 </span>
               </span>
               <span className="hub-agent-name">{agent.displayName}</span>
@@ -257,7 +255,7 @@ export function OwnedAgentCarousel({
       <p className="hub-carousel-caption">{agents[index]?.displayName}</p>
       <div className="hub-carousel-controls">
         <button
-          aria-label="上一个 Agent"
+          aria-label={tx("上一个 Agent")}
           className="ws-icon-button"
           disabled={previous < 0}
           onClick={() => navigate.current(previous)}
@@ -268,7 +266,7 @@ export function OwnedAgentCarousel({
           {Math.max(index + 1, 0)} <span>/ {agents.length}</span>
         </span>
         <button
-          aria-label="下一个 Agent"
+          aria-label={tx("下一个 Agent")}
           className="ws-icon-button"
           disabled={next < 0}
           onClick={() => navigate.current(next)}
@@ -276,7 +274,7 @@ export function OwnedAgentCarousel({
           <ChevronRight size={20} />
         </button>
       </div>
-      <p className="hub-carousel-hint">左右滑动，切换当前 Agent</p>
+      <p className="hub-carousel-hint">{tx("左右滑动，切换当前 Agent")}</p>
     </section>
   );
 }

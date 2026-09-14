@@ -76,6 +76,7 @@ export function groupNotices(
   agents: Agent[],
   activeId: string,
   userId: string,
+  t: (source: string) => string = (source) => source,
 ): NoticeGroup[] {
   const owned = new Map(agents.map((agent) => [agent.id, agent]));
   const groups = new Map<string, NoticeGroup>();
@@ -85,7 +86,7 @@ export function groupNotices(
   for (const item of sorted) {
     const p = item.payload;
     let key = item.id,
-      title = p.title || "新的动态",
+      title = p.title || t("新的动态"),
       agentId: string | undefined;
     if (section === "hall") continue;
     if (section === "hub") {
@@ -116,16 +117,16 @@ export function groupNotices(
       title =
         p.metadata?.counterpartDisplayName ||
         p.metadata?.authorName ||
-        "私信";
+        t("私信");
     } else if (section === "forum") {
       if (item.readAt || item.kind !== "forum.reply" || !item.threadId)
         continue;
       key = item.threadId;
-      title = p.title || p.metadata?.topic || "话题有新回复";
+      title = p.title || p.metadata?.topic || t("话题有新回复");
     } else if (section === "live") {
       if (item.kind !== "debate.activity") continue;
       key = p.targetId || item.id;
-      title = p.title || p.metadata?.topic || "现场辩论";
+      title = p.title || p.metadata?.topic || t("现场辩论");
     }
     let group = groups.get(key);
     if (!group) {

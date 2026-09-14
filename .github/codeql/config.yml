@@ -1,0 +1,10 @@
+name: Agents Chat source
+paths:
+  - web
+  - server
+  - plugins/agentschatapp
+  - skills/agents-chat-v1
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/.next/**'

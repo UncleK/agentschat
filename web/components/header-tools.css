@@ -1,0 +1,289 @@
+html {
+  scrollbar-gutter: stable;
+}
+.site-header .header-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.site-header .header-icon,
+.site-header .header-stop-slot .app-surface-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  color: #b8bece;
+  cursor: pointer;
+}
+.site-header .header-icon:hover,
+.site-header .header-stop-slot .app-surface-icon:hover {
+  background: #00d7ef12;
+  color: #00d7ef;
+}
+.site-header .header-icon:focus-visible,
+.header-language:focus-within {
+  outline: 2px solid #00d7ef;
+  outline-offset: 3px;
+}
+.site-header .header-stop-slot,
+.header-search-slot {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+}
+.site-header .header-stop-slot .app-surface-icon {
+  color: #a875df;
+}
+.site-header .header-stop-slot button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.header-search-slot:has(.page-search-action) .header-search-fallback {
+  display: none;
+}
+.header-language {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  position: relative;
+  width: 48px;
+  height: 36px;
+  border-radius: 10px;
+  color: #b8bece;
+  font-size: 13px;
+}
+.header-language select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.header-language select option {
+  background: #151b23;
+  color: #e0e4ee;
+}
+.site-header .header-launch {
+  min-width: 78px;
+  width: 106px;
+  flex: 0 0 106px;
+  padding-inline: 12px;
+  justify-content: center;
+  gap: 6px;
+}
+.header-agent-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+.header-agent-results button,
+.notification-online {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  border: 1px solid #ffffff16;
+  background: #ffffff05;
+  border-radius: 12px;
+  padding: 14px;
+  color: inherit;
+}
+.header-agent-results button:disabled {
+  opacity: 0.4;
+}
+.notification-center.ws-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(760px, calc(100dvh - 48px));
+  text-align: left;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+.notification-center p {
+  margin: 12px 0;
+  line-height: 1.6;
+}
+.notification-tabs {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0 20px;
+}
+.notification-tabs button,
+.notification-summary button,
+.notification-item button {
+  border: 1px solid #ffffff1c;
+  background: #ffffff05;
+  color: #b8bece;
+  border-radius: 9px;
+  padding: 7px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+.notification-tabs button[aria-pressed="true"] {
+  color: #00d7ef;
+  background: #00d7ef10;
+  border-color: #00d7ef55;
+}
+.notification-tabs span {
+  margin-left: 6px;
+  font-size: 11px;
+}
+.notification-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  color: #929baa;
+}
+.notification-summary button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.notification-item {
+  display: grid;
+  gap: 8px;
+  padding: 16px 12px;
+  border-bottom: 1px solid #ffffff12;
+  border-left: 2px solid transparent;
+}
+.notification-item[data-unread="true"] {
+  border-left-color: #00d7ef;
+  background: #00d7ef05;
+}
+.notification-item > small {
+  color: #00c7df;
+}
+.notification-item > strong,
+.notification-item > a {
+  color: #e0e4ee;
+}
+.notification-item p {
+  margin: 0;
+  color: #aeb6c7;
+  overflow-wrap: anywhere;
+}
+.notification-item > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.notification-item time {
+  color: #929baa;
+  font-size: 12px;
+}
+.notification-online {
+  margin: 8px 0;
+}
+.live-search-summary {
+  margin: 14px 0;
+  color: #b8bece;
+}
+.live-search-summary button {
+  border: 0;
+  background: transparent;
+  color: #00d7ef;
+}
+.live-workspace .reading-primary > .reading-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.live-workspace .reading-primary > .reading-pane-header > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.live-workspace .reading-primary > .reading-pane-header button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: #00d7ef;
+  font: inherit;
+  padding: 6px 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+@media (max-width: 1100px) {
+  .site-header .header-tools {
+    gap: 4px;
+  }
+}
+@media (min-width: 801px) and (max-width: 1200px) {
+  .site-header .brand-wordmark {
+    display: none;
+  }
+  .site-header .brand {
+    gap: 0;
+  }
+}
+@media (min-width: 801px) and (max-width: 1000px) {
+  .site-header .primary-navigation a span {
+    display: none;
+  }
+}
+@media (max-width: 800px) {
+  .site-header .surface-stop-feedback {
+    position: fixed;
+    top: calc(var(--header-height) + 8px);
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-width: none;
+  }
+  .site-header .header-tools > a[aria-label="接入指南"] {
+    display: inline-flex;
+  }
+  .site-header .header-tools {
+    gap: 3px;
+  }
+  .site-header .header-icon,
+  .site-header .header-stop-slot,
+  .site-header .header-search-slot,
+  .site-header .header-stop-slot .app-surface-icon {
+    width: 32px;
+    height: 36px;
+    flex-basis: 32px;
+  }
+  .site-header .header-launch {
+    min-width: 40px;
+    width: 40px;
+    flex-basis: 40px;
+    padding: 8px;
+  }
+  .site-header .header-launch span {
+    display: none;
+  }
+  .header-language {
+    width: 42px;
+  }
+  .live-workspace .reading-primary > .reading-pane-header {
+    padding: 16px 0;
+  }
+}
+@media (max-width: 600px) {
+  .site-header .brand-wordmark {
+    display: none;
+  }
+  .site-header .brand {
+    gap: 0;
+  }
+  .site-header .site-header-inner {
+    gap: 6px;
+  }
+  .live-workspace .reading-primary > .reading-pane-header {
+    font-size: 13px;
+  }
+}

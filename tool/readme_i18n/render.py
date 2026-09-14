@@ -18,6 +18,8 @@ REQUIRED_LOCALE_KEYS = {
     "file",
     "label",
     "website_label",
+    "migration_note",
+    "language_label",
     "hero_paragraph_1",
     "hero_paragraph_2",
     "repo_intro",
@@ -227,8 +229,10 @@ def build_section_banner_svg(
 """
 
 
-def ensure_generated_assets(order: list[str], locales: dict[str, dict[str, object]]) -> None:
-    GENERATED_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+def ensure_generated_assets(order: list[str], locales: dict[str, dict[str, object]], check: bool = False) -> list[str]:
+    mismatches: list[str] = []
+    if not check:
+        GENERATED_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     palette = {
         "section-overview.svg": ("#00DAF3", "#00DAF3"),
         "section-agents.svg": ("#A855F7", "#A855F7"),
@@ -238,11 +242,18 @@ def ensure_generated_assets(order: list[str], locales: dict[str, dict[str, objec
     }
     for code in order:
         locale_dir = GENERATED_ASSETS_DIR / code
-        locale_dir.mkdir(parents=True, exist_ok=True)
+        if not check:
+            locale_dir.mkdir(parents=True, exist_ok=True)
         for filename, (badge, title, subtitle) in section_banner_payload(locales[code]).items():
             accent, glow = palette[filename]
             svg = build_section_banner_svg(badge, title, subtitle, accent, glow)
-            (locale_dir / filename).write_text(svg, encoding="utf-8")
+            target = locale_dir / filename
+            if check:
+                if not target.exists() or target.read_text(encoding="utf-8") != svg:
+                    mismatches.append(str(target.relative_to(ROOT)))
+            else:
+                target.write_text(svg, encoding="utf-8")
+    return mismatches
 
 
 def build_language_nav(order: list[str], locales: dict[str, dict[str, object]], active_code: str) -> str:
@@ -255,7 +266,7 @@ def build_language_nav(order: list[str], locales: dict[str, dict[str, object]], 
             parts.append(f"**{label}**")
         else:
             parts.append(f"[{label}](./{output_file})")
-    return "Languages: " + " | ".join(parts)
+    return str(locales[active_code]["language_label"]) + ": " + " | ".join(parts)
 
 
 def build_language_nav_html(order: list[str], locales: dict[str, dict[str, object]], active_code: str) -> str:
@@ -268,7 +279,7 @@ def build_language_nav_html(order: list[str], locales: dict[str, dict[str, objec
             parts.append(f"<strong>{label}</strong>")
         else:
             parts.append(f'<a href="./{output_file}">{label}</a>')
-    return "Languages: " + " | ".join(parts)
+    return str(locales[active_code]["language_label"]) + ": " + " | ".join(parts)
 
 
 def load_configuration() -> tuple[list[str], dict[str, dict[str, object]]]:
@@ -339,8 +350,7 @@ def main() -> int:
     args = parser.parse_args()
 
     order, locales = load_configuration()
-    ensure_generated_assets(order, locales)
-    mismatches: list[str] = []
+    mismatches = ensure_generated_assets(order, locales, check=args.check)
 
     for code in order:
         output_path = ROOT / str(locales[code]["file"])

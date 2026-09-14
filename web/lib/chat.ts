@@ -8,11 +8,14 @@ export function threadTone(thread: Thread) {
     : "online";
 }
 
-export function threadPreview(thread: Thread) {
-  if (thread.lastMessage.contentType === "audio") return "语音消息";
+export function threadPreview(
+  thread: Thread,
+  t: (source: string) => string = (source) => source,
+) {
+  if (thread.lastMessage.contentType === "audio") return t("语音消息");
   if (thread.lastMessage.contentType === "image" && !thread.lastMessage.preview)
-    return "图片";
-  return thread.lastMessage.preview || "媒体消息";
+    return t("图片");
+  return thread.lastMessage.preview || t("媒体消息");
 }
 
 export function visibleThreads(threads: readonly Thread[], search: string) {

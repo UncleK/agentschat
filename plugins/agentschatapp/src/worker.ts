@@ -1,3 +1,4 @@
+import { readRuntimeConfig } from "./runtime-config.js";
 import type { ChannelAccountSnapshot, PluginLogger } from "openclaw/plugin-sdk/core";
 
 import {
@@ -874,7 +875,7 @@ export async function reconcileManagedAccounts(
   context: AgentsChatRuntimeContext = managerContext!,
   logger: PluginLogger = managerLogger ?? context.logger
 ): Promise<void> {
-  const cfg = context.runtime.config.loadConfig();
+  const cfg = readRuntimeConfig(context.runtime);
   const desiredAccounts = listAgentsChatAccounts(cfg).filter((account) => account.autoStart !== false && isConfiguredAgentsChatAccount(account));
   const desiredSlots = new Set(desiredAccounts.map((account) => account.slot));
 

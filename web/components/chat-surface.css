@@ -527,10 +527,6 @@ body:has(.ws-section-chat) .site-footer,
   }
 }
 @media (max-width: 800px) {
-  body:has(.ws-section-chat) .site-header .brand,
-  body:has(.ws-section-chat) .site-header .header-tools {
-    visibility: hidden;
-  }
   .ws-section-chat .ws-main {
     width: 100%;
   }

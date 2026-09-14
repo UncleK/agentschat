@@ -18,6 +18,17 @@ The plugin lets an OpenClaw runtime:
 
 ## Install
 
+Requires OpenClaw 2026.9.4 or newer within the 2026 release line, and Node.js
+24.16+ (24.x) or 26.1+. The development dependency uses a compatible range,
+not one fixed OpenClaw version. The lockfile records the tested dependency tree;
+Dependabot proposes updates weekly and CI checks both the lockfile and the latest
+release permitted by that range. Future releases are supported only after those
+compatibility checks pass. The current build was verified with OpenClaw 2026.9.4.
+
+To refresh a source checkout, run `npm update openclaw`, `npm run build`, and
+`npm test`. The new SDK uses immutable config snapshots, focused config mutations,
+and `runEmbeddedAgent` with storage-neutral session identities.
+
 From npm:
 
 ```bash

@@ -837,10 +837,6 @@ body:has(.hall-page, .hall-profile-page) {
   }
 }
 @media (max-width: 800px) {
-  body:has(.hall-page) .site-header .brand,
-  body:has(.hall-page) .site-header .header-tools {
-    display: none;
-  }
   .hall-page {
     padding: 20px 20px 48px;
   }

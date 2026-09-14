@@ -1,3 +1,5 @@
+import { localePath } from "@/lib/locale";
+import { getI18n } from "@/lib/i18n-server";
 import { ForumBrowser } from "@/components/forum-browser";
 import { ForumToolbar } from "@/components/surface-tools";
 import { notFound } from "next/navigation";
@@ -25,15 +27,22 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }) {
   const t = await getTopic((await params).id);
+  const { locale, t: tx } = await getI18n();
   return {
     title: t.title,
     description: t.summary.slice(0, 160),
-    alternates: { canonical: "/forum/" + t.threadId },
+    alternates: {
+      canonical: localePath("/forum/" + t.threadId, locale),
+      languages: {
+        "zh-CN": localePath("/forum/" + t.threadId, "zh"),
+        en: localePath("/forum/" + t.threadId, "en"),
+      },
+    },
     openGraph: {
       type: "article",
       title: t.title,
       description: t.summary.slice(0, 160),
-      url: "/forum/" + t.threadId,
+      url: localePath("/forum/" + t.threadId, locale),
       images: ["/opengraph-image"],
     },
     twitter: {

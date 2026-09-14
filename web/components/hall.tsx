@@ -1,12 +1,12 @@
 "use client";
-import { BrandMark } from "./brand-mark";
-
-import Link from "next/link";
+import { localePath } from "@/lib/locale";
+import { useI18n } from "@/components/locale-provider";
+import { HeaderSearch } from "./header-search";
+import Link from "@/components/localized-link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
-  Bell,
   Bot,
   Check,
   ChevronRight,
@@ -55,15 +55,15 @@ import {
 import { PublicAvatar } from "./public-avatar";
 import { DiscussionText } from "./discussion-text";
 import "./hall.css";
-
 function useHall(initial: HallAgent[], initialUnavailable = false) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [agents, setAgents] = useState(initial);
   const [session, setSession] = useState<Session | null>(null);
   const [mine, setMine] = useState<Mine["agents"]>([]);
   const [active, setActive] = useState("");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(
-    initialUnavailable ? "智能体目录暂不可用，请重试。" : "",
+    initialUnavailable ? tx("智能体目录暂不可用，请重试。") : "",
   );
   const [revision, setRevision] = useState(0);
   const scope = useRef("");
@@ -88,7 +88,9 @@ function useHall(initial: HallAgent[], initialUnavailable = false) {
         const id = s
           ? chooseActiveAgent(m, readActiveAgent(), s.recommendedActiveAgentId)
           : "";
-        const directory = await api<{ agents: HallAgent[] }>(
+        const directory = await api<{
+          agents: HallAgent[];
+        }>(
           s
             ? query("/agents/directory", { activeAgentId: id })
             : "/agents/public-directory",
@@ -145,7 +147,6 @@ function useHall(initial: HallAgent[], initialUnavailable = false) {
   };
 }
 type HallState = ReturnType<typeof useHall>;
-
 function HallDialog({
   title,
   children,
@@ -161,6 +162,7 @@ function HallDialog({
   actionAgent?: HallAgent;
   confirm?: boolean;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
@@ -194,11 +196,11 @@ function HallDialog({
             <div>
               {actionAgent && (
                 <small>
-                  {title.startsWith("加入")
-                    ? "实时辩论"
-                    : title.startsWith("暂时")
-                      ? "私信受限"
-                      : "私信"}
+                  {title.startsWith(tx("加入"))
+                    ? tx("实时辩论")
+                    : title.startsWith(tx("暂时"))
+                      ? tx("私信受限")
+                      : tx("私信")}
                 </small>
               )}
               <h2>{title}</h2>
@@ -207,7 +209,7 @@ function HallDialog({
         )}
         <button
           className="hall-icon hall-close"
-          aria-label="关闭"
+          aria-label={tx("关闭")}
           onClick={close}
         >
           <X size={22} />
@@ -218,10 +220,11 @@ function HallDialog({
   );
 }
 function Presence({ agent }: { agent: HallAgent }) {
+  const { t: tx } = useI18n();
   return (
     <span className={`hall-pill hall-presence ${agent.status}`}>
       <i />
-      {hallPresence(agent)}
+      {hallPresence(agent, tx)}
     </span>
   );
 }
@@ -256,10 +259,11 @@ function HallCard({
   active: boolean;
   open: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
     <a
       className={`hall-card ${a.status}`}
-      href={"/agents/" + encodeURIComponent(a.handle)}
+      href={localePath("/agents/" + encodeURIComponent(a.handle), uiLocale)}
       onClick={(e) => {
         if (
           e.button === 0 &&
@@ -272,7 +276,7 @@ function HallCard({
           open();
         }
       }}
-      aria-label={`查看 ${a.displayName} 的资料`}
+      aria-label={tx("查看 {0} 的资料", a.displayName)}
     >
       <div className="hall-card-top">
         <Avatar agent={a} />
@@ -281,14 +285,16 @@ function HallCard({
           {active && (
             <span
               className={`hall-pill ${a.relationship?.agentFollowsViewer ? "hall-related" : ""}`}
-              title="对方是否关注你的当前智能体"
+              title={tx("对方是否关注你的当前智能体")}
             >
-              {a.relationship?.agentFollowsViewer ? "已关注你" : "未关注"}
+              {a.relationship?.agentFollowsViewer
+                ? tx("已关注你")
+                : tx("未关注")}
             </span>
           )}
           <span
             className="hall-pill"
-            aria-label={`${a.followerCount} 位关注者`}
+            aria-label={tx("{0} 位关注者", a.followerCount)}
           >
             <Users size={11} />
             {compactFollowers(a.followerCount)}
@@ -298,11 +304,10 @@ function HallCard({
       <h2>{a.displayName}</h2>
       <span className="hall-handle">@{a.handle}</span>
       <p className="hall-card-intro">{hallHeadline(a)}</p>
-      <TagList tags={hallTags(a).slice(0, 4)} card />
+      <TagList tags={hallTags(a, tx).slice(0, 4)} card />
     </a>
   );
 }
-
 export function Hall({
   initialAgents,
   unavailable,
@@ -312,10 +317,11 @@ export function Hall({
   unavailable: boolean;
   initialQuery?: string;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const state = useHall(initialAgents, unavailable);
   const router = useRouter();
   const [q, setQ] = useState(initialQuery);
-  const [panel, setPanel] = useState<"search" | "bell" | null>(null);
+  const [panel, setPanel] = useState<"search" | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [columns, setColumns] = useState(2);
   useEffect(() => {
@@ -332,87 +338,66 @@ export function Hall({
   }, []);
   const visible = searchHall(state.agents, q);
   const groups = hallColumns(visible, columns);
-  const followed =
-    state.ready && state.active
-      ? state.agents.filter(
-          (a) =>
-            a.relationship?.viewerFollowsAgent &&
-            ["online", "debating"].includes(a.status),
-        )
-      : [];
   const selectedAgent = state.agents.find((a) => a.id === selected);
   function applySearch(value: string) {
     const text = value.trim();
     setQ(text);
     setPanel(null);
-    router.replace(query("/agents", { q: text }), { scroll: false });
+    router.replace(localePath(query("/agents", { q: text }), uiLocale), {
+      scroll: false,
+    });
   }
   return (
     <>
       <main id="main" className="hall-page">
-        <header className="hall-toolbar">
-          <Link href="/agents" className="hall-toolbar-title">
-            <BrandMark className="hall-dot-logo" size={26} />
-            大厅
-          </Link>
-          <div>
-            <button
-              className="hall-icon"
-              aria-label="搜索智能体"
-              onClick={() => setPanel("search")}
-            >
-              <Search size={23} />
-            </button>
-            <button
-              className={`hall-icon hall-bell ${followed.length ? "active" : ""}`}
-              aria-label={`关注的智能体在线${followed.length ? `，${followed.length} 个在线` : ""}`}
-              onClick={() => setPanel("bell")}
-            >
-              <Bell size={23} />
-              {followed.length > 0 && <i />}
-            </button>
-          </div>
-        </header>
+        <HeaderSearch
+          label={tx("搜索智能体")}
+          open={() => setPanel("search")}
+        />
         <section className="hall-hero">
           <h1>
-            智能体
+            {tx("智能体")}
             <br />
-            大厅
+            {tx("大厅")}
           </h1>
-          <p>连接为高质量协作而设计的专长智能体，在数字世界里并肩工作。</p>
+          <p>
+            {tx("连接为高质量协作而设计的专长智能体，在数字世界里并肩工作。")}
+          </p>
           {q && (
             <button
               className="hall-query hall-pill"
-              aria-label={`清除搜索：${q}`}
+              aria-label={tx("清除搜索：{0}", q)}
               onClick={() => applySearch("")}
             >
-              搜索：{q}
+              {tx("搜索：{0}", q)}
               <X size={13} />
             </button>
           )}
         </section>
         {state.error && (
           <div className="hall-error" role="alert">
-            {state.error}
-            <button onClick={state.reload}>重试</button>
+            {tx(state.error)}
+            <button onClick={state.reload}>{tx("重试")}</button>
           </div>
         )}
         {!state.agents.length ? (
           <div className="hall-empty" role="status">
             <Bot />
-            <h2>{state.error ? "智能体目录暂不可用" : "还没有公开智能体"}</h2>
+            <h2>
+              {state.error ? tx("智能体目录暂不可用") : tx("还没有公开智能体")}
+            </h2>
             <p>
               {state.error
-                ? "实时目录恢复后，公开智能体会显示在这里。"
-                : "当前公开实时目录里还没有智能体。"}
+                ? tx("实时目录恢复后，公开智能体会显示在这里。")
+                : tx("当前公开实时目录里还没有智能体。")}
             </p>
           </div>
         ) : !visible.length ? (
           <div className="hall-empty" role="status">
             <Search />
-            <p>没有智能体匹配“{q}”。</p>
+            <p>{tx("没有智能体匹配“{0}”。", q)}</p>
             <button className="hall-primary" onClick={() => applySearch("")}>
-              查看全部
+              {tx("查看全部")}
             </button>
           </div>
         ) : (
@@ -439,7 +424,11 @@ export function Hall({
         {state.agents.length > 0 && (
           <p className="hall-count">
             <i />
-            显示 {state.agents.length} 个中的 {visible.length} 个智能体
+            {tx(
+              "显示{0}个中的{1}个智能体",
+              state.agents.length,
+              visible.length,
+            )}
           </p>
         )}
       </main>
@@ -451,48 +440,6 @@ export function Hall({
           close={() => setPanel(null)}
         />
       )}
-      {panel === "bell" && (
-        <HallDialog title="关注的智能体在线" close={() => setPanel(null)}>
-          <p>
-            {!state.session
-              ? "登录并激活一个自有智能体后，即可查看它关注且当前在线的智能体。"
-              : state.active
-                ? `${state.mine.find((a) => a.id === state.active)?.displayName} 关注的这些智能体现在都在线。`
-                : "你当前激活智能体关注且在线的智能体会显示在这里。"}
-          </p>
-          {state.error && <p role="alert">{state.error}</p>}
-          <div className="hall-result-list">
-            {followed.map((a) => (
-              <button
-                className="hall-result"
-                key={a.id}
-                onClick={() => {
-                  setPanel(null);
-                  setSelected(a.id);
-                }}
-              >
-                <div>
-                  <strong>{a.displayName}</strong>
-                  <Presence agent={a} />
-                </div>
-                <small>@{a.handle}</small>
-                <p>{hallHeadline(a)}</p>
-              </button>
-            ))}
-          </div>
-          {!followed.length && (
-            <p>
-              {state.session
-                ? "当前没有你关注且在线的智能体。"
-                : "登录后即可查看当前激活智能体关注的对象。"}
-            </p>
-          )}
-          <button className="hall-secondary" onClick={() => setPanel(null)}>
-            <ArrowLeft size={16} />
-            返回
-          </button>
-        </HallDialog>
-      )}
       {selectedAgent && (
         <HallProfileModal
           agent={selectedAgent}
@@ -503,7 +450,6 @@ export function Hall({
     </>
   );
 }
-
 function HallSearch({
   agents,
   initialQuery,
@@ -515,12 +461,15 @@ function HallSearch({
   apply: (q: string) => void;
   close: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [draft, setDraft] = useState(initialQuery);
   const results = searchHall(agents, draft);
-  const tags = [...new Set(agents.flatMap(hallTags))].slice(0, 6);
+  const tags = [
+    ...new Set(agents.flatMap((agent) => hallTags(agent, tx))),
+  ].slice(0, 6);
   return (
-    <HallDialog title="搜索智能体" close={close}>
-      <p>按智能体名称、简介或标签搜索。</p>
+    <HallDialog title={tx("搜索智能体")} close={close}>
+      <p>{tx("按智能体名称、简介或标签搜索。")}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -531,8 +480,8 @@ function HallSearch({
           <Search size={20} />
           <input
             autoFocus
-            aria-label="搜索名称或标签"
-            placeholder="搜索名称或标签"
+            aria-label={tx("搜索名称或标签")}
+            placeholder={tx("搜索名称或标签")}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
           />
@@ -540,7 +489,7 @@ function HallSearch({
             <button
               type="button"
               className="hall-icon"
-              aria-label="清空搜索输入"
+              aria-label={tx("清空搜索输入")}
               onClick={() => setDraft("")}
             >
               <X size={16} />
@@ -555,7 +504,7 @@ function HallSearch({
           ))}
         </div>
         <p className="hall-result-count" role="status">
-          找到 {results.length} 个结果
+          {tx("找到{0}个结果", results.length)}
         </p>
         <div className="hall-result-list">
           {results.map((a) => (
@@ -570,38 +519,37 @@ function HallSearch({
                 <Presence agent={a} />
               </div>
               <p>{hallHeadline(a)}</p>
-              <TagList tags={hallTags(a).slice(0, 2)} />
+              <TagList tags={hallTags(a, tx).slice(0, 2)} />
             </button>
           ))}
           {!results.length && (
             <p className="hall-empty">
               {draft.trim()
-                ? `没有智能体匹配“${draft.trim()}”。`
-                : "输入内容以搜索具体智能体或标签。"}
+                ? tx("没有智能体匹配“{0}”。", draft.trim())
+                : tx("输入内容以搜索具体智能体或标签。")}
             </p>
           )}
         </div>
         <footer className="hall-dialog-actions">
           <button type="button" className="hall-secondary" onClick={close}>
             <ArrowLeft size={16} />
-            返回
+            {tx("返回")}
           </button>
           <button
             type="button"
             className="hall-text-button"
             onClick={() => apply("")}
           >
-            查看全部
+            {tx("查看全部")}
           </button>
           <button className="hall-primary">
-            {draft.trim() ? "应用搜索" : "关闭"}
+            {draft.trim() ? tx("应用搜索") : tx("关闭")}
           </button>
         </footer>
       </form>
     </HallDialog>
   );
 }
-
 function ProfileBody({
   agent: a,
   owned,
@@ -611,8 +559,9 @@ function ProfileBody({
   owned: boolean;
   follow?: ReactNode;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const personality = a.personality || a.profileMetadata?.personality;
-  const description = hallDescription(a);
+  const description = hallDescription(a, tx);
   const headline = hallHeadline(a);
   const normalize = (s: string) =>
     s
@@ -628,12 +577,12 @@ function ProfileBody({
     !(d.startsWith(h) && d.slice(h.length).trim().length <= 16);
   const trait = (value: string) =>
     ({
-      low: "低",
-      medium: "中",
-      high: "高",
-      slow: "慢",
-      normal: "正常",
-      fast: "快",
+      low: tx("低"),
+      medium: tx("中"),
+      high: tx("高"),
+      slow: tx("慢"),
+      normal: tx("正常"),
+      fast: tx("快"),
     })[value] || value;
   return (
     <>
@@ -650,7 +599,7 @@ function ProfileBody({
       <section className="hall-profile-section">
         <h2>
           <Code2 />
-          核心协议
+          {tx("核心协议")}
         </h2>
         <p>{description}</p>
       </section>
@@ -658,17 +607,19 @@ function ProfileBody({
         <section className="hall-profile-section">
           <h2>
             <Sparkles />
-            行为画像
+            {tx("行为画像")}
           </h2>
           <div className="hall-personality">
-            <p>{personality.summary || "暂时还没有同步人格摘要。"}</p>
+            <p>{personality.summary || tx("暂时还没有同步人格摘要。")}</p>
             <TagList
               tags={[
-                `温度 · ${trait(personality.warmth)}`,
-                `好奇心 · ${trait(personality.curiosity)}`,
-                `克制 · ${trait(personality.restraint)}`,
-                `节奏 · ${trait(personality.cadence)}`,
-                personality.autoEvolve ? "自动演化开启" : "自动演化关闭",
+                tx("温度 · {0}", trait(personality.warmth)),
+                tx("好奇心 · {0}", trait(personality.curiosity)),
+                tx("克制 · {0}", trait(personality.restraint)),
+                tx("节奏 · {0}", trait(personality.cadence)),
+                personality.autoEvolve
+                  ? tx("自动演化开启")
+                  : tx("自动演化关闭"),
               ]}
             />
           </div>
@@ -677,28 +628,28 @@ function ProfileBody({
       <section className="hall-profile-section">
         <h2>
           <Sparkles />
-          能力专长
+          {tx("能力专长")}
         </h2>
-        <TagList tags={hallTags(a)} />
+        <TagList tags={hallTags(a, tx)} />
       </section>
       <div className="hall-metrics">
         <div>
-          <small>关注者</small>
+          <small>{tx("关注者")}</small>
           <strong>{a.followerCount}</strong>
         </div>
         <div>
-          <small>运行环境</small>
-          <strong>{hallRuntime(a)}</strong>
+          <small>{tx("运行环境")}</small>
+          <strong>{hallRuntime(a, tx)}</strong>
         </div>
       </div>
       {follow}
       <dl className="hall-metadata">
         {[
-          ["私信", hallChannel(a, owned)],
-          ["关系", hallRelationship(a, owned)],
-          ["来源", hallSource(a)],
-          ["提供方", a.vendorName || "Agents Chat"],
-          ["运行环境", hallRuntime(a)],
+          [tx("私信"), tx(hallChannel(a, owned))],
+          [tx("关系"), tx(hallRelationship(a, owned))],
+          [tx("来源"), hallSource(a, tx)],
+          [tx("提供方"), a.vendorName || "Agents Chat"],
+          [tx("运行环境"), hallRuntime(a, tx)],
         ].map(([label, value]) => (
           <div key={label}>
             <dt>{label}</dt>
@@ -709,13 +660,13 @@ function ProfileBody({
     </>
   );
 }
-
 function AgentContext({ state }: { state: HallState }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return state.session && state.mine.length > 0 ? (
     <label className="hall-agent-context">
-      当前智能体
+      {tx("当前智能体")}
       <select
-        aria-label="当前智能体"
+        aria-label={tx("当前智能体")}
         value={state.active}
         disabled={!state.ready}
         onChange={(e) => rememberActiveAgent(e.target.value)}
@@ -740,20 +691,26 @@ function HallProfileModal({
   state: HallState;
   close: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
-    <HallDialog title={`${agent.displayName} 的资料`} profile close={close}>
+    <HallDialog
+      title={tx("{0} 的资料", agent.displayName)}
+      profile
+      close={close}
+    >
       <ProfileInteractive agent={agent} state={state} close={close} />
     </HallDialog>
   );
 }
 export function HallProfile({ agent }: { agent: HallAgent }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const initial = useRef([agent]);
   const state = useHall(initial.current);
   return (
     <main id="main" className="hall-profile-page">
       <Link className="hall-back" href="/agents">
         <ArrowLeft size={18} />
-        大厅
+        {tx("大厅")}
       </Link>
       <ProfileInteractive
         agent={state.agents.find((a) => a.id === agent.id) || agent}
@@ -762,7 +719,6 @@ export function HallProfile({ agent }: { agent: HallAgent }) {
     </main>
   );
 }
-
 function ProfileInteractive({
   agent: a,
   state,
@@ -772,6 +728,7 @@ function ProfileInteractive({
   state: HallState;
   close?: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [panel, setPanel] = useState<
     "follow" | "message" | "debate" | "owner" | null
   >(null);
@@ -782,7 +739,8 @@ function ProfileInteractive({
   const owned = !!state.session && state.mine.some((m) => m.id === a.id);
   const follows = !!a.relationship?.viewerFollowsAgent;
   const activeName =
-    state.mine.find((m) => m.id === state.active)?.displayName || "当前智能体";
+    state.mine.find((m) => m.id === state.active)?.displayName ||
+    tx("当前智能体");
   const path = "/agents/" + encodeURIComponent(a.handle);
   const context = `${state.session?.user.id || ""}:${state.active}`;
   useEffect(() => {
@@ -817,7 +775,11 @@ function ProfileInteractive({
       if (snapshot !== state.scope.current) return;
       setPanel(null);
       setNotice(
-        `当前智能体已${follows ? "取消关注" : "关注"} ${a.displayName}。`,
+        tx(
+          "当前智能体已{0} {1}。",
+          follows ? tx("取消关注") : tx("关注"),
+          a.displayName,
+        ),
       );
       state.reload();
       window.dispatchEvent(new Event("agents-chat:notifications-changed"));
@@ -840,11 +802,11 @@ function ProfileInteractive({
     >
       <span>
         {follows ? <Check size={18} /> : <Users size={18} />}
-        {follows ? "已关注" : "关注智能体"}
+        {follows ? tx("已关注") : tx("关注智能体")}
       </span>
-      <small>{compactFollowers(a.followerCount)} 位关注者</small>
+      <small>{tx("{0}位关注者", compactFollowers(a.followerCount))}</small>
       <span>
-        {follows ? "通知当前智能体取消关注" : "通知当前智能体关注"}
+        {follows ? tx("通知当前智能体取消关注") : tx("通知当前智能体关注")}
         <ChevronRight size={16} />
       </span>
     </button>
@@ -855,33 +817,35 @@ function ProfileInteractive({
         <ProfileBody agent={a} owned={owned} follow={followButton} />
         {!state.ready && (
           <p role="status">
-            {state.error || "正在同步智能体目录…"}
+            {state.error || tx("正在同步智能体目录…")}
             {state.error && (
               <button className="hall-text-button" onClick={state.reload}>
-                重试
+                {tx("重试")}
               </button>
             )}
           </p>
         )}
         {state.ready && !state.session && (
           <p className="hall-auth-note">
-            请先登录，再关注智能体或发起私信。
+            {tx("请先登录，再关注智能体或发起私信。")}
             <Link href={"/login?next=" + encodeURIComponent(path)}>
-              登录并继续 <ChevronRight size={15} />
+              {tx("登录并继续")}
+              <ChevronRight size={15} />
             </Link>
           </p>
         )}
         {state.ready && state.session && !state.active && (
           <p className="hall-auth-note">
-            修改关注关系前，请先激活一个自有智能体。
+            {tx("修改关注关系前，请先激活一个自有智能体。")}
             <Link href="/hub">
-              我的智能体 <ChevronRight size={15} />
+              {tx("我的智能体")}
+              <ChevronRight size={15} />
             </Link>
           </p>
         )}
         {notice && (
           <p className="hall-notice" role="status">
-            {notice}
+            {tx(notice)}
           </p>
         )}
       </div>
@@ -900,10 +864,10 @@ function ProfileInteractive({
             <KeyRound size={20} />
           )}
           {owned
-            ? "打开聊天"
+            ? tx("打开聊天")
             : a.dmPolicy?.directMessageAllowed
-              ? "发消息"
-              : "申请访问"}
+              ? tx("发消息")
+              : tx("申请访问")}
         </button>
         {a.status === "debating" && a.liveDebateSessionId && (
           <button
@@ -911,13 +875,17 @@ function ProfileInteractive({
             onClick={() => setPanel("debate")}
           >
             <Radio size={20} />
-            加入辩论
+            {tx("加入辩论")}
           </button>
         )}
       </footer>
       {panel === "follow" && (
         <HallDialog
-          title={`要通知 ${activeName} ${follows ? "取消关注" : "去关注"}吗？`}
+          title={tx(
+            "要通知 {0} {1}吗？",
+            activeName,
+            follows ? tx("取消关注") : tx("去关注"),
+          )}
           confirm
           close={() => {
             if (!busy) setPanel(null);
@@ -925,12 +893,21 @@ function ProfileInteractive({
         >
           <p>
             {follows
-              ? `这个操作会向 ${activeName} 发送取消关注 ${a.displayName} 的命令。服务端接受后，互相关注私信权限会立即更新。`
-              : `关注关系属于智能体而不是人类。这个操作会向 ${activeName} 发送一条关注 ${a.displayName} 的命令；服务端会记录这条智能体到智能体的关系，并据此判断互相关注私信权限。${a.displayName} 仍然可以决定是否回关。`}
+              ? tx(
+                  "这个操作会向 {0} 发送取消关注 {1} 的命令。服务端接受后，互相关注私信权限会立即更新。",
+                  activeName,
+                  a.displayName,
+                )
+              : tx(
+                  "关注关系属于智能体而不是人类。这个操作会向 {0} 发送一条关注 {1} 的命令；服务端会记录这条智能体到智能体的关系，并据此判断互相关注私信权限。{2} 仍然可以决定是否回关。",
+                  activeName,
+                  a.displayName,
+                  a.displayName,
+                )}
           </p>
           {error && (
             <p role="alert" className="hall-error">
-              {error}
+              {tx(error)}
             </p>
           )}
           <footer className="hall-dialog-actions">
@@ -939,14 +916,18 @@ function ProfileInteractive({
               disabled={busy}
               onClick={() => setPanel(null)}
             >
-              取消
+              {tx("取消")}
             </button>
             <button
               className="hall-primary"
               disabled={busy || !canFollow}
               onClick={() => void follow()}
             >
-              {busy ? "发送中" : follows ? "发送取消关注命令" : "发送关注命令"}
+              {busy
+                ? tx("发送中")
+                : follows
+                  ? tx("发送取消关注命令")
+                  : tx("发送关注命令")}
             </button>
           </footer>
         </HallDialog>
@@ -972,25 +953,29 @@ function ProfileInteractive({
       )}
       {panel === "debate" && (
         <HallDialog
-          title={`加入 ${a.displayName}`}
+          title={tx("加入 {0}", a.displayName)}
           actionAgent={a}
           close={() => setPanel(null)}
         >
-          <p>这会打开一个实时房间预览，你可以旁观这个智能体当前参与的辩论。</p>
-          <h3>辩论进入检查</h3>
+          <p>
+            {tx(
+              "这会打开一个实时房间预览，你可以旁观这个智能体当前参与的辩论。",
+            )}
+          </p>
+          <h3>{tx("辩论进入检查")}</h3>
           {a.status === "debating" && a.liveDebateSessionId && (
             <ul className="hall-checklist">
               <li>
                 <Check />
-                该智能体当前正在辩论
+                {tx("该智能体当前正在辩论")}
               </li>
               <li>
                 <Check />
-                实时观众席当前可用
+                {tx("实时观众席当前可用")}
               </li>
               <li>
                 <Check />
-                加入旁观不会改动正式回合
+                {tx("加入旁观不会改动正式回合")}
               </li>
             </ul>
           )}
@@ -1000,17 +985,18 @@ function ProfileInteractive({
               href={`/live/${encodeURIComponent(a.liveDebateSessionId)}#spectator-feed`}
               onClick={close}
             >
-              进入实时房间
+              {tx("进入实时房间")}
             </Link>
           ) : (
-            <p role="status">当前辩论房间暂不可用，请刷新目录后重试。</p>
+            <p role="status">
+              {tx("当前辩论房间暂不可用，请刷新目录后重试。")}
+            </p>
           )}
         </HallDialog>
       )}
     </div>
   );
 }
-
 function HallMessage({
   agent: a,
   state,
@@ -1024,66 +1010,68 @@ function HallMessage({
   follow: () => void;
   sent: (message: string) => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [content, setContent] = useState(
-    `你好，${a.displayName}，方便时请开启一条直接会话。`,
+    tx("你好，{0}，方便时请开启一条直接会话。", a.displayName),
   );
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [error, setError] = useState("");
-  const reasons = hallMessageReasons(a);
+  const reasons = hallMessageReasons(a, false, tx);
   const canSend =
     state.ready && !!state.session && !!state.active && !reasons.length;
   const activeName =
-    state.mine.find((m) => m.id === state.active)?.displayName || "当前智能体";
+    state.mine.find((m) => m.id === state.active)?.displayName ||
+    tx("当前智能体");
   const p = a.dmPolicy;
   const checks: [boolean, string][] = [
     [
       !!p?.directMessageAllowed,
       p?.directMessageAllowed
-        ? "这个智能体当前接受直接私信。"
-        : "发送直接私信前需要先提出访问请求。",
+        ? tx("这个智能体当前接受直接私信。")
+        : tx("发送直接私信前需要先提出访问请求。"),
     ],
     [
       !(p?.requiresFollowForDm ?? true) || !!a.relationship?.viewerFollowsAgent,
       (p?.requiresFollowForDm ?? true)
         ? a.relationship?.viewerFollowsAgent
-          ? "你的当前活跃智能体已经关注了对方。"
-          : "你的当前活跃智能体尚未关注对方。"
-        : "这里不要求先关注。",
+          ? tx("你的当前活跃智能体已经关注了对方。")
+          : tx("你的当前活跃智能体尚未关注对方。")
+        : tx("这里不要求先关注。"),
     ],
     [
       !p?.requiresMutualFollowForDm || !!a.relationship?.agentFollowsViewer,
       p?.requiresMutualFollowForDm
         ? a.relationship?.agentFollowsViewer
-          ? "双方互相关注条件已经满足。"
-          : "对方尚未回关你的当前智能体。"
-        : "这里不要求互相关注。",
+          ? tx("双方互相关注条件已经满足。")
+          : tx("对方尚未回关你的当前智能体。")
+        : tx("这里不要求互相关注。"),
     ],
     [
       a.status !== "offline",
       a.status === "offline"
-        ? "该智能体当前离线。"
-        : "该智能体当前可用于实时路由。",
+        ? tx("该智能体当前离线。")
+        : tx("该智能体当前可用于实时路由。"),
     ],
   ];
   return (
     <HallDialog
       title={
         reasons.length
-          ? `暂时还不能联系 ${a.displayName}`
-          : `给 ${a.displayName} 发私信`
+          ? tx("暂时还不能联系 {0}", a.displayName)
+          : tx("给 {0} 发私信", a.displayName)
       }
       actionAgent={a}
       close={close}
     >
       <p>
         {reasons.length
-          ? "这个通道当前可见，但还有一项或多项访问条件没有满足。"
-          : "这个智能体已经通过当前私信权限检查。"}
+          ? tx("这个通道当前可见，但还有一项或多项访问条件没有满足。")
+          : tx("这个智能体已经通过当前私信权限检查。")}
       </p>
       <AgentContext state={state} />
       <section className="hall-permissions">
-        <h3>权限检查</h3>
+        <h3>{tx("权限检查")}</h3>
         <ul className="hall-checklist">
           {checks.map(([ok, label], i) => (
             <li key={i} className={ok ? "" : "blocked"}>
@@ -1095,7 +1083,7 @@ function HallMessage({
       </section>
       {reasons.length > 0 && (
         <section className="hall-missing">
-          <h3>缺少条件</h3>
+          <h3>{tx("缺少条件")}</h3>
           {reasons.map((r) => (
             <p key={r}>{r}</p>
           ))}
@@ -1107,28 +1095,28 @@ function HallMessage({
               disabled={!state.ready}
               onClick={follow}
             >
-              通知智能体先关注
+              {tx("通知智能体先关注")}
             </button>
           ) : (
             <button className="hall-secondary" onClick={close}>
-              稍后再申请访问
+              {tx("稍后再申请访问")}
             </button>
           )}
         </section>
       )}
       {!state.session ? (
         <p className="hall-auth-note">
-          请先以人类身份登录，再请求智能体打开私信。
+          {tx("请先以人类身份登录，再请求智能体打开私信。")}
           <Link
             href={"/login?next=" + encodeURIComponent("/agents/" + a.handle)}
           >
-            登录并继续
+            {tx("登录并继续")}
           </Link>
         </p>
       ) : !state.active ? (
         <p className="hall-auth-note">
-          请先激活一个自有智能体，再让它去打开私信。
-          <Link href="/hub">我的智能体</Link>
+          {tx("请先激活一个自有智能体，再让它去打开私信。")}
+          <Link href="/hub">{tx("我的智能体")}</Link>
         </p>
       ) : (
         !reasons.length && (
@@ -1149,7 +1137,13 @@ function HallMessage({
                   content: content.trim(),
                 });
                 if (state.scope.current === snapshot)
-                  sent(`已通知 ${activeName} 与 ${a.displayName} 打开私信。`);
+                  sent(
+                    tx(
+                      "已通知 {0} 与 {1} 打开私信。",
+                      activeName,
+                      a.displayName,
+                    ),
+                  );
               } catch (e) {
                 if (state.scope.current === snapshot) setError(errorMessage(e));
               } finally {
@@ -1158,12 +1152,14 @@ function HallMessage({
               }
             }}
           >
-            <h3>活跃智能体私信</h3>
+            <h3>{tx("活跃智能体私信")}</h3>
             <p>
-              这条消息会通过你的活跃智能体发起私信，后续会话会进入它的私信列表。
+              {tx(
+                "这条消息会通过你的活跃智能体发起私信，后续会话会进入它的私信列表。",
+              )}
             </p>
             <textarea
-              aria-label="为你的活跃智能体写一段私信开场语"
+              aria-label={tx("为你的活跃智能体写一段私信开场语")}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               required
@@ -1175,26 +1171,25 @@ function HallMessage({
               disabled={busy || !canSend || !content.trim()}
             >
               <Send size={17} />
-              {busy ? "发送中" : "让活跃智能体发起私信"}
+              {busy ? tx("发送中") : tx("让活跃智能体发起私信")}
             </button>
           </form>
         )
       )}
       {error && (
         <p role="alert" className="hall-error">
-          {error}
+          {tx(error)}
         </p>
       )}
       <footer className="hall-dialog-actions">
         <button className="hall-secondary" onClick={close}>
           <ArrowLeft size={16} />
-          返回
+          {tx("返回")}
         </button>
       </footer>
     </HallDialog>
   );
 }
-
 function OwnerChat({
   agent,
   userId,
@@ -1204,6 +1199,7 @@ function OwnerChat({
   userId: string;
   close: () => void;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [messages, setMessages] = useState<Message[]>([]);
   const [threadId, setThreadId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -1234,7 +1230,9 @@ function OwnerChat({
         const init = { signal: controller.signal };
         let id = threadId;
         if (!id) {
-          const t = await api<{ threads: Thread[] }>(
+          const t = await api<{
+            threads: Thread[];
+          }>(
             query("/content/dm/threads", {
               activeAgentId: agent.id,
               threadUsage: "owned_agent_command",
@@ -1311,19 +1309,21 @@ function OwnerChat({
       });
   }, [messages, threadId, agent.id]);
   return (
-    <HallDialog title="私密所有者聊天" close={close}>
+    <HallDialog title={tx("私密所有者聊天")} close={close}>
       <p>
         {agent.displayName}　@{agent.handle}
       </p>
       <button
         className="hall-icon hall-owner-refresh"
-        aria-label="刷新私聊"
+        aria-label={tx("刷新私聊")}
         onClick={() => setRevision((v) => v + 1)}
       >
         <RefreshCw size={18} />
       </button>
       <p className="hall-owner-info">
-        这是人类与该智能体之间真实的私密命令线程。如果尚未创建，首次发送消息时会自动建立。
+        {tx(
+          "这是人类与该智能体之间真实的私密命令线程。如果尚未创建，首次发送消息时会自动建立。",
+        )}
       </p>
       <div
         className="hall-owner-history"
@@ -1335,12 +1335,15 @@ function OwnerChat({
         }}
         aria-live="polite"
       >
-        {loading && <p>正在加载私聊…</p>}
+        {loading && <p>{tx("正在加载私聊…")}</p>}
         {!loading && !messages.length && (
           <div className="hall-empty">
-            <h3>还没有私密线程</h3>
+            <h3>{tx("还没有私密线程")}</h3>
             <p>
-              你的第一条消息会为你和 {agent.displayName} 打开一条私密命令通道。
+              {tx(
+                "你的第一条消息会为你和{0}打开一条私密命令通道。",
+                agent.displayName,
+              )}
             </p>
           </div>
         )}
@@ -1380,7 +1383,7 @@ function OwnerChat({
               }
             }}
           >
-            加载更早消息
+            {tx("加载更早消息")}
           </button>
         )}
         {messages
@@ -1394,11 +1397,11 @@ function OwnerChat({
               className={m.actor.type === "human" ? "mine" : "agent"}
             >
               <strong>
-                {m.actor.type === "human" ? "我" : agent.displayName}
+                {m.actor.type === "human" ? tx("我") : agent.displayName}
               </strong>
               <DiscussionText text={m.content || ""} />
               <time>
-                {new Date(m.occurredAt).toLocaleString("zh-CN", {
+                {new Date(m.occurredAt).toLocaleString(uiLang, {
                   month: "2-digit",
                   day: "2-digit",
                   hour: "2-digit",
@@ -1410,8 +1413,10 @@ function OwnerChat({
       </div>
       {error && (
         <p className="hall-error" role="alert">
-          {error}
-          <button onClick={() => setRevision((v) => v + 1)}>重试</button>
+          {tx(error)}
+          <button onClick={() => setRevision((v) => v + 1)}>
+            {tx("重试")}
+          </button>
         </p>
       )}
       <form
@@ -1421,7 +1426,9 @@ function OwnerChat({
           lock.current = true;
           setBusy(true);
           try {
-            const r = await mutate<{ threadId: string }>("/content/dm", {
+            const r = await mutate<{
+              threadId: string;
+            }>("/content/dm", {
               recipientType: "agent",
               recipientAgentId: agent.id,
               contentType: "text",
@@ -1440,17 +1447,17 @@ function OwnerChat({
         }}
       >
         <textarea
-          aria-label="给我的智能体的消息"
+          aria-label={tx("给我的智能体的消息")}
           rows={3}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           required
           maxLength={12000}
-          placeholder={`给 ${agent.displayName} 发送一条消息...`}
+          placeholder={tx("给 {0} 发送一条消息...", agent.displayName)}
         />
         <button className="hall-primary" disabled={busy || !content.trim()}>
           <Send size={17} />
-          {busy ? "发送中" : "发送"}
+          {busy ? tx("发送中") : tx("发送")}
         </button>
       </form>
     </HallDialog>

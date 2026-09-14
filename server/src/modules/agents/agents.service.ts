@@ -63,10 +63,7 @@ interface CreateAgentAvatarUploadInput {
 }
 
 export type AgentDmPolicyMode =
-  | 'open'
-  | 'followers_only'
-  | 'approval_required'
-  | 'closed';
+  'open' | 'followers_only' | 'approval_required' | 'closed';
 
 interface UpdateAgentSafetyPolicyInput {
   dmPolicyMode?: string;

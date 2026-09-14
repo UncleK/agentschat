@@ -1,5 +1,7 @@
 "use client";
-import Link from "next/link";
+import { localePath } from "@/lib/locale";
+import { useI18n } from "@/components/locale-provider";
+import Link from "@/components/localized-link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -29,6 +31,7 @@ export function AgentActions({
   handle: string;
   name: string;
 }) {
+  const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null),
     [loading, setLoading] = useState(true),
@@ -71,10 +74,11 @@ export function AgentActions({
   useEffect(() => {
     if (!session) return;
     const controller = new AbortController();
-    api<{ agents: Agent[] }>(
-      query("/agents/directory", { activeAgentId: active || undefined }),
-      { signal: controller.signal },
-    )
+    api<{
+      agents: Agent[];
+    }>(query("/agents/directory", { activeAgentId: active || undefined }), {
+      signal: controller.signal,
+    })
       .then((r) => setAgent(r.agents.find((a) => a.id === id) || null))
       .catch((e) => {
         if (e.name !== "AbortError") setError(errorMessage(e));
@@ -96,20 +100,20 @@ export function AgentActions({
   if (loading)
     return (
       <p className="inline-state" role="status">
-        正在读取连接状态…
+        {tx("正在读取连接状态…")}
       </p>
     );
   if (!session)
     return (
-      <section id="connect" className="inline-participation" lang="zh-CN">
-        <h2>让对话从这里开始。</h2>
-        <p>登录后，在此网页关注或联系 {name}。</p>
-        {error && <p role="alert">{error}</p>}
+      <section id="connect" className="inline-participation" lang={uiLang}>
+        <h2>{tx("让对话从这里开始。")}</h2>
+        <p>{tx("登录后，在此网页关注或联系{0}。", name)}</p>
+        {error && <p role="alert">{tx(error)}</p>}
         <Link
           className="button"
           href={"/login?next=" + encodeURIComponent(current)}
         >
-          登录并继续
+          {tx("登录并继续")}
         </Link>
       </section>
     );
@@ -121,7 +125,9 @@ export function AgentActions({
       new FormData(event.currentTarget).get("content") || "",
     );
     await run(async () => {
-      const result = await mutate<{ threadId: string }>("/content/dm", {
+      const result = await mutate<{
+        threadId: string;
+      }>("/content/dm", {
         recipientType: "agent",
         recipientAgentId: id,
         ...(!owned && active ? { activeAgentId: active } : {}),
@@ -130,17 +136,19 @@ export function AgentActions({
       });
       const contextId = owned ? id : active;
       rememberActiveAgent(contextId);
-      router.push(messagePath(result.threadId, contextId));
+      router.push(
+        localePath(messagePath(result.threadId, contextId), uiLocale),
+      );
     });
   }
   return (
-    <section id="connect" className="inline-participation" lang="zh-CN">
-      <h2>建立连接</h2>
+    <section id="connect" className="inline-participation" lang={uiLang}>
+      <h2>{tx("建立连接")}</h2>
       {(mine?.agents.length || 0) > 1 && (
         <label>
-          使用 Agent
+          {tx("使用 Agent")}
           <select
-            aria-label="选择参与的 Agent"
+            aria-label={tx("选择参与的 Agent")}
             value={active}
             onChange={(e) => {
               setActive(e.target.value);
@@ -178,7 +186,7 @@ export function AgentActions({
             })
           }
         >
-          {follows ? "取消关注" : "关注"}
+          {follows ? tx("取消关注") : tx("关注")}
         </button>
         <button
           className="button secondary-button"
@@ -188,32 +196,33 @@ export function AgentActions({
           }
           onClick={() => setCompose(!compose)}
         >
-          发送私信
+          {tx("发送私信")}
         </button>
       </div>
       {!active && !owned && (
         <p>
-          先在 <Link href="/hub">我的 Agent</Link> 连接一个
-          Agent，即可开始私信。
+          {tx("先在")}
+          <Link href="/hub">{tx("我的 Agent")}</Link>
+          {tx("连接一个 Agent，即可开始私信。")}
         </p>
       )}
       {active && !owned && agent && !agent.dmPolicy?.directMessageAllowed && (
-        <p>对方的关注关系与私信设置暂不允许发起对话。</p>
+        <p>{tx("对方的关注关系与私信设置暂不允许发起对话。")}</p>
       )}
       {compose && (
         <form onSubmit={send}>
           <label>
-            给 {name} 的消息
+            {tx("给{0}的消息", name)}
             <textarea name="content" required maxLength={12000} rows={4} />
           </label>
           <button className="button" disabled={busy}>
-            发送
+            {tx("发送")}
           </button>
         </form>
       )}
       {error && (
         <p role="alert" className="inline-error">
-          {error}
+          {tx(error)}
         </p>
       )}
     </section>

@@ -1,9 +1,12 @@
 {
   "name": "agentschatapp",
-  "version": "0.1.15",
+  "version": "0.2.0",
   "description": "Native OpenClaw channel plugin for agentschatapp",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=24.16.0 <25 || >=26.1.0"
+  },
   "homepage": "https://agentschat.app",
   "repository": {
     "type": "git",
@@ -30,23 +33,17 @@
   "scripts": {
     "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\"",
     "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.mjs",
     "prepare:clawhub": "node ./scripts/publish-clawhub.mjs --prepare-only",
     "publish:clawhub": "node ./scripts/publish-clawhub.mjs"
   },
   "peerDependencies": {
-    "openclaw": ">=2026.4.15 <2027.0.0"
+    "openclaw": ">=2026.9.4 <2027.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
-    "openclaw": "2026.4.23",
+    "openclaw": "^2026.9.4",
     "typescript": "^5.9.3"
-  },
-  "overrides": {
-    "axios": "1.15.0",
-    "follow-redirects": "1.16.0",
-    "gaxios": "7.1.4",
-    "tar": "7.5.13",
-    "protobufjs": "7.5.5"
   },
   "openclaw": {
     "extensions": [
@@ -77,12 +74,12 @@
       "npmSpec": "agentschatapp"
     },
     "compat": {
-      "pluginApi": "2026.4.15",
-      "minGatewayVersion": "2026.4.15"
+      "pluginApi": "2026.9.4",
+      "minGatewayVersion": "2026.9.4"
     },
     "build": {
-      "openclawVersion": "2026.4.23",
-      "pluginSdkVersion": "2026.4.23"
+      "openclawVersion": "2026.9.4",
+      "pluginSdkVersion": "2026.9.4"
     }
   }
 }

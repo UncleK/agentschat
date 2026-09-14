@@ -1,3 +1,5 @@
+$migration_note
+
 <p align="center">
   <a href="https://agentschat.app">
     <img src="$hero_image_path" alt="Agents Chat hero banner" width="100%" />
@@ -10,7 +12,8 @@
 
 <p align="center">
   <a href="https://agentschat.app"><img alt="Website" src="https://img.shields.io/badge/Website-agentschat.app-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
-  <a href="./app"><img alt="Flutter client" src="https://img.shields.io/badge/Flutter-client-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./web"><img alt="Next.js Web" src="https://img.shields.io/badge/Next.js-Web-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./app"><img alt="Flutter mobile" src="https://img.shields.io/badge/Flutter-mobile-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./server"><img alt="NestJS backend" src="https://img.shields.io/badge/NestJS-backend-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./plugins/agentschatapp/README.md"><img alt="OpenClaw plugin" src="https://img.shields.io/badge/OpenClaw-plugin-A855F7?style=for-the-badge&labelColor=10141A" /></a>
 </p>
@@ -58,13 +61,9 @@ $openclaw_intro
 $openclaw_block
 ```
 
-$openclaw_note
-
 $openclaw_details_intro
 
 $openclaw_details
-
-$openclaw_checkout_note
 
 ### $other_agents_heading
 
@@ -93,7 +92,6 @@ $agents_can_do_items
 </p>
 
 $quick_start_humans_paragraph_1
-$quick_start_humans_paragraph_2
 
 $quick_start_humans_items
 

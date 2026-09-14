@@ -1,3 +1,4 @@
+import { readRuntimeConfig } from "./runtime-config.js";
 import { createHash, randomUUID } from "node:crypto";
 
 import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
@@ -306,7 +307,7 @@ export async function draftInitialPublicProfile(
   context: AgentsChatRuntimeContext,
   account: AgentsChatAccountConfig
 ): Promise<Pick<AgentsChatAccountConfig, "handle" | "displayName">> {
-  const cfg = context.runtime.config.loadConfig();
+  const cfg = readRuntimeConfig(context.runtime);
   const sessionKey = buildSessionKey(account, "planner", `${account.slot}:profile-bootstrap`);
   const sessionId = buildStableSessionId(sessionKey);
   const agentDir = context.runtime.agent.resolveAgentDir(cfg, account.openclawAgent);
@@ -318,11 +319,8 @@ export async function draftInitialPublicProfile(
     context.runtime.agent.defaults.model
   );
   await context.runtime.agent.ensureAgentWorkspace({ dir: workspaceDir, ensureBootstrapFiles: true });
-  const sessionFile = context.runtime.agent.session.resolveSessionFilePath(sessionId, undefined, {
-    agentId: account.openclawAgent
-  });
 
-  const result = await context.runtime.agent.runEmbeddedPiAgent({
+  const result = await context.runtime.agent.runEmbeddedAgent({
     sessionId,
     sessionKey,
     agentId: account.openclawAgent,
@@ -333,7 +331,6 @@ export async function draftInitialPublicProfile(
     messageThreadId: `${account.slot}:profile-bootstrap`,
     agentDir,
     config: cfg,
-    sessionFile,
     workspaceDir,
     prompt: buildProfileBootstrapPrompt(account),
     provider: modelSelection.provider,
@@ -384,7 +381,7 @@ export async function runEmbeddedReply(
     maxChars?: number;
   }
 ): Promise<string> {
-  const cfg = context.runtime.config.loadConfig();
+  const cfg = readRuntimeConfig(context.runtime);
   const sessionKey = buildSessionKey(params.account, params.kind, params.threadId);
   const sessionId = buildStableSessionId(sessionKey);
   const agentDir = context.runtime.agent.resolveAgentDir(cfg, params.account.openclawAgent);
@@ -396,11 +393,8 @@ export async function runEmbeddedReply(
     context.runtime.agent.defaults.model
   );
   await context.runtime.agent.ensureAgentWorkspace({ dir: workspaceDir, ensureBootstrapFiles: true });
-  const sessionFile = context.runtime.agent.session.resolveSessionFilePath(sessionId, undefined, {
-    agentId: params.account.openclawAgent
-  });
 
-  const result = await context.runtime.agent.runEmbeddedPiAgent({
+  const result = await context.runtime.agent.runEmbeddedAgent({
     sessionId,
     sessionKey,
     agentId: params.account.openclawAgent,
@@ -414,7 +408,6 @@ export async function runEmbeddedReply(
     senderUsername: params.senderUsername ?? undefined,
     agentDir,
     config: cfg,
-    sessionFile,
     workspaceDir,
     prompt: params.prompt,
     provider: modelSelection.provider,
