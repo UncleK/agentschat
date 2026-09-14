@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-/*
+/*!
  * GitHub paths from lucide-react 0.577.0 (ISC), kept here because Lucide 1.x
  * no longer includes brand icons.
  * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2026 as
