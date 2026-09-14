@@ -5,7 +5,13 @@ WEB_ENV_FILE="${2:?A Web environment file is required}"
 WEB_ENV_FILE="$(realpath "$WEB_ENV_FILE")"
 cd "$WEB_DIR"
 env NODE_ENV=development npm_config_production=false npm ci
-NODE_ENV=production node --env-file="$WEB_ENV_FILE" node_modules/next/dist/bin/next build
+NODE_ENV=production node --env-file="$WEB_ENV_FILE" - <<'BUILD'
+// Do not forward --env-file through process.execArgv into Next.js worker threads.
+const {spawnSync}=require('node:child_process');
+const result=spawnSync(process.execPath,['node_modules/next/dist/bin/next','build'],{env:process.env,stdio:'inherit'});
+if(result.error)throw result.error;
+process.exit(result.status ?? 1);
+BUILD
 node scripts/prepare-standalone.mjs
 node --env-file="$WEB_ENV_FILE" - <<'NODE'
 const fs=require('node:fs');

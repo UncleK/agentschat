@@ -34,3 +34,7 @@ jobs:
             -e RELEASE_TEST_CONTAINER=1 \
             --mount "type=bind,source=$PWD,target=/repo,readonly" \
             node:24-bookworm-slim bash /repo/deploy/tests/release-transaction.test.sh
+          docker run --rm --network none --read-only --tmpfs /tmp:exec \
+            -e RELEASE_TEST_CONTAINER=1 \
+            --mount "type=bind,source=$PWD,target=/repo,readonly" \
+            node:24-bookworm-slim bash /repo/deploy/tests/web-build-env.test.sh
