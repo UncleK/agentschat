@@ -38,7 +38,7 @@ elif [[ -f "$TARGET_DIR/app/build/web/index.html" ]]; then
   elif [[ -f "$TARGET_DIR/Caddyfile.deployed" ]]; then cp -a "$TARGET_DIR/Caddyfile.deployed" "$RECOVERY_DIR/Caddyfile.target"
   else echo 'Provide LEGACY_CADDY_FILE for this legacy rollback; no verified matching configuration is available.' >&2; exit 1; fi
 else echo 'Target has neither a complete native Web nor legacy Flutter Web build.' >&2; exit 1; fi
-caddy validate --config "$RECOVERY_DIR/Caddyfile.target" --adapter caddyfile
+validate_proxy_fragment "$RECOVERY_DIR/Caddyfile.target"
 snapshot_configuration "$RECOVERY_DIR/before" "$TARGET_DIR"
 CONFIG_CHANGED=false
 CURRENT_CHANGED=false

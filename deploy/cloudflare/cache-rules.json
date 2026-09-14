@@ -1,0 +1,27 @@
+{
+  "name": "Agents Chat cache rules",
+  "kind": "zone",
+  "phase": "http_request_cache_settings",
+  "rules": [
+    {
+      "ref": "agents_chat_private_bypass",
+      "description": "Agents Chat pages, API, media and WebSockets bypass cache",
+      "expression": "(http.host in {\"agentschat.app\" \"www.agentschat.app\"} and not starts_with(http.request.uri.path, \"/_next/static/\"))",
+      "action": "set_cache_settings",
+      "action_parameters": { "cache": false },
+      "enabled": true
+    },
+    {
+      "ref": "agents_chat_immutable_static",
+      "description": "Cache immutable Next.js assets using origin cache headers",
+      "expression": "(http.host in {\"agentschat.app\" \"www.agentschat.app\"} and starts_with(http.request.uri.path, \"/_next/static/\"))",
+      "action": "set_cache_settings",
+      "action_parameters": {
+        "cache": true,
+        "edge_ttl": { "mode": "respect_origin" },
+        "browser_ttl": { "mode": "respect_origin" }
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -12,12 +12,15 @@ Environment=NODE_ENV=production
 Environment=PORT=3100
 Environment=HOSTNAME=127.0.0.1
 EnvironmentFile=/etc/agents-chat/web.env
-ExecStart=/usr/bin/env node server.js
+ExecStart=/opt/agents-chat/runtime/bin/node server.js
 Restart=always
 RestartSec=5
 TimeoutStopSec=30
 NoNewPrivileges=true
 PrivateTmp=true
+UMask=0027
+MemoryMax=768M
+CPUQuota=100%
 StandardOutput=journal
 StandardError=journal
 

@@ -1,30 +1,46 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: agents-chat-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-agents_chat}
       POSTGRES_USER: ${POSTGRES_USER:-agents_chat}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD to match DATABASE_URL in server.env}
-    ports: ['127.0.0.1:5432:5432']
+    ports: ['127.0.0.1:${POSTGRES_HOST_PORT:-55434}:5432']
+    mem_limit: 512m
+    cpus: 0.75
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes: ['postgres-data:/var/lib/postgresql/data']
   redis:
-    image: redis:7-alpine
+    image: ${REDIS_IMAGE:-redis:7-alpine}
     container_name: agents-chat-redis
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
-    ports: ['127.0.0.1:6379:6379']
+    ports: ['127.0.0.1:${REDIS_HOST_PORT:-56379}:6379']
+    mem_limit: 192m
+    cpus: 0.25
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes: ['redis-data:/data']
   minio:
-    image: minio/minio:latest
+    image: ${MINIO_IMAGE:?Set MINIO_IMAGE to a verified immutable image digest}
     container_name: agents-chat-minio
     restart: unless-stopped
     command: server /data --console-address ':9001'
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in server.env}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in server.env}
-    ports: ['127.0.0.1:9000:9000', '127.0.0.1:9001:9001']
+    ports: ['127.0.0.1:${MINIO_HOST_PORT:-59000}:9000', '127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-59001}:9001']
+    mem_limit: 512m
+    cpus: 0.5
     volumes: ['minio-data:/data']
 volumes:
   postgres-data:

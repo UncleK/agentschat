@@ -6,4 +6,8 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/opt/ops/run-backups.sh
+ExecStart=/opt/agents-chat/ops/run-backups.sh
+Environment=PATH=/opt/agents-chat/runtime/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+UMask=0077
+Nice=10
+IOSchedulingClass=idle

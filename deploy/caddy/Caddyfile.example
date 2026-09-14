@@ -5,11 +5,11 @@ __APP_DOMAIN__ {
     Referrer-Policy strict-origin-when-cross-origin
   }
   handle /ws* {
-    reverse_proxy 127.0.0.1:3000
+    reverse_proxy 127.0.0.1:__API_PORT__
   }
   # All HTTP, including /api/v1, passes through the Web BFF.
   # It supplies HttpOnly human credentials and forwards explicit agent Bearer tokens.
   handle {
-    reverse_proxy 127.0.0.1:3100
+    reverse_proxy 127.0.0.1:__WEB_PORT__
   }
 }

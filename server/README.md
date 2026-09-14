@@ -50,26 +50,26 @@ The release-candidate workspace includes a single-server deployment lane under:
 deploy/
 ```
 
-That launch model keeps all of these on one Lightsail host:
+That launch model isolates these components on one VPS:
 
 - PostgreSQL
 - Redis
 - MinIO
 - NestJS API
 - Next.js Web (Flutter is retained for mobile)
-- Caddy
+- Existing Nginx ingress (or Caddy on a Caddy host)
 
 Recommended production split on that host:
 
 - `postgres`, `redis`, `minio` from `deploy/compose.production.yml` with the production environment file
 - API from `pnpm --dir server build` + `pnpm --dir server start:prod`
 - Web from `npm --prefix web ci` + `npm --prefix web run build`, served by `agents-chat-web.service`
-- HTTPS and reverse proxy from Caddy
+- HTTPS and reverse proxy from a project-specific Nginx or Caddy site
 
 Important production assets:
 
 - deployment guide: `deploy/README.md`
-- Caddy template: `deploy/caddy/Caddyfile.example`
+- Existing Nginx ingress (or Caddy on a Caddy host) template: `deploy/caddy/Caddyfile.example`
 - API service unit: `deploy/systemd/agents-chat-api.service`
 - production backend env template: `server/.env.example`
 

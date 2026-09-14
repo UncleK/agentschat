@@ -7,13 +7,35 @@ release_init() {
   CURRENT_LINK="${CURRENT_LINK:-$APP_ROOT/current}"
   ENV_FILE="${ENV_FILE:-/etc/agents-chat/server.env}"
   WEB_ENV_FILE="${WEB_ENV_FILE:-/etc/agents-chat/web.env}"
-  OPS_DIR="${OPS_DIR:-/opt/ops}"
+  export PATH="$APP_ROOT/runtime/bin:$PATH"
+  local setting value
+  if [[ -f "$(dirname "$ENV_FILE")/deploy.env" ]]; then
+    while IFS= read -r -d '' setting && IFS= read -r -d '' value; do
+      export "$setting=$value"
+    done < <(node --env-file="$(dirname "$ENV_FILE")/deploy.env" - <<'SETTINGS'
+for (const key of ['PROXY_SERVER','PROXY_CONFIG_FILE','API_PORT','WEB_PORT','TLS_CERT_FILE','TLS_KEY_FILE','ORIGIN_CA_FILE','CLOUDFLARE_GEO_FILE']) {
+  if (process.env[key]) process.stdout.write(key+'\0'+process.env[key]+'\0');
+}
+SETTINGS
+)
+  fi
+  OPS_DIR="${OPS_DIR:-$APP_ROOT/ops}"
   SYSTEMD_DIR="${SYSTEMD_DIR:-/etc/systemd/system}"
-  CADDY_FILE="${CADDY_FILE:-/etc/caddy/Caddyfile}"
+  PROXY_SERVER="${PROXY_SERVER:-caddy}"
+  [[ "$PROXY_SERVER" == caddy || "$PROXY_SERVER" == nginx ]] || { echo 'Unsupported PROXY_SERVER.' >&2; return 1; }
+  # CADDY_FILE is retained as a compatibility alias for existing release snapshots.
+  CADDY_FILE="${PROXY_CONFIG_FILE:-${CADDY_FILE:-/etc/caddy/sites/agents-chat.caddy}}"
+  API_PORT="${API_PORT:-3000}" WEB_PORT="${WEB_PORT:-3100}"
+  [[ "$API_PORT" =~ ^[0-9]+$ && "$WEB_PORT" =~ ^[0-9]+$ ]] || return 1
+  TLS_CERT_FILE="${TLS_CERT_FILE:-/etc/agents-chat/tls/origin.pem}"
+  TLS_KEY_FILE="${TLS_KEY_FILE:-/etc/agents-chat/tls/origin.key}"
+  CLOUDFLARE_GEO_FILE="${CLOUDFLARE_GEO_FILE:-/etc/agents-chat/cloudflare-ips.geo}"
+  export PROXY_SERVER API_PORT WEB_PORT TLS_CERT_FILE TLS_KEY_FILE CLOUDFLARE_GEO_FILE
+  if [[ -n "${ORIGIN_CA_FILE:-}" ]]; then export CURL_CA_BUNDLE="$ORIGIN_CA_FILE" NODE_EXTRA_CA_CERTS="$ORIGIN_CA_FILE"; fi
   if [[ -z "${APP_DOMAIN:-}" && -f "$(dirname "$WEB_ENV_FILE")/domain" ]]; then APP_DOMAIN="$(cat "$(dirname "$WEB_ENV_FILE")/domain")"; fi
   SMOKE_RETRIES="${SMOKE_RETRIES:-15}"
   SMOKE_DELAY_SECONDS="${SMOKE_DELAY_SECONDS:-2}"
-  HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://127.0.0.1:3000/api/v1/health}"
+  HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://127.0.0.1:$API_PORT/api/v1/health}"
   [[ "$CURRENT_LINK" == /* && "$RELEASES_DIR" == /* ]] || { echo 'Release paths must be absolute.' >&2; return 1; }
   [[ ! -e "$CURRENT_LINK" || -L "$CURRENT_LINK" ]] || { echo 'Current path is not a symlink; refusing to overwrite it.' >&2; return 1; }
 }
@@ -55,8 +77,33 @@ prepare_caddy() {
   local release="$1" target="$2" domain
   domain="$(discover_caddy_domain)"
   validate_domain "$domain"
-  sed "s/__APP_DOMAIN__/$domain/g" "$release/deploy/caddy/Caddyfile.example" > "$target"
-  caddy validate --config "$target" --adapter caddyfile
+  local template="$release/deploy/caddy/Caddyfile.example"
+  [[ "$PROXY_SERVER" != nginx ]] || template="$release/deploy/nginx/agents-chat.conf.example"
+  APP_DOMAIN="$domain" node - "$template" "$target" <<'RENDER'
+const fs=require('node:fs');let text=fs.readFileSync(process.argv[2],'utf8');
+for (const key of ['APP_DOMAIN','API_PORT','WEB_PORT','TLS_CERT_FILE','TLS_KEY_FILE','CLOUDFLARE_GEO_FILE']) {
+ const value=process.env[key]||'';
+ if (/[\r\n;{}]/.test(value)) throw new Error('Invalid proxy setting '+key);
+ text=text.replaceAll('__'+key+'__',value);
+}
+fs.writeFileSync(process.argv[3],text);
+RENDER
+  validate_proxy_fragment "$target"
+}
+validate_proxy_fragment() {
+  if [[ "$PROXY_SERVER" == nginx ]]; then
+    local temporary
+    temporary="$(mktemp)"
+    printf 'events {}\nhttp { include /etc/nginx/mime.types; include %s; }\n' "$1" > "$temporary"
+    local result=0
+    nginx -t -c "$temporary" || result=$?
+    rm -f -- "$temporary"
+    return "$result"
+  else caddy validate --config "$1" --adapter caddyfile; fi
+}
+reload_proxy() {
+  if [[ "$PROXY_SERVER" == nginx ]]; then nginx -t && systemctl reload nginx
+  else caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && systemctl reload caddy; fi
 }
 snapshot_configuration() {
   local snapshot="$1" release="$2" file unit
@@ -98,6 +145,7 @@ fs.writeFileSync(process.argv[3],text);
 NODE
     atomic_install "$temp" "$SYSTEMD_DIR/$unit"
   done
+  install -d "$(dirname "$CADDY_FILE")"
   atomic_install "$caddy_next" "$CADDY_FILE"
   systemctl daemon-reload
 }
@@ -105,7 +153,7 @@ restart_application() {
   local release="$1" failed=0
   systemctl restart agents-chat-api.service || failed=1
   if [[ -f "$release/web/.next/standalone/server.js" ]]; then systemctl restart agents-chat-web.service || failed=1; else systemctl stop agents-chat-web.service || failed=1; fi
-  systemctl reload caddy || failed=1
+  reload_proxy || failed=1
   return "$failed"
 }
 smoke_application() {
@@ -114,11 +162,11 @@ smoke_application() {
   domain="$(discover_caddy_domain)"
   validate_domain "$domain"
   if [[ -f "$release/web/.next/standalone/server.js" ]]; then
-    retry_command "$SMOKE_RETRIES" "$SMOKE_DELAY_SECONDS" 'Native Web readiness' curl -fsS --max-time 15 http://127.0.0.1:3100/llms.txt >/dev/null
+    retry_command "$SMOKE_RETRIES" "$SMOKE_DELAY_SECONDS" 'Native Web readiness' curl -fsS --max-time 15 "http://127.0.0.1:$WEB_PORT/llms.txt" >/dev/null
     response="$(curl -fsS --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain/")" || return
     [[ "$response" == *'A world beyond'* && "$response" != *'flutter_bootstrap.js'* ]] || { echo 'Native Web HTML check failed.' >&2; return 1; }
     curl -fsS --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain/api/v1/health" | jq -e '.status == "ok"' >/dev/null || return
-    curl -fsS --max-time 15 http://127.0.0.1:3100/api/openapi.json >/dev/null || return
+    curl -fsS --max-time 15 "http://127.0.0.1:$WEB_PORT/api/openapi.json" >/dev/null || return
   else
     curl -fsS --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain/" >/dev/null || return
   fi

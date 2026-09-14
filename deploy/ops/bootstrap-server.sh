@@ -1,210 +1,96 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-REPO_DIR="/opt/agents-chat/repo"
-REPO_URL=""
-APP_DOMAIN=""
-SKIP_FLUTTER="false"
-APP_USER="agentschat"
-APP_ROOT="/opt/agents-chat"
-ENV_DIR="/etc/agents-chat"
-OPS_DIR="/opt/ops"
-
-usage() {
-  cat <<'EOF'
-Usage:
-  bootstrap-server.sh [--repo-dir PATH] [--repo-url URL] [--domain DOMAIN] [--skip-flutter]
-
-Options:
-  --repo-dir PATH    Server-side repository path. Default: /opt/agents-chat/repo
-  --repo-url URL     Optional git URL to clone if the repo does not exist yet.
-  --domain DOMAIN    Public domain to inject into the Caddyfile.
-  --skip-flutter     Deprecated compatibility flag; Web no longer requires Flutter.
-EOF
-}
-
-while [[ $# -gt 0 ]]; do
+APP_ROOT=/opt/agents-chat
+APP_USER=agentschat
+ENV_DIR=/etc/agents-chat
+REPO_DIR="$APP_ROOT/repo"
+OPS_DIR="$APP_ROOT/ops"
+REPO_URL=''
+APP_DOMAIN=''
+PROXY_SERVER=nginx
+NODE_VERSION=24.21.0
+while (( $# )); do
   case "$1" in
-    --repo-dir)
-      REPO_DIR="$2"
-      shift 2
-      ;;
-    --repo-url)
-      REPO_URL="$2"
-      shift 2
-      ;;
-    --domain)
-      APP_DOMAIN="$2"
-      shift 2
-      ;;
-    --skip-flutter)
-      SKIP_FLUTTER="true"
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      usage >&2
-      exit 1
-      ;;
+    --repo-dir) REPO_DIR="$2"; shift 2;;
+    --repo-url) REPO_URL="$2"; shift 2;;
+    --domain) APP_DOMAIN="$2"; shift 2;;
+    --proxy) PROXY_SERVER="$2"; shift 2;;
+    --skip-flutter) shift;;
+    -h|--help) echo 'bootstrap-server.sh --repo-url URL --domain DOMAIN [--proxy nginx|caddy] [--repo-dir PATH]'; exit 0;;
+    *) echo "Unknown argument: $1" >&2; exit 1;;
   esac
 done
-
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "Run this script as root." >&2
-  exit 1
+[[ "$(id -u)" == 0 ]] || { echo 'Run as root.' >&2; exit 1; }
+[[ "$APP_DOMAIN" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] || { echo 'A DNS hostname is required.' >&2; exit 1; }
+[[ "$PROXY_SERVER" == nginx || "$PROXY_SERVER" == caddy ]] || exit 1
+. /etc/os-release
+[[ "$ID" == ubuntu || "$ID" == debian ]] || { echo 'This bootstrap supports Ubuntu and Debian.' >&2; exit 1; }
+# Reuse the selected ingress, never install a competing web server on occupied ports.
+command -v "$PROXY_SERVER" >/dev/null || { echo "Install/configure $PROXY_SERVER before bootstrap; existing ingress is not replaced." >&2; exit 1; }
+export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l
+apt-get update
+apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends ca-certificates curl ffmpeg git jq python3 python3-venv tar xz-utils util-linux
+if ! command -v docker >/dev/null; then
+  apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends docker.io
 fi
-
-install_base_packages() {
-  apt-get update
-  apt-get install -y \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    ffmpeg \
-    git \
-    gnupg \
-    jq \
-    lsb-release \
-    postgresql-client \
-    python3 \
-    python3-pip \
-    python3-venv \
-    software-properties-common \
-    tar \
-    unzip \
-    util-linux
-}
-
-install_node() {
-  if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)'; then
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    apt-get install -y nodejs
-  fi
-
-  if ! command -v corepack >/dev/null 2>&1; then npm install -g corepack; fi
-  corepack enable
-}
-
-install_docker() {
-  if ! command -v docker >/dev/null 2>&1; then
-    install -d -m 0755 /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
-
-    cat >/etc/apt/sources.list.d/docker.list <<EOF
-deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable
-EOF
-
-    apt-get update
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  fi
-
-  systemctl enable --now docker
-}
-
-install_caddy() {
-  if ! command -v caddy >/dev/null 2>&1; then
-    install -d -m 0755 /etc/apt/keyrings
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /etc/apt/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/deb/debian.any-version.list' > /etc/apt/sources.list.d/caddy-stable.list
-
-    apt-get update
-    apt-get install -y caddy
-  fi
-
-  systemctl enable --now caddy
-}
-
-ensure_users_and_dirs() {
-  if ! id "$APP_USER" >/dev/null 2>&1; then
-    useradd --system --create-home --shell /bin/bash "$APP_USER"
-  fi
-
-  usermod -aG docker "$APP_USER"
-
-  install -d -o "$APP_USER" -g "$APP_USER" "$APP_ROOT"
-  install -d -o "$APP_USER" -g "$APP_USER" "$APP_ROOT/releases"
-  install -d -o "$APP_USER" -g "$APP_USER" "$APP_ROOT/shared"
-  install -d -o "$APP_USER" -g "$APP_USER" "$OPS_DIR"
-  install -d -o root -g "$APP_USER" -m 0750 "$ENV_DIR"
-  install -d -o root -g root /opt/backups
-  install -d -o root -g root /opt/backups/postgres
-  install -d -o root -g root /opt/backups/minio
-  install -d -o root -g root /opt/backups/reports
-}
-
-ensure_repo() {
-  if [[ -d "$REPO_DIR/.git" ]]; then
-    return
-  fi
-
-  if [[ -z "$REPO_URL" ]]; then
-    echo "Repository not found at $REPO_DIR. Re-run with --repo-url or clone manually." >&2
-    exit 1
-  fi
-
-  install -d -o "$APP_USER" -g "$APP_USER" "$(dirname "$REPO_DIR")"
+if ! docker compose version >/dev/null 2>&1; then
+  compose_package=docker-compose-v2
+  [[ "$ID" != debian ]] || compose_package=docker-compose
+  apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends "$compose_package"
+fi
+docker compose version >/dev/null
+systemctl enable --now docker
+id "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash "$APP_USER"
+install -d -o root -g "$APP_USER" -m 0755 "$APP_ROOT" "$APP_ROOT/runtime" "$APP_ROOT/runtime/bin"
+install -d -o "$APP_USER" -g "$APP_USER" "$APP_ROOT/releases" "$APP_ROOT/shared" "$REPO_DIR"
+install -d -o root -g root -m 0755 "$OPS_DIR"
+install -d -o root -g "$APP_USER" -m 0750 "$ENV_DIR"
+install -d -o root -g root -m 0700 "$ENV_DIR/tls" "$APP_ROOT/backups"
+arch="$(uname -m)"
+case "$arch" in x86_64) arch=x64;; aarch64) arch=arm64;; *) echo 'Unsupported architecture.' >&2; exit 1;; esac
+node_dir="node-v$NODE_VERSION-linux-$arch"
+if [[ ! -x "$APP_ROOT/runtime/$node_dir/bin/node" ]]; then
+  temporary="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary"' EXIT
+  curl -fsS --retry 3 "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt" -o "$temporary/SHASUMS256.txt"
+  curl -fsS --retry 3 "https://nodejs.org/dist/v$NODE_VERSION/$node_dir.tar.xz" -o "$temporary/$node_dir.tar.xz"
+  (cd "$temporary"; grep " $node_dir.tar.xz$" SHASUMS256.txt | sha256sum --check -)
+  tar -xJf "$temporary/$node_dir.tar.xz" --no-same-owner -C "$APP_ROOT/runtime"
+  rm -rf -- "$temporary"
+  trap - EXIT
+fi
+for command in node npm npx; do ln -sfn "$APP_ROOT/runtime/$node_dir/bin/$command" "$APP_ROOT/runtime/bin/$command"; done
+export PATH="$APP_ROOT/runtime/bin:$PATH"
+if [[ ! -x "$APP_ROOT/runtime/tools/node_modules/.bin/pnpm" ]]; then
+  npm install --prefix "$APP_ROOT/runtime/tools" --no-audit --no-fund pnpm@10.33.0
+fi
+ln -sfn "$APP_ROOT/runtime/tools/node_modules/.bin/pnpm" "$APP_ROOT/runtime/bin/pnpm"
+if [[ ! -d "$REPO_DIR/.git" ]]; then
+  [[ -n "$REPO_URL" ]] || { echo 'Set --repo-url or provide a checkout.' >&2; exit 1; }
   sudo -u "$APP_USER" git clone "$REPO_URL" "$REPO_DIR"
-}
-
-install_templates() {
-  local deploy_dir="$REPO_DIR/deploy"
-
-  if [[ ! -L "$APP_ROOT/current" ]]; then
-  install -m 0644 "$deploy_dir/systemd/agents-chat-api.service" /etc/systemd/system/agents-chat-api.service
-  install -m 0644 "$deploy_dir/systemd/agents-chat-backup.service" /etc/systemd/system/agents-chat-backup.service
-  install -m 0644 "$deploy_dir/systemd/agents-chat-backup.timer" /etc/systemd/system/agents-chat-backup.timer
+fi
+install -m 0755 "$REPO_DIR/deploy/ops/"*.sh "$OPS_DIR/"
+if [[ ! -f "$ENV_DIR/server.env" ]]; then
+  install -m 0640 -o root -g "$APP_USER" "$REPO_DIR/server/.env.example" "$ENV_DIR/server.env"
+  sed -i -e 's/^NODE_ENV=.*/NODE_ENV=production/' -e 's/^PORT=.*/PORT=3200/' \
+    -e 's/^MAIL_DELIVERY_MODE=.*/MAIL_DELIVERY_MODE=disabled/' \
+    -e 's/^MINIO_ENDPOINT=.*/MINIO_ENDPOINT=127.0.0.1/' -e 's/^MINIO_PORT=.*/MINIO_PORT=59000/' "$ENV_DIR/server.env"
+fi
+if [[ ! -f "$ENV_DIR/web.env" ]]; then
+  install -m 0640 -o root -g "$APP_USER" "$REPO_DIR/deploy/web.env.example" "$ENV_DIR/web.env"
+  sed -i -e "s|^NEXT_PUBLIC_SITE_URL=.*|NEXT_PUBLIC_SITE_URL=https://$APP_DOMAIN|" \
+    -e 's|^API_ORIGIN=.*|API_ORIGIN=http://127.0.0.1:3200|' "$ENV_DIR/web.env"
+  printf '\nPORT=3201\n' >> "$ENV_DIR/web.env"
+fi
+if [[ ! -f "$ENV_DIR/deploy.env" ]]; then
+  install -m 0640 -o root -g "$APP_USER" "$REPO_DIR/deploy/deploy.env.example" "$ENV_DIR/deploy.env"
+  if [[ "$PROXY_SERVER" == caddy ]]; then
+    sed -i -e 's/^PROXY_SERVER=.*/PROXY_SERVER=caddy/' \
+      -e 's|^PROXY_CONFIG_FILE=.*|PROXY_CONFIG_FILE=/etc/caddy/sites/agents-chat.caddy|' \
+      -e 's|^ORIGIN_CA_FILE=.*|ORIGIN_CA_FILE=|' "$ENV_DIR/deploy.env"
+    install -d /etc/caddy/sites
+    grep -Eq '^import /etc/caddy/sites/\*' /etc/caddy/Caddyfile || { echo 'Add import /etc/caddy/sites/* to the existing Caddy main config first.' >&2; exit 1; }
   fi
-  install -m 0755 "$deploy_dir/ops/"*.sh "$OPS_DIR/"
-
-  if [[ ! -f "$ENV_DIR/server.env" ]]; then
-    install -m 0640 -o root -g "$APP_USER" "$REPO_DIR/server/.env.example" "$ENV_DIR/server.env"
-    sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' "$ENV_DIR/server.env"
-    sed -i 's/^MINIO_ENDPOINT=.*/MINIO_ENDPOINT=127.0.0.1/' "$ENV_DIR/server.env"
-    printf '
-# Fresh production database: set this to the password in DATABASE_URL.
-POSTGRES_PASSWORD=
-' >> "$ENV_DIR/server.env"
-  fi
-
-
-  if [[ -n "$APP_DOMAIN" ]]; then
-    [[ "$APP_DOMAIN" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] || { echo 'Invalid DNS hostname.' >&2; exit 1; }
-    printf '%s\n' "$APP_DOMAIN" > "$ENV_DIR/domain"
-    sed "s/__APP_DOMAIN__/$APP_DOMAIN/g" "$deploy_dir/caddy/Caddyfile.example" > "$ENV_DIR/Caddyfile.pending"
-    caddy validate --config "$ENV_DIR/Caddyfile.pending" --adapter caddyfile
-  fi
-
-  if [[ ! -L "$APP_ROOT/current" ]]; then install -m 0644 "$deploy_dir/systemd/agents-chat-web.service" /etc/systemd/system/agents-chat-web.service; fi
-  if [[ ! -f "$ENV_DIR/web.env" ]]; then
-    install -m 0640 -o root -g "$APP_USER" "$deploy_dir/web.env.example" "$ENV_DIR/web.env"
-    if [[ -n "$APP_DOMAIN" ]]; then
-      sed -i "s|^NEXT_PUBLIC_SITE_URL=.*|NEXT_PUBLIC_SITE_URL=https://$APP_DOMAIN|" "$ENV_DIR/web.env"
-    fi
-  fi
-  systemctl daemon-reload
-  systemctl enable agents-chat-backup.timer
-
-  if [[ -n "$APP_DOMAIN" ]]; then
-    echo "Caddy configuration prepared at $ENV_DIR/Caddyfile.pending; it will be applied by deploy-release.sh after both builds pass."
-  elif [[ ! -f /etc/caddy/Caddyfile ]]; then
-    echo "No domain provided, so /etc/caddy/Caddyfile was not generated yet." >&2
-    echo "Set the domain and install the Caddy template before exposing the server publicly." >&2
-  fi
-}
-
-main() {
-  install_base_packages
-  install_node
-  install_docker
-  install_caddy
-  ensure_users_and_dirs
-  ensure_repo
-  install_templates
-}
-
-main "$@"
+fi
+printf '%s\n' "$APP_DOMAIN" > "$ENV_DIR/domain"
+echo 'Bootstrap ready. Configure production secrets, loopback ports, immutable images, TLS and Cloudflare CIDRs before release.'

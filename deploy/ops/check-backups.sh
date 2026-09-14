@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-POSTGRES_BACKUP_DIR="${POSTGRES_BACKUP_DIR:-/opt/backups/postgres}"
-MINIO_BACKUP_DIR="${MINIO_BACKUP_DIR:-/opt/backups/minio}"
-REPORT_DIR="${REPORT_DIR:-/opt/backups/reports}"
+POSTGRES_BACKUP_DIR="${POSTGRES_BACKUP_DIR:-/opt/agents-chat/backups/postgres}"
+MINIO_BACKUP_DIR="${MINIO_BACKUP_DIR:-/opt/agents-chat/backups/minio}"
+REPORT_DIR="${REPORT_DIR:-/opt/agents-chat/backups/reports}"
 MAX_BACKUP_AGE_HOURS="${MAX_BACKUP_AGE_HOURS:-30}"
 REQUIRE_SNAPSHOT_STATUS="${REQUIRE_SNAPSHOT_STATUS:-false}"
 
 latest_file() {
   local directory="$1"
-  find "$directory" -maxdepth 1 -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | cut -d' ' -f2-
+  find "$directory" -maxdepth 1 -type f ! -name '*.partial' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | cut -d' ' -f2-
 }
 
 check_file_age() {

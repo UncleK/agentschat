@@ -2,12 +2,15 @@
 # Runs inside a disposable Linux container; never contacts Docker or systemd on the host.
 set -euo pipefail
 [[ "${RELEASE_TEST_CONTAINER:-}" == 1 ]] || { echo 'Run in the documented disposable container.' >&2; exit 1; }
-TEST_ROOT="$(mktemp -d)"
+export TEST_ROOT="$(mktemp -d)"
 trap 'result=$?; if (( result )); then cat "$TEST_ROOT/"*.log >&2; fi; rm -rf -- "$TEST_ROOT"' EXIT
 export APP_ROOT="$TEST_ROOT/app" APP_USER=root OPS_DIR="$TEST_ROOT/ops" SYSTEMD_DIR="$TEST_ROOT/units" CADDY_FILE="$TEST_ROOT/Caddyfile" APP_DOMAIN=test.example
 export ENV_FILE="$TEST_ROOT/server.env" WEB_ENV_FILE="$TEST_ROOT/web.env" SMOKE_RETRIES=1 SMOKE_DELAY_SECONDS=0
 export CURRENT_LINK="$APP_ROOT/current" RELEASES_DIR="$APP_ROOT/releases" TEST_LOG="$TEST_ROOT/calls"
 touch "$TEST_LOG"
+export POSTGRES_BACKUP_DIR="$TEST_ROOT/backups/pg" MINIO_BACKUP_DIR="$TEST_ROOT/backups/minio" REPORT_DIR="$TEST_ROOT/backups/reports"
+mkdir -p "$TEST_ROOT/minio"
+printf test > "$TEST_ROOT/minio/object"
 mkdir -p "$TEST_ROOT/bin" "$OPS_DIR" "$SYSTEMD_DIR" "$RELEASES_DIR/old" "$TEST_ROOT/source/web/public" "$TEST_ROOT/source/server"
 cp -a /repo/deploy "$TEST_ROOT/source/deploy"
 printf 'DATABASE_URL=postgresql://unused\nMAIL_FROM_ADDRESS=Agents Chat <noreply@example.test>\n' > "$ENV_FILE"
@@ -25,6 +28,8 @@ MOCK
 cat > "$TEST_ROOT/bin/docker" <<'MOCK'
 #!/bin/bash
 printf 'docker %s\n' "$*" >> "$TEST_LOG"
+if [[ "$*" == *'--format'* ]]; then printf '%s/minio\n' "$TEST_ROOT"; fi
+if [[ "$*" == *'pg_isready'* && "${FAIL_DATABASE_READY:-}" == 1 ]]; then exit 1; fi
 MOCK
 cat > "$TEST_ROOT/bin/jq" <<'MOCK'
 #!/bin/bash
@@ -39,6 +44,7 @@ cat > "$TEST_ROOT/bin/sudo" <<'MOCK'
 #!/bin/bash
 set -eu
 shift 2
+if [[ "$1" == env ]]; then shift 2; fi
 if [[ "$1 $2" == 'bash -se' ]]; then
   input="$(cat)"
   if [[ "$input" == *'migration:run'* ]]; then printf 'migration\n' >> "$TEST_LOG"; exit 0; fi
@@ -102,3 +108,35 @@ if bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --us
 [[ "$(readlink "$CURRENT_LINK")" == "$RELEASES_DIR/old" ]]
 grep -q 'Prebuilt Web platform mismatch' "$TEST_ROOT/platform.log"
 echo 'PASS: Windows prebuilt artifact rejected on Linux before cutover'
+
+before_migrations="$(grep -c '^migration$' "$TEST_LOG")"
+cp "$CADDY_FILE" "$TEST_ROOT/db-before-site"
+cp "$SYSTEMD_DIR/agents-chat-api.service" "$TEST_ROOT/db-before-api"
+if INFRA_RETRIES=1 INFRA_DELAY_SECONDS=0 FAIL_DATABASE_READY=1 bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --release-id db-not-ready > "$TEST_ROOT/database.log" 2>&1; then echo 'Unready database accepted'; exit 1; fi
+[[ "$(readlink "$CURRENT_LINK")" == "$RELEASES_DIR/old" ]]
+cmp "$CADDY_FILE" "$TEST_ROOT/db-before-site"
+cmp "$SYSTEMD_DIR/agents-chat-api.service" "$TEST_ROOT/db-before-api"
+[[ "$(grep -c '^migration$' "$TEST_LOG")" == "$before_migrations" ]]
+echo 'PASS: unready database prevents migration and cutover'
+
+cat > "$TEST_ROOT/bin/nginx" <<'MOCK'
+#!/bin/bash
+printf 'nginx %s\n' "$*" >> "$TEST_LOG"
+MOCK
+chmod +x "$TEST_ROOT/bin/nginx"
+printf 'unrelated nginx configuration\n' > "$TEST_ROOT/unrelated.conf"
+cp "$TEST_ROOT/unrelated.conf" "$TEST_ROOT/unrelated.before"
+export PROXY_SERVER=nginx API_PORT=3200 WEB_PORT=3201
+bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --release-id nginx-new > "$TEST_ROOT/nginx.log" 2>&1
+cmp "$TEST_ROOT/unrelated.conf" "$TEST_ROOT/unrelated.before"
+grep -q 'proxy_pass http://127.0.0.1:3200' "$CADDY_FILE"
+grep -q 'proxy_pass http://127.0.0.1:3201' "$CADDY_FILE"
+grep -q 'enable --now agents-chat-backup.timer' "$TEST_LOG"
+grep -q 'reload nginx' "$TEST_LOG"
+echo 'PASS: isolated nginx site, configured ports and active backup timer'
+cp "$CADDY_FILE" "$TEST_ROOT/nginx.before"
+if FAIL_SMOKE_RELEASE=nginx-failed bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --release-id nginx-failed > "$TEST_ROOT/nginx-failed.log" 2>&1; then echo 'Nginx smoke failure accepted'; exit 1; fi
+[[ "$(readlink "$CURRENT_LINK")" == "$RELEASES_DIR/nginx-new" ]]
+cmp "$CADDY_FILE" "$TEST_ROOT/nginx.before"
+cmp "$TEST_ROOT/unrelated.conf" "$TEST_ROOT/unrelated.before"
+echo 'PASS: failed nginx cutover restores only its own site'

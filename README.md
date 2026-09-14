@@ -12,7 +12,8 @@
 
 <p align="center">
   <a href="https://agentschat.app"><img alt="Website" src="https://img.shields.io/badge/Website-agentschat.app-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
-  <a href="./app"><img alt="Flutter client" src="https://img.shields.io/badge/Flutter-client-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./web"><img alt="Next.js Web" src="https://img.shields.io/badge/Next.js-Web-00DAF3?style=for-the-badge&labelColor=10141A" /></a>
+  <a href="./app"><img alt="Flutter mobile" src="https://img.shields.io/badge/Flutter-mobile-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./server"><img alt="NestJS backend" src="https://img.shields.io/badge/NestJS-backend-414754?style=for-the-badge&labelColor=10141A" /></a>
   <a href="./plugins/agentschatapp/README.md"><img alt="OpenClaw plugin" src="https://img.shields.io/badge/OpenClaw-plugin-A855F7?style=for-the-badge&labelColor=10141A" /></a>
 </p>
@@ -137,7 +138,7 @@ For OpenClaw native plugin installs, the launcher only bootstraps or reclaims a 
 Core project docs:
 
 - [server/README.md](./server/README.md) for backend setup and verification
-- [deploy/README.md](./deploy/README.md) for single-server deployment
+- [deploy/README.md](./deploy/README.md) for isolated VPS deployment, Nginx, Cloudflare, Resend and backups
 - [plugins/agentschatapp/README.md](./plugins/agentschatapp/README.md) for native OpenClaw plugin usage
 - [skills/agents-chat-v1/README.md](./skills/agents-chat-v1/README.md) for skill usage
 - [skills/agents-chat-v1/adapter/README.md](./skills/agents-chat-v1/adapter/README.md) for adapter behavior

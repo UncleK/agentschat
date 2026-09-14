@@ -46,8 +46,8 @@ recover_failed_release() {
   if [[ "$CONFIG_CHANGED" == true ]]; then restore_configuration "$RECOVERY_DIR" || recovery_failed=1; fi
   if [[ "$CURRENT_CHANGED" == true ]]; then
     if [[ -n "$PREVIOUS_RELEASE" ]]; then restart_application "$PREVIOUS_RELEASE" || recovery_failed=1
-    else systemctl stop agents-chat-web.service agents-chat-api.service || recovery_failed=1; systemctl reload caddy || recovery_failed=1; fi
-  elif [[ "$CONFIG_CHANGED" == true && -f "$CADDY_FILE" ]]; then systemctl reload caddy || recovery_failed=1; fi
+    else systemctl stop agents-chat-web.service agents-chat-api.service || recovery_failed=1; reload_proxy || recovery_failed=1; fi
+  elif [[ "$CONFIG_CHANGED" == true && -f "$CADDY_FILE" ]]; then reload_proxy || recovery_failed=1; fi
   if (( recovery_failed )); then echo 'Release failed; automatic recovery was incomplete. Inspect systemd and Caddy before retrying.' >&2
   else echo 'Release failed; previous application/configuration restored. Database migrations were not reversed.' >&2; fi
   exit "$result"
@@ -57,11 +57,11 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 install -d -o "$APP_USER" -g "$APP_USER" "$RELEASES_DIR" "$RELEASE_DIR"
 if [[ -n "$GIT_REF" ]]; then
-  git -C "$REPO_DIR" fetch --all --tags --prune
+  sudo -u "$APP_USER" git -C "$REPO_DIR" fetch --all --tags --prune
   archive_ref="$GIT_REF"
-  if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/${GIT_REF}^{commit}" >/dev/null; then archive_ref="origin/$GIT_REF"; fi
-  git -C "$REPO_DIR" rev-parse --verify "${archive_ref}^{commit}" > "$RELEASE_DIR/.source-commit"
-  git -C "$REPO_DIR" archive "$archive_ref" | tar -xf - -C "$RELEASE_DIR"
+  if sudo -u "$APP_USER" git -C "$REPO_DIR" rev-parse --verify --quiet "origin/${GIT_REF}^{commit}" >/dev/null; then archive_ref="origin/$GIT_REF"; fi
+  sudo -u "$APP_USER" git -C "$REPO_DIR" rev-parse --verify "${archive_ref}^{commit}" > "$RELEASE_DIR/.source-commit"
+  sudo -u "$APP_USER" git -C "$REPO_DIR" archive "$archive_ref" | tar -xf - -C "$RELEASE_DIR"
 else
   [[ -d "$SOURCE_DIR" ]] || { echo 'Source directory not found.' >&2; exit 1; }
   SOURCE_DIR="$(realpath "$SOURCE_DIR")"
@@ -76,10 +76,10 @@ require_file "$RELEASE_DIR/web/package-lock.json"
 chown -R "$APP_USER:$APP_USER" "$RELEASE_DIR"
 prepare_caddy "$RELEASE_DIR" "$RELEASE_DIR/Caddyfile.next"
 # Finish both builds before touching the live schema, service definitions, or release pointer.
-sudo -u "$APP_USER" bash -se -- "$RELEASE_DIR" <<'BUILD'
+sudo -u "$APP_USER" env "PATH=$PATH" bash -se -- "$RELEASE_DIR" <<'BUILD'
 cd "$1/server"
-env NODE_ENV=development npm_config_production=false corepack pnpm install --frozen-lockfile
-corepack pnpm build
+env NODE_ENV=development npm_config_production=false pnpm install --frozen-lockfile
+pnpm build
 BUILD
 if [[ "$USE_PREBUILT_WEB" == true ]]; then
   node --env-file="$WEB_ENV_FILE" - "$RELEASE_DIR/web/.next/deploy-build.json" <<'VERIFY'
@@ -88,7 +88,7 @@ const expected={platform:process.platform,arch:process.arch,nodeMajor:process.ve
 for(const [key,value] of Object.entries(expected))if(manifest[key]!==value)throw new Error('Prebuilt Web '+key+' mismatch; build on the target platform with its public URLs.');
 VERIFY
 else
-  sudo -u "$APP_USER" bash "$RELEASE_DIR/deploy/ops/prepare-web-artifact.sh" "$RELEASE_DIR/web" "$WEB_ENV_FILE"
+  sudo -u "$APP_USER" env "PATH=$PATH" bash "$RELEASE_DIR/deploy/ops/prepare-web-artifact.sh" "$RELEASE_DIR/web" "$WEB_ENV_FILE"
 fi
 require_file "$RELEASE_DIR/server/dist/src/main.js"
 require_file "$RELEASE_DIR/web/.next/standalone/server.js"
@@ -102,7 +102,12 @@ if docker inspect agents-chat-postgres agents-chat-redis agents-chat-minio >/dev
 else
   docker compose --env-file "$ENV_FILE" --project-name "$COMPOSE_PROJECT_NAME" -f "$RELEASE_DIR/deploy/compose.production.yml" up -d postgres redis minio
 fi
-sudo -u "$APP_USER" bash -se -- "$RELEASE_DIR" "$ENV_FILE" <<'MIGRATE'
+retry_command "${INFRA_RETRIES:-60}" "${INFRA_DELAY_SECONDS:-2}" 'PostgreSQL readiness' docker exec agents-chat-postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+retry_command "${INFRA_RETRIES:-30}" "${INFRA_DELAY_SECONDS:-2}" 'Redis readiness' docker exec agents-chat-redis redis-cli ping
+minio_port="$(node --env-file="$ENV_FILE" -p 'process.env.MINIO_PORT || 59000')"
+retry_command "${INFRA_RETRIES:-30}" "${INFRA_DELAY_SECONDS:-2}" 'MinIO readiness' curl -fsS --max-time 5 "http://127.0.0.1:$minio_port/minio/health/ready"
+if [[ -n "$PREVIOUS_RELEASE" ]]; then bash "$SCRIPT_DIR/run-backups.sh"; fi
+sudo -u "$APP_USER" env "PATH=$PATH" bash -se -- "$RELEASE_DIR" "$ENV_FILE" <<'MIGRATE'
 cd "$1/server"
 node --env-file="$2" --require ts-node/register --require tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/database/typeorm.data-source.ts
 MIGRATE
@@ -114,7 +119,8 @@ CURRENT_CHANGED=true
 atomic_switch "$RELEASE_DIR"
 restart_application "$RELEASE_DIR"
 smoke_application "$RELEASE_DIR"
-systemctl enable agents-chat-api.service agents-chat-web.service agents-chat-backup.timer >/dev/null
+systemctl enable agents-chat-api.service agents-chat-web.service >/dev/null
+systemctl enable --now agents-chat-backup.timer >/dev/null
 cp -a "$CADDY_FILE" "$RELEASE_DIR/Caddyfile.deployed"
 date -u +%FT%TZ > "$RELEASE_DIR/.release-ready"
 trap - EXIT INT TERM

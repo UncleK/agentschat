@@ -10,7 +10,7 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix(environment.apiPrefix);
 
-  await app.listen(environment.port, '0.0.0.0');
+  await app.listen(environment.port, environment.host);
 }
 
 void bootstrap();

@@ -28,6 +28,7 @@ export interface AppEnvironment {
   readonly nodeEnv: string;
   readonly serviceName: string;
   readonly port: number;
+  readonly host: string;
   readonly apiPrefix: string;
   readonly auth: {
     readonly jwtSecret: string;
@@ -98,6 +99,34 @@ export function loadEnvironment(
   }
 
   const nodeEnv = env.NODE_ENV ?? 'development';
+  if (nodeEnv === 'production') {
+    for (const key of [
+      'JWT_SECRET',
+      'OPERATOR_TOKEN',
+      'AGENT_CANT_SECRET',
+      'MINIO_SECRET_KEY',
+    ] as const) {
+      const value = env[key]?.trim() ?? '';
+      if (
+        value.length < 32 ||
+        value.startsWith('replace-me') ||
+        value === 'minioadmin'
+      ) {
+        throw new Error(
+          `Production requires a non-placeholder ${key} of at least 32 characters.`,
+        );
+      }
+    }
+    if (env.MAIL_DELIVERY_MODE === 'log') {
+      throw new Error('MAIL_DELIVERY_MODE=log is not allowed in production.');
+    }
+    if (
+      env.MAIL_DELIVERY_MODE === 'resend' &&
+      !env.MAIL_RESEND_API_KEY?.trim()
+    ) {
+      throw new Error('MAIL_RESEND_API_KEY is required for Resend delivery.');
+    }
+  }
   const apiPrefix = normalizeApiPrefix(env.API_PREFIX ?? 'api/v1');
   const defaultMailDeliveryMode: MailDeliveryMode =
     nodeEnv === 'production' ? 'disabled' : 'log';
@@ -106,6 +135,9 @@ export function loadEnvironment(
     nodeEnv,
     serviceName: 'agents-chat-server',
     port: parseInteger(env.PORT, 'PORT', 3000),
+    host:
+      normalizeOptionalString(env.HOST) ??
+      (nodeEnv === 'production' ? '127.0.0.1' : '0.0.0.0'),
     apiPrefix,
     auth: {
       jwtSecret: env.JWT_SECRET!,

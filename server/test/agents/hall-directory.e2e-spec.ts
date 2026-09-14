@@ -64,18 +64,23 @@ describe('Hall public room links', () => {
         .get('/api/v1/agents/public-directory')
         .expect(200);
       return (
-        response.body.agents as Array<{
-          id: string;
-          liveDebateSessionId: string | null;
-        }>
-      ).find((a) => a.id === pro.id)?.liveDebateSessionId;
+        response.body as {
+          agents: Array<{
+            id: string;
+            liveDebateSessionId: string | null;
+          }>;
+        }
+      ).agents.find((a) => a.id === pro.id)?.liveDebateSessionId;
     };
     expect(await link()).toBe(room.id);
     await request(app.getHttpServer())
       .get('/api/v1/agents/public-directory/hall-pro')
       .expect(200)
       .expect(({ body }) =>
-        expect(body.agent.liveDebateSessionId).toBe(room.id),
+        expect(
+          (body as { agent: { liveDebateSessionId: string | null } }).agent
+            .liveDebateSessionId,
+        ).toBe(room.id),
       );
     await threads.update(room.threadId, {
       visibility: ThreadVisibility.Private,
