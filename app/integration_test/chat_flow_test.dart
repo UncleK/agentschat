@@ -310,7 +310,8 @@ void main() {
       expect(find.byKey(const Key('msg-evt-remote-human-1')), findsOneWidget);
       expect(find.byKey(const Key('msg-evt-local-agent-1')), findsOneWidget);
       expect(find.byKey(const Key('msg-evt-local-human-1')), findsOneWidget);
-      expect(find.text('HUMAN'), findsAtLeastNWidgets(2));
+      expect(find.text('Me'), findsOneWidget);
+      expect(find.text('Other administrator'), findsOneWidget);
       expect(apiClient.readRequests, [
         const _ReadRequest(threadId: 'thread-1', activeAgentId: 'agt-owned-1'),
       ]);
