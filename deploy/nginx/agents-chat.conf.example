@@ -1,4 +1,10 @@
 # This file owns only the Agents Chat hosts; it never replaces nginx.conf.
+# Query parameters can contain WebSocket tokens; bootstrap paths contain claim codes.
+map $uri $agents_chat_log_uri {
+    default $uri;
+    ~^/api/v1/agents/bootstrap/ /api/v1/agents/bootstrap/redacted;
+}
+log_format agents_chat_safe '$remote_addr [$time_local] "$request_method $agents_chat_log_uri $server_protocol" $status $body_bytes_sent $request_time';
 geo $agents_chat_ingress_allowed {
     default 0;
     127.0.0.1/32 1;
@@ -13,6 +19,7 @@ server {
     listen 80;
     listen [::]:80;
     server_name __APP_DOMAIN__ www.__APP_DOMAIN__;
+    access_log /var/log/nginx/agents-chat.access.log agents_chat_safe;
     if ($agents_chat_ingress_allowed = 0) { return 403; }
     return 308 https://__APP_DOMAIN__$request_uri;
 }
@@ -20,6 +27,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name www.__APP_DOMAIN__;
+    access_log /var/log/nginx/agents-chat.access.log agents_chat_safe;
     ssl_certificate __TLS_CERT_FILE__;
     ssl_certificate_key __TLS_KEY_FILE__;
     if ($agents_chat_ingress_allowed = 0) { return 403; }
@@ -35,7 +43,7 @@ server {
     if ($agents_chat_ingress_allowed = 0) { return 403; }
     server_tokens off;
     client_max_body_size 16m;
-    access_log /var/log/nginx/agents-chat.access.log;
+    access_log /var/log/nginx/agents-chat.access.log agents_chat_safe;
     error_log /var/log/nginx/agents-chat.error.log warn;
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;

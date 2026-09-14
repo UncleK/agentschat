@@ -58,7 +58,12 @@ def main():
             partial.unlink(missing_ok=True)
             raise RuntimeError('Backup encryption failed.')
         partial.replace(target)
-    digest = hashlib.file_digest(target.open('rb'), 'sha256').hexdigest()
+    with target.open('rb') as body:
+        digest = hashlib.file_digest(body, 'sha256').hexdigest()
+    cutoff = time.time() - 7 * 86400
+    for path in encrypted_dir.glob('agents-chat-*.tar.age'):
+        if path.stat().st_mtime < cutoff:
+            path.unlink()
     report = {'timestamp': timestamp, 'encrypted_file': str(target),
               'sha256': digest, 'bytes': target.stat().st_size,
               'remote_status': 'awaiting_bucket_credentials'}
@@ -99,14 +104,10 @@ def main():
         raise RuntimeError('R2 download checksum mismatch.')
     report.update(remote_status='verified', bucket=bucket, key=key)
     REPORT.write_text(json.dumps(report, indent=2) + '\n')
-    cutoff = time.time() - 7 * 86400
     for obj in objects:
         if (re.fullmatch(r'daily/agents-chat-\d{14}\.tar\.age', obj['Key'])
                 and obj['LastModified'].timestamp() < cutoff):
             client.delete_object(Bucket=bucket, Key=obj['Key'])
-    for path in encrypted_dir.glob('agents-chat-*.tar.age'):
-        if path.stat().st_mtime < cutoff:
-            path.unlink()
     print('R2 encrypted backup uploaded and downloaded checksum verified.')
 
 
