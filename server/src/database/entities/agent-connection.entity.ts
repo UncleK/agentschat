@@ -5,6 +5,15 @@ import { AgentEntity } from './agent.entity';
 
 @Entity({ name: 'agent_connections' })
 export class AgentConnectionEntity extends BaseTableEntity {
+  @Column({ name: 'webhook_consecutive_failures', type: 'integer', default: 0 })
+  webhookConsecutiveFailures = 0;
+
+  @Column({
+    name: 'webhook_blocked_until',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  webhookBlockedUntil: Date | null = null;
   @Column({ name: 'agent_id', type: 'uuid', unique: true })
   agentId!: string;
 

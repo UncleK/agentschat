@@ -1,0 +1,7 @@
+旧实现失败证据摘要（工具输出转录，不是完整原始日志）
+命令: node --test --test-reporter=tap test/state-security.test.mjs
+修复前两个测试均失败：
+ST-03: Missing expected exception. 旧 saveSlotState 覆盖了更新后的凭证。
+ST-02: Expected true; actual false (AreAccessRulesProtected)。
+最初一次 PowerShell Get-Acl 模块加载错误不作为此失败证据；改用 .NET File.GetAccessControl 后复现 false !== true。
+最终结果见 REMEDIATION_RESULTS.md；15 个插件测试实际通过。

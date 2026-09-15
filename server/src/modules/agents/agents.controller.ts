@@ -1,7 +1,9 @@
+import { AuthRateLimitGuard } from '../auth/auth-rate-limit.guard';
 import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -35,6 +37,12 @@ interface ImportAgentBody {
 
 interface ConfirmClaimBody {
   challengeToken: string;
+  authorization?: {
+    purpose?: string;
+    accountId?: string;
+    agentId?: string;
+    approved?: boolean;
+  };
 }
 
 interface RequestClaimBody {
@@ -117,11 +125,13 @@ export class AgentsController {
   }
 
   @Post('import/self')
+  @UseGuards(AuthRateLimitGuard)
   importSelfOwnedAgent(@Body() body: ImportAgentBody) {
     return this.agentsService.importSelfOwnedAgent(body);
   }
 
   @Post('bootstrap/public')
+  @UseGuards(AuthRateLimitGuard)
   createPublicAgentBootstrap(
     @Body() body: ImportAgentBody,
   ): Promise<PublicAgentBootstrapResponse> {
@@ -144,7 +154,7 @@ export class AgentsController {
   }
 
   @Post('self/avatar-upload')
-  @UseGuards(FederationAuthGuard)
+  @UseGuards(FederationAuthGuard, AuthRateLimitGuard)
   createSelfAvatarUpload(
     @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
     @Body() body: CreateSelfAvatarUploadBody,
@@ -173,11 +183,14 @@ export class AgentsController {
   ) {
     const avatar = await this.agentsService.readPublicAgentAvatar(agentId);
     response.setHeader('Content-Type', avatar.mimeType);
-    response.setHeader('Content-Length', String(avatar.byteSize));
+    response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader(
-      'Cache-Control',
-      'public, max-age=86400, stale-while-revalidate=604800',
+      'Content-Security-Policy',
+      "sandbox; default-src 'none'; frame-ancestors 'none'",
     );
+    response.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+    response.setHeader('Content-Length', String(avatar.byteSize));
+    response.setHeader('Cache-Control', 'no-store');
     return new StreamableFile(avatar.body);
   }
 
@@ -214,7 +227,7 @@ export class AgentsController {
   }
 
   @Post(':agentId/claim-requests')
-  @UseGuards(HumanAuthGuard)
+  @UseGuards(HumanAuthGuard, AuthRateLimitGuard)
   requestClaim(
     @CurrentHuman() human: AuthenticatedHuman,
     @Param('agentId') agentId: string,
@@ -228,7 +241,7 @@ export class AgentsController {
   }
 
   @Post('claim-requests')
-  @UseGuards(HumanAuthGuard)
+  @UseGuards(HumanAuthGuard, AuthRateLimitGuard)
   requestUntargetedClaim(
     @CurrentHuman() human: AuthenticatedHuman,
     @Body() body: RequestClaimBody,
@@ -247,12 +260,36 @@ export class AgentsController {
     @Param('agentId') agentId: string,
     @Param('claimRequestId') claimRequestId: string,
     @Body() body: ConfirmClaimBody,
+    @Headers('x-agent-control-token') controlToken?: string,
   ) {
     return this.agentsService.confirmClaim(
       human,
       agentId,
       claimRequestId,
       body.challengeToken,
+      controlToken,
+      body.authorization,
     );
+  }
+
+  @Get(':agentId/claim-requests/:claimRequestId/control-preview')
+  @UseGuards(HumanAuthGuard)
+  previewClaim(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('agentId') agentId: string,
+    @Param('claimRequestId') requestId: string,
+    @Headers('x-agent-control-token') token?: string,
+  ) {
+    return this.agentsService.previewClaim(human, agentId, requestId, token);
+  }
+
+  @Post(':agentId/claim-requests/:claimRequestId/cancel')
+  @HttpCode(200)
+  @UseGuards(HumanAuthGuard)
+  cancelClaim(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('claimRequestId') requestId: string,
+  ) {
+    return this.agentsService.cancelClaim(human, requestId);
   }
 }

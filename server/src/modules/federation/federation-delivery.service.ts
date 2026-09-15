@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { enqueueDelivery } from '../../database/enqueue-delivery';
+import { postWebhook } from './webhook-http';
 import { recordAgentActivity } from './agent-activity';
 import {
   Inject,
@@ -105,24 +108,12 @@ export class FederationDeliveryService
     event: EventEntity,
     recipientAgentId: string,
   ): Promise<DeliveryEntity> {
-    const connection = await this.agentConnectionRepository.findOneBy({
-      agentId: recipientAgentId,
-    });
-    const sequence = await this.nextSequenceForRecipient(recipientAgentId);
-    const delivery = await this.deliveryRepository.save(
-      this.deliveryRepository.create({
-        eventId: event.id,
-        recipientAgentId,
-        agentConnectionId: connection?.id ?? null,
-        sequence,
-        deliveryChannel: connection?.pollingEnabled
-          ? DeliveryChannel.Polling
-          : DeliveryChannel.Webhook,
-        nextAttemptAt: new Date(),
-        replayExpiresAt: new Date(Date.now() + this.replayWindowMs),
-      }),
+    const delivery = await enqueueDelivery(
+      this.deliveryRepository.manager.connection,
+      event.id,
+      recipientAgentId,
+      this.replayWindowMs,
     );
-
     this.poke();
     return delivery;
   }
@@ -148,6 +139,7 @@ export class FederationDeliveryService
     cursor: string | undefined,
     limit: number | undefined,
     waitSeconds: number | undefined,
+    signal?: AbortSignal,
   ): Promise<PollResult> {
     if (!agent.pollingEnabled) {
       throw new FederationHttpException(
@@ -161,26 +153,65 @@ export class FederationDeliveryService
     const deadline = Date.now() + normalizedWaitSeconds * 1_000;
     const normalizedCursor = this.parseCursor(cursor);
 
-    while (true) {
-      const deliveries = await this.collectPollableDeliveries(
-        agent.id,
-        normalizedCursor,
-        limit,
+    const leaseId = randomUUID();
+    const db = this.deliveryRepository.manager.connection;
+    await db.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`poll:${agent.id}`],
       );
-
-      if (deliveries.length > 0 || Date.now() >= deadline) {
-        await this.recordAgentPollingActivity(agent, true);
-        const latestCursor = deliveries.at(-1)?.cursor as string | undefined;
-
-        return {
-          cursor:
-            latestCursor ??
-            (normalizedCursor === null ? null : String(normalizedCursor)),
-          deliveries,
-        };
+      await manager.query(
+        'DELETE FROM agent_poll_leases WHERE agent_id=$1 AND expires_at<=now()',
+        [agent.id],
+      );
+      const rows = await manager.query<Array<{ count: string }>>(
+        'SELECT count(*) FROM agent_poll_leases WHERE agent_id=$1',
+        [agent.id],
+      );
+      if (Number(rows[0].count) >= 2)
+        throw new FederationHttpException(
+          429,
+          'poll_concurrency_limit',
+          'At most two concurrent polls per agent.',
+        );
+      await manager.query(
+        'INSERT INTO agent_poll_leases(id,agent_id,expires_at) VALUES ($1,$2,$3)',
+        [leaseId, agent.id, new Date(deadline + 5000)],
+      );
+    });
+    try {
+      while (!signal?.aborted && !this.isStopped) {
+        const deliveries = await this.collectPollableDeliveries(
+          agent.id,
+          normalizedCursor,
+          limit,
+        );
+        if (deliveries.length > 0 || Date.now() >= deadline) {
+          if (!signal?.aborted)
+            await this.recordAgentPollingActivity(agent, true);
+          return {
+            cursor:
+              (deliveries.at(-1)?.cursor as string | undefined) ??
+              (normalizedCursor === null ? null : String(normalizedCursor)),
+            deliveries,
+          };
+        }
+        try {
+          await delay(
+            Math.min(250, Math.max(1, deadline - Date.now())),
+            undefined,
+            { signal },
+          );
+        } catch (error) {
+          if (!signal?.aborted) throw error;
+        }
       }
-
-      await delay(50);
+      return {
+        cursor: normalizedCursor === null ? null : String(normalizedCursor),
+        deliveries: [],
+      };
+    } finally {
+      await db.query('DELETE FROM agent_poll_leases WHERE id=$1', [leaseId]);
     }
   }
 
@@ -188,6 +219,23 @@ export class FederationDeliveryService
     agent: AuthenticatedFederatedAgent,
     deliveryIds: string[],
   ) {
+    if (
+      !Array.isArray(deliveryIds) ||
+      deliveryIds.length > 100 ||
+      deliveryIds.some(
+        (id) =>
+          typeof id !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            id.trim(),
+          ),
+      )
+    ) {
+      throw new FederationHttpException(
+        400,
+        'invalid_ack_batch',
+        'ACK expects at most 100 UUID delivery IDs.',
+      );
+    }
     if (deliveryIds.length === 0) {
       throw new FederationHttpException(
         400,
@@ -210,6 +258,7 @@ export class FederationDeliveryService
 
     const deliveries = await this.deliveryRepository.findBy({
       recipientAgentId: agent.id,
+      id: In(uniqueDeliveryIds),
     });
     const deliveriesById = new Map(
       deliveries.map((delivery) => [delivery.id, delivery]),
@@ -377,18 +426,25 @@ export class FederationDeliveryService
     this.isProcessingWebhooks = true;
     try {
       const connections = await this.agentConnectionRepository.find({
-        where: {},
-        order: { createdAt: 'ASC' },
+        where: {
+          transportMode: In([
+            ConnectionTransportMode.Webhook,
+            ConnectionTransportMode.Hybrid,
+          ]),
+        },
+        order: { updatedAt: 'ASC' },
       });
 
-      for (const connection of connections) {
+      const deliver = async (connection: AgentConnectionEntity) => {
         if (
+          (connection.webhookBlockedUntil &&
+            connection.webhookBlockedUntil.getTime() > Date.now()) ||
           !connection.webhookUrl ||
           !connection.webhookSecret ||
           (connection.transportMode !== ConnectionTransportMode.Webhook &&
             connection.transportMode !== ConnectionTransportMode.Hybrid)
         ) {
-          continue;
+          return;
         }
 
         const outstanding = await this.loadEarliestOutstandingDelivery(
@@ -396,18 +452,18 @@ export class FederationDeliveryService
         );
 
         if (!outstanding) {
-          continue;
+          return;
         }
 
         if (!(await this.ensureDeliveryIsActive(outstanding))) {
-          continue;
+          return;
         }
 
         if (
           outstanding.nextAttemptAt &&
           outstanding.nextAttemptAt.getTime() > Date.now()
         ) {
-          continue;
+          return;
         }
 
         const claimed = await this.claimDeliveryAttempt(
@@ -415,7 +471,7 @@ export class FederationDeliveryService
           DeliveryChannel.Webhook,
           new Date(Date.now() + this.webhookRequestTimeoutMs + 1_000),
         );
-        if (!claimed) continue;
+        if (!claimed) return;
 
         const payload = await this.serializeDeliveryById(outstanding.id);
         const body = JSON.stringify({
@@ -430,27 +486,31 @@ export class FederationDeliveryService
 
         const timeoutSignal = AbortSignal.timeout(this.webhookRequestTimeoutMs);
         try {
-          const response = await fetch(connection.webhookUrl, {
-            method: 'POST',
-            headers: {
+          const response = await postWebhook(
+            connection.webhookUrl,
+            body,
+            {
               'content-type': 'application/json',
               'x-agents-chat-delivery-id': outstanding.id,
               'x-agents-chat-timestamp': timestamp,
               'x-agents-chat-signature': signature,
             },
-            body,
-            signal: timeoutSignal,
-          });
-          void response.body?.cancel().catch(() => undefined);
+            timeoutSignal,
+          );
 
           if (!response.ok) {
+            await this.recordWebhookFailure(connection.id);
             await this.markDeliveryAttemptFailure(
               claimed,
               `Webhook returned HTTP ${response.status}.`,
             );
-            continue;
+            return;
           }
 
+          await this.agentConnectionRepository.update(connection.id, {
+            webhookConsecutiveFailures: 0,
+            webhookBlockedUntil: null,
+          });
           // ACK is terminal even when it arrived before the HTTP response.
           await this.deliveryRepository.update(
             {
@@ -470,9 +530,19 @@ export class FederationDeliveryService
               ['TimeoutError', 'AbortError'].includes(error.name))
               ? 'Webhook request timed out.'
               : 'Webhook delivery failed.';
+          await this.recordWebhookFailure(connection.id);
           await this.markDeliveryAttemptFailure(claimed, message);
         }
-      }
+      };
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(4, connections.length) }, async () => {
+          while (next < connections.length && !this.isStopped) {
+            const connection = connections[next++];
+            await deliver(connection);
+          }
+        }),
+      );
     } catch (error) {
       if (
         this.isStopped ||
@@ -485,6 +555,19 @@ export class FederationDeliveryService
     } finally {
       this.isProcessingWebhooks = false;
     }
+  }
+
+  private async recordWebhookFailure(connectionId: string): Promise<void> {
+    await this.agentConnectionRepository
+      .createQueryBuilder()
+      .update()
+      .set({
+        webhookConsecutiveFailures: () => 'webhook_consecutive_failures + 1',
+        webhookBlockedUntil: () =>
+          "CASE WHEN webhook_consecutive_failures >= 2 THEN now() + interval '30 seconds' ELSE webhook_blocked_until END",
+      })
+      .where('id = :id', { id: connectionId })
+      .execute();
   }
 
   private async claimDeliveryAttempt(
@@ -572,20 +655,10 @@ export class FederationDeliveryService
   private async loadEarliestOutstandingDelivery(
     recipientAgentId: string,
   ): Promise<DeliveryEntity | null> {
-    const deliveries = await this.deliveryRepository.find({
-      where: { recipientAgentId },
-      order: {
-        sequence: 'ASC',
-      },
+    return this.deliveryRepository.findOne({
+      where: { recipientAgentId, status: In(this.activeDeliveryStatuses) },
+      order: { sequence: 'ASC' },
     });
-
-    return (
-      deliveries.find(
-        (delivery) =>
-          delivery.status !== DeliveryStatus.Acked &&
-          delivery.status !== DeliveryStatus.DeadLetter,
-      ) ?? null
-    );
   }
 
   private async serializeDeliveryById(
@@ -651,18 +724,6 @@ export class FederationDeliveryService
     }
 
     return event.eventType;
-  }
-
-  private async nextSequenceForRecipient(
-    recipientAgentId: string,
-  ): Promise<number> {
-    const deliveries = await this.deliveryRepository.find({
-      where: { recipientAgentId },
-      order: { sequence: 'DESC' },
-      take: 1,
-    });
-
-    return (deliveries[0]?.sequence ?? 0) + 1;
   }
 
   private nextAttemptAt(attemptCount: number): Date {

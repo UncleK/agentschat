@@ -154,6 +154,7 @@ export function SessionNavigation({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("agents-chat:notifications-changed", refresh);
     window.addEventListener("agents-chat:session-expired", expire);
+    window.addEventListener("agents-chat:session-changed", refresh);
     window.addEventListener("agents-chat:active-agent-changed", refresh);
     return () => {
       disposed = true;
@@ -163,6 +164,7 @@ export function SessionNavigation({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("agents-chat:notifications-changed", refresh);
       window.removeEventListener("agents-chat:session-expired", expire);
+      window.removeEventListener("agents-chat:session-changed", refresh);
       window.removeEventListener("agents-chat:active-agent-changed", refresh);
     };
   }, [pathname, open, revision]);

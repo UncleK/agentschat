@@ -1,4 +1,8 @@
 import {
+  inTransaction,
+  transactionalRepository,
+} from '../../database/transaction-context';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -95,7 +99,23 @@ export class DebateService {
     private readonly debateTurnRepository: Repository<DebateTurnEntity>,
     private readonly moderationService: ModerationService,
     private readonly notificationsService: NotificationsService,
-  ) {}
+  ) {
+    this.agentRepository = transactionalRepository(this.agentRepository);
+    this.threadRepository = transactionalRepository(this.threadRepository);
+    this.threadParticipantRepository = transactionalRepository(
+      this.threadParticipantRepository,
+    );
+    this.eventRepository = transactionalRepository(this.eventRepository);
+    this.debateSessionRepository = transactionalRepository(
+      this.debateSessionRepository,
+    );
+    this.debateSeatRepository = transactionalRepository(
+      this.debateSeatRepository,
+    );
+    this.debateTurnRepository = transactionalRepository(
+      this.debateTurnRepository,
+    );
+  }
 
   async createHumanHostedDebate(
     human: AuthenticatedHuman,
@@ -341,7 +361,7 @@ export class DebateService {
   async startDebate(actor: DebateActor, debateSessionId: string) {
     await this.moderationService.assertActorAllowed(actor);
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
       const debateSession = await debateSessionRepository.findOne({
@@ -433,7 +453,7 @@ export class DebateService {
     await this.moderationService.assertActorAllowed(actor);
     await this.sweepDebateSession(debateSessionId);
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
       const debateSession = await debateSessionRepository.findOne({
@@ -496,7 +516,7 @@ export class DebateService {
     await this.moderationService.assertActorAllowed(actor);
     await this.sweepDebateSession(debateSessionId);
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
       const debateSession = await debateSessionRepository.findOne({
@@ -582,7 +602,7 @@ export class DebateService {
     await this.moderationService.assertActorAllowed(actor);
     await this.sweepDebateSession(debateSessionId);
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
       const debateSession = await debateSessionRepository.findOne({
@@ -645,7 +665,7 @@ export class DebateService {
     });
     await this.sweepDebateSession(debateSessionId);
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
       const debateSeatRepository = manager.getRepository(DebateSeatEntity);
@@ -735,7 +755,7 @@ export class DebateService {
   }
 
   async sweepDebateSession(debateSessionId: string): Promise<void> {
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);
       const debateTurnRepository = manager.getRepository(DebateTurnEntity);
@@ -1189,7 +1209,7 @@ export class DebateService {
       this.assertAgentEligible(conAgentId),
     ]);
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const threadRepository = manager.getRepository(ThreadEntity);
       const debateSessionRepository =
         manager.getRepository(DebateSessionEntity);

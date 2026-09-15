@@ -7,16 +7,19 @@ import { AuthController } from './auth.controller';
 import { AuthRateLimitGuard } from './auth-rate-limit.guard';
 import { AuthService } from './auth.service';
 import { HumanAuthGuard } from './human-auth.guard';
+import { OAuthService } from './oauth.service';
+import { OAuthController } from './oauth.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([UserEntity, AuthEmailCodeEntity])],
-  controllers: [AuthController],
+  controllers: [AuthController, OAuthController],
   providers: [
+    OAuthService,
     AuthEmailDeliveryService,
     AuthService,
     HumanAuthGuard,
     AuthRateLimitGuard,
   ],
-  exports: [AuthService, HumanAuthGuard],
+  exports: [AuthService, HumanAuthGuard, AuthRateLimitGuard],
 })
 export class AuthModule {}

@@ -82,18 +82,27 @@ export class FederationController {
 
   @Get('deliveries/poll')
   @UseGuards(FederationAuthGuard)
-  pollDeliveries(
+  async pollDeliveries(
     @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+    @Res({ passthrough: true }) response: Response,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
     @Query('wait_seconds') waitSeconds?: string,
   ) {
-    return this.federationDeliveryService.pollDeliveries(
-      agent,
-      cursor,
-      limit ? Number.parseInt(limit, 10) : undefined,
-      waitSeconds ? Number.parseInt(waitSeconds, 10) : undefined,
-    );
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    response.once('close', abort);
+    try {
+      return await this.federationDeliveryService.pollDeliveries(
+        agent,
+        cursor,
+        limit ? Number.parseInt(limit, 10) : undefined,
+        waitSeconds ? Number.parseInt(waitSeconds, 10) : undefined,
+        controller.signal,
+      );
+    } finally {
+      response.off('close', abort);
+    }
   }
 
   @Post('acks')

@@ -5,14 +5,17 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { createHash } from 'node:crypto';
+import { WebSocket, WebSocketServer } from 'ws';
+import type { IncomingMessage } from 'node:http';
 import { Socket } from 'node:net';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import { AuthService } from '../auth/auth.service';
 import { Inject } from '@nestjs/common';
 
 interface HumanSocketSession {
-  socket: Socket;
+  socket: WebSocket;
+  queuedBytes: number;
+  alive: boolean;
   userId: string;
   token: string;
   expiresAt: number;
@@ -41,8 +44,14 @@ export class RealtimeService
   implements OnApplicationBootstrap, OnModuleDestroy
 {
   private readonly logger = new Logger(RealtimeService.name);
-  private readonly sessionsByUserId = new Map<string, Set<Socket>>();
-  private readonly sessionBySocket = new Map<Socket, HumanSocketSession>();
+  private readonly sessionsByUserId = new Map<string, Set<WebSocket>>();
+  private readonly sessionBySocket = new Map<WebSocket, HumanSocketSession>();
+  private readonly websocketServer = new WebSocketServer({
+    noServer: true,
+    maxPayload: 65536,
+    perMessageDeflate: false,
+  });
+  private heartbeatTimer?: NodeJS.Timeout;
   private httpServer?: UpgradeCapableServer;
   private unsubscribeInvalidation?: () => void;
 
@@ -54,6 +63,18 @@ export class RealtimeService
   ) {}
 
   onApplicationBootstrap(): void {
+    this.heartbeatTimer = setInterval(() => {
+      for (const session of this.sessionBySocket.values()) {
+        if (!session.alive) {
+          session.socket.terminate();
+          this.unregisterSocket(session.socket);
+          continue;
+        }
+        session.alive = false;
+        session.socket.ping();
+      }
+    }, 30_000);
+    this.heartbeatTimer.unref();
     this.unsubscribeInvalidation = this.authService.onHumanTokensInvalidated(
       (userId) => {
         for (const socket of this.sessionsByUserId.get(userId) ?? []) {
@@ -73,12 +94,14 @@ export class RealtimeService
   }
 
   onModuleDestroy(): void {
+    clearInterval(this.heartbeatTimer);
+    this.websocketServer.close();
     this.httpServer?.off?.('upgrade', this.handleUpgradeListener);
     this.unsubscribeInvalidation?.();
 
     for (const session of this.sessionBySocket.values()) {
       clearTimeout(session.expiryTimer);
-      session.socket.destroy();
+      session.socket.terminate();
     }
 
     this.sessionBySocket.clear();
@@ -92,16 +115,26 @@ export class RealtimeService
       return;
     }
 
-    const frame = this.encodeFrame(JSON.stringify(payload), 0x1);
+    const frame = JSON.stringify(payload);
+    const byteSize = Buffer.byteLength(frame);
 
     for (const socket of sockets) {
-      if (socket.destroyed) {
+      if (socket.readyState !== WebSocket.OPEN) {
         this.unregisterSocket(socket);
         continue;
       }
 
       const session = this.sessionBySocket.get(socket);
       if (!session) continue;
+      if (
+        byteSize > 262144 ||
+        session.queuedBytes + socket.bufferedAmount + byteSize > 1048576
+      ) {
+        this.unregisterSocket(socket);
+        socket.close(1009, 'Realtime payload or backpressure limit exceeded.');
+        continue;
+      }
+      session.queuedBytes += byteSize;
       session.sendQueue = session.sendQueue.then(async () => {
         if (this.sessionBySocket.get(socket) !== session) return;
         try {
@@ -111,9 +144,14 @@ export class RealtimeService
             this.closeUnauthorizedSocket(socket);
             return;
           }
-          socket.write(frame);
+          if (socket.readyState === WebSocket.OPEN)
+            socket.send(frame, (error) => {
+              if (error) socket.terminate();
+            });
         } catch {
           this.closeUnauthorizedSocket(socket);
+        } finally {
+          session.queuedBytes -= byteSize;
         }
       });
     }
@@ -139,55 +177,46 @@ export class RealtimeService
       );
 
       if (requestUrl.pathname !== this.environment.transport.appRealtime.path) {
+        socket.destroy();
         return;
       }
 
       const token = this.extractBearerToken(request.headers, requestUrl);
       const authenticatedHuman =
         await this.authService.authenticateHumanToken(token);
-      const websocketKey = this.readHeader(
-        request.headers,
-        'sec-websocket-key',
-      );
-
-      if (!websocketKey) {
-        throw new Error('Missing Sec-WebSocket-Key header.');
+      if (
+        (this.sessionsByUserId.get(authenticatedHuman.id)?.size ?? 0) >= 8 ||
+        this.sessionBySocket.size >= 1024
+      ) {
+        socket.end(
+          'HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n',
+        );
+        return;
       }
-
-      const acceptValue = createHash('sha1')
-        .update(`${websocketKey}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`)
-        .digest('base64');
-
-      socket.write(
-        [
-          'HTTP/1.1 101 Switching Protocols',
-          'Upgrade: websocket',
-          'Connection: Upgrade',
-          `Sec-WebSocket-Accept: ${acceptValue}`,
-          '\r\n',
-        ].join('\r\n'),
-      );
-
       socket.setNoDelay(true);
-      socket.on('data', (chunk) => this.handleSocketData(socket, chunk));
-      socket.on('close', () => this.unregisterSocket(socket));
-      socket.on('error', () => this.unregisterSocket(socket));
-
-      this.registerSocket(
-        authenticatedHuman.id,
+      this.websocketServer.handleUpgrade(
+        request as IncomingMessage,
         socket,
-        token,
-        this.authService.readHumanTokenExpiresAt(token),
+        head,
+        (websocket) => {
+          this.registerSocket(
+            authenticatedHuman.id,
+            websocket,
+            token,
+            this.authService.readHumanTokenExpiresAt(token),
+          );
+          websocket.on('close', () => this.unregisterSocket(websocket));
+          websocket.on('error', () => this.unregisterSocket(websocket));
+          websocket.on('pong', () => {
+            const session = this.sessionBySocket.get(websocket);
+            if (session) session.alive = true;
+          });
+          this.emitToHuman(authenticatedHuman.id, {
+            type: 'realtime.connected',
+            path: this.environment.transport.appRealtime.path,
+          });
+        },
       );
-
-      if (head.length > 0) {
-        this.handleSocketData(socket, head);
-      }
-
-      this.emitToHuman(authenticatedHuman.id, {
-        type: 'realtime.connected',
-        path: this.environment.transport.appRealtime.path,
-      });
     } catch (error) {
       this.logger.warn(
         `Realtime upgrade rejected: ${error instanceof Error ? error.message : 'unknown error'}`,
@@ -215,32 +244,13 @@ export class RealtimeService
     );
   }
 
-  private handleSocketData(socket: Socket, chunk: Buffer): void {
-    const frame = this.decodeFrame(chunk);
-
-    if (!frame) {
-      return;
-    }
-
-    if (frame.opcode === 0x8) {
-      socket.write(this.encodeFrame(Buffer.alloc(0), 0x8));
-      socket.end();
-      this.unregisterSocket(socket);
-      return;
-    }
-
-    if (frame.opcode === 0x9) {
-      socket.write(this.encodeFrame(frame.payload, 0xa));
-    }
-  }
-
   private registerSocket(
     userId: string,
-    socket: Socket,
+    socket: WebSocket,
     token: string,
     expiresAt: number,
   ): void {
-    const sessions = this.sessionsByUserId.get(userId) ?? new Set<Socket>();
+    const sessions = this.sessionsByUserId.get(userId) ?? new Set<WebSocket>();
     sessions.add(socket);
     this.sessionsByUserId.set(userId, sessions);
     this.sessionBySocket.set(socket, {
@@ -253,18 +263,20 @@ export class RealtimeService
         Math.max(0, expiresAt - Date.now()),
       ),
       sendQueue: Promise.resolve(),
+      queuedBytes: 0,
+      alive: true,
     });
   }
 
-  private closeUnauthorizedSocket(socket: Socket): void {
+  private closeUnauthorizedSocket(socket: WebSocket): void {
     this.unregisterSocket(socket);
-    if (!socket.destroyed) {
-      // 1008 = policy violation. Stop fanout before initiating the close handshake.
-      socket.end(this.encodeFrame(Buffer.from([0x03, 0xf0]), 0x8));
-    }
+    if (socket.readyState === WebSocket.OPEN)
+      socket.close(1008, 'Authentication expired or revoked.');
+    const timer = setTimeout(() => socket.terminate(), 1000);
+    timer.unref();
   }
 
-  private unregisterSocket(socket: Socket): void {
+  private unregisterSocket(socket: WebSocket): void {
     const session = this.sessionBySocket.get(socket);
 
     if (!session) {
@@ -316,67 +328,5 @@ export class RealtimeService
     }
 
     return value;
-  }
-
-  private encodeFrame(payload: string | Buffer, opcode: number): Buffer {
-    const payloadBuffer = Buffer.isBuffer(payload)
-      ? payload
-      : Buffer.from(payload, 'utf8');
-    let header: Buffer;
-
-    if (payloadBuffer.length < 126) {
-      header = Buffer.from([0x80 | opcode, payloadBuffer.length]);
-    } else {
-      header = Buffer.alloc(4);
-      header[0] = 0x80 | opcode;
-      header[1] = 126;
-      header.writeUInt16BE(payloadBuffer.length, 2);
-    }
-
-    return Buffer.concat([header, payloadBuffer]);
-  }
-
-  private decodeFrame(chunk: Buffer): {
-    opcode: number;
-    payload: Buffer;
-  } | null {
-    if (chunk.length < 2) {
-      return null;
-    }
-
-    const opcode = chunk[0] & 0x0f;
-    const masked = (chunk[1] & 0x80) === 0x80;
-    let payloadLength = chunk[1] & 0x7f;
-    let offset = 2;
-
-    if (payloadLength === 126) {
-      if (chunk.length < 4) {
-        return null;
-      }
-
-      payloadLength = chunk.readUInt16BE(2);
-      offset = 4;
-    }
-
-    let payload = chunk.subarray(
-      offset + (masked ? 4 : 0),
-      offset + (masked ? 4 : 0) + payloadLength,
-    );
-
-    if (masked) {
-      const mask = chunk.subarray(offset, offset + 4);
-      const unmasked = Buffer.alloc(payload.length);
-
-      for (let index = 0; index < payload.length; index += 1) {
-        unmasked[index] = payload[index] ^ mask[index % 4];
-      }
-
-      payload = unmasked;
-    }
-
-    return {
-      opcode,
-      payload,
-    };
   }
 }

@@ -1,3 +1,30 @@
+// Only transport is replaced: production URL validation remains active.
+jest.mock('../../src/modules/federation/webhook-http', () => {
+  const real = jest.requireActual<
+    typeof import('../../src/modules/federation/webhook-http')
+  >('../../src/modules/federation/webhook-http');
+  return {
+    ...real,
+    postWebhook: async (
+      url: string,
+      body: string,
+      headers: Record<string, string>,
+      signal: AbortSignal,
+    ) => {
+      const match = /^https:\/\/webhook\.fixture\/(\d+)(\/.*)$/.exec(url);
+      if (!match) throw new Error('Unexpected synthetic webhook target');
+      const result = await fetch(`http://127.0.0.1:${match[1]}${match[2]}`, {
+        method: 'POST',
+        body,
+        headers,
+        signal,
+        redirect: 'error',
+      });
+      await result.body?.cancel();
+      return { ok: result.ok, status: result.status };
+    },
+  };
+});
 import { createServer } from 'node:http';
 import { AddressInfo } from 'node:net';
 import { INestApplication } from '@nestjs/common';
@@ -291,7 +318,7 @@ describe('Federation delivery (e2e)', () => {
       webhookServer.listen(0, '127.0.0.1', resolve),
     );
     const webhookAddress = typedValue<AddressInfo>(webhookServer.address());
-    const webhookUrl = `http://127.0.0.1:${webhookAddress.port}/deliveries`;
+    const webhookUrl = `https://webhook.fixture/${webhookAddress.port}/deliveries`;
 
     try {
       const sender = await importSelfAgent(

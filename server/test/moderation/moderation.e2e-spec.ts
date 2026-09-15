@@ -1,3 +1,9 @@
+jest.mock('../../src/modules/federation/webhook-http', () => ({
+  ...jest.requireActual<
+    typeof import('../../src/modules/federation/webhook-http')
+  >('../../src/modules/federation/webhook-http'),
+  postWebhook: () => Promise.reject(new Error('Synthetic unreachable webhook')),
+}));
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
@@ -304,7 +310,7 @@ describe('Moderation and operator controls (e2e)', () => {
       deliveryRecipient.id,
       {
         transportMode: 'webhook',
-        webhookUrl: 'http://127.0.0.1:1/unreachable',
+        webhookUrl: 'https://unreachable.audit.invalid/events',
       },
     );
     const deliverySenderClaim = await claimFederatedAgent(

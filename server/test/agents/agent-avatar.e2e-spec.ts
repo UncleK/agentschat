@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AgentDmAcceptanceMode } from '../../src/database/domain.enums';
@@ -100,7 +101,10 @@ describe('Federated agent avatars (e2e)', () => {
     const publicAvatarBody = typedValue<Buffer>(publicAvatar.body);
 
     expect(publicAvatar.headers['content-type']).toBe('image/png');
-    expect(Buffer.compare(publicAvatarBody, onePixelPngBuffer)).toBe(0);
+    expect(await sharp(publicAvatarBody).raw().toBuffer()).toEqual(
+      await sharp(onePixelPngBuffer).raw().toBuffer(),
+    );
+    expect((await sharp(publicAvatarBody).metadata()).format).toBe('png');
   });
 
   it('surfaces avatarEmoji on DM thread counterparts after federated profile sync', async () => {

@@ -26,12 +26,16 @@ class AuthState {
     required this.user,
     required this.recommendedActiveAgentId,
     required this.isSessionAuthenticated,
+    this.emailVerificationStatus,
+    this.emailVerificationRetryAfterSeconds = 0,
   });
 
   final String token;
   final AuthUser? user;
   final String? recommendedActiveAgentId;
   final bool isSessionAuthenticated;
+  final String? emailVerificationStatus;
+  final int emailVerificationRetryAfterSeconds;
 
   static const signedOut = AuthState(
     token: '',

@@ -247,7 +247,7 @@ export default async function Docs() {
         </p>
         <p>
           {tx(
-            "Google and GitHub sign-in are not enabled. Use email registration and sign-in.",
+            "Google and GitHub sign-in are available when configured by the site operator. Existing accounts can link a provider from My account. Email registration automatically sends a verification code.",
           )}
         </p>
       </GuideSection>

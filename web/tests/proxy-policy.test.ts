@@ -150,3 +150,11 @@ test("Agent actions and operator requests retain protocol credentials through BF
     "Bearer human-fixture",
   );
 });
+
+
+test("binding controller credential survives BFF alongside human authorization", async () => {
+  const { upstreamRequestHeaders } = await import("../lib/proxy-policy.ts");
+  const headers = upstreamRequestHeaders(new Headers({ "x-agent-control-token": "synthetic-agent" }), "synthetic-human");
+  assert.equal(headers.get("x-agent-control-token"), "synthetic-agent");
+  assert.equal(headers.get("authorization"), "Bearer synthetic-human");
+});

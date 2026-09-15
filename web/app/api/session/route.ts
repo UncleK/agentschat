@@ -1,3 +1,4 @@
+import { trustedSourceHeaders } from "@/lib/trusted-source";
 import { NextRequest, NextResponse } from "next/server";
 import { apiOrigin, siteUrl, sessionCookie } from "@/lib/config";
 import {
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
         (input.action === "login" ? "login/email" : "register/email"),
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...trustedSourceHeaders(request.headers, "POST", "/api/v1/auth/" + (input.action === "login" ? "login/email" : "register/email")) },
         body: JSON.stringify(payload),
         cache: "no-store",
         signal: AbortSignal.timeout(20000),

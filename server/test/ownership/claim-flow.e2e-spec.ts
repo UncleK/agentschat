@@ -1,3 +1,6 @@
+import { FederationCredentialsService } from '../../src/modules/federation/federation-credentials.service';
+import { approveBinding } from '../audit/control-test-support';
+import { claimFederatedAgent } from '../federation/support/federation-test-support';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
@@ -205,6 +208,7 @@ describe('Agent claim flow (e2e)', () => {
       ownedOlder.id,
     ]);
     expect(agentsMineResponse.claimableAgents.map(({ id }) => id)).toEqual([
+      blockedByOtherPending.id,
       claimableNewer.id,
       claimableOlder.id,
     ]);
@@ -263,6 +267,13 @@ describe('Agent claim flow (e2e)', () => {
     ]);
     expect(agentsMineResponse.claimableAgents).toMatchObject([
       {
+        id: blockedByOtherPending.id,
+        handle: 'blocked-by-other-pending',
+        displayName: 'Blocked By Other Pending',
+        ownerType: 'self',
+        status: 'offline',
+      },
+      {
         id: claimableNewer.id,
         handle: 'claimable-newer-agent',
         displayName: 'Claimable Newer Agent',
@@ -313,7 +324,7 @@ describe('Agent claim flow (e2e)', () => {
     expect(agentsMineResponse.agents).not.toContainEqual(
       expect.objectContaining({ id: suspendedOwned.id }),
     );
-    expect(agentsMineResponse.claimableAgents).not.toContainEqual(
+    expect(agentsMineResponse.claimableAgents).toContainEqual(
       expect.objectContaining({ id: blockedByOtherPending.id }),
     );
     expect(agentsMineResponse.pendingClaims).not.toContainEqual(
@@ -462,7 +473,7 @@ describe('Agent claim flow (e2e)', () => {
           emergencyStopForumResponses: false,
           emergencyStopLiveResponses: false,
         }) as unknown,
-        status: 'offline',
+        status: 'online',
       }),
     );
     expect(ownedResponse.claimableAgents).not.toContainEqual(
@@ -877,16 +888,20 @@ describe('Agent claim flow (e2e)', () => {
     claimRequestId: string,
     challengeToken: string,
   ): Promise<ClaimConfirmationResponse> {
-    const response = await request(app.getHttpServer())
-      .post(
-        `/api/v1/agents/${agentId}/claim-requests/${claimRequestId}/confirm`,
-      )
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        challengeToken,
-      })
-      .expect(200);
-
+    const control = await claimFederatedAgent(
+      app,
+      app.get(FederationCredentialsService),
+      agentId,
+      { pollingEnabled: true },
+    );
+    const response = await approveBinding(
+      app,
+      accessToken,
+      control.accessToken,
+      agentId,
+      claimRequestId,
+      challengeToken,
+    );
     return typedValue<ClaimConfirmationResponse>(response.body);
   }
 });

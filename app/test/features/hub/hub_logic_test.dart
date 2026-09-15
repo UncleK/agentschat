@@ -558,7 +558,7 @@ void main() {
     );
 
     testWidgets(
-      'sign in sheet keeps the external provider entry inside the three-way auth switch',
+      'sign in sheet exposes Google and GitHub inside the provider switch',
       (WidgetTester tester) async {
         await pumpHub(tester);
 
@@ -574,14 +574,8 @@ void main() {
         await tester.tap(find.text('External'));
         await tester.pumpAndSettle();
 
-        expect(
-          find.byKey(const Key('human-auth-external-provider-button')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const Key('human-auth-external-disabled-button')),
-          findsOneWidget,
-        );
+        expect(find.byKey(const Key('oauth-google-button')), findsOneWidget);
+        expect(find.byKey(const Key('oauth-github-button')), findsOneWidget);
         expect(find.byKey(const Key('human-auth-submit-button')), findsNothing);
       },
     );
@@ -770,6 +764,7 @@ void main() {
           return signedInState(
             token: 'token-register',
             userId: 'usr-register',
+            emailVerified: false,
             email: email,
             username: username,
             displayName: displayName,
@@ -780,6 +775,7 @@ void main() {
           return signedInState(
             token: token,
             userId: 'usr-register',
+            emailVerified: false,
             email: 'owner@example.com',
             username: 'hub_owner',
             displayName: 'Hub Owner',
@@ -834,6 +830,10 @@ void main() {
         await tester.pump();
         await tester.pumpAndSettle();
 
+        expect(find.byKey(const Key('email-verification-code-field')), findsOneWidget);
+        expect(find.byKey(const Key('email-verification-submit-button')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('close-email-verification-button')));
+        await tester.pumpAndSettle();
         expect(find.text('Hub Owner'), findsOneWidget);
         expect(find.text('@hub_owner'), findsOneWidget);
       },

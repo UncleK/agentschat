@@ -1,17 +1,27 @@
+import { randomUUID } from 'node:crypto';
+import {
+  inTransaction,
+  transactionalRepository,
+} from '../../database/transaction-context';
+import { validateWebhookUrl } from './webhook-http';
 import { recordAgentActivity } from './agent-activity';
-import { HttpException, Inject, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  Inject,
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import {
-  AgentOwnerType,
   AgentStatus,
   ConnectionTransportMode,
   FederationActionStatus,
   FollowTargetType,
   SubjectType,
   ThreadContextType,
-  ClaimRequestStatus,
 } from '../../database/domain.enums';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { AgentEntity } from '../../database/entities/agent.entity';
@@ -54,7 +64,7 @@ interface SubmittedActionInput {
 }
 
 @Injectable()
-export class FederationService {
+export class FederationService implements OnModuleInit, OnModuleDestroy {
   private static readonly allowInitialHandleClaimKey =
     'allowInitialHandleClaim';
   private static readonly avatarEmojiMetadataKey = 'avatarEmoji';
@@ -65,7 +75,44 @@ export class FederationService {
   private static readonly avatarUpdatedAtMetadataKey = 'avatarUpdatedAt';
   private static readonly pendingAvatarUploadMetadataKey =
     'pendingAvatarUpload';
-  private readonly actionProcessingByAgentId = new Map<string, Promise<void>>();
+  private recoveryTimer?: NodeJS.Timeout;
+  private readonly runningActions = new Set<Promise<void>>();
+  private scanning = false;
+  private stopped = false;
+
+  onModuleInit(): void {
+    this.recoveryTimer = setInterval(
+      () => {
+        void this.recoverActions();
+      },
+      this.environment.nodeEnv === 'test' ? 50 : 1000,
+    );
+    this.recoveryTimer.unref();
+    void this.recoverActions();
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    this.stopped = true;
+    clearInterval(this.recoveryTimer);
+    await Promise.allSettled([...this.runningActions]);
+  }
+
+  private async recoverActions(): Promise<void> {
+    if (this.stopped || this.scanning || this.runningActions.size >= 4) return;
+    this.scanning = true;
+    try {
+      const rows = await this.dataSource.query<
+        Array<{ id: string; agent_id: string }>
+      >(`SELECT id, agent_id FROM federation_actions
+        WHERE status='accepted' OR (status='processing' AND (lease_expires_at IS NULL OR lease_expires_at<=now()))
+        ORDER BY accepted_at LIMIT 4`);
+      for (const row of rows) this.enqueueAcceptedAction(row.agent_id, row.id);
+    } catch {
+      /* The next persisted sweep retries startup/database failures. */
+    } finally {
+      this.scanning = false;
+    }
+  }
 
   constructor(
     @Inject(APP_ENVIRONMENT)
@@ -91,7 +138,23 @@ export class FederationService {
     private readonly followService: FollowService,
     private readonly federationCredentialsService: FederationCredentialsService,
     private readonly federationDeliveryService: FederationDeliveryService,
-  ) {}
+  ) {
+    this.agentRepository = transactionalRepository(this.agentRepository);
+    this.agentConnectionRepository = transactionalRepository(
+      this.agentConnectionRepository,
+    );
+    this.federationActionRepository = transactionalRepository(
+      this.federationActionRepository,
+    );
+    this.threadRepository = transactionalRepository(this.threadRepository);
+    this.eventRepository = transactionalRepository(this.eventRepository);
+    this.claimRequestRepository = transactionalRepository(
+      this.claimRequestRepository,
+    );
+    this.debateSessionRepository = transactionalRepository(
+      this.debateSessionRepository,
+    );
+  }
 
   async claimAgent(input: ClaimAgentInput) {
     const claimToken = input.claimToken?.trim();
@@ -115,6 +178,7 @@ export class FederationService {
       input.pollingEnabled,
     );
     const webhookUrl = input.webhookUrl?.trim() || null;
+    if (webhookUrl) validateWebhookUrl(webhookUrl);
 
     if (
       (transportMode === ConnectionTransportMode.Webhook ||
@@ -128,87 +192,92 @@ export class FederationService {
       );
     }
 
-    const claimResult = await this.dataSource.transaction(async (manager) => {
-      const agentRepository = manager.getRepository(AgentEntity);
-      const connectionRepository = manager.getRepository(AgentConnectionEntity);
-      let connection = await connectionRepository.findOneBy({
-        agentId: agent.id,
-      });
-
-      if (!connection) {
-        connection = await connectionRepository.save(
-          connectionRepository.create({
-            agentId: agent.id,
-            protocolVersion: 'v1',
-            transportMode,
-            pollingEnabled:
-              transportMode === ConnectionTransportMode.Polling ||
-              transportMode === ConnectionTransportMode.Hybrid,
-            tokenHash: 'pending',
-            capabilities: input.capabilities ?? {},
-          }),
+    const claimResult = await inTransaction(
+      this.dataSource,
+      async (manager) => {
+        const agentRepository = manager.getRepository(AgentEntity);
+        const connectionRepository = manager.getRepository(
+          AgentConnectionEntity,
         );
-      }
+        let connection = await connectionRepository.findOneBy({
+          agentId: agent.id,
+        });
 
-      const accessToken =
-        this.federationCredentialsService.generateAgentAccessToken(
-          connection.id,
-        );
-      const webhookSecret =
-        transportMode === ConnectionTransportMode.Webhook ||
-        transportMode === ConnectionTransportMode.Hybrid
-          ? this.federationCredentialsService.generateWebhookSecret()
+        if (!connection) {
+          connection = await connectionRepository.save(
+            connectionRepository.create({
+              agentId: agent.id,
+              protocolVersion: 'v1',
+              transportMode,
+              pollingEnabled:
+                transportMode === ConnectionTransportMode.Polling ||
+                transportMode === ConnectionTransportMode.Hybrid,
+              tokenHash: 'pending',
+              capabilities: input.capabilities ?? {},
+            }),
+          );
+        }
+
+        const accessToken =
+          this.federationCredentialsService.generateAgentAccessToken(
+            connection.id,
+          );
+        const webhookSecret =
+          transportMode === ConnectionTransportMode.Webhook ||
+          transportMode === ConnectionTransportMode.Hybrid
+            ? this.federationCredentialsService.generateWebhookSecret()
+            : null;
+
+        connection.protocolVersion = 'v1';
+        connection.transportMode = transportMode;
+        connection.webhookUrl = webhookUrl;
+        connection.webhookSecret = webhookSecret;
+        connection.webhookSecretHash = webhookSecret
+          ? this.federationCredentialsService.hashValue(webhookSecret)
           : null;
+        connection.pollingEnabled =
+          transportMode === ConnectionTransportMode.Polling ||
+          transportMode === ConnectionTransportMode.Hybrid;
+        connection.tokenHash =
+          this.federationCredentialsService.hashValue(accessToken);
+        connection.lastSeenAt = new Date();
+        connection.capabilities = input.capabilities ?? {};
 
-      connection.protocolVersion = 'v1';
-      connection.transportMode = transportMode;
-      connection.webhookUrl = webhookUrl;
-      connection.webhookSecret = webhookSecret;
-      connection.webhookSecretHash = webhookSecret
-        ? this.federationCredentialsService.hashValue(webhookSecret)
-        : null;
-      connection.pollingEnabled =
-        transportMode === ConnectionTransportMode.Polling ||
-        transportMode === ConnectionTransportMode.Hybrid;
-      connection.tokenHash =
-        this.federationCredentialsService.hashValue(accessToken);
-      connection.lastSeenAt = new Date();
-      connection.capabilities = input.capabilities ?? {};
+        const persistedAgent = await agentRepository.findOneByOrFail({
+          id: agent.id,
+        });
+        const nextProfileMetadata: Record<string, unknown> =
+          persistedAgent.profileMetadata['invitationPending'] == true
+            ? {
+                ...persistedAgent.profileMetadata,
+                invitationPending: false,
+              }
+            : persistedAgent.profileMetadata;
+        persistedAgent.lastSeenAt = new Date();
+        persistedAgent.profileMetadata = nextProfileMetadata;
+        if (
+          persistedAgent.status === AgentStatus.Offline ||
+          (persistedAgent.sourceType === 'hub_invitation' &&
+            persistedAgent.status === AgentStatus.Suspended)
+        ) {
+          persistedAgent.status = AgentStatus.Online;
+        }
+        await agentRepository.save(persistedAgent);
 
-      const persistedAgent = await agentRepository.findOneByOrFail({
-        id: agent.id,
-      });
-      const nextProfileMetadata: Record<string, unknown> =
-        persistedAgent.profileMetadata['invitationPending'] == true
-          ? {
-              ...persistedAgent.profileMetadata,
-              invitationPending: false,
-            }
-          : persistedAgent.profileMetadata;
-      persistedAgent.lastSeenAt = new Date();
-      persistedAgent.profileMetadata = nextProfileMetadata;
-      if (
-        persistedAgent.status === AgentStatus.Offline ||
-        (persistedAgent.sourceType === 'hub_invitation' &&
-          persistedAgent.status === AgentStatus.Suspended)
-      ) {
-        persistedAgent.status = AgentStatus.Online;
-      }
-      await agentRepository.save(persistedAgent);
+        const savedConnection = await connectionRepository.save(connection);
 
-      const savedConnection = await connectionRepository.save(connection);
-      await this.federationDeliveryService.bindPendingDeliveriesToConnection(
-        agent.id,
-        savedConnection,
-      );
+        return {
+          connection: savedConnection,
+          accessToken,
+          webhookSecret,
+        };
+      },
+    );
 
-      return {
-        connection: savedConnection,
-        accessToken,
-        webhookSecret,
-      };
-    });
-
+    await this.federationDeliveryService.bindPendingDeliveriesToConnection(
+      agent.id,
+      claimResult.connection,
+    );
     return {
       protocolVersion: 'v1',
       agent: {
@@ -379,72 +448,88 @@ export class FederationService {
   }
 
   private async processAcceptedAction(actionId: string): Promise<void> {
-    const action = await this.federationActionRepository.findOneBy({
-      id: actionId,
-    });
-
-    if (!action || action.status !== FederationActionStatus.Accepted) {
-      return;
-    }
-
-    action.status = FederationActionStatus.Processing;
-    action.processingStartedAt = new Date();
-    await this.federationActionRepository.save(action);
-
+    const owner = randomUUID();
+    const claimed = await this.dataSource.query<
+      Array<{ id: string; agent_id: string }>
+    >(
+      `WITH due AS (
+      SELECT id FROM federation_actions WHERE id=$1 AND (status='accepted' OR
+        (status='processing' AND (lease_expires_at IS NULL OR lease_expires_at<=now()))) FOR UPDATE SKIP LOCKED
+      ), claimed AS (UPDATE federation_actions a SET status='processing', processing_started_at=now(), lease_owner=$2,
+        lease_expires_at=now()+interval '30 seconds' FROM due WHERE a.id=due.id RETURNING a.id, a.agent_id) SELECT id, agent_id FROM claimed`,
+      [actionId, owner],
+    );
+    if (!claimed.length) return;
     try {
-      const result = await this.executeAction(action);
-      action.status = FederationActionStatus.Succeeded;
-      action.threadId = result.threadId ?? null;
-      action.eventId = result.eventId ?? null;
-      action.resultPayload = result.resultPayload;
-      action.completedAt = new Date();
-      action.errorPayload = null;
+      await inTransaction(this.dataSource, async (manager) => {
+        // Serialize a single agent across every process. A running transaction
+        // holds the row; an expired lease cannot permit concurrent execution.
+        await manager.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+          [`action:${claimed[0].agent_id}`],
+        );
+        const held = await manager.query<Array<{ id: string }>>(
+          'SELECT id FROM federation_actions WHERE id=$1 AND lease_owner=$2 FOR UPDATE',
+          [actionId, owner],
+        );
+        if (!held.length) return;
+        const repo = manager.getRepository(FederationActionEntity);
+        const action = await repo.findOneByOrFail({ id: actionId });
+        const result = await this.executeAction(action);
+        await repo
+          .createQueryBuilder()
+          .update()
+          .set({
+            status: FederationActionStatus.Succeeded,
+            threadId: result.threadId ?? null,
+            eventId: result.eventId ?? null,
+            resultPayload: () => 'CAST(:result AS jsonb)',
+            completedAt: new Date(),
+            errorPayload: null,
+          })
+          .where('id = :id', { id: action.id })
+          .setParameter('result', JSON.stringify(result.resultPayload))
+          .execute();
+        await manager.query(
+          'UPDATE federation_actions SET lease_owner=NULL, lease_expires_at=NULL WHERE id=$1',
+          [actionId],
+        );
+      });
     } catch (error) {
+      let status = FederationActionStatus.Failed;
+      let payload: Record<string, unknown> = {
+        code: 'internal_error',
+        message: 'Action failed; no business changes were committed.',
+      };
       if (error instanceof FederationActionRejectionError) {
-        action.status = FederationActionStatus.Rejected;
-        action.errorPayload = {
+        status = FederationActionStatus.Rejected;
+        payload = {
           code: error.code,
           message: error.message,
           ...(error.details ? { details: error.details } : {}),
         };
       } else if (error instanceof FederationHttpException) {
-        const response = error.getResponse() as {
-          error: Record<string, unknown>;
-        };
-        action.status = FederationActionStatus.Rejected;
-        action.errorPayload = response.error;
+        status = FederationActionStatus.Rejected;
+        payload = (error.getResponse() as { error: Record<string, unknown> })
+          .error;
       } else if (error instanceof HttpException) {
-        action.status = FederationActionStatus.Rejected;
-        action.errorPayload = this.serializeHttpException(error);
-      } else {
-        action.status = FederationActionStatus.Failed;
-        action.errorPayload = {
-          code: 'internal_error',
-          message:
-            error instanceof Error ? error.message : 'Internal action failure.',
-        };
+        status = FederationActionStatus.Rejected;
+        payload = this.serializeHttpException(error);
       }
-
-      action.completedAt = new Date();
+      await this.dataSource.query(
+        `UPDATE federation_actions SET status=$3, error_payload=$4::jsonb, completed_at=now(),
+        lease_owner=NULL, lease_expires_at=NULL WHERE id=$1 AND lease_owner=$2 AND status='processing'`,
+        [actionId, owner, status, JSON.stringify(payload)],
+      );
     }
-
-    await this.federationActionRepository.save(action);
   }
 
-  private enqueueAcceptedAction(agentId: string, actionId: string): void {
-    const previous = this.actionProcessingByAgentId.get(agentId);
-    const next = (previous ?? Promise.resolve())
+  private enqueueAcceptedAction(_agentId: string, actionId: string): void {
+    if (this.stopped || this.runningActions.size >= 4) return;
+    const work = this.processAcceptedAction(actionId)
       .catch(() => undefined)
-      .then(async () => {
-        await this.processAcceptedAction(actionId);
-      })
-      .finally(() => {
-        if (this.actionProcessingByAgentId.get(agentId) === next) {
-          this.actionProcessingByAgentId.delete(agentId);
-        }
-      });
-
-    this.actionProcessingByAgentId.set(agentId, next);
+      .finally(() => this.runningActions.delete(work));
+    this.runningActions.add(work);
   }
 
   private async recoverConcurrentIdempotentAction(input: {
@@ -515,7 +600,7 @@ export class FederationService {
       case 'debate.spectator.post':
         return this.handleDebateSpectatorPost(action);
       case 'claim.confirm':
-        return this.handleClaimConfirmation(action);
+        return this.handleClaimConfirmation();
       default:
         throw new FederationActionRejectionError(
           'unsupported_action',
@@ -525,7 +610,7 @@ export class FederationService {
   }
 
   private async handleAgentProfileUpdate(action: FederationActionEntity) {
-    return this.dataSource.transaction(async (manager) => {
+    return inTransaction(this.dataSource, async (manager) => {
       const agentRepository = manager.getRepository(AgentEntity);
       const agent = await agentRepository.findOne({
         where: { id: action.agentId },
@@ -627,6 +712,25 @@ export class FederationService {
       }
 
       if (profileMetadata) {
+        // Closed public schema; nested objects cannot smuggle policy/storage fields.
+        const allowed = new Set([
+          'headline',
+          'website',
+          'location',
+          'avatarEmoji',
+        ]);
+        for (const [key, value] of Object.entries(profileMetadata)) {
+          if (
+            !allowed.has(key) ||
+            (value !== null &&
+              (typeof value !== 'string' || value.length > 500))
+          ) {
+            throw new FederationActionRejectionError(
+              'reserved_profile_metadata',
+              `Public profile field is not writable: ${key}`,
+            );
+          }
+        }
         agent.profileMetadata = {
           ...agent.profileMetadata,
           ...profileMetadata,
@@ -1007,133 +1111,11 @@ export class FederationService {
     };
   }
 
-  private async handleClaimConfirmation(action: FederationActionEntity) {
-    const claimRequestId = this.requiredString(
-      action.payload.claimRequestId,
-      'claimRequestId',
+  private handleClaimConfirmation(): never {
+    throw new FederationActionRejectionError(
+      'control_authorization_required',
+      'Account binding requires the trusted management endpoint, an authenticated human, and original control credentials. Social actions cannot authorize binding.',
     );
-    const challengeToken = this.requiredString(
-      action.payload.challengeToken,
-      'challengeToken',
-    );
-    const challengeHash =
-      this.federationCredentialsService.hashValue(challengeToken);
-
-    return this.dataSource.transaction(async (manager) => {
-      const claimRepository = manager.getRepository(ClaimRequestEntity);
-      const agentRepository = manager.getRepository(AgentEntity);
-      const claimRequest = await claimRepository.findOneBy({
-        id: claimRequestId,
-      });
-
-      if (!claimRequest) {
-        throw new FederationActionRejectionError(
-          'claim_request_not_found',
-          `Claim request ${claimRequestId} was not found.`,
-        );
-      }
-
-      if (claimRequest.agentId && claimRequest.agentId !== action.agentId) {
-        throw new FederationActionRejectionError(
-          'claim_request_not_found',
-          `Claim request ${claimRequestId} was not found.`,
-        );
-      }
-
-      if (claimRequest.status !== ClaimRequestStatus.Pending) {
-        throw new FederationActionRejectionError(
-          'claim_request_not_pending',
-          'Only pending claim requests can be confirmed.',
-        );
-      }
-
-      if (claimRequest.expiresAt.getTime() <= Date.now()) {
-        claimRequest.status = ClaimRequestStatus.Expired;
-        await claimRepository.save(claimRequest);
-        throw new FederationActionRejectionError(
-          'claim_request_expired',
-          'The claim request challenge has expired.',
-        );
-      }
-
-      if (claimRequest.challengeTokenHash !== challengeHash) {
-        throw new FederationActionRejectionError(
-          'invalid_claim_challenge',
-          'The claim challenge confirmation is invalid.',
-        );
-      }
-
-      const agent = await agentRepository.findOneBy({ id: action.agentId });
-
-      if (!agent) {
-        throw new FederationActionRejectionError(
-          'agent_not_found',
-          `Agent ${action.agentId} was not found.`,
-        );
-      }
-
-      if (agent.ownerType !== AgentOwnerType.Self) {
-        throw new FederationActionRejectionError(
-          'claim_requires_self_owned_agent',
-          'Only self-owned agents can be claimed.',
-        );
-      }
-
-      const conflictingPendingRequest = await claimRepository.findOne({
-        where: {
-          agentId: action.agentId,
-          status: ClaimRequestStatus.Pending,
-        },
-        order: {
-          createdAt: 'DESC',
-        },
-      });
-      if (
-        conflictingPendingRequest &&
-        conflictingPendingRequest.id !== claimRequest.id &&
-        conflictingPendingRequest.requestedByUserId !==
-          claimRequest.requestedByUserId
-      ) {
-        throw new FederationActionRejectionError(
-          'claim_request_conflict',
-          'Another pending claim request already exists for this agent.',
-        );
-      }
-
-      agent.ownerType = AgentOwnerType.Human;
-      agent.ownerUserId = claimRequest.requestedByUserId;
-      claimRequest.agentId = action.agentId;
-      claimRequest.status = ClaimRequestStatus.Confirmed;
-      claimRequest.confirmedAt = new Date();
-      await agentRepository.save(agent);
-      await claimRepository.save(claimRequest);
-      await claimRepository
-        .createQueryBuilder()
-        .update(ClaimRequestEntity)
-        .set({
-          status: ClaimRequestStatus.Expired,
-          rejectedAt: claimRequest.confirmedAt,
-          rejectionReason: 'agent_claimed',
-        })
-        .where('agent_id = :agentId', { agentId: action.agentId })
-        .andWhere('id <> :claimRequestId', {
-          claimRequestId: claimRequest.id,
-        })
-        .andWhere('status = :status', {
-          status: ClaimRequestStatus.Pending,
-        })
-        .execute();
-
-      return {
-        resultPayload: {
-          agentId: agent.id,
-          ownerType: agent.ownerType,
-          ownerUserId: agent.ownerUserId,
-          claimRequestId: claimRequest.id,
-          claimStatus: claimRequest.status,
-        },
-      };
-    });
   }
 
   private serializeAction(action: FederationActionEntity) {

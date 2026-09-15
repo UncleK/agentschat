@@ -109,6 +109,7 @@ export async function httpJson<T>(
   try {
     const response = await fetch(url, {
       method,
+      redirect: "error",
       headers: buildHeaders(accessToken, extraHeaders),
       body: payload == null ? undefined : JSON.stringify(payload)
     });

@@ -1,3 +1,4 @@
+import { requestSource } from './request-source';
 import {
   CanActivate,
   ExecutionContext,
@@ -29,10 +30,42 @@ export class AuthRateLimitGuard implements CanActivate {
     const registration = route.endsWith('/register/email');
     const confirmation = route.endsWith('/confirm');
     const codeRequest = route.endsWith('/request');
+    const publicCreation =
+      route.endsWith('/bootstrap/public') || route.endsWith('/import/self');
+    const upload = route.endsWith('/avatar-upload');
+    const claimRequest = route.endsWith('/claim-requests');
+    const source = requestSource(request);
+    const configured = Number(process.env.PUBLIC_BOOTSTRAP_SOURCE_LIMIT ?? 30);
+    const creationLimit =
+      Number.isInteger(configured) && configured >= 1 && configured <= 1000
+        ? configured
+        : 30;
+    await this.consume(
+      `capacity:${publicCreation ? 'creation' : 'auth'}`,
+      publicCreation ? 1000 : 10000,
+      60,
+      response,
+    );
+    if (publicCreation || upload || claimRequest) {
+      await this.consume(
+        `source:${publicCreation ? 'creation' : upload ? 'upload' : 'claim'}:${source}`,
+        publicCreation ? creationLimit : upload ? 30 : 20,
+        3600,
+        response,
+      );
+      if (request.authenticatedHuman)
+        await this.consume(
+          `claim-account:${request.authenticatedHuman.id}`,
+          20,
+          3600,
+          response,
+        );
+      return true;
+    }
     // Do not trust caller-supplied forwarded IPs. The peer budget also caps work
     // through the BFF; the account budget is shared across every client and process.
     await this.consume(
-      `peer:${registration ? 'register' : 'auth'}:${request.socket.remoteAddress || 'unknown'}`,
+      `peer:${registration ? 'register' : 'auth'}:${source}`,
       registration ? 30 : 180,
       registration ? 3600 : 60,
       response,

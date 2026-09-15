@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/auth/auth_repository.dart';
+import '../../core/auth/oauth_buttons.dart';
 import '../../core/locale/app_locale.dart';
 import '../../core/locale/app_locale_scope.dart';
 import '../../core/locale/app_localization_extensions.dart';
@@ -228,6 +229,21 @@ class _HubScreenState extends State<HubScreen> {
     };
 
     await session.authenticate(authState);
+    if (mode == _HumanAuthMode.register &&
+        !authState.emailVerified &&
+        mounted) {
+      await showSwipeBackSheet<String>(
+        context: context,
+        builder: (_) => _EmailVerificationSheet(
+          authRepository: authRepository,
+          email: authState.email,
+          onVerified: () => session.bootstrap(),
+          registrationStatus: authState.emailVerificationStatus,
+          initialRetryAfterSeconds:
+              authState.emailVerificationRetryAfterSeconds,
+        ),
+      );
+    }
 
     return switch (mode) {
       _HumanAuthMode.signIn => localizedAppText(
@@ -237,7 +253,7 @@ class _HubScreenState extends State<HubScreen> {
         zhHans: '已登录为 ${authState.displayName}。',
       ),
       _HumanAuthMode.register =>
-        authState.emailVerified
+        session.authState.emailVerified
             ? localizedAppText(
                 key: 'msgCreatedAccountForAuthStateDisplayNameac40bd2e',
                 args: <String, Object?>{
@@ -269,6 +285,7 @@ class _HubScreenState extends State<HubScreen> {
       context: context,
       builder: (context) => _HumanAuthSheet(
         initialMode: mode,
+        session: session,
         authRepository: session.authRepository,
         onSubmit: _submitHumanAuth,
       ),
@@ -1148,6 +1165,31 @@ class _HubScreenState extends State<HubScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 _HubMenuRow(
+                  rowKey: const Key('human-auth-providers-button'),
+                  accentColor: AppColors.primary,
+                  icon: Icons.link_rounded,
+                  title: context.localizedText(
+                    key: 'oauthLoginMethods',
+                    en: 'Sign-in methods',
+                    zhHans: '登录方式',
+                  ),
+                  subtitle: 'Google / GitHub',
+                  enabled: true,
+                  onTap: () {
+                    final session = AppSessionScope.read(context);
+                    unawaited(
+                      showSwipeBackSheet<void>(
+                        context: context,
+                        builder: (_) => Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: OAuthButtons(session: session, link: true),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                _HubMenuRow(
                   rowKey: const Key('human-auth-logout-button'),
                   accentColor: AppColors.error,
                   icon: Icons.logout_rounded,
@@ -1953,6 +1995,21 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
       };
 
       await widget.session.authenticate(authState);
+      if (_authMode == _HumanAuthMode.register &&
+          !authState.emailVerified &&
+          mounted) {
+        await showSwipeBackSheet<String>(
+          context: context,
+          builder: (_) => _EmailVerificationSheet(
+            authRepository: authRepository,
+            email: authState.email,
+            onVerified: () => widget.session.bootstrap(),
+            registrationStatus: authState.emailVerificationStatus,
+            initialRetryAfterSeconds:
+                authState.emailVerificationRetryAfterSeconds,
+          ),
+        );
+      }
       if (!mounted) {
         return;
       }
@@ -2919,10 +2976,9 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                     : AppColors.primaryFixed,
                 text: isExternal
                     ? context.localizedText(
-                        key:
-                            'msgExternalLoginRemainsVisibleButThisProviderHandoffIsStill18303f66',
-                        en: 'External login remains visible, but this provider handoff is still disabled.',
-                        zhHans: '外部登录入口会继续显示，但当前还不能完成供应方跳转。',
+                        key: 'oauthProviderBrowserHandoff',
+                        en: 'Continue with Google or GitHub in your browser.',
+                        zhHans: '通过浏览器使用 Google 或 GitHub 继续登录。',
                       )
                     : isRegister
                     ? context.localizedText(
@@ -2940,9 +2996,10 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
               ),
               const SizedBox(height: AppSpacing.lg),
               if (isExternal)
-                _buildExternalAuthDisabledCard()
+                _buildOAuthButtons()
               else
                 _buildInlineCommandAuthFields(isRegister),
+              if (!isExternal) _buildOAuthButtons(),
               if (_authError != null) ...[
                 const SizedBox(height: AppSpacing.md),
                 Text(
@@ -2971,9 +3028,9 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
                               )
                             : isRegister
                             ? context.localizedText(
-                                key: 'msgCreateIdentity8455c438',
-                                en: 'Create identity',
-                                zhHans: '创建身份',
+                                key: 'registrationSendVerification',
+                                en: 'Register and send code',
+                                zhHans: '注册并发送验证码',
                               )
                             : context.localizedText(
                                 key: 'msgInitializeSessionf08b42db',
@@ -3020,61 +3077,15 @@ class _OwnedAgentCommandSheetState extends State<_OwnedAgentCommandSheet> {
     );
   }
 
-  Widget _buildExternalAuthDisabledCard() {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceHighest.withValues(alpha: 0.24),
-        borderRadius: AppRadii.large,
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.12)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.localizedText(
-                key: 'msgExternalProvider9688c16b',
-                en: 'External provider',
-                zhHans: '外部提供方',
-              ),
-              key: const Key('human-auth-external-provider-button'),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              context.localizedText(
-                key: 'msgUseSignInOrCreateForNowExternalLoginStaysb2249804',
-                en: 'Use Sign in or Create for now. External login stays visible here for future rollout.',
-                zhHans: '当前请先使用“登录”或“创建”。外部登录入口会保留在这里，供后续正式开放。',
-              ),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.onSurfaceMuted),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            SizedBox(
-              width: double.infinity,
-              child: Opacity(
-                opacity: 0.5,
-                child: IgnorePointer(
-                  ignoring: true,
-                  child: PrimaryGradientButton(
-                    key: const Key('human-auth-external-disabled-button'),
-                    label: context.localizedText(
-                      key: 'msgExternalLoginComingSoonea7143cb',
-                      en: 'External login coming soon',
-                      zhHans: '外部登录即将开放',
-                    ),
-                    icon: Icons.hub_rounded,
-                    onPressed: () {},
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+  Widget _buildOAuthButtons() {
+    return OAuthButtons(
+      session: widget.session,
+      onCompleted: () async {
+        if (mounted) {
+          setState(() => _isLoadingThread = true);
+          await _loadCommandThread();
+        }
+      },
     );
   }
 
@@ -7096,10 +7107,14 @@ class _EmailVerificationSheet extends StatefulWidget {
     required this.authRepository,
     required this.email,
     required this.onVerified,
+    this.registrationStatus,
+    this.initialRetryAfterSeconds = 0,
   });
 
   final AuthRepository authRepository;
   final String email;
+  final String? registrationStatus;
+  final int initialRetryAfterSeconds;
   final Future<void> Function() onVerified;
 
   @override
@@ -7112,6 +7127,8 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
   bool _isRequestingCode = false;
   bool _isSubmitting = false;
   bool _hasRequestedCode = false;
+  int _retryAfter = 0;
+  Timer? _resendTimer;
   String? _statusMessage;
   String? _errorMessage;
 
@@ -7119,16 +7136,22 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
   void initState() {
     super.initState();
     _codeController = TextEditingController();
+    _hasRequestedCode = widget.registrationStatus == 'sent';
+    _retryAfter = widget.initialRetryAfterSeconds;
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _retryAfter > 0) setState(() => _retryAfter--);
+    });
   }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _codeController.dispose();
     super.dispose();
   }
 
   Future<void> _requestCode() async {
-    if (_isRequestingCode) {
+    if (_isRequestingCode || _retryAfter > 0) {
       return;
     }
 
@@ -7146,6 +7169,7 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
       setState(() {
         _isRequestingCode = false;
         _hasRequestedCode = true;
+        _retryAfter = 60;
         _statusMessage = message;
       });
     } on ApiException catch (error) {
@@ -7244,6 +7268,22 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (widget.registrationStatus != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          context.localizedText(
+                            key:
+                                'registrationVerification${widget.registrationStatus}',
+                            en: widget.registrationStatus == 'sent'
+                                ? 'Account created. A verification code has been sent to your email.'
+                                : 'Account created, but the email could not be sent. Retry below; do not register again.',
+                            zhHans: widget.registrationStatus == 'sent'
+                                ? '账号已创建，验证码已发送到你的邮箱。'
+                                : '账号已创建，但验证码暂未发送成功。请点击重新发送，无需重复注册。',
+                          ),
+                        ),
+                      ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -7313,12 +7353,14 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
                           child: Opacity(
                             opacity: _isRequestingCode ? 0.6 : 1,
                             child: IgnorePointer(
-                              ignoring: _isRequestingCode,
+                              ignoring: _isRequestingCode || _retryAfter > 0,
                               child: PrimaryGradientButton(
                                 key: const Key(
                                   'email-verification-request-button',
                                 ),
-                                label: _isRequestingCode
+                                label: _retryAfter > 0
+                                    ? '${context.localizedText(key: 'registrationResendCode', en: 'Resend code', zhHans: '重新发送验证码')} (${_retryAfter}s)'
+                                    : _isRequestingCode
                                     ? context.localizedText(
                                         key: 'msgSendingCodea904ce15',
                                         en: 'Sending code',
@@ -7430,11 +7472,13 @@ class _EmailVerificationSheetState extends State<_EmailVerificationSheet> {
 class _HumanAuthSheet extends StatefulWidget {
   const _HumanAuthSheet({
     required this.initialMode,
+    required this.session,
     required this.authRepository,
     required this.onSubmit,
   });
 
   final _HumanAuthMode initialMode;
+  final AppSessionController session;
   final AuthRepository authRepository;
   final Future<String> Function({
     required _HumanAuthMode mode,
@@ -7720,18 +7764,15 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                           Text(
                             isExternal
                                 ? context.localizedText(
-                                    key:
-                                        'msgKeepThisEntryVisibleInsideTheHumanSignInFlow1b817627',
-                                    en: 'Keep this entry visible inside the human sign-in flow. External providers are not open yet.',
-                                    zhHans:
-                                        '先保留这个外部登录入口在人类登录流程中，当前外部身份提供方还未开放。',
+                                    key: 'oauthSystemBrowserAuthorization',
+                                    en: 'Use Google or GitHub to sign in securely in your browser.',
+                                    zhHans: '通过系统浏览器使用 Google 或 GitHub 登录。',
                                   )
                                 : isRegister
                                 ? context.localizedText(
-                                    key:
-                                        'msgCreateAHumanAccountAndSignInImmediatelySoOwned6a69e0e7',
-                                    en: 'Create a human account and sign in immediately so owned agents can attach to it.',
-                                    zhHans: '先创建一个人类账号并立即登录，这样你的自有智能体才能绑定到它。',
+                                    key: 'registrationAutomaticVerification',
+                                    en: 'Create an account and receive a verification code automatically.',
+                                    zhHans: '创建账号后会自动发送邮箱验证码。',
                                   )
                                 : context.localizedText(
                                     key:
@@ -7821,10 +7862,9 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                       : AppColors.primaryFixed,
                   text: isExternal
                       ? context.localizedText(
-                          key:
-                              'msgThisProviderLaneStaysVisibleForFutureExternalIdentityLogin86c30229',
-                          en: 'This provider lane stays visible for future external identity login, but the backend handoff is intentionally disabled today.',
-                          zhHans: '这个入口会为未来的外部身份登录保留，但今天后端接入仍然是关闭状态。',
+                          key: 'oauthProviderBrowserFlow',
+                          en: 'Continue with Google or GitHub in your browser.',
+                          zhHans: '通过浏览器使用 Google 或 GitHub 继续登录。',
                         )
                       : isRegister
                       ? context.localizedText(
@@ -7842,66 +7882,11 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 if (isExternal)
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLow.withValues(alpha: 0.72),
-                      borderRadius: AppRadii.large,
-                      border: Border.all(
-                        color: AppColors.outline.withValues(alpha: 0.16),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            context.localizedText(
-                              key: 'msgHubHumanAuthExternalProvider',
-                              en: 'External provider',
-                              zhHans: '外部身份提供方',
-                            ),
-                            key: const Key(
-                              'human-auth-external-provider-button',
-                            ),
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            context.localizedText(
-                              key:
-                                  'msgThisAppStillKeepsTheEntryVisibleForFutureOAuth32751808',
-                              en: 'This app still keeps the entry visible for future OAuth or partner login, but it cannot be used yet.',
-                              zhHans: '应用先保留这个入口，用于未来 OAuth 或合作方登录；当前还不能实际使用。',
-                            ),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: AppColors.onSurfaceMuted),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          SizedBox(
-                            width: double.infinity,
-                            child: Opacity(
-                              opacity: 0.5,
-                              child: IgnorePointer(
-                                ignoring: true,
-                                child: PrimaryGradientButton(
-                                  key: const Key(
-                                    'human-auth-external-disabled-button',
-                                  ),
-                                  label: context.localizedText(
-                                    key: 'msgExternalLoginComingSoonea7143cb',
-                                    en: 'External login coming soon',
-                                    zhHans: '外部登录即将开放',
-                                  ),
-                                  icon: Icons.hub_rounded,
-                                  onPressed: () {},
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  OAuthButtons(
+                    session: widget.session,
+                    onCompleted: () async {
+                      if (mounted) Navigator.of(context).pop('');
+                    },
                   )
                 else
                   DecoratedBox(
@@ -8044,16 +8029,14 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                       : AppColors.primary,
                   text: isExternal
                       ? context.localizedText(
-                          key:
-                              'msgThisPageIsIntentionallyNonInteractiveForNowKeepUsing296bb928',
-                          en: 'This page is intentionally non-interactive for now. Keep using Sign in or Create until external login opens.',
-                          zhHans: '这个页面目前刻意保持不可交互，请继续使用“登录”或“创建”，直到外部登录正式开放。',
+                          key: 'oauthReturnToApp',
+                          en: 'Authorize in your browser, then return here to finish signing in.',
+                          zhHans: '在浏览器完成授权后返回 App，继续使用同一个账号。',
                         )
                       : context.localizedText(
-                          key:
-                              'msgThisSheetUsesTheRealAuthRepositoryNoPreviewOnlyba56ec6c',
-                          en: 'This sheet uses the real auth repository. No preview-only login path is left in the visible UI.',
-                          zhHans: '这个面板已经接入真实认证仓库，界面里不再保留仅预览用的登录路径。',
+                          key: 'oauthAccountContinuity',
+                          en: 'Use the same account on the website and in the app.',
+                          zhHans: '网站与 App 共用同一个账号。',
                         ),
                 ),
                 if (_errorMessage != null) ...[
@@ -8068,6 +8051,13 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                 ],
                 const SizedBox(height: AppSpacing.xl),
                 if (!isExternal) ...[
+                  OAuthButtons(
+                    session: widget.session,
+                    onCompleted: () async {
+                      if (mounted) Navigator.of(context).pop('');
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
                   SizedBox(
                     width: double.infinity,
                     child: Opacity(
@@ -8084,9 +8074,9 @@ class _HumanAuthSheetState extends State<_HumanAuthSheet> {
                                 )
                               : isRegister
                               ? context.localizedText(
-                                  key: 'msgCreateIdentity8455c438',
-                                  en: 'Create identity',
-                                  zhHans: '创建身份',
+                                  key: 'registrationSendVerification',
+                                  en: 'Register and send code',
+                                  zhHans: '注册并发送验证码',
                                 )
                               : context.localizedText(
                                   key: 'msgInitializeSessionf08b42db',

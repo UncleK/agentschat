@@ -1,3 +1,9 @@
+import { UserEntity } from '../../database/entities/user.entity';
+import {
+  sanitizeAvatar,
+  AVATAR_MAX_BYTES,
+  AVATAR_MIME_TYPES,
+} from '../assets/avatar-raster';
 import {
   BadRequestException,
   ConflictException,
@@ -32,6 +38,7 @@ import {
 import { AgentPolicyEntity } from '../../database/entities/agent-policy.entity';
 import { AgentEntity } from '../../database/entities/agent.entity';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
+import { AuditLogEntity } from '../../database/entities/audit-log.entity';
 import { ClaimRequestEntity } from '../../database/entities/claim-request.entity';
 import { EventEntity } from '../../database/entities/event.entity';
 import { DeliveryEntity } from '../../database/entities/delivery.entity';
@@ -504,33 +511,31 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   async readMine(owner: AuthenticatedHuman): Promise<AgentsMineResponse> {
     await this.expireStaleClaimRequests(this.claimRequestRepository);
 
-    const [agents, selfOwnedAgents, pendingClaims, otherPendingClaimAgentIds] =
-      await Promise.all([
-        this.findEligibleOwnedAgents(owner.id),
-        this.agentRepository.find({
-          where: {
-            ownerType: AgentOwnerType.Self,
-          },
-          order: {
-            updatedAt: 'DESC',
-            createdAt: 'DESC',
-          },
-        }),
-        this.claimRequestRepository.find({
-          relations: {
-            agent: true,
-          },
-          where: {
-            requestedByUserId: owner.id,
-            status: ClaimRequestStatus.Pending,
-          },
-          order: {
-            createdAt: 'DESC',
-            updatedAt: 'DESC',
-          },
-        }),
-        this.findOtherPendingClaimAgentIds(owner.id),
-      ]);
+    const [agents, selfOwnedAgents, pendingClaims] = await Promise.all([
+      this.findEligibleOwnedAgents(owner.id),
+      this.agentRepository.find({
+        where: {
+          ownerType: AgentOwnerType.Self,
+        },
+        order: {
+          updatedAt: 'DESC',
+          createdAt: 'DESC',
+        },
+      }),
+      this.claimRequestRepository.find({
+        relations: {
+          agent: true,
+        },
+        where: {
+          requestedByUserId: owner.id,
+          status: ClaimRequestStatus.Pending,
+        },
+        order: {
+          createdAt: 'DESC',
+          updatedAt: 'DESC',
+        },
+      }),
+    ]);
 
     const pendingClaimAgentIds = new Set(
       pendingClaims
@@ -541,11 +546,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return {
       agents: agents.map((agent) => this.serializeAgentSummary(agent)),
       claimableAgents: selfOwnedAgents
-        .filter(
-          (agent) =>
-            !pendingClaimAgentIds.has(agent.id) &&
-            !otherPendingClaimAgentIds.has(agent.id),
-        )
+        .filter((agent) => !pendingClaimAgentIds.has(agent.id))
         .map((agent) => this.serializeAgentSummary(agent)),
       pendingClaims: pendingClaims.map((claimRequest) =>
         this.serializePendingClaim(claimRequest),
@@ -647,7 +648,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     const pendingUpload = this.readPendingAvatarUpload(
       persistedAgent.profileMetadata,
     );
-    if (!pendingUpload) {
+    if (!pendingUpload || !this.isOwnAvatarReference(agent.id, pendingUpload)) {
       throw new ConflictException(
         'No pending agent avatar upload exists for this slot.',
       );
@@ -680,13 +681,30 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
+    if (storedObject.byteSize > AVATAR_MAX_BYTES)
+      throw new ForbiddenException('Avatar byte limit exceeded.');
+    const original = await this.assetStorageService.readObject({
+      bucket: pendingUpload.bucket,
+      key: pendingUpload.key,
+      maxBytes: AVATAR_MAX_BYTES,
+    });
+    if (!original) throw new ConflictException('Avatar upload disappeared.');
+    const raster = await sanitizeAvatar(original.body);
+    // Never publish the presigned writable object. Store a distinct server-only copy.
+    const publicKey = this.buildAgentAvatarObjectKey(agent.id, 'verified.png');
+    await this.assetStorageService.writeObject({
+      bucket: pendingUpload.bucket,
+      key: publicKey,
+      mimeType: 'image/png',
+      body: raster,
+    });
     const updatedAt = new Date();
     persistedAgent.profileMetadata = this.withStoredAvatarMetadata(
       this.clearPendingAvatarUpload(persistedAgent.profileMetadata),
       {
         bucket: pendingUpload.bucket,
-        key: pendingUpload.key,
-        mimeType,
+        key: publicKey,
+        mimeType: 'image/png',
         updatedAt: updatedAt.toISOString(),
       },
     );
@@ -698,7 +716,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
 
     return {
       avatarUrl: persistedAgent.avatarUrl,
-      mimeType,
+      mimeType: 'image/png',
       updatedAt: updatedAt.toISOString(),
     };
   }
@@ -715,7 +733,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     const storedAvatar = this.readStoredAvatarMetadata(agent.profileMetadata);
-    if (!storedAvatar) {
+    if (!storedAvatar || !this.isOwnAvatarReference(agentId, storedAvatar)) {
       throw new NotFoundException(
         `Agent ${agentId} does not have an uploaded avatar.`,
       );
@@ -724,6 +742,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     const object = await this.assetStorageService.readObject({
       bucket: storedAvatar.bucket,
       key: storedAvatar.key,
+      maxBytes: AVATAR_MAX_BYTES,
     });
 
     if (!object) {
@@ -732,12 +751,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    return {
-      body: object.body,
-      mimeType:
-        storedAvatar.mimeType || object.mimeType || 'application/octet-stream',
-      byteSize: object.byteSize,
-    };
+    // Legacy objects take the same decoder path; old SVG/corrupt objects fail closed.
+    const body = await sanitizeAvatar(object.body);
+    return { body, mimeType: 'image/png', byteSize: body.byteLength };
   }
 
   async disconnectConnectedAgents(
@@ -1131,16 +1147,6 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
           createdAt: 'DESC',
         },
       });
-      const conflictingPendingRequest = existingPendingRequests.find(
-        (claimRequest) => claimRequest.requestedByUserId !== owner.id,
-      );
-
-      if (conflictingPendingRequest) {
-        throw new ConflictException(
-          'Another pending claim request already exists for this agent.',
-        );
-      }
-
       const reusablePendingRequests = existingPendingRequests.filter(
         (claimRequest) => claimRequest.requestedByUserId === owner.id,
       );
@@ -1269,88 +1275,214 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  async previewClaim(
+    owner: AuthenticatedHuman,
+    agentId: string,
+    requestId: string,
+    token?: string,
+  ) {
+    await this.assertControlToken(agentId, token);
+    const claim = await this.claimRequestRepository.findOneBy({
+      id: requestId,
+    });
+    if (
+      !claim ||
+      claim.requestedByUserId !== owner.id ||
+      (claim.agentId && claim.agentId !== agentId)
+    ) {
+      throw new ForbiddenException(
+        'Binding request does not match this account and agent.',
+      );
+    }
+    if (
+      claim.status !== ClaimRequestStatus.Pending ||
+      claim.expiresAt.getTime() <= Date.now()
+    ) {
+      throw new ConflictException('Binding request is no longer pending.');
+    }
+    return {
+      purpose: 'bind_account',
+      requestId,
+      agentId,
+      accountId: owner.id,
+      account: { username: owner.username, displayName: owner.displayName },
+      expiresAt: claim.expiresAt,
+      managementScope:
+        'Manage this agent and read its existing private conversations. Identity and visibility are preserved.',
+    };
+  }
+
+  async cancelClaim(owner: AuthenticatedHuman, requestId: string) {
+    const result = await this.claimRequestRepository
+      .createQueryBuilder()
+      .update()
+      .set({
+        status: ClaimRequestStatus.Rejected,
+        rejectedAt: new Date(),
+        rejectionReason: 'withdrawn_by_applicant',
+      })
+      .where(
+        'id = :id AND requested_by_user_id = :owner AND status = :pending',
+        {
+          id: requestId,
+          owner: owner.id,
+          pending: ClaimRequestStatus.Pending,
+        },
+      )
+      .execute();
+    if (result.affected !== 1)
+      throw new ConflictException('No matching pending request.');
+    return { status: 'rejected' };
+  }
+
+  private async assertControlToken(agentId: string, token?: string) {
+    if (!token)
+      throw new ForbiddenException(
+        'Original agent control credential and explicit operator approval are required. Use the trusted management CLI; lost credentials require recovery, never a new identity.',
+      );
+    const control =
+      await this.federationCredentialsService.authenticateAgentToken(token);
+    if (control.id !== agentId)
+      throw new ForbiddenException(
+        'Control credential belongs to another agent.',
+      );
+    return control;
+  }
+
   async confirmClaim(
     owner: AuthenticatedHuman,
     agentId: string,
     claimRequestId: string,
     challengeToken: string,
+    controlToken?: string,
+    authorization?: {
+      purpose?: string;
+      accountId?: string;
+      agentId?: string;
+      approved?: boolean;
+    },
   ) {
-    if (!challengeToken?.trim()) {
-      throw new BadRequestException('challengeToken is required.');
-    }
-
-    const claimRequest = await this.claimRequestRepository.findOneBy({
-      id: claimRequestId,
-      agentId,
-    });
-
-    if (!claimRequest) {
-      throw new NotFoundException(
-        `Claim request ${claimRequestId} was not found.`,
-      );
-    }
-
-    if (claimRequest.requestedByUserId !== owner.id) {
-      throw new ForbiddenException(
-        'Claim requests can only be confirmed by the requesting human.',
-      );
-    }
-
-    if (claimRequest.status !== ClaimRequestStatus.Pending) {
-      throw new ConflictException(
-        'Only pending claim requests can be confirmed.',
-      );
-    }
-
-    if (claimRequest.expiresAt.getTime() <= Date.now()) {
-      claimRequest.status = ClaimRequestStatus.Expired;
-      await this.claimRequestRepository.save(claimRequest);
-      throw new ConflictException('The claim request challenge has expired.');
-    }
-
+    const control = await this.assertControlToken(agentId, controlToken);
     if (
-      claimRequest.challengeTokenHash !== this.hashToken(challengeToken.trim())
+      authorization?.purpose !== 'bind_account' ||
+      authorization.accountId !== owner.id ||
+      authorization.agentId !== agentId ||
+      authorization.approved !== true
     ) {
       throw new ForbiddenException(
-        'The claim challenge confirmation is invalid.',
+        'Explicit approval must name this account, agent, and bind_account purpose.',
       );
     }
-
-    const confirmedAt = new Date();
-
-    await this.dataSource.transaction(async (manager) => {
-      const agentRepository = manager.getRepository(AgentEntity);
-      const claimRepository = manager.getRepository(ClaimRequestEntity);
-      const agent = await agentRepository.findOneBy({ id: agentId });
-
-      if (!agent) {
-        throw new NotFoundException(`Agent ${agentId} was not found.`);
+    if (!challengeToken?.trim())
+      throw new BadRequestException('challengeToken is required.');
+    return this.dataSource.transaction(async (manager) => {
+      // Common lock order: human, agent, connection, request. Recheck credential under
+      // the connection lock so a concurrent revocation cannot authorize a bind.
+      const account = await manager.getRepository(UserEntity).findOne({
+        where: { id: owner.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (
+        !account ||
+        !owner.authenticatedSession ||
+        account.authTokenVersion !== owner.authenticatedSession.version ||
+        owner.authenticatedSession.expiresAt <= Date.now()
+      ) {
+        throw new ForbiddenException(
+          'Human session expired or was revoked; log in again.',
+        );
       }
-
-      if (agent.ownerType !== AgentOwnerType.Self) {
-        throw new ConflictException('Only self-owned agents can be claimed.');
+      const agents = manager.getRepository(AgentEntity);
+      const claims = manager.getRepository(ClaimRequestEntity);
+      const agent = await agents.findOne({
+        where: { id: agentId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!agent) throw new NotFoundException('Agent not found.');
+      const connection = await manager
+        .getRepository(AgentConnectionEntity)
+        .findOne({
+          where: { id: control.connectionId, agentId },
+          lock: { mode: 'pessimistic_write' },
+        });
+      if (!connection || connection.tokenHash !== this.hashToken(controlToken!))
+        throw new ForbiddenException('Control credential was revoked.');
+      const claimRequest = await claims.findOne({
+        where: { id: claimRequestId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!claimRequest)
+        throw new NotFoundException('Binding request not found.');
+      if (
+        claimRequest.requestedByUserId !== owner.id ||
+        (claimRequest.agentId && claimRequest.agentId !== agentId)
+      ) {
+        throw new ForbiddenException('Binding request scope does not match.');
       }
-
+      if (
+        claimRequest.status !== ClaimRequestStatus.Pending ||
+        claimRequest.expiresAt.getTime() <= Date.now() ||
+        agent.ownerType !== AgentOwnerType.Self
+      ) {
+        throw new ConflictException(
+          'Request is expired, consumed, or the agent is already bound.',
+        );
+      }
+      if (
+        claimRequest.challengeTokenHash !==
+        this.hashToken(challengeToken.trim())
+      )
+        throw new ForbiddenException('Invalid binding challenge.');
       agent.ownerType = AgentOwnerType.Human;
       agent.ownerUserId = owner.id;
-      await agentRepository.save(agent);
-
+      // Update only ownership: preserve all social history, credentials and visibility.
+      await agents.update(agentId, {
+        ownerType: agent.ownerType,
+        ownerUserId: owner.id,
+      });
+      claimRequest.agentId = agentId;
       claimRequest.status = ClaimRequestStatus.Confirmed;
-      claimRequest.confirmedAt = confirmedAt;
-      await claimRepository.save(claimRequest);
+      claimRequest.confirmedAt = new Date();
+      await claims.update(claimRequest.id, {
+        agentId,
+        status: claimRequest.status,
+        confirmedAt: claimRequest.confirmedAt,
+      });
+      claimRequest.agent = agent;
+      await claims
+        .createQueryBuilder()
+        .update()
+        .set({
+          status: ClaimRequestStatus.Expired,
+          rejectedAt: claimRequest.confirmedAt,
+          rejectionReason: 'agent_bound',
+        })
+        .where('agent_id = :agentId AND id <> :id AND status = :pending', {
+          agentId,
+          id: claimRequestId,
+          pending: ClaimRequestStatus.Pending,
+        })
+        .execute();
+      const audits = manager.getRepository(AuditLogEntity);
+      await audits.save(
+        audits.create({
+          actorType: EventActorType.Human,
+          actorUserId: owner.id,
+          action: 'agent.account_bound',
+          entityType: 'agent',
+          entityId: agentId,
+          payload: {
+            purpose: 'bind_account',
+            claimRequestId,
+            connectionId: control.connectionId,
+            accountId: owner.id,
+            managementScope: 'agent_management_and_private_history',
+            visibilityChanged: false,
+          },
+        }),
+      );
+      return { agent, claimRequest };
     });
-
-    const updatedAgent = await this.agentRepository.findOneByOrFail({
-      id: agentId,
-    });
-    const updatedClaim = await this.claimRequestRepository.findOneByOrFail({
-      id: claimRequestId,
-    });
-
-    return {
-      agent: updatedAgent,
-      claimRequest: updatedClaim,
-    };
   }
 
   private async createAgent(
@@ -1376,28 +1508,6 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     );
 
     return this.agentRepository.findOneByOrFail({ id: agent.id });
-  }
-
-  private async findOtherPendingClaimAgentIds(
-    ownerUserId: string,
-  ): Promise<Set<string>> {
-    const pendingClaims = await this.claimRequestRepository
-      .createQueryBuilder('claimRequest')
-      .select('claimRequest.agentId', 'agentId')
-      .where('claimRequest.status = :status', {
-        status: ClaimRequestStatus.Pending,
-      })
-      .andWhere('claimRequest.agentId IS NOT NULL')
-      .andWhere('claimRequest.requestedByUserId <> :ownerUserId', {
-        ownerUserId,
-      })
-      .getRawMany<{ agentId: string | null }>();
-
-    return new Set(
-      pendingClaims
-        .map((claimRequest) => claimRequest.agentId)
-        .filter((agentId): agentId is string => typeof agentId === 'string'),
-    );
   }
 
   private serializeAgentSummary(agent: AgentEntity): AgentSummary {
@@ -2130,6 +2240,16 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return nextMetadata;
   }
 
+  private isOwnAvatarReference(
+    agentId: string,
+    value: { bucket: string; key: string },
+  ): boolean {
+    return (
+      value.bucket === this.environment.minio.bucket &&
+      new RegExp(`^agent-avatars/${agentId}/[a-zA-Z0-9._-]+$`).test(value.key)
+    );
+  }
+
   private buildAgentAvatarObjectKey(agentId: string, fileName: string): string {
     return `agent-avatars/${agentId}/${randomUUID()}-${this.sanitizePathSegment(fileName)}`;
   }
@@ -2151,7 +2271,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     if (!normalized) {
       throw new BadRequestException('mimeType is required.');
     }
-    if (!normalized.startsWith('image/')) {
+    if (!AVATAR_MIME_TYPES.includes(normalized)) {
       throw new BadRequestException('mimeType must be an image media type.');
     }
     return normalized;

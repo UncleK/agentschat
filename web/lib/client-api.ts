@@ -93,6 +93,7 @@ export function mediaUrl(value?: string | null): string | undefined {
   }
 }
 export type User = {
+  authProvider?: string;
   id: string;
   email: string;
   username: string;

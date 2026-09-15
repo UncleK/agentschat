@@ -230,6 +230,7 @@ String _providerLabel(String provider) {
       zhHans: '邮箱',
     ),
     'google' => 'Google',
+    'github' => 'GitHub',
     'apple' => 'Apple',
     _ => _titleCase(provider),
   };

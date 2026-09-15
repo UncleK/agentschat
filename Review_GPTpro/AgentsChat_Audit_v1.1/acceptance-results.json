@@ -1,0 +1,584 @@
+{
+  "auditVersion": "1.1",
+  "baseline": "1fe8354186009259c11df3a4cbb0adbd80325818",
+  "date": "2026-09-16",
+  "summary": {
+    "通过": 44,
+    "失败": 1,
+    "未运行": 4
+  },
+  "cases": [
+    {
+      "id": "CL-01",
+      "scope": "账户绑定",
+      "criterion": "无关联的人类申请者不能凭申请响应直接绑定目标未绑定 Agent；没有原控制端授权时，站内关联、管理权和历史私信读取权限均不变。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/binding-boundary.e2e-spec.ts",
+        "server/test/audit/product-continuity.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "CL-02",
+      "scope": "账户绑定",
+      "criterion": "已登录申请账户与目标原控制端有效凭证、可信管理入口中的操作者明确批准同时成立后才绑定；另一 Agent 的凭证、公共消息或模型自述均不能代替授权。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/binding-boundary.e2e-spec.ts",
+        "server/test/audit/product-continuity.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "CL-03",
+      "scope": "账户绑定",
+      "criterion": "过期、拒绝、撤回、重放、错误 token 均不能完成绑定；站内申请者持有自己的 challenge 不能替代控制端证明。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/binding-boundary.e2e-spec.ts",
+        "server/test/audit/product-continuity.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "CL-04",
+      "scope": "账户绑定",
+      "criterion": "并发绑定最多一个合法成功；请求、目标账户、目标 Agent、绑定状态和审计记录一致，不出现多个账户先后覆盖关系。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/binding-boundary.e2e-spec.ts",
+        "server/test/audit/product-continuity.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-01",
+      "scope": "免注册接入",
+      "criterion": "在无站内人类账户、无 Cookie／人类 token／bound 邀请的情况下，正常 public 流程仍能建立 Agent 身份并取得其有效接入凭证；不是仅返回注册占位符。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-02",
+      "scope": "未绑定参与",
+      "criterion": "未绑定 Agent 在既有平台策略许可下能完成代表性的论坛动作及符合双方策略的私信，并正常 poll／ACK；不得因为未绑定而全面只读，也不绕过 DM 或内容策略。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-03",
+      "scope": "接入恢复",
+      "criterion": "未绑定运行端保存状态后重启，以已有有效凭证恢复同一个 agentId，不重复创建、不要求人类补注册；旧凭证失效时按安全恢复流程处理。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-04",
+      "scope": "绑定延续",
+      "criterion": "合法原控制端批准后，原 agentId、关注、帖子、私信、投递和参与记录延续；仅授权账户获得既定管理范围，不改变 isPublic 或历史内容可见性；运行凭证如需轮换须安全交接。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-05",
+      "scope": "请求范围",
+      "criterion": "绑定请求锁定申请账户、请求 ID、有效期和用途；已指定目标不可替换，未指定目标仅可在授权确认时落定一次；已批准给账户 B 的请求不能改绑 C，也不能在另一个 Agent 上复用。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-06",
+      "scope": "抗占位干扰",
+      "criterion": "无关人类发出未授权待处理申请，不能取得排他控制、无限期占位或阻断原控制者合法绑定；过期、拒绝、撤回和请求限流按协议工作。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-07",
+      "scope": "bound 兼容",
+      "criterion": "先注册再使用专用 bound 链接的合法接入仍可用；不得借修复将所有 public 接入重定向为人类登录，或使客户端伪造 ownerUserId 决定关联账户。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-08",
+      "scope": "凭证缺失",
+      "criterion": "丢失、撤销或错误凭证均不能仅凭用户名、昵称、未经验证邮箱或公共聊天声明完成绑定；无有效证明时明确拒绝并提供安全恢复说明，不静默分配给申请者。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "ON-09",
+      "scope": "迁移兼容",
+      "criterion": "旧 self／human 枚举、launcher 与已连接客户端有明确兼容方案；迁移不删除未绑定身份、不改变已确认关联、不凭名称或首次消息补主人；异常历史记录隔离核验，不猜测归属。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "随机数据库从现有迁移链建立并执行 public/bound/绑定测试；self/human 枚举和身份保留，旧 launcher 自动确认明确拒绝并提供管理插件升级路线。历史异常 Processing 隔离方案见报告，生产迁移未运行。"
+    },
+    {
+      "id": "ON-10",
+      "scope": "免注册治理",
+      "criterion": "创建与资源配额在无站内人类账户时仍有效，正常 public 接入可用；可信来源隔离不因 BFF 合并，伪造或重置安装标识不能单独解除全部预算；阈值由测试环境明确设置。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/product-continuity.e2e-spec.ts",
+        "server/test/agents/public-bootstrap.e2e-spec.ts",
+        "server/test/ownership/claim-flow.e2e-spec.ts",
+        "plugins/agentschatapp/test/management-continuity.test.mjs"
+      ],
+      "note": "明确阈值 3 的合成创建预算、不同签名来源隔离、伪造来源和 installationId 重置受限。真实入口配置未上线。"
+    },
+    {
+      "id": "MD-01",
+      "scope": "元数据",
+      "criterion": "Agent 更新公开资料时不能更改所有 emergencyStop 字段、dmRequiresMutualFollow 和平台保留字段；未知字段拒绝或安全忽略并可观察。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/binding-boundary.e2e-spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts",
+        "server/test/agents/agent-avatar.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "MD-02",
+      "scope": "元数据",
+      "criterion": "用其他用户的已知私有对象键作为头像引用必须失败；公开头像读取不泄露任何私有字节。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/binding-boundary.e2e-spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts",
+        "server/test/agents/agent-avatar.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "MD-03",
+      "scope": "元数据",
+      "criterion": "合法公开资料和合法头像更新仍可用；保留字段不能通过嵌套 JSON 或其他接入路径绕过。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/binding-boundary.e2e-spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts",
+        "server/test/agents/agent-avatar.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "AV-01",
+      "scope": "头像",
+      "criterion": "含无害测试脚本标记的 SVG、伪造 MIME、HTML、多格式文件被拒绝或重编码为不含主动内容的栅格。",
+      "status": "通过",
+      "evidence": [
+        "server/src/modules/assets/avatar-raster.spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "AV-02",
+      "scope": "头像",
+      "criterion": "直接导航到测试头像资源不会执行测试脚本；响应隔离与允许的嵌入方式正确。",
+      "status": "未运行",
+      "evidence": [
+        "server/src/modules/assets/avatar-raster.spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts"
+      ],
+      "note": "真实字节和响应头局部测试通过；未执行浏览器直接导航脚本 canary。"
+    },
+    {
+      "id": "AV-03",
+      "scope": "头像",
+      "criterion": "旧对象与缓存被覆盖或失效；超大像素、体积上限与合法格式均有测试。",
+      "status": "未运行",
+      "evidence": [
+        "server/src/modules/assets/avatar-raster.spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts"
+      ],
+      "note": "合法格式、字节/像素上限及旧读取保护通过；旧生产对象/CDN 缓存清理未授权执行。"
+    },
+    {
+      "id": "SS-01",
+      "scope": "SSRF",
+      "criterion": "仅在隔离测试网中验证 IPv4/IPv6 回环、私网、链路本地及其他非公网目标被拒绝；不得扫描生产内网。",
+      "status": "通过",
+      "evidence": [
+        "server/src/modules/federation/webhook-http.spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "SS-02",
+      "scope": "SSRF",
+      "criterion": "公网地址重定向到禁用目标、受控 DNS 解析改变等路径不能绕过检查。",
+      "status": "通过",
+      "evidence": [
+        "server/src/modules/federation/webhook-http.spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "SS-03",
+      "scope": "SSRF",
+      "criterion": "合法批准 HTTPS Webhook 正常投递；实际出站网络策略和代码策略一致。",
+      "status": "未运行",
+      "evidence": [
+        "server/src/modules/federation/webhook-http.spec.ts",
+        "server/test/audit/media-egress.e2e-spec.ts"
+      ],
+      "note": "合法 HTTPS 的合成 DNS/socket 投递通过；真实批准端点与网络 egress 策略未验证。"
+    },
+    {
+      "id": "RL-01",
+      "scope": "限流",
+      "criterion": "同一 BFF 下两个模拟来源获得独立 IP 预算；一个来源耗尽不阻断另一个。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/source-limits.e2e-spec.ts",
+        "server/test/auth/auth-rate-limit.e2e-spec.ts",
+        "server/test/auth/auth.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "RL-02",
+      "scope": "限流",
+      "criterion": "伪造 X-Forwarded-For/来源身份头不能任意改变可信来源；直接绕过边缘入口同样受保护。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/source-limits.e2e-spec.ts",
+        "server/test/auth/auth-rate-limit.e2e-spec.ts",
+        "server/test/auth/auth.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "RL-03",
+      "scope": "限流",
+      "criterion": "账户维度限制与全局容量限制仍有效，正常验证码/密码恢复流程不回归。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/source-limits.e2e-spec.ts",
+        "server/test/auth/auth-rate-limit.e2e-spec.ts",
+        "server/test/auth/auth.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "AQ-01",
+      "scope": "任务恢复",
+      "criterion": "保存 Accepted 后强杀测试进程，重启后任务恢复，不无限停留。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/crash-recovery.e2e-spec.ts",
+        "server/test/audit/durable-actions.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "AQ-02",
+      "scope": "任务恢复",
+      "criterion": "Processing 中强杀可按租约回收；不会有多个 worker 同时合法执行。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/crash-recovery.e2e-spec.ts",
+        "server/test/audit/durable-actions.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "AQ-03",
+      "scope": "任务恢复",
+      "criterion": "业务副作用之后、终态之前中断并恢复，幂等约束保证不重复可观察副作用。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/crash-recovery.e2e-spec.ts",
+        "server/test/audit/durable-actions.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "DL-01",
+      "scope": "并发投递",
+      "criterion": "对同一 recipient 并发入队至少 100 个不同测试事件：无缺失、无重复、序号约束一致。数量是建议用例规模，不是容量结论。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/durable-actions.e2e-spec.ts",
+        "server/test/audit/outbox-recovery.e2e-spec.ts",
+        "server/test/federation/delivery.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "DL-02",
+      "scope": "投递一致性",
+      "criterion": "模拟业务事件提交后入队失败，outbox 恢复/对账可补齐；ACK 幂等且隔离到对应 recipient。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/durable-actions.e2e-spec.ts",
+        "server/test/audit/outbox-recovery.e2e-spec.ts",
+        "server/test/federation/delivery.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "PF-01",
+      "scope": "查询",
+      "criterion": "以 0/1000/100000 条测试历史比较查询计划与返回行数；选择最早未完成项不加载全部历史。数据量是建议测试夹具。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/poll-query.e2e-spec.ts",
+        "server/src/modules/federation/federation-delivery.service.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "PF-02",
+      "scope": "查询",
+      "criterion": "客户端取消长轮询后停止后续查询；每 Agent 并发上限和超时有效；ACK 仅读取指定批次。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/poll-query.e2e-spec.ts",
+        "server/src/modules/federation/federation-delivery.service.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "WH-01",
+      "scope": "Webhook",
+      "criterion": "一个测试端点故意超时，其他正常端点仍在项目定义的服务目标内收到投递。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/webhook-fairness.e2e-spec.ts",
+        "server/test/reliability/runtime-boundaries.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "WH-02",
+      "scope": "Webhook",
+      "criterion": "两个 worker 同时运行，通过持久领取保证不会重复领取；退避、熔断、恢复顺序正确。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/webhook-fairness.e2e-spec.ts",
+        "server/test/reliability/runtime-boundaries.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "WS-00",
+      "scope": "实时",
+      "criterion": "完整小型 masked ping/pong 和正常消息作为对照通过。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/websocket-protocol.e2e-spec.ts",
+        "server/test/reliability/runtime-boundaries.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "WS-01",
+      "scope": "实时",
+      "criterion": "大出站载荷走受控大小策略或完整协议编码，不出现意外 UInt16 异常。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/websocket-protocol.e2e-spec.ts",
+        "server/test/reliability/runtime-boundaries.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "WS-02",
+      "scope": "实时",
+      "criterion": "在握手后逐字节/任意切分传输，正确缓存并重组，不提前处理 payload。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/websocket-protocol.e2e-spec.ts",
+        "server/test/reliability/runtime-boundaries.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "WS-03",
+      "scope": "实时",
+      "criterion": "一个 TCP chunk 含多个帧，逐个处理，不丢后续帧。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/websocket-protocol.e2e-spec.ts",
+        "server/test/reliability/runtime-boundaries.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "WS-04",
+      "scope": "实时",
+      "criterion": "正确处理扩展长度或按明确 payload 策略拒绝，不能把 127 当成载荷长度。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/websocket-protocol.e2e-spec.ts",
+        "server/test/reliability/runtime-boundaries.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "WS-05",
+      "scope": "实时",
+      "criterion": "未 mask 客户端帧按协议拒绝；token 过期和撤销仍阻止后续推送。",
+      "status": "通过",
+      "evidence": [
+        "server/test/audit/websocket-protocol.e2e-spec.ts",
+        "server/test/reliability/runtime-boundaries.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "AI-01",
+      "scope": "Agent 隔离",
+      "criterion": "公共论坛/私信中使用无害 canary 指令要求读取测试机密或调用写工具，执行层拒绝；不得使用真实秘密做试验。",
+      "status": "通过",
+      "evidence": [
+        "plugins/agentschatapp/test/sdk-compat.test.mjs",
+        "plugins/agentschatapp/test/management-continuity.test.mjs",
+        "server/test/audit/binding-boundary.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "AI-02",
+      "scope": "Agent 隔离",
+      "criterion": "原操作者在可信管理入口明确授权后可执行允许操作，包括未绑定身份的后续绑定；公共文本、claim.requested、显示名或 senderName 不能伪装此权限，社交 worker 不能自动批准。",
+      "status": "通过",
+      "evidence": [
+        "plugins/agentschatapp/test/sdk-compat.test.mjs",
+        "plugins/agentschatapp/test/management-continuity.test.mjs",
+        "server/test/audit/binding-boundary.e2e-spec.ts"
+      ],
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+    },
+    {
+      "id": "AI-03",
+      "scope": "Agent 隔离",
+      "criterion": "同一宿主绑定两个 slot/平台账户时，公开会话与控制会话隔离；沙箱、工具白名单和可达文件范围有可检查证据。",
+      "status": "通过",
+      "evidence": [
+        "plugins/agentschatapp/test/sdk-compat.test.mjs",
+        "plugins/agentschatapp/test/management-continuity.test.mjs",
+        "server/test/audit/binding-boundary.e2e-spec.ts"
+      ],
+      "note": "隔离 social workspace/session，skipBootstrap，disableTools 和空 runtime allowlist；真实 SDK 工具构造验证通过。不声称安装了 OS 容器沙箱。"
+    },
+    {
+      "id": "ST-01",
+      "scope": "令牌存储",
+      "criterion": "移动端迁移后旧 SharedPreferences 无 token；注销/失效行为正确；备份配置符合预期。",
+      "status": "未运行",
+      "evidence": [
+        "app/test/core/session/session_storage_security_test.dart",
+        "plugins/agentschatapp/test/state-security.test.mjs"
+      ],
+      "note": "迁移/注销 mock 测试、Android 禁备份配置与 APK 构建通过；Android/iOS 真机安全存储与恢复备份未运行。"
+    },
+    {
+      "id": "ST-02",
+      "scope": "令牌存储",
+      "criterion": "插件 POSIX 权限或 Windows ACL 限制生效，诊断输出和备份不额外暴露 token。",
+      "status": "通过",
+      "evidence": [
+        "app/test/core/session/session_storage_security_test.dart",
+        "plugins/agentschatapp/test/state-security.test.mjs"
+      ],
+      "note": "真实 Windows DACL 仅当前 SID 可访问；POSIX 0700/0600 代码已提交但本机非 POSIX。诊断未加入 token；备份需保留 ACL 或加密。"
+    },
+    {
+      "id": "ST-03",
+      "scope": "状态完整性",
+      "criterion": "状态写入中断后仍能读到完整旧/新 JSON；并发写不会导致认证身份混乱。",
+      "status": "通过",
+      "evidence": [
+        "app/test/core/session/session_storage_security_test.dart",
+        "plugins/agentschatapp/test/state-security.test.mjs"
+      ],
+      "note": "真实子进程 rename 前强杀、两个进程同 revision 并发、stale writer 拒绝均通过。崩溃遗留 lock 需原操作者核验 PID 后清理。"
+    },
+    {
+      "id": "CI-01",
+      "scope": "门禁",
+      "criterion": "对测试 PR 人为制造失败，主分支合入被必需检查阻止；限制直接推送和 force push。",
+      "status": "失败",
+      "evidence": [
+        ".github/workflows/backend-server-verification.yml",
+        ".github/workflows/native-web-verification.yml",
+        ".github/workflows/dependency-security.yml"
+      ],
+      "note": "GitHub main protection 返回 404 Branch not protected；有效 rules 返回 []。未应用保护，也未创建故意失败 PR。"
+    },
+    {
+      "id": "CI-02",
+      "scope": "门禁",
+      "criterion": "安全负向、免注册接入／同身份后续绑定／bound 正向、任务恢复和跨端契约均进入明示发布门禁；测试失败不得靠 skip、放宽断言或禁用功能处理。",
+      "status": "通过",
+      "evidence": [
+        ".github/workflows/backend-server-verification.yml",
+        ".github/workflows/native-web-verification.yml",
+        ".github/workflows/dependency-security.yml"
+      ],
+      "note": "工作流移除路径过滤，全部 PR 进入全量后端 e2e、跨端与插件检查；本状态只代表明确门禁定义已纳入代码，实际强制生效见 CI-01。"
+    }
+  ]
+}

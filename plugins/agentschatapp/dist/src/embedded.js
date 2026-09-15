@@ -1,6 +1,8 @@
 import { readRuntimeConfig } from "./runtime-config.js";
 import { createHash, randomUUID } from "node:crypto";
-import { DEFAULT_REPLY_MAX_CHARS } from "./constants.js";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { DEFAULT_REPLY_MAX_CHARS, DEFAULT_SERVER_BASE_URL } from "./constants.js";
 import { trimReplyText } from "./prompts.js";
 const BANNED_VISIBLE_LINE_PATTERNS = [
     /^System \(untrusted\):/i,
@@ -243,19 +245,23 @@ function resolveEmbeddedModelSelection(cfg, agentId, fallbackProvider, fallbackM
     return splitModelSelection(cfg, selectedModel, fallbackProvider);
 }
 export function buildSessionKey(account, kind, threadId) {
-    if (kind === "dm") {
-        return `agentschatapp:${account.openclawAgent}:${threadId}`;
-    }
-    return `agentschatapp:${account.openclawAgent}:${kind}:${threadId}`;
+    const scope = createHash("sha256").update(JSON.stringify([
+        account.serverBaseUrl ?? DEFAULT_SERVER_BASE_URL, account.slot, account.openclawAgent
+    ])).digest("hex").slice(0, 24);
+    return `agentschatapp:social:${scope}:${kind}:${threadId}`;
 }
 export async function draftInitialPublicProfile(context, account) {
     const cfg = readRuntimeConfig(context.runtime);
+    cfg.agents ??= {};
+    cfg.agents.defaults ??= {};
+    cfg.agents.defaults.skipBootstrap = true;
+    cfg.tools = { ...cfg.tools, deny: ["*"] };
     const sessionKey = buildSessionKey(account, "planner", `${account.slot}:profile-bootstrap`);
     const sessionId = buildStableSessionId(sessionKey);
     const agentDir = context.runtime.agent.resolveAgentDir(cfg, account.openclawAgent);
-    const workspaceDir = context.runtime.agent.resolveAgentWorkspaceDir(cfg, account.openclawAgent);
+    const workspaceDir = join(context.pluginStateRoot ?? join(tmpdir(), "agentschatapp-test"), "social-workspaces", buildStableSessionId(buildSessionKey(account, "planner", "workspace")));
     const modelSelection = resolveEmbeddedModelSelection(cfg, account.openclawAgent, context.runtime.agent.defaults.provider, context.runtime.agent.defaults.model);
-    await context.runtime.agent.ensureAgentWorkspace({ dir: workspaceDir, ensureBootstrapFiles: true });
+    await context.runtime.agent.ensureAgentWorkspace({ dir: workspaceDir, ensureBootstrapFiles: false });
     const result = await context.runtime.agent.runEmbeddedAgent({
         sessionId,
         sessionKey,
@@ -271,6 +277,10 @@ export async function draftInitialPublicProfile(context, account) {
         prompt: buildProfileBootstrapPrompt(account),
         provider: modelSelection.provider,
         model: modelSelection.model,
+        disableTools: true,
+        toolsAllow: [],
+        clientTools: [],
+        senderIsOwner: false,
         disableMessageTool: true,
         requireExplicitMessageTarget: true,
         allowGatewaySubagentBinding: false,
@@ -301,12 +311,16 @@ export async function draftInitialPublicProfile(context, account) {
 }
 export async function runEmbeddedReply(context, params) {
     const cfg = readRuntimeConfig(context.runtime);
+    cfg.agents ??= {};
+    cfg.agents.defaults ??= {};
+    cfg.agents.defaults.skipBootstrap = true;
+    cfg.tools = { ...cfg.tools, deny: ["*"] };
     const sessionKey = buildSessionKey(params.account, params.kind, params.threadId);
     const sessionId = buildStableSessionId(sessionKey);
     const agentDir = context.runtime.agent.resolveAgentDir(cfg, params.account.openclawAgent);
-    const workspaceDir = context.runtime.agent.resolveAgentWorkspaceDir(cfg, params.account.openclawAgent);
+    const workspaceDir = join(context.pluginStateRoot ?? join(tmpdir(), "agentschatapp-test"), "social-workspaces", buildStableSessionId(buildSessionKey(params.account, "planner", "workspace")));
     const modelSelection = resolveEmbeddedModelSelection(cfg, params.account.openclawAgent, context.runtime.agent.defaults.provider, context.runtime.agent.defaults.model);
-    await context.runtime.agent.ensureAgentWorkspace({ dir: workspaceDir, ensureBootstrapFiles: true });
+    await context.runtime.agent.ensureAgentWorkspace({ dir: workspaceDir, ensureBootstrapFiles: false });
     const result = await context.runtime.agent.runEmbeddedAgent({
         sessionId,
         sessionKey,
@@ -325,6 +339,10 @@ export async function runEmbeddedReply(context, params) {
         prompt: params.prompt,
         provider: modelSelection.provider,
         model: modelSelection.model,
+        disableTools: true,
+        toolsAllow: [],
+        clientTools: [],
+        senderIsOwner: false,
         disableMessageTool: true,
         requireExplicitMessageTarget: true,
         allowGatewaySubagentBinding: false,

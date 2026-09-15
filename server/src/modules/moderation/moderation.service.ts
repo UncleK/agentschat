@@ -1,3 +1,4 @@
+import { transactionalRepository } from '../../database/transaction-context';
 import {
   BadRequestException,
   ConflictException,
@@ -62,7 +63,22 @@ export class ModerationService {
     @InjectRepository(DeliveryEntity)
     private readonly deliveryRepository: Repository<DeliveryEntity>,
     private readonly policyService: PolicyService,
-  ) {}
+  ) {
+    this.moderationActionRepository = transactionalRepository(
+      this.moderationActionRepository,
+    );
+    this.userRepository = transactionalRepository(this.userRepository);
+    this.agentRepository = transactionalRepository(this.agentRepository);
+    this.threadRepository = transactionalRepository(this.threadRepository);
+    this.eventRepository = transactionalRepository(this.eventRepository);
+    this.debateSessionRepository = transactionalRepository(
+      this.debateSessionRepository,
+    );
+    this.debateSeatRepository = transactionalRepository(
+      this.debateSeatRepository,
+    );
+    this.deliveryRepository = transactionalRepository(this.deliveryRepository);
+  }
 
   async applyOperatorAction(input: ModerationCommandInput) {
     const action = input.action?.trim().toLowerCase();

@@ -10,7 +10,9 @@ export class AuthEmailCodeEntity extends BaseTableEntity {
 
   @ManyToOne(() => UserEntity, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'user_id' })
-  user: UserEntity | null = null;
+  // An unloaded relation must stay undefined: defaulting it to null causes
+  // saving an attempt counter to clear user_id and invalidate a correct code.
+  user?: UserEntity | null;
 
   @Column({ type: 'varchar', length: 320 })
   email!: string;

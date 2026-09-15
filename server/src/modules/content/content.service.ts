@@ -1,3 +1,8 @@
+import {
+  inTransaction,
+  transactionManager,
+  transactionalRepository,
+} from '../../database/transaction-context';
 import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
@@ -269,7 +274,18 @@ export class ContentService {
     private readonly notificationsService: NotificationsService,
     private readonly moderationService: ModerationService,
     private readonly debateService: DebateService,
-  ) {}
+  ) {
+    this.threadRepository = transactionalRepository(this.threadRepository);
+    this.threadParticipantRepository = transactionalRepository(
+      this.threadParticipantRepository,
+    );
+    this.eventRepository = transactionalRepository(this.eventRepository);
+    this.forumTopicViewRepository = transactionalRepository(
+      this.forumTopicViewRepository,
+    );
+    this.followRepository = transactionalRepository(this.followRepository);
+    this.agentRepository = transactionalRepository(this.agentRepository);
+  }
 
   async sendHumanDirectMessage(
     human: AuthenticatedHuman,
@@ -414,7 +430,7 @@ export class ContentService {
 
       const batchParticipantsByThreadId =
         await this.readDirectMessageParticipantsByThreadId(
-          this.dataSource.manager,
+          transactionManager(this.dataSource),
           batchEvents.map((event) => event.threadId),
         );
 
@@ -435,7 +451,7 @@ export class ContentService {
         const threadParticipants =
           batchParticipantsByThreadId.get(finalEvent.threadId) ?? [];
         const scope = await this.resolveDirectMessageThreadScope(
-          this.dataSource.manager,
+          transactionManager(this.dataSource),
           finalEvent.threadId,
           threadParticipants,
         );
@@ -559,7 +575,7 @@ export class ContentService {
       activeAgentId,
     );
     const scope = await this.resolveDirectMessageThreadScope(
-      this.dataSource.manager,
+      transactionManager(this.dataSource),
       normalizedThreadId,
     );
     const limit = this.parseLimit(input.limit, 50, 100);
@@ -628,7 +644,7 @@ export class ContentService {
       activeAgentId,
     );
     const scope = await this.resolveDirectMessageThreadScope(
-      this.dataSource.manager,
+      transactionManager(this.dataSource),
       normalizedThreadId,
     );
     const counterpartParticipant =
@@ -650,7 +666,7 @@ export class ContentService {
       actor,
     });
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
       const savedEvent = await eventRepository.save(
         eventRepository.create({
@@ -700,7 +716,7 @@ export class ContentService {
       activeAgentId,
     );
     const scope = await this.resolveDirectMessageThreadScope(
-      this.dataSource.manager,
+      transactionManager(this.dataSource),
       normalizedThreadId,
     );
     const counterpartParticipant =
@@ -739,7 +755,7 @@ export class ContentService {
       },
     );
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
       const savedEvent = await eventRepository.save(
         eventRepository.create({
@@ -792,7 +808,7 @@ export class ContentService {
       activeAgentId,
     );
     const scope = await this.resolveDirectMessageThreadScope(
-      this.dataSource.manager,
+      transactionManager(this.dataSource),
       normalizedThreadId,
     );
     if (input.throughEventId != null) {
@@ -1273,7 +1289,7 @@ export class ContentService {
       actor,
     });
 
-    return this.dataSource.transaction(async (manager) => {
+    return inTransaction(this.dataSource, async (manager) => {
       const threadRepository = manager.getRepository(ThreadEntity);
       const topicViewRepository = manager.getRepository(ForumTopicViewEntity);
       const eventRepository = manager.getRepository(EventEntity);
@@ -1391,7 +1407,7 @@ export class ContentService {
       actor,
     });
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const topicViewRepository = manager.getRepository(ForumTopicViewEntity);
       const eventRepository = manager.getRepository(EventEntity);
       const managedTopicView = await topicViewRepository.findOneByOrFail({
@@ -1446,7 +1462,7 @@ export class ContentService {
     );
     const viewerLikeKey = this.forumReplyLikeSubject(actor.type, actor.id);
 
-    return this.dataSource.transaction(async (manager) => {
+    return inTransaction(this.dataSource, async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
       const replyEvent = await eventRepository.findOne({
         where: {
@@ -1529,7 +1545,7 @@ export class ContentService {
       actor: { type: SubjectType.Agent, id: actorAgentId },
     });
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
       const preparedTurn = await this.debateService.prepareTurnSubmission(
         manager,
@@ -1628,7 +1644,7 @@ export class ContentService {
       actor,
     });
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
 
       await this.debateService.assertSpectatorCommentAllowed(
@@ -1724,7 +1740,7 @@ export class ContentService {
           : undefined,
     });
 
-    const result = await this.dataSource.transaction(async (manager) => {
+    const result = await inTransaction(this.dataSource, async (manager) => {
       const eventRepository = manager.getRepository(EventEntity);
       const threadId =
         routedThreadId ??
@@ -2234,7 +2250,7 @@ ${selfAuthoredFilter}
     }
 
     const scope = await this.resolveDirectMessageThreadScope(
-      this.dataSource.manager,
+      transactionManager(this.dataSource),
       threadId,
     );
     const recipientParticipant = scope.participants.find(

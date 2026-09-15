@@ -1,0 +1,99 @@
+{
+  "actions": [],
+  "advisories": {
+    "1119108": {
+      "findings": [
+        {
+          "version": "8.18.3",
+          "paths": [
+            ".>ws"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/websockets/ws/security/advisories/GHSA-58qx-3vcg-4xpx\n- https://nvd.nist.gov/vuln/detail/CVE-2026-45736\n- https://github.com/websockets/ws/commit/c0327ec15a54d701eb6ccefaa8bef328cfc03086\n- https://github.com/advisories/GHSA-58qx-3vcg-4xpx",
+      "created": "2026-05-18T19:02:40.000Z",
+      "id": 1119108,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nThe `websocket.close()` implementation is vulnerable to uninitialized memory disclosure when a `TypedArray` is passed as the reason argument.\n\n### Proof of concept\n\n```js\nimport { deepStrictEqual } from 'node:assert';\nimport { WebSocket, WebSocketServer } from 'ws';\n\nconst wss = new WebSocketServer(\n  { port: 0, skipUTF8Validation: true },\n  function () {\n    const { port } = wss.address();\n    const ws = new WebSocket(`ws://localhost:${port}`, {\n      skipUTF8Validation: true\n    });\n\n    ws.on('close', function (code, reason) {\n      deepStrictEqual(reason, Buffer.alloc(80));\n    });\n  }\n);\n\nwss.on('connection', function (ws) {\n  ws.close(1000, new Float32Array(20));\n});\n```\n\n### Patches\n\nThe vulnerability was fixed in ws@8.20.1 (https://github.com/websockets/ws/commit/c0327ec15a54d701eb6ccefaa8bef328cfc03086).\n\n### Credits\n\nCredit for the private and responsible disclosure of this issue goes to [Nikita Skovoroda](https://github.com/ChALkeR).\n\n### Remarks\n\nAlthough the calculated CVSS severity is medium, the actual severity is believed to be low, as the flaw is only exploitable through misuse that is unlikely in practice.\n\n### Resources\n\n- https://github.com/advisories/GHSA-58qx-3vcg-4xpx\n- https://www.cve.org/CVERecord?id=CVE-2026-45736",
+      "reported_by": null,
+      "title": "ws: Uninitialized memory disclosure",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-45736"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "ws",
+      "vulnerable_versions": ">=8.0.0 <8.20.1",
+      "github_advisory_id": "GHSA-58qx-3vcg-4xpx",
+      "recommendation": "Upgrade to version 8.20.1 or later",
+      "patched_versions": ">=8.20.1",
+      "updated": "2026-05-18T19:02:42.000Z",
+      "cvss": {
+        "score": 4.4,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-908"
+      ],
+      "url": "https://github.com/advisories/GHSA-58qx-3vcg-4xpx"
+    },
+    "1123259": {
+      "findings": [
+        {
+          "version": "8.18.3",
+          "paths": [
+            ".>ws"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/websockets/ws/security/advisories/GHSA-96hv-2xvq-fx4p\n- https://github.com/websockets/ws/commit/86d3e8a5fb0246ed373860c5fbb0de88824a27f7\n- https://github.com/websockets/ws/commit/b5372ac67bb97a773727b8e9f5035a8123556d53\n- https://github.com/websockets/ws/commit/bca91adf15677e47dbe4f959653452727be28b94\n- https://github.com/websockets/ws/commit/fd36cd864fcdf62a08273a99e19a7d975401fee8\n- https://nvd.nist.gov/vuln/detail/CVE-2026-48779\n- https://security.access.redhat.com/data/csaf/v2/vex/2026/cve-2026-48779.json\n- https://bugzilla.redhat.com/show_bug.cgi?id=2489661\n- https://access.redhat.com/security/cve/CVE-2026-48779\n- https://access.redhat.com/errata/RHSA-2026:34342\n- https://access.redhat.com/errata/RHSA-2026:33574\n- https://access.redhat.com/errata/RHSA-2026:33183\n- https://access.redhat.com/errata/RHSA-2026:33173\n- https://access.redhat.com/errata/RHSA-2026:33163\n- https://access.redhat.com/errata/RHSA-2026:33160\n- https://access.redhat.com/errata/RHSA-2026:33155\n- https://access.redhat.com/errata/RHSA-2026:29197\n- https://access.redhat.com/errata/RHSA-2026:36820\n- https://access.redhat.com/errata/RHSA-2026:36754\n- https://access.redhat.com/errata/RHSA-2026:37272\n- https://access.redhat.com/errata/RHSA-2026:27171\n- https://access.redhat.com/errata/RHSA-2026:26638\n- https://github.com/advisories/GHSA-96hv-2xvq-fx4p",
+      "created": "2026-06-15T16:34:23.000Z",
+      "id": 1123259,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nA high volume of exceptionally small fragments and data chunks can be sent by a peer, with modest network traffic, to force the remote peer into allocating and holding structural wrappers that consume far more memory than the default documented message-size limit, leading to process termination due to OOM.\n\n### Proof of concept\n\n```js\nimport { WebSocket, WebSocketServer } from 'ws';\n\nconst wss = new WebSocketServer({ port: 0 }, function () {\n  const data = Buffer.alloc(1);\n  const options = { fin: false };\n  const { port } = wss.address();\n  const ws = new WebSocket(`ws://localhost:${port}`);\n\n  ws.on('open', function () {\n    (function send() {\n      ws.send(data, options, function (err) {\n        if (err) return;\n        send();\n      });\n    })();\n  });\n\n  ws.on('error', console.error);\n  ws.on('close', function (code, reason) {\n    console.log(`client close - code: ${code} reason: ${reason.toString()}`);\n  });\n});\n\nwss.on('connection', function (ws) {\n  ws.on('error', console.error);\n  ws.on('close', function (code, reason) {\n    console.log(`server close - code: ${code} reason: ${reason.toString()}`);\n  });\n});\n```\n\n### Patches\n\nThe vulnerability was fixed in ws@8.21.0 (https://github.com/websockets/ws/commit/bca91adf15677e47dbe4f959653452727be28b94) and backported to ws@7.5.11 (https://github.com/websockets/ws/commit/fd36cd864fcdf62a08273a99e19a7d975401fee8), ws@6.2.4 (https://github.com/websockets/ws/commit/86d3e8a5fb0246ed373860c5fbb0de88824a27f7), and ws@5.2.5 (https://github.com/websockets/ws/commit/b5372ac67bb97a773727b8e9f5035a8123556d53).\n\n### Workarounds\n\nIn vulnerable versions, the issue can be mitigated by lowering the value of the `maxPayload` option if possible.\n\n### Credits\n\nThe vulnerability was responsibly disclosed and fixed by [Nadav Magier](https://github.com/Nadav0077).",
+      "reported_by": null,
+      "title": "ws: Memory exhaustion DoS from tiny fragments and data chunks",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-48779"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "ws",
+      "vulnerable_versions": ">=8.0.0 <8.21.0",
+      "github_advisory_id": "GHSA-96hv-2xvq-fx4p",
+      "recommendation": "Upgrade to version 8.21.0 or later",
+      "patched_versions": ">=8.21.0",
+      "updated": "2026-07-13T15:31:39.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-770",
+        "CWE-1050"
+      ],
+      "url": "https://github.com/advisories/GHSA-96hv-2xvq-fx4p"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 1,
+      "critical": 0
+    },
+    "dependencies": 742,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 742
+  }
+}

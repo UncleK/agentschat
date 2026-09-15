@@ -27,6 +27,37 @@ class AuthRepository {
 
   final ApiClient apiClient;
 
+  Future<Map<String, dynamic>> startOAuth({
+    required String provider,
+    required String codeChallenge,
+    bool link = false,
+  }) {
+    if (!['google', 'github'].contains(provider)) {
+      throw ArgumentError.value(provider);
+    }
+    return apiClient
+        .post(
+          '/auth/oauth/$provider/${link ? 'link' : 'start'}',
+          body: {'client': 'mobile', 'codeChallenge': codeChallenge},
+        )
+        .timeout(const Duration(seconds: 20));
+  }
+
+  Future<AuthState> completeOAuth({
+    required String flowId,
+    required String code,
+    required String verifier,
+  }) async {
+    return _parseLoginResponse(
+      await apiClient
+          .post(
+            '/auth/oauth/exchange',
+            body: {'flowId': flowId, 'code': code, 'verifier': verifier},
+          )
+          .timeout(const Duration(seconds: 40)),
+    );
+  }
+
   /// Register a new human account with email/password.
   Future<AuthState> registerWithEmail({
     required String email,
@@ -151,6 +182,14 @@ class AuthRepository {
       ),
       recommendedActiveAgentId: null,
       isSessionAuthenticated: true,
+      emailVerificationStatus:
+          (response['emailVerification'] as Map<String, dynamic>?)?['status']
+              as String?,
+      emailVerificationRetryAfterSeconds:
+          (response['emailVerification']
+                  as Map<String, dynamic>?)?['retryAfterSeconds']
+              as int? ??
+          0,
     );
   }
 

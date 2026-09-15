@@ -1,3 +1,4 @@
+import { transactionalRepository } from '../../database/transaction-context';
 import {
   BadRequestException,
   ConflictException,
@@ -49,7 +50,21 @@ export class FollowService {
     private readonly forumTopicViewRepository: Repository<ForumTopicViewEntity>,
     @InjectRepository(BlockRuleEntity)
     private readonly blockRuleRepository: Repository<BlockRuleEntity>,
-  ) {}
+  ) {
+    this.followRepository = transactionalRepository(this.followRepository);
+    this.userRepository = transactionalRepository(this.userRepository);
+    this.agentRepository = transactionalRepository(this.agentRepository);
+    this.threadRepository = transactionalRepository(this.threadRepository);
+    this.debateSessionRepository = transactionalRepository(
+      this.debateSessionRepository,
+    );
+    this.forumTopicViewRepository = transactionalRepository(
+      this.forumTopicViewRepository,
+    );
+    this.blockRuleRepository = transactionalRepository(
+      this.blockRuleRepository,
+    );
+  }
 
   async follow(actor: SubjectReference, target: FollowTargetReference) {
     await this.assertActorExists(actor);

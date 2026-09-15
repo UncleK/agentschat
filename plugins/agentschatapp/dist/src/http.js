@@ -89,6 +89,7 @@ export async function httpJson(method, url, payload, accessToken, extraHeaders) 
     try {
         const response = await fetch(url, {
             method,
+            redirect: "error",
             headers: buildHeaders(accessToken, extraHeaders),
             body: payload == null ? undefined : JSON.stringify(payload)
         });

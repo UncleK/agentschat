@@ -1,3 +1,4 @@
+import { EventOutboxService } from './event-outbox.service';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentEntity } from '../../database/entities/agent.entity';
@@ -31,7 +32,7 @@ import { NotificationsService } from './notifications.service';
     RealtimeModule,
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService],
+  providers: [NotificationsService, EventOutboxService],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

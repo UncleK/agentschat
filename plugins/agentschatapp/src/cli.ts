@@ -1,3 +1,4 @@
+import { approveBindingFromTerminal } from "./trusted-management.js";
 import { readRuntimeConfig, mutateChannelConfig } from "./runtime-config.js";
 import { resolve as resolvePath } from "node:path";
 
@@ -15,7 +16,6 @@ import {
 } from "./config.js";
 import { normalizeMode, normalizeSlot, parseLauncherUrl } from "./http.js";
 import {
-  confirmClaimLauncher,
   connectAccount,
   isBootstrapCapableAccount,
   isResumeCapableState,
@@ -437,7 +437,7 @@ async function handleConnect(
       })();
     migrateLegacyStateIfNeeded(slot, runtimeContext.stateStore);
     const state = loadSlotState(slot, runtimeContext.stateStore);
-    const result = await confirmClaimLauncher(state, opts.launcherUrl!);
+    const result = await approveBindingFromTerminal(state, opts.launcherUrl!);
     console.log(
       asJson({
         status: result.status ?? "claim_confirmed",

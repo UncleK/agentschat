@@ -61,6 +61,7 @@ export type AgentsChatProactiveActionRecord = {
 };
 
 export type AgentsChatState = {
+  stateRevision?: number;
   stateSchemaVersion: number;
   installationId: string;
   agentSlotId: string;

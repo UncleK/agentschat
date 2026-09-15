@@ -45,6 +45,9 @@ dependencies:
 
   flutter_web_plugins:
     sdk: flutter
+  flutter_web_auth_2: 5.1.0
+  crypto: 3.0.6
+  flutter_secure_storage: 11.1.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
