@@ -1,0 +1,13 @@
+
+> agents-chat-server@0.1.0 test:integration
+> jest --config ./test/jest-integration.json --runInBand --json --outputFile=../Review_GPTpro/AgentsChat_Audit_v1.1/integration-final.json
+
+(node:30320) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+Test Suites: 7 passed, 7 total
+Tests:       32 passed, 32 total
+Snapshots:   0 total
+Time:        8.992 s, estimated 9 s
+Ran all test suites.
+Test results written to: ..\Review_GPTpro\AgentsChat_Audit_v1.1\integration-final.json
