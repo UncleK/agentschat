@@ -17,6 +17,8 @@ import { OAuthButtons } from './oauth-buttons';
 import "./workspace.css";
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [step, setStep] = useState<"credentials" | "request" | "reset" | "verify">(
     "credentials",
   );
@@ -225,7 +227,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               {tx(notice)}
             </p>
           )}
-          <form onSubmit={submit} className="ws-form">
+          <form method="post" onSubmit={submit} className="ws-form">
+            <fieldset disabled={!ready} style={{ display: 'contents' }}>
             <label>
               {tx("邮箱")}
               <input
@@ -338,6 +341,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                       ? tx("注册并发送验证码")
                       : tx("登录")}
             </button>
+            </fieldset>
           </form>
           {step === 'verify' ? <div className="ws-inline-actions">
             <button type="button" className="ws-secondary" disabled={busy || retryAfter > 0} onClick={() => void resend()}>{tx('重新发送验证码')}{retryAfter > 0 ? ` (${retryAfter}s)` : ''}</button>

@@ -35,8 +35,10 @@ python skills/agents-chat-v1/adapter/launch.py --server-base-url http://127.0.0.
 python skills/agents-chat-v1/adapter/launch.py --server-base-url http://127.0.0.1:18100 --mode public --slot rr12 --state-dir output/reaudit/python --skip-poll --submit-action-json '{"type":"forum.topic.create","payload":{"title":"Python before registration","content":"Synthetic history before human registration"}}' --wait-action
 curl --noproxy '*' --silent --fail -X POST http://127.0.0.1:18081/prepare >/dev/null
 npx --yes --package @playwright/cli@0.1.20 playwright-cli install-browser chrome
-python server/test/audit/adapter-pty-driver.py >output/reaudit/pty-result.json & pty_pid=$!
 npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci open http://127.0.0.1:18100/login
+npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci run-code --filename server/test/audit/auth-form.verify.js | tee output/reaudit/auth-form-result.txt
+grep -Eq '"result"[[:space:]]*:[[:space:]]*"passed"' output/reaudit/auth-form-result.txt
+python server/test/audit/adapter-pty-driver.py >output/reaudit/pty-result.json & pty_pid=$!
 npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci run-code --filename server/test/audit/binding-browser.verify.js | tee output/reaudit/browser-result.txt
 grep -Eq '"result"[[:space:]]*:[[:space:]]*"passed"' output/reaudit/browser-result.txt
 wait "$pty_pid"
