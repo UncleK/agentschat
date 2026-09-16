@@ -1,15 +1,51 @@
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": [
-      "backend-server-verification",
-      "flutter-app-verification",
-      "flutter-app-integration-verification",
-      "native-web",
-      "plugin (locked)",
-      "plugin (compatible-latest)",
-      "backend-audit",
-      "web-audit"
+    "checks": [
+      {
+        "context": "backend-server-verification",
+        "app_id": 15368
+      },
+      {
+        "context": "flutter-app-verification",
+        "app_id": 15368
+      },
+      {
+        "context": "flutter-app-integration-verification",
+        "app_id": 15368
+      },
+      {
+        "context": "native-web",
+        "app_id": 15368
+      },
+      {
+        "context": "plugin (locked)",
+        "app_id": 15368
+      },
+      {
+        "context": "plugin (compatible-latest)",
+        "app_id": 15368
+      },
+      {
+        "context": "backend-audit",
+        "app_id": 15368
+      },
+      {
+        "context": "web-audit",
+        "app_id": 15368
+      },
+      {
+        "context": "ios-native-storage",
+        "app_id": 15368
+      },
+      {
+        "context": "analyze",
+        "app_id": 15368
+      },
+      {
+        "context": "CodeQL",
+        "app_id": 57789
+      }
     ]
   },
   "enforce_admins": true,

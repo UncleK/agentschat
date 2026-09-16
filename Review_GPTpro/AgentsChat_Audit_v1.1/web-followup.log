@@ -1,0 +1,61 @@
+
+> agents-chat-web@1.0.0 test
+> node --experimental-strip-types --test tests/*.test.ts
+
+✔ auth return paths cannot select a script or another origin (1.6761ms)
+✔ auth retains allowed localized return destinations (0.1615ms)
+✔ preset payloads leave per-Agent emergency stops to the server (1.2986ms)
+✔ changing autonomy never resumes emergency-stopped surfaces (0.1698ms)
+✔ guarded requires mutual follow; standard permits a one-way follow; full opens DMs (0.2363ms)
+✔ AV-03 first document navigation clears old HTTP cache, preserving sessions (0.4433ms)
+✔ Flutter conversation ordering prioritizes unread, then name rather than activity (1.5207ms)
+✔ presence and mutual follow determine distinct conversation colors (0.213ms)
+✔ conversation search covers relationship, unread, handle and message author (0.2669ms)
+✔ conversation-list backlog reopens pagination without undoing later page progress (2.3721ms)
+✔ background backlog is bridged even when the initial history was complete (2.3518ms)
+✔ gap fetching stops at an existing anchor without traversing all older history (0.8787ms)
+✔ first page keeps its pagination cursor; overlapping updates do not fetch (0.2434ms)
+✔ repeated pagination cursors fail explicitly instead of looping forever (0.5114ms)
+✔ fresh message fields replace stale cached fields and equal timestamps stay ordered (7.2087ms)
+✔ only an owned available Agent can be restored from saved selection (0.2204ms)
+✔ thread access checks only the active Agent without falling back to another owned Agent (0.3809ms)
+✔ switching login and register retains thread and Agent context (0.5624ms)
+✔ message identities distinguish four parties while sharing one real owner (0.3622ms)
+✔ forum branches keep Flutter preorder and original tree intact (1.0437ms)
+✔ long nested branches do not exhaust the JavaScript stack (7.3289ms)
+✔ reply identity colors match Flutter, with administrator identity taking priority (0.1727ms)
+✔ acceptance does not bypass follow, reciprocal follow or offline checks; owner chat stays independent (0.8407ms)
+✔ Hall search includes stable handles, bios, metadata headlines and skills without changing directory order (0.32ms)
+✔ hiding a conversation is isolated to this user and active agent (1.0264ms)
+✔ language paths preserve filters, thread IDs and anchors in both directions (0.8138ms)
+✔ language routing leaves APIs, downloads, external links and fragments alone (0.1032ms)
+✔ localized login return paths retain the same local destination restrictions (0.2325ms)
+✔ translation formats complete sentences without interpreting replacement values (0.5682ms)
+✔ localized product fallbacks never translate an agent bio, custom tag or message (0.7497ms)
+✔ notification URL only accepts own section keys (0.5517ms)
+✔ owned-agent commands and network messages keep identity boundaries (6.333ms)
+✔ forum groups unread branches and does not mark hidden notices (0.1296ms)
+✔ latest debate state hides ended or paused sessions even when earlier notices are unread (0.0947ms)
+✔ global inbox includes messages for every owned agent without conflating human and agent recipients (0.6341ms)
+✔ read history and finished debates stay categorized in the global inbox (0.1303ms)
+✔ inbox links never borrow an unrelated active identity or invent a target (0.0979ms)
+✔ cookie-backed mutations reject forged browser origins (0.6093ms)
+✔ API paths cannot escape the fixed upstream prefix (0.1806ms)
+✔ user content cannot break out of JSON-LD scripts (0.1301ms)
+✔ reverse proxy origin uses the browser host and published HTTPS (0.1478ms)
+✔ session JSON rejects oversized bodies, including streaming without a length (19.6133ms)
+✔ Agent actions and operator requests retain protocol credentials through BFF (0.5173ms)
+✔ binding controller credential survives BFF alongside human authorization (0.2041ms)
+✔ repeated public search keys remain strings and pagination preserves the query (0.5147ms)
+✔ discussion export keeps nested replies and quoted authored instructions with stable citations (0.6648ms)
+✔ debate export distinguishes a missed turn from a published statement and preserves actor type (0.1765ms)
+✔ source discovery permits HTTP links without credentials and deduplicates them (0.5578ms)
+✔ source links preserve balanced URL parentheses while removing Markdown wrappers (0.1065ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 49
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 214.9251

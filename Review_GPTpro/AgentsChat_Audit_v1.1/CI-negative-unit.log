@@ -1,0 +1,372 @@
+﻿2026-09-16T00:15:30.6539385Z Current runner version: '2.337.0'
+2026-09-16T00:15:30.6562748Z ##[group]Runner Image Provisioner
+2026-09-16T00:15:30.6563695Z Hosted Compute Agent
+2026-09-16T00:15:30.6564276Z Version: 20260828.587
+2026-09-16T00:15:30.6564996Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+2026-09-16T00:15:30.6565734Z Build Date: 2026-08-28T16:44:25Z
+2026-09-16T00:15:30.6566450Z Worker ID: {5ffc2c1c-656d-4757-a47f-9e980d1a416f}
+2026-09-16T00:15:30.6567228Z Azure Region: westus2
+2026-09-16T00:15:30.6567807Z ##[endgroup]
+2026-09-16T00:15:30.6569257Z ##[group]Operating System
+2026-09-16T00:15:30.6569958Z Ubuntu
+2026-09-16T00:15:30.6570476Z 24.04.5
+2026-09-16T00:15:30.6571377Z LTS
+2026-09-16T00:15:30.6571904Z ##[endgroup]
+2026-09-16T00:15:30.6572518Z ##[group]Runner Image
+2026-09-16T00:15:30.6573126Z Image: ubuntu-24.04
+2026-09-16T00:15:30.6573678Z Version: 20260907.300.1
+2026-09-16T00:15:30.6575007Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260907.300/images/ubuntu/Ubuntu2404-Readme.md
+2026-09-16T00:15:30.6576656Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260907.300
+2026-09-16T00:15:30.6577670Z ##[endgroup]
+2026-09-16T00:15:30.6579000Z ##[group]GITHUB_TOKEN Permissions
+2026-09-16T00:15:30.6581050Z Contents: read
+2026-09-16T00:15:30.6581657Z Metadata: read
+2026-09-16T00:15:30.6582335Z Packages: read
+2026-09-16T00:15:30.6582882Z ##[endgroup]
+2026-09-16T00:15:30.6584933Z Secret source: Actions
+2026-09-16T00:15:30.6585960Z Cache mode: write
+2026-09-16T00:15:30.6586696Z Prepare workflow directory
+2026-09-16T00:15:30.6984237Z Prepare all required actions
+2026-09-16T00:15:30.7032857Z Getting action download info
+2026-09-16T00:15:31.0868775Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-09-16T00:15:31.1913054Z Download action repository 'pnpm/action-setup@v6' (SHA:0977fd99725f1db4007ccb2928dbb4e90d06cc86)
+2026-09-16T00:15:31.4640574Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+2026-09-16T00:15:31.5459935Z Download action repository 'actions/upload-artifact@v6' (SHA:b7c566a772e6b6bfb58ed0dc250532a479d7789f)
+2026-09-16T00:15:31.8245549Z Complete job name: backend-server-verification
+2026-09-16T00:15:31.9088437Z ##[group]Run actions/checkout@v7
+2026-09-16T00:15:31.9089384Z with:
+2026-09-16T00:15:31.9089872Z   repository: UncleK/agentschat
+2026-09-16T00:15:31.9094672Z   token: ***
+2026-09-16T00:15:31.9095153Z   ssh-strict: true
+2026-09-16T00:15:31.9095617Z   ssh-user: git
+2026-09-16T00:15:31.9096093Z   persist-credentials: true
+2026-09-16T00:15:31.9096619Z   clean: true
+2026-09-16T00:15:31.9097100Z   sparse-checkout-cone-mode: true
+2026-09-16T00:15:31.9097664Z   fetch-depth: 1
+2026-09-16T00:15:31.9098124Z   fetch-tags: false
+2026-09-16T00:15:31.9098600Z   show-progress: true
+2026-09-16T00:15:31.9099074Z   lfs: false
+2026-09-16T00:15:31.9099506Z   submodules: false
+2026-09-16T00:15:31.9099986Z   set-safe-directory: true
+2026-09-16T00:15:31.9100531Z   allow-unsafe-pr-checkout: false
+2026-09-16T00:15:31.9101572Z ##[endgroup]
+2026-09-16T00:15:32.0125213Z Syncing repository: UncleK/agentschat
+2026-09-16T00:15:32.0127952Z ##[group]Getting Git version info
+2026-09-16T00:15:32.0129375Z Working directory is '/home/runner/work/agentschat/agentschat'
+2026-09-16T00:15:32.0131981Z [command]/usr/bin/git version
+2026-09-16T00:15:32.0247197Z git version 2.55.0
+2026-09-16T00:15:32.0271293Z ##[endgroup]
+2026-09-16T00:15:32.0280499Z Temporarily overriding HOME='/home/runner/work/_temp/5c02e883-1bb1-4e4c-86e6-09f5598b7f51' before making global git config changes
+2026-09-16T00:15:32.0283534Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-16T00:15:32.0287130Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/agentschat/agentschat
+2026-09-16T00:15:32.0340909Z Deleting the contents of '/home/runner/work/agentschat/agentschat'
+2026-09-16T00:15:32.0421228Z ##[group]Determining repository object format
+2026-09-16T00:15:32.0423910Z ##[endgroup]
+2026-09-16T00:15:32.0425064Z ##[group]Initializing the repository
+2026-09-16T00:15:32.0426090Z [command]/usr/bin/git init /home/runner/work/agentschat/agentschat
+2026-09-16T00:15:32.0470342Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-09-16T00:15:32.0472514Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-09-16T00:15:32.0474345Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-09-16T00:15:32.0475869Z hint: call:
+2026-09-16T00:15:32.0476545Z hint:
+2026-09-16T00:15:32.0477398Z hint: 	git config --global init.defaultBranch <name>
+2026-09-16T00:15:32.0478519Z hint:
+2026-09-16T00:15:32.0479602Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-09-16T00:15:32.0481649Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-09-16T00:15:32.0483090Z hint:
+2026-09-16T00:15:32.0483785Z hint: 	git branch -m <name>
+2026-09-16T00:15:32.0484609Z hint:
+2026-09-16T00:15:32.0485719Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-09-16T00:15:32.0487782Z Initialized empty Git repository in /home/runner/work/agentschat/agentschat/.git/
+2026-09-16T00:15:32.0490982Z [command]/usr/bin/git remote add origin https://github.com/UncleK/agentschat
+2026-09-16T00:15:32.0541288Z ##[endgroup]
+2026-09-16T00:15:32.0542778Z ##[group]Disabling automatic garbage collection
+2026-09-16T00:15:32.0545271Z [command]/usr/bin/git config --local gc.auto 0
+2026-09-16T00:15:32.0588160Z ##[endgroup]
+2026-09-16T00:15:32.0590127Z ##[group]Setting up auth
+2026-09-16T00:15:32.0591505Z Removing SSH command configuration
+2026-09-16T00:15:32.0597648Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-16T00:15:32.0635805Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-16T00:15:32.1020138Z Removing HTTP extra header
+2026-09-16T00:15:32.1027314Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-16T00:15:32.1063699Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-16T00:15:32.1313012Z Removing includeIf entries pointing to credentials config files
+2026-09-16T00:15:32.1317539Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-16T00:15:32.1353648Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-16T00:15:32.1577912Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-16c04640-7fff-4bb8-8569-e1a2907d8066.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-09-16T00:15:32.1617584Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/agentschat/agentschat/.git.path /home/runner/work/_temp/git-credentials-16c04640-7fff-4bb8-8569-e1a2907d8066.config
+2026-09-16T00:15:32.1652114Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/agentschat/agentschat/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-16c04640-7fff-4bb8-8569-e1a2907d8066.config
+2026-09-16T00:15:32.1688412Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-16c04640-7fff-4bb8-8569-e1a2907d8066.config
+2026-09-16T00:15:32.1723572Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-16c04640-7fff-4bb8-8569-e1a2907d8066.config
+2026-09-16T00:15:32.1754705Z ##[endgroup]
+2026-09-16T00:15:32.1755656Z ##[group]Fetching the repository
+2026-09-16T00:15:32.1763658Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +b6b985d2f3442842be599f4d4043dd54847f2e1b:refs/remotes/pull/8/merge
+2026-09-16T00:15:33.1657380Z From https://github.com/UncleK/agentschat
+2026-09-16T00:15:33.1660414Z  * [new ref]         b6b985d2f3442842be599f4d4043dd54847f2e1b -> pull/8/merge
+2026-09-16T00:15:33.1667531Z ##[endgroup]
+2026-09-16T00:15:33.1670024Z ##[group]Determining the checkout info
+2026-09-16T00:15:33.1673496Z ##[endgroup]
+2026-09-16T00:15:33.1675572Z [command]/usr/bin/git sparse-checkout disable
+2026-09-16T00:15:33.1733495Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-09-16T00:15:33.1771136Z ##[group]Checking out the ref
+2026-09-16T00:15:33.1774124Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/8/merge
+2026-09-16T00:15:33.3671659Z Note: switching to 'refs/remotes/pull/8/merge'.
+2026-09-16T00:15:33.3673216Z 
+2026-09-16T00:15:33.3674526Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-09-16T00:15:33.3677578Z changes and commit them, and you can discard any commits you make in this
+2026-09-16T00:15:33.3680227Z state without impacting any branches by switching back to a branch.
+2026-09-16T00:15:33.3682539Z 
+2026-09-16T00:15:33.3684114Z If you want to create a new branch to retain commits you create, you may
+2026-09-16T00:15:33.3687503Z do so (now or later) by using -c with the switch command. Example:
+2026-09-16T00:15:33.3689724Z 
+2026-09-16T00:15:33.3690948Z   git switch -c <new-branch-name>
+2026-09-16T00:15:33.3692413Z 
+2026-09-16T00:15:33.3693267Z Or undo this operation with:
+2026-09-16T00:15:33.3694647Z 
+2026-09-16T00:15:33.3695498Z   git switch -
+2026-09-16T00:15:33.3696708Z 
+2026-09-16T00:15:33.3698320Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-09-16T00:15:33.3700593Z 
+2026-09-16T00:15:33.3703418Z HEAD is now at b6b985d Merge a74757ad8c7b3aaa84389025de5f72e9d81d8d14 into 1fe8354186009259c11df3a4cbb0adbd80325818
+2026-09-16T00:15:33.3710446Z ##[endgroup]
+2026-09-16T00:15:33.3745887Z [command]/usr/bin/git log -1 --format=%H
+2026-09-16T00:15:33.3775675Z b6b985d2f3442842be599f4d4043dd54847f2e1b
+2026-09-16T00:15:33.4103168Z ##[group]Run pnpm/action-setup@v6
+2026-09-16T00:15:33.4104330Z with:
+2026-09-16T00:15:33.4105167Z   version: 10.33.0
+2026-09-16T00:15:33.4106093Z   dest: ~/setup-pnpm
+2026-09-16T00:15:33.4107056Z   run_install: null
+2026-09-16T00:15:33.4107985Z   cache: false
+2026-09-16T00:15:33.4108953Z   cache_dependency_path: pnpm-lock.yaml
+2026-09-16T00:15:33.4110239Z   package_json_file: package.json
+2026-09-16T00:15:33.4111538Z   standalone: false
+2026-09-16T00:15:33.4112464Z ##[endgroup]
+2026-09-16T00:15:33.5691253Z ##[group]Running self-installer...
+2026-09-16T00:15:35.5104037Z 
+2026-09-16T00:15:35.5104814Z added 1 package, and audited 2 packages in 2s
+2026-09-16T00:15:35.5105599Z 
+2026-09-16T00:15:35.5105859Z 1 package is looking for funding
+2026-09-16T00:15:35.5106376Z   run `npm fund` for details
+2026-09-16T00:15:35.5113032Z 
+2026-09-16T00:15:35.5113596Z found 0 vulnerabilities
+2026-09-16T00:15:36.1450685Z Checking for updates...
+2026-09-16T00:15:36.5209593Z Switching pnpm from v11.19.0 to v10.33.0...
+2026-09-16T00:15:37.0307417Z .../v11/8eb-1a0a791ab9f-adeb74d7bea8eb22 | Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-09-16T00:15:37.0334188Z .../v11/8eb-1a0a791ab9f-adeb74d7bea8eb22 |   +1 +
+2026-09-16T00:15:37.2918512Z .../v11/8eb-1a0a791ab9f-adeb74d7bea8eb22 | Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-09-16T00:15:37.6995629Z [WARN] Detected a pnpm v10 installation layout at PNPM_HOME. The pnpm shims at PNPM_HOME have been refreshed so the new version is active, but pnpm v11 expects bins in PNPM_HOME/bin. Run "pnpm setup" to migrate your PATH to the v11 layout.
+2026-09-16T00:15:37.7026057Z Successfully updated pnpm to v10.33.0
+2026-09-16T00:15:37.7319980Z ##[endgroup]
+2026-09-16T00:15:37.7321332Z Installation Completed!
+2026-09-16T00:15:37.7515219Z ##[group]Run actions/setup-node@v7
+2026-09-16T00:15:37.7515762Z with:
+2026-09-16T00:15:37.7516354Z   node-version: 22
+2026-09-16T00:15:37.7516775Z   cache: pnpm
+2026-09-16T00:15:37.7517103Z   cache-dependency-path: server/pnpm-lock.yaml
+2026-09-16T00:15:37.7517636Z   check-latest: false
+2026-09-16T00:15:37.7520305Z   token: ***
+2026-09-16T00:15:37.7520530Z   package-manager-cache: true
+2026-09-16T00:15:37.7520918Z env:
+2026-09-16T00:15:37.7521165Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:15:37.7521475Z ##[endgroup]
+2026-09-16T00:15:37.8949502Z Found in cache @ /opt/hostedtoolcache/node/22.23.2/x64
+2026-09-16T00:15:37.8952293Z ##[group]Environment details
+2026-09-16T00:15:38.3549512Z node: v22.23.2
+2026-09-16T00:15:38.3550196Z npm: 10.9.8
+2026-09-16T00:15:38.3550982Z yarn: 1.22.22
+2026-09-16T00:15:38.3553985Z ##[endgroup]
+2026-09-16T00:15:38.3577683Z [command]/home/runner/setup-pnpm/node_modules/.bin/bin/pnpm store path --silent
+2026-09-16T00:15:38.6424715Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-09-16T00:15:38.9056383Z Cache hit for: node-cache-Linux-x64-pnpm-2cf0ecf14ee5ffac91262c510c2cfe70f5f3869b2f93b69095e07101aa9b6a8f
+2026-09-16T00:15:40.2138589Z Received 0 of 47672163 (0.0%), 0.0 MBs/sec
+2026-09-16T00:15:40.6658084Z Received 47672163 of 47672163 (100.0%), 31.3 MBs/sec
+2026-09-16T00:15:40.6659327Z Cache Size: ~45 MB (47672163 B)
+2026-09-16T00:15:40.6761466Z [command]/usr/bin/tar -xf /home/runner/work/_temp/282244cc-87b6-437b-b183-f7e97ee60322/cache.tzst -P -C /home/runner/work/agentschat/agentschat --use-compress-program unzstd
+2026-09-16T00:15:41.7007765Z Cache restored successfully
+2026-09-16T00:15:41.7037704Z Cache restored from key: node-cache-Linux-x64-pnpm-2cf0ecf14ee5ffac91262c510c2cfe70f5f3869b2f93b69095e07101aa9b6a8f
+2026-09-16T00:15:41.7191927Z ##[group]Run pnpm --dir server install --frozen-lockfile
+2026-09-16T00:15:41.7192410Z [36;1mpnpm --dir server install --frozen-lockfile[0m
+2026-09-16T00:15:41.7244943Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:15:41.7245297Z env:
+2026-09-16T00:15:41.7245551Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:15:41.7245884Z ##[endgroup]
+2026-09-16T00:15:42.0929172Z Lockfile is up to date, resolution step is skipped
+2026-09-16T00:15:42.1453033Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-09-16T00:15:42.2615345Z Packages: +682
+2026-09-16T00:15:42.2621670Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-09-16T00:15:42.7719422Z Packages are hard linked from the content-addressable store to the virtual store.
+2026-09-16T00:15:42.7720882Z   Content-addressable store is at: /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-09-16T00:15:42.7721929Z   Virtual store is at:             node_modules/.pnpm
+2026-09-16T00:15:42.7813215Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-install$ npm install
+2026-09-16T00:15:43.1482484Z Progress: resolved 682, reused 680, downloaded 0, added 476
+2026-09-16T00:15:43.9314588Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-install: added 3 packages, and audited 4 packages in 1s
+2026-09-16T00:15:43.9317997Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-install: found 0 vulnerabilities
+2026-09-16T00:15:43.9747857Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-install: Done
+2026-09-16T00:15:43.9756185Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-run-prepack$ npm run prepack
+2026-09-16T00:15:44.0819081Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-run-prepack: > agentscant@0.2.0 prepack
+2026-09-16T00:15:44.0820791Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-run-prepack: > npm run build
+2026-09-16T00:15:44.1474683Z Progress: resolved 682, reused 680, downloaded 0, added 681
+2026-09-16T00:15:44.1797881Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-run-prepack: > agentscant@0.2.0 build
+2026-09-16T00:15:44.1798955Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-run-prepack: > tsc -p tsconfig.json
+2026-09-16T00:15:45.4332932Z ...2369_dbc70a7d875a47286a727d617ae10b0b npm-run-prepack: Done
+2026-09-16T00:15:45.4709333Z Progress: resolved 682, reused 680, downloaded 1, added 681
+2026-09-16T00:15:45.4721783Z Progress: resolved 682, reused 680, downloaded 1, added 682, done
+2026-09-16T00:15:45.7925112Z 
+2026-09-16T00:15:45.7925718Z dependencies:
+2026-09-16T00:15:45.7926209Z + @nestjs/common 11.2.3
+2026-09-16T00:15:45.7926582Z + @nestjs/core 11.2.3
+2026-09-16T00:15:45.7926997Z + @nestjs/platform-express 11.2.3
+2026-09-16T00:15:45.7927407Z + @nestjs/typeorm 11.0.3
+2026-09-16T00:15:45.7927803Z + agentscant 0.2.0
+2026-09-16T00:15:45.7928114Z + dotenv 16.6.1
+2026-09-16T00:15:45.7928426Z + ipaddr.js 2.2.0
+2026-09-16T00:15:45.7928731Z + pg 8.23.0
+2026-09-16T00:15:45.7929053Z + reflect-metadata 0.2.2
+2026-09-16T00:15:45.7929442Z + rxjs 7.8.2
+2026-09-16T00:15:45.7929750Z + sharp 0.35.4
+2026-09-16T00:15:45.7930042Z + typeorm 0.3.31
+2026-09-16T00:15:45.7930339Z + ws 8.21.3
+2026-09-16T00:15:45.7930492Z 
+2026-09-16T00:15:45.7930769Z devDependencies:
+2026-09-16T00:15:45.7931116Z + @eslint/eslintrc 3.3.7
+2026-09-16T00:15:45.7931473Z + @eslint/js 9.39.5
+2026-09-16T00:15:45.7931796Z + @nestjs/cli 11.0.24
+2026-09-16T00:15:45.7932157Z + @nestjs/schematics 11.1.0
+2026-09-16T00:15:45.7932527Z + @nestjs/testing 11.2.3
+2026-09-16T00:15:45.7932885Z + @types/express 5.0.6
+2026-09-16T00:15:45.7933222Z + @types/jest 30.0.0
+2026-09-16T00:15:45.7933551Z + @types/node 22.20.2
+2026-09-16T00:15:45.7933884Z + @types/pg 8.23.1
+2026-09-16T00:15:45.7934217Z + @types/supertest 6.0.3
+2026-09-16T00:15:45.7934709Z + @types/ws 8.18.1
+2026-09-16T00:15:45.7935244Z + eslint 9.39.4
+2026-09-16T00:15:45.7935850Z + eslint-config-prettier 10.1.8
+2026-09-16T00:15:45.7936623Z + eslint-plugin-prettier 5.5.6
+2026-09-16T00:15:45.7937292Z + globals 16.5.0
+2026-09-16T00:15:45.7937809Z + jest 30.5.1
+2026-09-16T00:15:45.7938494Z + prettier 3.9.6
+2026-09-16T00:15:45.7938871Z + source-map-support 0.5.21
+2026-09-16T00:15:45.7939255Z + supertest 7.2.2
+2026-09-16T00:15:45.7939615Z + ts-jest 29.4.12
+2026-09-16T00:15:45.7940062Z + ts-loader 9.6.2
+2026-09-16T00:15:45.7940426Z + ts-node 10.9.2
+2026-09-16T00:15:45.7941164Z + tsconfig-paths 4.2.0
+2026-09-16T00:15:45.7941569Z + typescript 5.9.3
+2026-09-16T00:15:45.7941846Z + typescript-eslint 8.70.0
+2026-09-16T00:15:45.7942013Z 
+2026-09-16T00:15:45.8098326Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-09-16T00:15:45.8099485Z │                                                                              │
+2026-09-16T00:15:45.8101062Z │   Ignored build scripts: @parcel/watcher@2.6.0, unrs-resolver@1.12.2.        │
+2026-09-16T00:15:45.8102434Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-09-16T00:15:45.8103669Z │   to run scripts.                                                            │
+2026-09-16T00:15:45.8104781Z │                                                                              │
+2026-09-16T00:15:45.8106004Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-09-16T00:15:45.8309367Z Done in 4s using pnpm v10.33.0
+2026-09-16T00:15:45.8515545Z ##[group]Run pnpm --dir server lint
+2026-09-16T00:15:45.8515907Z [36;1mpnpm --dir server lint[0m
+2026-09-16T00:15:45.8552799Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:15:45.8553153Z env:
+2026-09-16T00:15:45.8553407Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:15:45.8553730Z ##[endgroup]
+2026-09-16T00:15:46.1326151Z 
+2026-09-16T00:15:46.1327004Z > agents-chat-server@0.1.0 lint /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:15:46.1327573Z > eslint "{src,test}/**/*.ts"
+2026-09-16T00:15:46.1327765Z 
+2026-09-16T00:16:01.0554588Z ##[group]Run pnpm --dir server typecheck
+2026-09-16T00:16:01.0554963Z [36;1mpnpm --dir server typecheck[0m
+2026-09-16T00:16:01.0591870Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:16:01.0592232Z env:
+2026-09-16T00:16:01.0592490Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:16:01.0592804Z ##[endgroup]
+2026-09-16T00:16:01.3383682Z 
+2026-09-16T00:16:01.3384637Z > agents-chat-server@0.1.0 typecheck /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:16:01.3385690Z > tsc --noEmit -p tsconfig.build.json
+2026-09-16T00:16:01.3385958Z 
+2026-09-16T00:16:05.2163058Z ##[group]Run pnpm --dir server build
+2026-09-16T00:16:05.2163413Z [36;1mpnpm --dir server build[0m
+2026-09-16T00:16:05.2199738Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:16:05.2200089Z env:
+2026-09-16T00:16:05.2200346Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:16:05.2200852Z ##[endgroup]
+2026-09-16T00:16:05.4952909Z 
+2026-09-16T00:16:05.4953825Z > agents-chat-server@0.1.0 build /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:16:05.4954372Z > nest build
+2026-09-16T00:16:05.4954509Z 
+2026-09-16T00:16:11.5895609Z ##[group]Run pnpm --dir server test:unit
+2026-09-16T00:16:11.5895974Z [36;1mpnpm --dir server test:unit[0m
+2026-09-16T00:16:11.5932847Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:16:11.5933205Z env:
+2026-09-16T00:16:11.5933469Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:16:11.5933810Z ##[endgroup]
+2026-09-16T00:16:11.8728718Z 
+2026-09-16T00:16:11.8729507Z > agents-chat-server@0.1.0 test:unit /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:16:11.8730224Z > jest --config ./test/jest-unit.json
+2026-09-16T00:16:11.8730480Z 
+2026-09-16T00:16:13.5222382Z PASS src/modules/speech/speech.service.spec.ts
+2026-09-16T00:16:14.4403149Z PASS src/modules/assets/assets.service.spec.ts
+2026-09-16T00:16:14.6502305Z PASS src/modules/federation/webhook-http.spec.ts
+2026-09-16T00:16:15.2042306Z PASS src/modules/federation/federation-credentials.service.spec.ts
+2026-09-16T00:16:15.4670042Z PASS src/modules/federation/federation.service.spec.ts
+2026-09-16T00:16:15.4742259Z PASS src/modules/health/health.service.spec.ts
+2026-09-16T00:16:15.7082038Z PASS src/modules/auth/auth.service.spec.ts
+2026-09-16T00:16:15.7622160Z PASS src/modules/assets/avatar-raster.spec.ts
+2026-09-16T00:16:15.7791987Z PASS src/config/environment.spec.ts
+2026-09-16T00:16:15.8234874Z PASS src/modules/assets/byte-range.spec.ts
+2026-09-16T00:16:15.8451658Z PASS src/modules/auth/oauth.config.spec.ts
+2026-09-16T00:16:15.8585665Z FAIL src/audit-gate-canary.spec.ts
+2026-09-16T00:16:15.8586481Z   ● CI-01 intentional negative canary must never merge
+2026-09-16T00:16:15.8586792Z 
+2026-09-16T00:16:15.8587240Z     expect(received).toBe(expected) // Object.is equality
+2026-09-16T00:16:15.8587496Z 
+2026-09-16T00:16:15.8587598Z     Expected: "PASS"
+2026-09-16T00:16:15.8588011Z     Received: "intentionally failing repository gate probe"
+2026-09-16T00:16:15.8588321Z 
+2026-09-16T00:16:15.8588933Z     [0m [90m 1 |[39m it([32m'CI-01 intentional negative canary must never merge'[39m[33m,[39m () [33m=>[39m {
+2026-09-16T00:16:15.8589926Z     [31m[1m>[22m[39m[90m 2 |[39m   expect([32m'intentionally failing repository gate probe'[39m)[33m.[39mtoBe([32m'PASS'[39m)[33m;[39m
+2026-09-16T00:16:15.8591342Z      [90m   |[39m                                                         [31m[1m^[22m[39m
+2026-09-16T00:16:15.8592143Z      [90m 3 |[39m })[33m;[39m
+2026-09-16T00:16:15.8592517Z      [90m 4 |[39m[0m
+2026-09-16T00:16:15.8592664Z 
+2026-09-16T00:16:15.8593263Z       at Object.<anonymous> (src/audit-gate-canary.spec.ts:2:57)
+2026-09-16T00:16:15.8593697Z 
+2026-09-16T00:16:15.9302024Z PASS src/modules/content/content.controller.spec.ts
+2026-09-16T00:16:15.9929864Z 
+2026-09-16T00:16:15.9934156Z Test Suites: 1 failed, 12 passed, 13 total
+2026-09-16T00:16:15.9934949Z Tests:       1 failed, 69 passed, 70 total
+2026-09-16T00:16:15.9935539Z Snapshots:   0 total
+2026-09-16T00:16:15.9935985Z Time:        3.797 s
+2026-09-16T00:16:15.9936465Z Ran all test suites.
+2026-09-16T00:16:16.0221951Z  ELIFECYCLE  Command failed with exit code 1.
+2026-09-16T00:16:16.0503730Z ##[error]Process completed with exit code 1.
+2026-09-16T00:16:16.0583212Z ##[group]Run actions/upload-artifact@v6
+2026-09-16T00:16:16.0583519Z with:
+2026-09-16T00:16:16.0583719Z   name: audit-v1.1-e2e
+2026-09-16T00:16:16.0584143Z   path: audit-e2e-results.json
+2026-09-16T00:16:16.0584398Z   if-no-files-found: warn
+2026-09-16T00:16:16.0584632Z   compression-level: 6
+2026-09-16T00:16:16.0584846Z   overwrite: false
+2026-09-16T00:16:16.0585063Z   include-hidden-files: false
+2026-09-16T00:16:16.0585295Z env:
+2026-09-16T00:16:16.0585530Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:16:16.0585839Z ##[endgroup]
+2026-09-16T00:16:16.2157517Z ##[warning]No files were found with the provided path: audit-e2e-results.json. No artifacts will be uploaded.
+2026-09-16T00:16:16.2289663Z ##[group]Run docker compose -f server/docker-compose.yml down -v
+2026-09-16T00:16:16.2290162Z [36;1mdocker compose -f server/docker-compose.yml down -v[0m
+2026-09-16T00:16:16.2327424Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:16:16.2327796Z env:
+2026-09-16T00:16:16.2328059Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:16:16.2328394Z ##[endgroup]
+2026-09-16T00:16:16.5333208Z Post job cleanup.
+2026-09-16T00:16:16.6756769Z Pruning is unnecessary.
+2026-09-16T00:16:16.6951617Z Post job cleanup.
+2026-09-16T00:16:16.7858322Z [command]/usr/bin/git version
+2026-09-16T00:16:16.7911863Z git version 2.55.0
+2026-09-16T00:16:16.7950990Z Temporarily overriding HOME='/home/runner/work/_temp/eea8d5e2-1cc8-410f-8edf-6f3e57561ab8' before making global git config changes
+2026-09-16T00:16:16.7952636Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-16T00:16:16.7957077Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/agentschat/agentschat
+2026-09-16T00:16:16.7989018Z Removing SSH command configuration
+2026-09-16T00:16:16.7995959Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-16T00:16:16.8034153Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-16T00:16:16.8285457Z fatal: No url found for submodule path 'research/daytona' in .gitmodules
+2026-09-16T00:16:16.8305957Z ##[warning]The process '/usr/bin/git' failed with exit code 128
+2026-09-16T00:16:16.8478845Z Cleaning up orphan processes

@@ -1,0 +1,64 @@
+Resolving dependencies...
+Downloading packages...
+  audio_session 0.2.3 (0.2.4 available)
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.0.0 (2.0.0 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  crypto 3.0.6 (3.0.7 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  glob 2.1.3 (2.2.0 available)
+  hooks 1.0.3 (2.2.0 available)
+  image_picker 1.2.1 (1.2.3 available)
+  image_picker_android 0.8.13+16 (0.8.13+23 available)
+  image_picker_ios 0.8.13+6 (0.8.13+7 available)
+  intl 0.20.2 (0.20.3 available)
+  jni 1.0.0 (1.0.3 available)
+  jni_flutter 1.0.1 (1.0.3 available)
+  just_audio 0.10.5 (0.10.6 available)
+  matcher 0.12.19 (0.12.20 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.17.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  native_toolchain_c 0.17.6 (0.19.4 available)
+  objective_c 9.3.0 (9.6.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  platform 3.1.6 (3.2.0 available)
+  process 5.0.5 (5.0.6 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  record 6.2.0 (7.1.1 available)
+  record_android 1.5.1 (2.2.0 available)
+  record_ios 1.2.0 (2.1.1 available)
+  record_linux 1.3.0 (2.1.1 available)
+  record_macos 1.2.1 (2.1.1 available)
+  record_platform_interface 1.5.0 (2.1.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  record_web 1.3.0 (2.1.3 available)
+  record_windows 1.0.7 (2.3.0 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  synchronized 3.4.0+1 (3.4.2 available)
+  test_api 0.7.10 (0.7.14 available)
+  url_launcher_android 6.3.30 (6.3.33 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.0.2 (15.3.0 available)
+  webdriver 3.1.0 (3.2.0 available)
+  window_to_front 0.0.4 (1.0.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+52 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading E:/VP/agents_chat_release_candidate/app/test/core/session/android_backup_policy_test.dart
+00:00 +0: E:/VP/agents_chat_release_candidate/app/test/core/session/android_backup_policy_test.dart: ST-01 credentials are excluded from cloud and device transfer
+00:00 +1: E:/VP/agents_chat_release_candidate/app/test/core/session/session_storage_security_test.dart: ST-01 migrates token before removing legacy plaintext
+00:00 +2: E:/VP/agents_chat_release_candidate/app/test/core/session/session_storage_security_test.dart: ST-01 writes only to vault and logout clears both stores
+00:00 +3: E:/VP/agents_chat_release_candidate/app/test/core/session/session_storage_security_test.dart: ST-01 secure token wins over stale legacy copy
+00:00 +4: E:/VP/agents_chat_release_candidate/app/test/core/session/session_storage_security_test.dart: ST-01 logout ordered after migration cannot resurrect token
+00:00 +5: All tests passed!

@@ -3,9 +3,9 @@
   "baseline": "1fe8354186009259c11df3a4cbb0adbd80325818",
   "date": "2026-09-16",
   "summary": {
-    "通过": 44,
-    "失败": 1,
-    "未运行": 4
+    "通过": 48,
+    "失败": 0,
+    "未运行": 1
   },
   "cases": [
     {
@@ -233,23 +233,24 @@
       "id": "AV-02",
       "scope": "头像",
       "criterion": "直接导航到测试头像资源不会执行测试脚本；响应隔离与允许的嵌入方式正确。",
-      "status": "未运行",
+      "status": "通过",
       "evidence": [
-        "server/src/modules/assets/avatar-raster.spec.ts",
-        "server/test/audit/media-egress.e2e-spec.ts"
+        "AV-browser-green.log",
+        "AV-bff-green.log"
       ],
-      "note": "真实字节和响应头局部测试通过；未执行浏览器直接导航脚本 canary。"
+      "note": "真实 Chromium 直接导航、旧主动内容拒绝、BFF 安全头与合法嵌入均通过；未保护 SVG 正对照确实执行。"
     },
     {
       "id": "AV-03",
       "scope": "头像",
       "criterion": "旧对象与缓存被覆盖或失效；超大像素、体积上限与合法格式均有测试。",
-      "status": "未运行",
+      "status": "通过",
       "evidence": [
-        "server/src/modules/assets/avatar-raster.spec.ts",
-        "server/test/audit/media-egress.e2e-spec.ts"
+        "AV-cache-browser.log",
+        "AV-cloudflare-evidence.json",
+        "web-followup.log"
       ],
-      "note": "合法格式、字节/像素上限及旧读取保护通过；旧生产对象/CDN 缓存清理未授权执行。"
+      "note": "真实旧浏览器缓存清除后重新读取安全图片，登录与身份状态保留；Cloudflare API 绕过缓存且指定前缀清除成功。新代码仍需部署后实查，未宣称生产已切换。"
     },
     {
       "id": "SS-01",
@@ -279,10 +280,10 @@
       "criterion": "合法批准 HTTPS Webhook 正常投递；实际出站网络策略和代码策略一致。",
       "status": "未运行",
       "evidence": [
-        "server/src/modules/federation/webhook-http.spec.ts",
-        "server/test/audit/media-egress.e2e-spec.ts"
+        "SS-real-tls.log",
+        "server/test/audit/webhook-tls.verify.cjs"
       ],
-      "note": "合法 HTTPS 的合成 DNS/socket 投递通过；真实批准端点与网络 egress 策略未验证。"
+      "note": "实际 TLS/DNS lookup/peer pinning/合法投递、错误证书、私网和重定向均在 internal Docker 网络通过。生产实际出站规则及真实入口端到端仍未运行，SSH 访问待确认。"
     },
     {
       "id": "RL-01",
@@ -527,12 +528,16 @@
       "id": "ST-01",
       "scope": "令牌存储",
       "criterion": "移动端迁移后旧 SharedPreferences 无 token；注销/失效行为正确；备份配置符合预期。",
-      "status": "未运行",
+      "status": "通过",
       "evidence": [
-        "app/test/core/session/session_storage_security_test.dart",
-        "plugins/agentschatapp/test/state-security.test.mjs"
+        "ST-android-migrate.log",
+        "ST-android-restart.log",
+        "ST-android-logged-out.log",
+        "ST-android-backup.log",
+        "ST-ios-ci.log",
+        "ST-session-followup.log"
       ],
-      "note": "迁移/注销 mock 测试、Android 禁备份配置与 APK 构建通过；Android/iOS 真机安全存储与恢复备份未运行。"
+      "note": "Android Keystore 和 iOS Keychain 在独立原生模拟器的迁移、进程重启、注销再启动通过；19 项会话测试通过。Android 显式禁备份/传输，实际 Backup Manager 拒绝应用备份。无真机换机恢复或商店上架声明。"
     },
     {
       "id": "ST-02",
@@ -560,13 +565,13 @@
       "id": "CI-01",
       "scope": "门禁",
       "criterion": "对测试 PR 人为制造失败，主分支合入被必需检查阻止；限制直接推送和 force push。",
-      "status": "失败",
+      "status": "通过",
       "evidence": [
-        ".github/workflows/backend-server-verification.yml",
-        ".github/workflows/native-web-verification.yml",
-        ".github/workflows/dependency-security.yml"
+        "CI-protection-applied.json",
+        "CI-negative-pr.json",
+        "CI-negative-unit.log"
       ],
-      "note": "GitHub main protection 返回 404 Branch not protected；有效 rules 返回 []。未应用保护，也未创建故意失败 PR。"
+      "note": "main 保护已应用，11 项 required checks 绑定受信任 GitHub app ID；故意失败 PR #8 被 BLOCKED，已关闭并清理分支。正式候选 #7 必须全绿才合并。"
     },
     {
       "id": "CI-02",
@@ -580,5 +585,6 @@
       ],
       "note": "工作流移除路径过滤，全部 PR 进入全量后端 e2e、跨端与插件检查；本状态只代表明确门禁定义已纳入代码，实际强制生效见 CI-01。"
     }
-  ]
+  ],
+  "followup": "FOLLOWUP_VERIFICATION.md"
 }
