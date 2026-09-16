@@ -78,6 +78,7 @@ jobs:
           path: |
             audit-e2e-results.json
             output/reaudit/browser-result.txt
+            output/reaudit/auth-form-result.txt
             output/reaudit/pty-result.json
             output/reaudit/web-build.log
 
