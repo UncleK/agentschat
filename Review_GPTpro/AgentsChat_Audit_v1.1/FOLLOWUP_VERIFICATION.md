@@ -1,5 +1,7 @@
 # 剩余验收补测与发布边界
 
+> 最新：已获生产授权，PR #9 全部 required checks 通过后合并并部署 `06dfebdb`。真实入口、出站与生产检查已完成，矩阵为 49 通过、0 失败、0 未运行。见 [生产发布记录](PRODUCTION_RELEASE_20260916.md)。下文保留当时的未完成状态。
+
 日期：2026-09-16。接续首轮本地 `248a8aff`；工作分支 `codex/audit-release-verification`，正式修复 PR [#7](https://github.com/UncleK/agentschat/pull/7)。本记录补充并更新 REMEDIATION_RESULTS.md 的首轮状态，不把首轮结果文件当作补测结果。
 
 后续更新：#7 的 11 项 required checks 已通过并合并为 `3c355920`。SSH 访问现已恢复；线上仍为旧提交，入口签名配置未设置，SS-03 仍未闭合。分支入口修正及最新只读实查见 [main 分支迁移记录](../../docs/main-branch-migration-20260916.md)。下文 SSH 失败记录描述的是首次补测时的情况。

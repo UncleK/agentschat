@@ -3,9 +3,9 @@
   "baseline": "1fe8354186009259c11df3a4cbb0adbd80325818",
   "date": "2026-09-16",
   "summary": {
-    "通过": 48,
+    "通过": 49,
     "失败": 0,
-    "未运行": 1
+    "未运行": 0
   },
   "cases": [
     {
@@ -248,9 +248,10 @@
       "evidence": [
         "AV-cache-browser.log",
         "AV-cloudflare-evidence.json",
-        "web-followup.log"
+        "web-followup.log",
+        "production-20260916/http-smoke.json"
       ],
-      "note": "真实旧浏览器缓存清除后重新读取安全图片，登录与身份状态保留；Cloudflare API 绕过缓存且指定前缀清除成功。新代码仍需部署后实查，未宣称生产已切换。"
+      "note": "隔离浏览器旧缓存清除及身份保持通过；生产新代码已部署，首次文档返回 Clear-Site-Data: cache，带版本 cookie 后不再重复；API no-store / Cloudflare DYNAMIC。客户端须重新访问站点，不能远程召回离线缓存。"
     },
     {
       "id": "SS-01",
@@ -278,12 +279,15 @@
       "id": "SS-03",
       "scope": "SSRF",
       "criterion": "合法批准 HTTPS Webhook 正常投递；实际出站网络策略和代码策略一致。",
-      "status": "未运行",
+      "status": "通过",
       "evidence": [
         "SS-real-tls.log",
-        "server/test/audit/webhook-tls.verify.cjs"
+        "server/test/audit/webhook-tls.verify.cjs",
+        "production-20260916/egress-result.json",
+        "production-20260916/post-release.json",
+        "PRODUCTION_RELEASE_20260916.md"
       ],
-      "note": "实际 TLS/DNS lookup/peer pinning/合法投递、错误证书、私网和重定向均在 internal Docker 网络通过。SSH 已恢复，只读实查确认线上仍是旧提交，入口签名配置未设置；生产实际出站与入口端到端验收尚未完成。见 docs/main-branch-migration-20260916.md。"
+      "note": "已在部署提交 06dfebdb 的芬兰 VPS 上使用实际构建的 postWebhook、真实 DNS/TLS/公网 Cloudflare 入口及合成凭证完成合法 204 投递、302 不跟随和连接前拒绝；使用独立测试数据库。主机 OUTPUT 为 ACCEPT，应用传输层执行地址/端口/peer 政策，不声称有内核私网隔离。"
     },
     {
       "id": "RL-01",
@@ -293,9 +297,11 @@
       "evidence": [
         "server/test/audit/source-limits.e2e-spec.ts",
         "server/test/auth/auth-rate-limit.e2e-spec.ts",
-        "server/test/auth/auth.e2e-spec.ts"
+        "server/test/auth/auth.e2e-spec.ts",
+        "production-20260916/public-source-results.json",
+        "production-20260916/origin-source-results.json"
       ],
-      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。 生产入口合成验收补充了 Cloudflare、Nginx、实际构建 BFF/guard 的来源预算和伪造头检查；见生产发布记录。"
     },
     {
       "id": "RL-02",
@@ -305,9 +311,11 @@
       "evidence": [
         "server/test/audit/source-limits.e2e-spec.ts",
         "server/test/auth/auth-rate-limit.e2e-spec.ts",
-        "server/test/auth/auth.e2e-spec.ts"
+        "server/test/auth/auth.e2e-spec.ts",
+        "production-20260916/public-source-results.json",
+        "production-20260916/origin-source-results.json"
       ],
-      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。"
+      "note": "本地隔离测试通过；范围与外部未覆盖边界见 REMEDIATION_RESULTS.md。 生产入口合成验收补充了 Cloudflare、Nginx、实际构建 BFF/guard 的来源预算和伪造头检查；见生产发布记录。"
     },
     {
       "id": "RL-03",
@@ -586,5 +594,7 @@
       "note": "工作流移除路径过滤，全部 PR 进入全量后端 e2e、跨端与插件检查；本状态只代表明确门禁定义已纳入代码，实际强制生效见 CI-01。"
     }
   ],
-  "followup": "FOLLOWUP_VERIFICATION.md"
+  "followup": "FOLLOWUP_VERIFICATION.md",
+  "productionFollowup": "PRODUCTION_RELEASE_20260916.md",
+  "deployedCommit": "06dfebdb8ec5f782625912a6332933774ce49b3c"
 }

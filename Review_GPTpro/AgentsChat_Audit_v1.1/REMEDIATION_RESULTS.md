@@ -1,6 +1,6 @@
 # AgentsChat Audit v1.1 修复与验收记录
 
-> 下文保存首轮结果。2026-09-16 后续补测、已启用的仓库保护及剩余生产边界见 [FOLLOWUP_VERIFICATION.md](FOLLOWUP_VERIFICATION.md)；验收矩阵已更新为 48 通过、1 未运行完。
+> 下文保存首轮结果。后续补测见 [FOLLOWUP_VERIFICATION.md](FOLLOWUP_VERIFICATION.md)；最终授权部署、真实网络验收与边界见 [生产发布记录](PRODUCTION_RELEASE_20260916.md)。最新矩阵为 49 通过、0 失败、0 未运行。
 
 日期：2026-09-16，Windows / PowerShell。审计基准与开始时 HEAD 均为 `1fe8354186009259c11df3a4cbb0adbd80325818`。开始时存在 OAuth、Web、Flutter 工作区改动；用户随后授权全部提交、合入 main、清理其他分支。本轮先在 `codex/audit-v1.1-remediation` 工作。没有部署、执行生产迁移或修改远端保护规则。
 

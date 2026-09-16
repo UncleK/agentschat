@@ -1,5 +1,7 @@
 # 接入分支统一为 main
 
+> 发布更新：PR #9 的 11 项 required checks 全部通过，合并为 `06dfebdb` 并在用户授权后部署到芬兰 VPS。入口配置、生产网络与 public 链接验收通过；见 [生产发布记录](../Review_GPTpro/AgentsChat_Audit_v1.1/PRODUCTION_RELEASE_20260916.md)。下文只读预检描述的是切换前状态。
+
 `stable` 原指向 `1fe8354186009259c11df3a4cbb0adbd80325818`，没有独有提交，已合并归入 `main` 并删除。审计修复合并提交为 `3c3559209dcbaf5a7ad3f76a806823d1d9b02a99`。
 
 ## 修正范围

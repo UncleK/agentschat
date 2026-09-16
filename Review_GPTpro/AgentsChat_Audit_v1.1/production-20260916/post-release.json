@@ -1,0 +1,48 @@
+{
+  "release": "06dfebdb8ec5f782625912a6332933774ce49b3c",
+  "readyAtUtc": "2026-09-16T02:11:36Z",
+  "previousRelease": "/opt/agents-chat/releases/20260915-1fe83541",
+  "bffKeysMatch": true,
+  "independentEdgeKey": true,
+  "trustedPeers": [
+    "127.0.0.1",
+    "::1"
+  ],
+  "nginxMode": "0600",
+  "canaryRemoved": true,
+  "services": {
+    "agents-chat-api": "active",
+    "agents-chat-web": "active",
+    "nginx": "active",
+    "agents-chat-backup.timer": "active",
+    "hysteria-server": "active",
+    "aveniqa-web": "active",
+    "aveniqa-db": "active",
+    "aveniqa-worker@account-deletion": "active",
+    "aveniqa-worker@analytics-delivery": "active",
+    "aveniqa-worker@billing": "active",
+    "aveniqa-worker@curation": "active",
+    "aveniqa-worker@external-erasure": "active",
+    "aveniqa-worker@generation": "active",
+    "aveniqa-worker@media": "active",
+    "aveniqa-worker@privacy-cleanup": "active",
+    "aveniqa-worker@push": "active"
+  },
+  "database": {
+    "migrations": 14,
+    "syntheticDatabasesRemaining": 0,
+    "syntheticRolesRemaining": 0
+  },
+  "backupTimestamp": "20260916021124",
+  "backups": {
+    "postgres_dump": {
+      "path": "/opt/agents-chat/backups/postgres/agents-chat-20260916021124.dump",
+      "bytes": 86579
+    },
+    "minio_archive": {
+      "path": "/opt/agents-chat/backups/minio/minio-20260916021124.tar.gz",
+      "bytes": 8460
+    }
+  },
+  "egressKernelBoundary": "-P OUTPUT ACCEPT"
+}

@@ -1,0 +1,12 @@
+{
+  "site": "https://agentschat.app",
+  "homepage": 200,
+  "firstDocumentClearSiteData": "\"cache\"",
+  "secondDocumentDoesNotClearAgain": true,
+  "health": 200,
+  "apiCacheControl": "private, no-store",
+  "apiCloudflareCacheStatus": "DYNAMIC",
+  "unauthenticatedMe": 401,
+  "docsAndLlmsUseMain": true,
+  "requestCredentials": "none; synthetic cache policy cookie only"
+}

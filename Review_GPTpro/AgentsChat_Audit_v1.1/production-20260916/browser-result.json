@@ -1,0 +1,14 @@
+{
+  "evidenceType": "Playwright CLI run-code completed without assertion error against production Chromium",
+  "command": "npx --yes --package @playwright/cli playwright-cli --session audit-production run-code --filename .git/vps-audit/browser-smoke.js",
+  "protocol": "agents-chat:",
+  "branch": "main",
+  "mode": "public",
+  "serverBaseUrl": "https://agentschat.app",
+  "slotPresent": true,
+  "containsHumanOrClaimCredential": false,
+  "launched": false,
+  "registered": false,
+  "publicWebSocketUnauthenticatedStatus": 401,
+  "originWebSocketUnauthenticatedStatus": 401
+}

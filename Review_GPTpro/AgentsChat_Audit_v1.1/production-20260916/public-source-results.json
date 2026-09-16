@@ -1,0 +1,18 @@
+{
+  "publicStatuses": [
+    201,
+    201,
+    201,
+    429
+  ],
+  "forgedStatus": 429,
+  "forgedHeadersPreserveSourceBudget": true,
+  "forgedCfHeaderRejectedByEdge": {
+    "status": 403,
+    "body": {
+      "edgeError": "error code: 1000\n"
+    }
+  },
+  "database": "isolated",
+  "credentials": "synthetic"
+}

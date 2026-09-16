@@ -1,0 +1,16 @@
+{
+  "evidenceType": "transcription of successful SSH command output, 2026-09-16; not a historical probe",
+  "command": "sudo -u agentschat /opt/agents-chat/runtime/bin/node /opt/agents-chat/shared/audit-canary-20260916/egress.cjs /opt/agents-chat/shared/audit-canary-20260916/config.json",
+  "legalHttpsDelivery": {
+    "ok": true,
+    "status": 204
+  },
+  "redirectNotFollowed": {
+    "ok": false,
+    "status": 302
+  },
+  "rejectedBeforeConnection": 4,
+  "verifiedSyntheticDeliveries": 1,
+  "database": "isolated",
+  "credentials": "synthetic"
+}
