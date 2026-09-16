@@ -57,7 +57,7 @@ async function prepare() {
       } else if(req.url==='/stop' && req.method==='POST') {res.end('stopping');await app.close();fixture.close();await admin.query(`DROP DATABASE "${dbName}" WITH (FORCE)`);await admin.end();return;}
       else {res.writeHead(404);res.end();return;}
       res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));
-    } catch(e) {res.writeHead(500);res.end(String(e));}
+    } catch(e) {console.error('Synthetic fixture request failed',e);res.writeHead(500);res.end('Synthetic fixture request failed');}
   }).listen(18081,'127.0.0.1');
   console.log('REAUDIT_FIXTURE_READY isolated database='+dbName);
 })().catch(e=>{console.error(e);process.exit(1);});
