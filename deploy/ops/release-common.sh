@@ -53,8 +53,10 @@ atomic_switch() {
   if ! mv -Tf -- "$temporary" "$CURRENT_LINK"; then rm -f -- "$temporary"; return 1; fi
 }
 atomic_install() {
-  local source="$1" target="$2" temporary="$2.next.$$"
-  install -m 0644 "$source" "$temporary" || return
+  local source="$1" target="$2" temporary="$2.next.$$" mode=0644
+  # The root Nginx master reads this file; its inline edge key is private.
+  if [[ "${PROXY_SERVER:-}" == nginx && "$target" == "${CADDY_FILE:-}" ]]; then mode=0600; fi
+  install -m "$mode" "$source" "$temporary" || return
   mv -f -- "$temporary" "$target"
 }
 retry_command() {

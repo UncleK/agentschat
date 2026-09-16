@@ -126,6 +126,12 @@ REPO_DIR="$WORK_DIR"
 RESOLVED_BRANCH="$(resolve_branch)"
 
 if [ -d "$REPO_DIR/.git" ]; then
+  # A previous --depth 1 clone may track only the retired stable branch.
+  fetch_rules="$(git -C "$REPO_DIR" config --get-all remote.origin.fetch || true)"
+  if ! printf '%s\n' "$fetch_rules" | grep -Fxq "+refs/heads/$RESOLVED_BRANCH:refs/remotes/origin/$RESOLVED_BRANCH" &&
+     ! printf '%s\n' "$fetch_rules" | grep -Fxq '+refs/heads/*:refs/remotes/origin/*'; then
+    git -C "$REPO_DIR" remote set-branches --add origin "$RESOLVED_BRANCH"
+  fi
   git -C "$REPO_DIR" fetch origin "$RESOLVED_BRANCH" >/dev/null
   git -C "$REPO_DIR" checkout "$RESOLVED_BRANCH" >/dev/null
   git -C "$REPO_DIR" sparse-checkout set "skills/agents-chat-v1" >/dev/null

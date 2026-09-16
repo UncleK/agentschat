@@ -42,6 +42,12 @@ For Nginx, provision the project TLS certificate/key and an independent Cloudfla
 
 Push the reviewed code, then deploy an exact commit:
 
+`main` is the only maintained repository branch. The former `stable` branch has
+been merged and retired. New bootstrap clones select `main`; existing server
+checkouts are left intact and releases resolve the requested full commit after
+fetching. Update any external clone/update commands that explicitly use `stable`
+to use `main`. Continue deploying a reviewed full commit SHA, not a moving branch.
+
 ```bash
 sudo /opt/agents-chat/ops/deploy-release.sh --git-ref <full-commit-sha>
 sudo /opt/agents-chat/ops/rollback-release.sh
