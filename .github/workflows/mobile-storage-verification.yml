@@ -33,7 +33,7 @@ jobs:
           set -o pipefail
           mkdir -p audit-results
           for phase in migrate restart logged-out; do
-            flutter drive --keep-app-running --target integration_test/session_storage_native_test.dart --driver test_driver/session_storage_test.dart -d "$AUDIT_IOS_DEVICE" --dart-define=STORAGE_AUDIT_PHASE="$phase" 2>&1 | tee "audit-results/ios-$phase.log"
+            flutter drive --verbose --keep-app-running --target integration_test/session_storage_native_test.dart --driver test_driver/session_storage_test.dart -d "$AUDIT_IOS_DEVICE" --dart-define=STORAGE_AUDIT_PHASE="$phase" 2>&1 | tee "audit-results/ios-$phase.log"
             xcrun simctl terminate "$AUDIT_IOS_DEVICE" com.example.agentsChatApp
           done
       - name: Build iOS release without signing

@@ -19,6 +19,8 @@
 
 两套测试都使用本地合成 Git 仓库，覆盖首次安装、旧 stable 单分支浅克隆迁移、重复更新、状态文件逐字节保留和本地冲突。只执行安装器 Git 阶段，在任何 Adapter 激活之前停止，不注册账户、不创建计划任务或服务、不启动后台进程。POSIX 与 PowerShell 检查已加入各自 CI。
 
+发布预检发现 Nginx 站点文件会按 0644 安装，可能公开内嵌入口签名密钥。部署及失败恢复改为原子安装 0600，仅 root Nginx master 读取；其他项目配置和 Caddy 行为保持。`deploy/tests/release-transaction.test.sh` 的权限回归先失败，修复后连同原部署/回滚检查通过。iOS CI 增加详细日志以定位偶发的模拟器启动停滞，测试和断言保持。
+
 Web `npm test` 49 项、`npm run typecheck`、`npm run build` 通过；Flutter `flutter test test/features/hub` 28 项通过，bound/claim 测试保留原凭证和权限断言并检查 `branch=main`。
 
 回滚时仍须使用存在的仓库分支或完整提交；不要恢复指向已删除 stable 的链接。Git 升级失败会保留本地文件供检查，不执行强制 reset。

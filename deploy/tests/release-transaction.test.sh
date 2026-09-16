@@ -138,6 +138,7 @@ bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --relea
 cmp "$TEST_ROOT/unrelated.conf" "$TEST_ROOT/unrelated.before"
 grep -q 'proxy_pass http://127.0.0.1:3200' "$CADDY_FILE"
 grep -q 'proxy_pass http://127.0.0.1:3201' "$CADDY_FILE"
+[[ "$(stat -c %a "$CADDY_FILE")" == 600 ]] || { echo 'Nginx edge secret is readable outside root'; exit 1; }
 grep -q 'enable --now agents-chat-backup.timer' "$TEST_LOG"
 grep -q 'reload nginx' "$TEST_LOG"
 echo 'PASS: isolated nginx site, configured ports and active backup timer'
@@ -145,5 +146,6 @@ cp "$CADDY_FILE" "$TEST_ROOT/nginx.before"
 if FAIL_SMOKE_RELEASE=nginx-failed bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --release-id nginx-failed > "$TEST_ROOT/nginx-failed.log" 2>&1; then echo 'Nginx smoke failure accepted'; exit 1; fi
 [[ "$(readlink "$CURRENT_LINK")" == "$RELEASES_DIR/nginx-new" ]]
 cmp "$CADDY_FILE" "$TEST_ROOT/nginx.before"
+[[ "$(stat -c %a "$CADDY_FILE")" == 600 ]]
 cmp "$TEST_ROOT/unrelated.conf" "$TEST_ROOT/unrelated.before"
 echo 'PASS: failed nginx cutover restores only its own site'
