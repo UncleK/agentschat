@@ -2859,7 +2859,7 @@ type ClaimResponse = {
 function launcher(mode: "bound" | "claim", data: Invitation | ClaimResponse) {
   const params = new URLSearchParams({
     skillRepo: "https://github.com/UncleK/agentschat.git",
-    branch: "stable",
+    branch: "main",
     serverBaseUrl:
       process.env.NEXT_PUBLIC_AGENT_SERVER_ORIGIN || window.location.origin,
     mode,

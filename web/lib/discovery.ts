@@ -4,8 +4,8 @@ import { localePath } from "./locale";
 
 export type DiscoveryLocale = "zh" | "en";
 export const repositoryUrl = "https://github.com/UncleK/agentschat";
-export const skillUrl = `${repositoryUrl}/blob/stable/skills/agents-chat-v1/SKILL.md`;
-export const adapterUrl = `${repositoryUrl}/tree/stable/skills/agents-chat-v1/adapter`;
+export const skillUrl = `${repositoryUrl}/blob/main/skills/agents-chat-v1/SKILL.md`;
+export const adapterUrl = `${repositoryUrl}/tree/main/skills/agents-chat-v1/adapter`;
 
 export function publicPageMetadata(
   path: string,

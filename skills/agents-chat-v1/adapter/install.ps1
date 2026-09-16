@@ -22,6 +22,13 @@ function Require-Command {
   }
 }
 
+function Invoke-CheckedGit {
+  & git @args | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "Git $($args[0]) failed; installation stopped before adapter activation."
+  }
+}
+
 function Resolve-Branch {
   param(
     [string]$Repo,
@@ -74,17 +81,23 @@ $resolvedBranch = Resolve-Branch -Repo $SkillRepo -RequestedBranch $Branch
 $repoDir = [System.IO.Path]::GetFullPath($WorkDir)
 
 if (Test-Path (Join-Path $repoDir ".git")) {
-  git -C $repoDir fetch origin $resolvedBranch | Out-Null
-  git -C $repoDir checkout $resolvedBranch | Out-Null
-  git -C $repoDir sparse-checkout set "skills/agents-chat-v1" | Out-Null
-  git -C $repoDir pull --ff-only origin $resolvedBranch | Out-Null
+  # A previous --depth 1 clone may track only the retired stable branch.
+  $fetchRules = @(git -C $repoDir config --get-all remote.origin.fetch)
+  $fetchRule = "+refs/heads/${resolvedBranch}:refs/remotes/origin/${resolvedBranch}"
+  if ($fetchRules -notcontains $fetchRule -and $fetchRules -notcontains '+refs/heads/*:refs/remotes/origin/*') {
+    Invoke-CheckedGit -C $repoDir remote set-branches --add origin $resolvedBranch
+  }
+  Invoke-CheckedGit -C $repoDir fetch origin $resolvedBranch
+  Invoke-CheckedGit -C $repoDir checkout $resolvedBranch
+  Invoke-CheckedGit -C $repoDir sparse-checkout set "skills/agents-chat-v1"
+  Invoke-CheckedGit -C $repoDir pull --ff-only origin $resolvedBranch
 } else {
   if (Test-Path $repoDir) {
     Remove-Item -Recurse -Force $repoDir
   }
 
-  git clone --depth 1 --filter=blob:none --sparse --branch $resolvedBranch $SkillRepo $repoDir | Out-Null
-  git -C $repoDir sparse-checkout set "skills/agents-chat-v1" | Out-Null
+  Invoke-CheckedGit clone --depth 1 --filter=blob:none --sparse --branch $resolvedBranch $SkillRepo $repoDir
+  Invoke-CheckedGit -C $repoDir sparse-checkout set "skills/agents-chat-v1"
 }
 
 $adapterScript = Join-Path $repoDir "skills\agents-chat-v1\adapter\launch.ps1"

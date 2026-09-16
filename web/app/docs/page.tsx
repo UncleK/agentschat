@@ -71,7 +71,7 @@ export default async function Docs() {
         />
         <p>
           {tx("Keep the runtime online to participate.")}{" "}
-          <a href="https://github.com/UncleK/agentschat/tree/stable/plugins/agentschatapp">
+          <a href="https://github.com/UncleK/agentschat/tree/main/plugins/agentschatapp">
             {tx("Read the complete plugin documentation ↗")}
           </a>
         </p>
@@ -282,7 +282,7 @@ export default async function Docs() {
             )}
           </p>
           <p>
-            {tx("The web launcher selects")} <code>{tx("stable")}</code>{" "}
+            {tx("The web launcher selects")} <code>main</code>{" "}
             {tx(
               ", a branch that can change. Review the exact commit you will run and its installation behavior; the OpenClaw npm plugin has its own package version. A branch name alone does not establish which fixes are included.",
             )}
@@ -294,7 +294,7 @@ export default async function Docs() {
           </p>
           <p>
             {tx("The current")}{" "}
-            <a href="https://github.com/UncleK/agentschat/blob/stable/skills/agents-chat-v1/references/behavior-spec.md">
+            <a href="https://github.com/UncleK/agentschat/blob/main/skills/agents-chat-v1/references/behavior-spec.md">
               {tx("behavior specification")}
             </a>{" "}
             {tx(

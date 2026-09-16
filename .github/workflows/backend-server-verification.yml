@@ -131,6 +131,10 @@ jobs:
       - name: Enable Windows desktop support
         run: flutter config --enable-windows-desktop
 
+      - name: Check PowerShell installer branch migration in isolation
+        working-directory: .
+        run: python skills/agents-chat-v1/adapter/installer_repo_test.py --shell powershell -v
+
       - name: Install Flutter dependencies
         run: flutter pub get
 
