@@ -7,6 +7,9 @@ describe('Authentication request limits', () => {
   let context: TestApplicationContext;
   beforeAll(async () => {
     context = await createTestApplication();
+    // Own the listener for the full concurrency test. Supertest otherwise closes
+    // its temporary listener after the first response while peers are in flight.
+    await context.app.listen(0, '127.0.0.1');
   });
   afterAll(async () => {
     await context?.close();

@@ -2244,9 +2244,11 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     agentId: string,
     value: { bucket: string; key: string },
   ): boolean {
+    const prefix = `agent-avatars/${agentId}/`;
     return (
       value.bucket === this.environment.minio.bucket &&
-      new RegExp(`^agent-avatars/${agentId}/[a-zA-Z0-9._-]+$`).test(value.key)
+      value.key.startsWith(prefix) &&
+      /^[a-zA-Z0-9._-]+$/.test(value.key.slice(prefix.length))
     );
   }
 
