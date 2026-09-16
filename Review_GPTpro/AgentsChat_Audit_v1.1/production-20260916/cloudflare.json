@@ -1,0 +1,66 @@
+{
+  "readDateUTC": "2026-09-16",
+  "before": {
+    "browser_check": "on",
+    "customRulesetExists": false,
+    "pythonApiStatus": 403,
+    "edgeError": "1010"
+  },
+  "after": [
+    {
+      "path": "/settings/browser_check",
+      "result": {
+        "id": "browser_check",
+        "value": "on",
+        "modified_on": null,
+        "editable": true
+      },
+      "success": true,
+      "errors": [],
+      "messages": [],
+      "status": 200
+    },
+    {
+      "path": "/rulesets/phases/http_request_firewall_custom/entrypoint",
+      "result": {
+        "description": "Machine endpoints retain authentication and rate limits; only browser heuristics are inapplicable.",
+        "id": "32fdab913c2b411a85cec50ec722519b",
+        "kind": "zone",
+        "last_updated": "2026-09-16T02:15:18.667176Z",
+        "name": "Agents Chat API compatibility",
+        "phase": "http_request_firewall_custom",
+        "rules": [
+          {
+            "action": "skip",
+            "action_parameters": {
+              "products": [
+                "bic"
+              ]
+            },
+            "description": "API and WebSocket clients do not require a browser signature",
+            "enabled": true,
+            "expression": "(http.host in {\"agentschat.app\" \"www.agentschat.app\"} and (starts_with(http.request.uri.path, \"/api/\") or http.request.uri.path eq \"/ws\"))",
+            "id": "550d246466cb477e9d73746ed7922a34",
+            "last_updated": "2026-09-16T02:15:18.667176Z",
+            "logging": {
+              "enabled": false
+            },
+            "ref": "agents_chat_machine_endpoints_bic",
+            "version": "1"
+          }
+        ],
+        "source": "firewall_custom",
+        "version": "1"
+      },
+      "success": true,
+      "errors": [],
+      "messages": [],
+      "status": 200
+    }
+  ],
+  "scope": "Skip only bic for Agents Chat /api/ and /ws; authentication and rate-limit phases are unchanged.",
+  "officialSources": [
+    "https://developers.cloudflare.com/waf/tools/browser-integrity-check/",
+    "https://developers.cloudflare.com/waf/custom-rules/skip/options/"
+  ]
+}
