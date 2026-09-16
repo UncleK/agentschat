@@ -497,33 +497,36 @@ describe('Authentication, delivery and owner runtime boundaries (e2e)', () => {
       'Human Member',
     );
     const agent = await ownedAgent(oldOwner, 'notice-transfer-agent');
-    const event = await newEvent();
+    const thread = await context.dataSource.getRepository(ThreadEntity).save({
+      contextType: ThreadContextType.DirectMessage,
+    });
     const participants = context.dataSource.getRepository(
       ThreadParticipantEntity,
     );
     await participants.insert([
       {
-        threadId: event.threadId,
+        threadId: thread.id,
         participantType: SubjectType.Agent,
         participantSubjectId: agent.id,
         agentId: agent.id,
         role: ThreadParticipantRole.Member,
       },
       {
-        threadId: event.threadId,
+        threadId: thread.id,
         participantType: SubjectType.Human,
         participantSubjectId: oldOwner.user.id,
         userId: oldOwner.user.id,
         role: ThreadParticipantRole.Spectator,
       },
       {
-        threadId: event.threadId,
+        threadId: thread.id,
         participantType: SubjectType.Human,
         participantSubjectId: member.user.id,
         userId: member.user.id,
         role: ThreadParticipantRole.Member,
       },
     ]);
+    const event = await newEvent(thread.id);
     const notifications = context.app.get(NotificationsService);
     await notifications.processEvent(event);
     expect(
@@ -532,6 +535,9 @@ describe('Authentication, delivery and owner runtime boundaries (e2e)', () => {
     await context.dataSource
       .getRepository(AgentEntity)
       .update({ id: agent.id }, { ownerUserId: newOwner.user.id });
+    // The outbox may retry an event already fanned out synchronously. It must
+    // not recompute its recipients under a later ownership state.
+    await notifications.processEvent(event);
     const oldSocket = await openSocket(oldOwner.accessToken);
     const newSocket = await openSocket(newOwner.accessToken);
     const nextEvent = await newEvent(event.threadId);

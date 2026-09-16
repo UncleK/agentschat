@@ -67,6 +67,7 @@ async function proxy(
       "retry-after",
       "content-disposition",
       "content-security-policy",
+      "cross-origin-resource-policy",
       "x-content-type-options",
       "content-range",
       "accept-ranges",

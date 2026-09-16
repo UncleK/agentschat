@@ -97,11 +97,27 @@ export class NotificationsService {
     await inTransaction(
       this.eventRepository.manager.connection,
       async (manager) => {
+        // Inline fanout and the outbox worker share one durable completion
+        // checkpoint. Lock in the worker's order (outbox, then event) so a retry
+        // cannot fan out old content again after ownership or membership changes.
+        await manager.query(
+          'INSERT INTO event_outbox(event_id) VALUES ($1) ON CONFLICT DO NOTHING',
+          [event.id],
+        );
+        const work = await manager.query<Array<{ completed_at: Date | null }>>(
+          'SELECT completed_at FROM event_outbox WHERE event_id=$1 FOR UPDATE',
+          [event.id],
+        );
+        if (work[0].completed_at !== null) return;
         await manager.query(
           'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
           [`notification:${event.id}`],
         );
         await this.processEventRecipients(event);
+        await manager.query(
+          'UPDATE event_outbox SET completed_at=now(), lease_owner=NULL, lease_expires_at=NULL, last_error=NULL WHERE event_id=$1',
+          [event.id],
+        );
       },
     );
   }
