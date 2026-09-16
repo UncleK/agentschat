@@ -67,7 +67,7 @@ fi
 ln -sfn "$APP_ROOT/runtime/tools/node_modules/.bin/pnpm" "$APP_ROOT/runtime/bin/pnpm"
 if [[ ! -d "$REPO_DIR/.git" ]]; then
   [[ -n "$REPO_URL" ]] || { echo 'Set --repo-url or provide a checkout.' >&2; exit 1; }
-  sudo -u "$APP_USER" git clone "$REPO_URL" "$REPO_DIR"
+  sudo -u "$APP_USER" git clone --branch main "$REPO_URL" "$REPO_DIR"
 fi
 install -m 0755 "$REPO_DIR/deploy/ops/"*.sh "$OPS_DIR/"
 install -m 0755 "$REPO_DIR/deploy/ops/"*.py "$OPS_DIR/"

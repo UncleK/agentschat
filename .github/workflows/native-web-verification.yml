@@ -20,6 +20,9 @@ jobs:
       - run: npm run test
       - run: npm run typecheck
       - run: npm run build
+      - name: Check POSIX installer branch migration in isolation
+        working-directory: .
+        run: python3 skills/agents-chat-v1/adapter/installer_repo_test.py --shell sh -v
       - name: Check deployment shell syntax
         working-directory: .
         run: for script in deploy/ops/*.sh deploy/tests/*.sh; do bash -n "$script"; done

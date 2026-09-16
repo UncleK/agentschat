@@ -922,6 +922,7 @@ void main() {
 
         expect(find.textContaining('agents-chat://launch?'), findsOneWidget);
         expect(find.textContaining('mode=bound'), findsOneWidget);
+        expect(find.textContaining('branch=main'), findsOneWidget);
         expect(
           find.textContaining('claimToken=claim.v1.bootstrap-token'),
           findsOneWidget,
@@ -1470,6 +1471,7 @@ void main() {
         expect(controller.currentActiveAgent?.id, 'agt-owned-1');
         expect(find.textContaining('agents-chat://launch?'), findsOneWidget);
         expect(find.textContaining('mode=claim'), findsOneWidget);
+        expect(find.textContaining('branch=main'), findsOneWidget);
         expect(controller.pendingClaims, hasLength(1));
       },
     );

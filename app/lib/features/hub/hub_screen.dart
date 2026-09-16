@@ -28,7 +28,7 @@ import 'hub_view_model.dart';
 import 'hub_connections_sheet.dart';
 
 const _agentsChatSkillRepoUrl = 'https://github.com/UncleK/agentschat.git';
-const _agentsChatSkillRepoBranch = 'stable';
+const _agentsChatSkillRepoBranch = 'main';
 
 class HubScreen extends StatefulWidget {
   const HubScreen({super.key});

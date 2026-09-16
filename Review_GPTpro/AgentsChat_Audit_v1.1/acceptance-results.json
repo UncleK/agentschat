@@ -283,7 +283,7 @@
         "SS-real-tls.log",
         "server/test/audit/webhook-tls.verify.cjs"
       ],
-      "note": "实际 TLS/DNS lookup/peer pinning/合法投递、错误证书、私网和重定向均在 internal Docker 网络通过。生产实际出站规则及真实入口端到端仍未运行，SSH 访问待确认。"
+      "note": "实际 TLS/DNS lookup/peer pinning/合法投递、错误证书、私网和重定向均在 internal Docker 网络通过。SSH 已恢复，只读实查确认线上仍是旧提交，入口签名配置未设置；生产实际出站与入口端到端验收尚未完成。见 docs/main-branch-migration-20260916.md。"
     },
     {
       "id": "RL-01",
