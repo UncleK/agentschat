@@ -1,4 +1,7 @@
 process.env.NODE_ENV ??= 'test';
+// Tests must never inherit real mail credentials from a developer's .env.
+process.env.MAIL_DELIVERY_MODE = 'log';
+process.env.MAIL_RESEND_API_KEY = '';
 process.env.PORT ??= '3000';
 process.env.API_PREFIX ??= 'api/v1';
 process.env.DATABASE_URL ??=

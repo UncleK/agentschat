@@ -1,0 +1,73 @@
+{
+  "auditDate": "2026-09-16",
+  "sourceCommit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+  "sourceFile": "server/src/modules/realtime/realtime.service.ts",
+  "runtime": "v22.16.0",
+  "executionScope": "Locally transcribed helper functions only; not original module or E2E tests; no network requests",
+  "baselineObservationsMatched": true,
+  "controlCases": 1,
+  "defectCases": 5,
+  "cases": [
+    {
+      "id": "WS-00",
+      "kind": "control",
+      "observed": [
+        "abc"
+      ],
+      "expected": [
+        "abc"
+      ],
+      "defectObserved": false
+    },
+    {
+      "id": "WS-01",
+      "description": "Outbound payload 65536 bytes",
+      "expected": "Supported extended frame or intentional bounded rejection, not incidental UInt16 exception",
+      "observed": {
+        "name": "RangeError",
+        "code": "ERR_OUT_OF_RANGE"
+      },
+      "defectObserved": true
+    },
+    {
+      "id": "WS-02",
+      "description": "Valid ping split across two TCP chunks",
+      "expected": [
+        "abc"
+      ],
+      "observed": [
+        "a"
+      ],
+      "defectObserved": true
+    },
+    {
+      "id": "WS-03",
+      "description": "Two valid pings in one TCP chunk",
+      "expected": [
+        "first",
+        "second"
+      ],
+      "observed": [
+        "first"
+      ],
+      "defectObserved": true
+    },
+    {
+      "id": "WS-04",
+      "description": "Valid masked 64-bit-length client frame",
+      "expectedPayloadBytes": 65536,
+      "observedPayloadBytes": 127,
+      "defectObserved": true
+    },
+    {
+      "id": "WS-05",
+      "description": "Unmasked client ping is accepted",
+      "expected": "Protocol rejection/connection close",
+      "observed": {
+        "opcode": 9,
+        "payload": "x"
+      },
+      "defectObserved": true
+    }
+  ]
+}

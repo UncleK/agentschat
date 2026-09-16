@@ -1,0 +1,93 @@
+
+> agents-chat-web@1.0.0 build
+> next build
+
+▲ Next.js 16.3.5 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 20ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 56s
+  Running TypeScript ...
+  Finished TypeScript in 1230ms ...
+  Collecting page data using 31 workers ...
+  Generating static pages using 31 workers (0/31) ...
+  Generating static pages using 31 workers (7/31) 
+  Generating static pages using 31 workers (15/31) 
+  Generating static pages using 31 workers (23/31) 
+✓ Generating static pages using 31 workers (31/31) in 5.4s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /agents
+├ ƒ /agents/[handle]
+├ ƒ /api/oauth/callback/[provider]
+├ ƒ /api/oauth/complete
+├ ƒ /api/oauth/start
+├ ƒ /api/openapi.json
+├ ƒ /api/session
+├ ƒ /api/v1/[...path]
+├ ƒ /app/[[...section]]
+├ ƒ /connections
+├ ƒ /discussions/[[...topic]]
+├ ƒ /docs
+├ ƒ /en
+├ ƒ /en/agents
+├ ƒ /en/agents/[handle]
+├ ƒ /en/app/[[...section]]
+├ ƒ /en/connections
+├ ƒ /en/discussions/[[...topic]]
+├ ƒ /en/docs
+├ ƒ /en/for-agents
+├ ƒ /en/forum
+├ ƒ /en/forum/[id]
+├ ƒ /en/guide
+├ ƒ /en/hub
+├ ƒ /en/live
+├ ƒ /en/live/[id]
+├ ƒ /en/login
+├ ƒ /en/messages/[[...thread]]
+├ ƒ /en/notifications
+├ ƒ /en/privacy
+├ ƒ /en/register
+├ ƒ /en/rooms/[[...room]]
+├ ƒ /en/settings
+├ ƒ /en/watch
+├ ƒ /flutter_service_worker.js
+├ ƒ /for-agents
+├ ƒ /forum
+├ ƒ /forum/[id]
+├ ƒ /forum/[id]/transcript
+├ ƒ /guide
+├ ƒ /hub
+├ ƒ /live
+├ ƒ /live/[id]
+├ ƒ /live/[id]/transcript
+├ ƒ /llms-full.txt
+├ ƒ /llms.txt
+├ ƒ /login
+├ ○ /manifest.webmanifest
+├ ƒ /messages/[[...thread]]
+├ ƒ /notifications
+├ ○ /opengraph-image
+├ ƒ /privacy
+├ ƒ /register
+├ ○ /robots.txt
+├ ƒ /rooms/[[...room]]
+├ ƒ /settings
+├ ƒ /sitemap.xml
+└ ƒ /watch
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+> agents-chat-web@1.0.0 postbuild
+> node scripts/prepare-standalone.mjs
+
+Standalone assets prepared.

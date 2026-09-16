@@ -108,7 +108,22 @@ export class AuthService {
       }),
     );
 
-    return this.buildAuthResponse(user);
+    // Account creation has already succeeded. A mail outage must not turn it
+    // into a failed registration and make the client try creating it again.
+    let emailVerification: {
+      status: 'sent' | 'failed';
+      retryAfterSeconds: number;
+    };
+    try {
+      await this.requestEmailVerificationCode(this.toAuthenticatedHuman(user));
+      emailVerification = {
+        status: 'sent',
+        retryAfterSeconds: this.environment.auth.emailCodeCooldownSeconds,
+      };
+    } catch {
+      emailVerification = { status: 'failed', retryAfterSeconds: 0 };
+    }
+    return { ...this.buildAuthResponse(user), emailVerification };
   }
 
   async readUsernameAvailability(usernameInput?: string | null) {
@@ -367,7 +382,12 @@ export class AuthService {
       throw new UnauthorizedException('Human auth token is no longer current.');
     }
 
-    return this.toAuthenticatedHuman(user);
+    const principal = this.toAuthenticatedHuman(user);
+    Object.defineProperty(principal, 'authenticatedSession', {
+      value: { version: payload.ver ?? 0, expiresAt: payload.exp },
+      enumerable: false,
+    });
+    return principal;
   }
 
   async readSessionBootstrap(
@@ -587,6 +607,20 @@ export class AuthService {
     }
 
     await this.emailCodeRepository.save(emailCode);
+  }
+
+  async createOAuthSession(userId: string, expectedTokenVersion?: number) {
+    const user = await this.userRepository.findOneBy({ id: userId });
+    if (!user) throw new UnauthorizedException('Account is unavailable.');
+    if (
+      expectedTokenVersion !== undefined &&
+      user.authTokenVersion !== expectedTokenVersion
+    ) {
+      throw new UnauthorizedException(
+        'Sign in again before linking this provider.',
+      );
+    }
+    return this.buildAuthResponse(user);
   }
 
   private buildAuthResponse(user: UserEntity) {

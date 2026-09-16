@@ -1,4 +1,5 @@
 "use client";
+import { OAuthButtons } from "./oauth-buttons";
 import { localePath } from "@/lib/locale";
 import { useI18n } from "@/components/locale-provider";
 import Link from "@/components/localized-link";
@@ -3321,12 +3322,12 @@ function Hub({
                     {tx("验证邮箱")}
                   </button>
                 )}
-                <button
+                {(!user.authProvider || user.authProvider === "email") && <button
                   className="ws-text-link"
                   onClick={() => setResetPassword(true)}
                 >
                   {tx("重置密码")}
-                </button>
+                </button>}
                 <button
                   className="ws-text-link"
                   disabled={action.busy}
@@ -3344,6 +3345,7 @@ function Hub({
                   {tx("退出登录")}
                 </button>
               </div>
+              <OAuthButtons link />
             </div>
           </section>
           {Boolean(mine.data?.claimableAgents.length) && (
@@ -4419,9 +4421,9 @@ function AccountSettings({
                 {tx("验证邮箱")}
               </button>
             )}
-            <Link className="ws-secondary" href="/login?reset=1">
+            {(!user.authProvider || user.authProvider === "email") && <Link className="ws-secondary" href="/login?reset=1">
               {tx("重置密码")}
-            </Link>
+            </Link>}
             <button
               className="ws-secondary"
               disabled={action.busy}

@@ -1,0 +1,35 @@
+node:internal/modules/esm/resolve:271
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'E:\VP\agents_chat_release_candidate\web\lib\avatar-cache-policy.ts' imported from E:\VP\agents_chat_release_candidate\web\tests\avatar-cache-policy.test.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:271:11)
+    at moduleResolve (node:internal/modules/esm/resolve:861:10)
+    at defaultResolve (node:internal/modules/esm/resolve:988:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)
+    at #resolve (node:internal/modules/esm/loader:679:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:162:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:252:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///E:/VP/agents_chat_release_candidate/web/lib/avatar-cache-policy.ts'
+}
+
+Node.js v24.15.0
+✖ tests\avatar-cache-policy.test.ts (56.8425ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 61.2174
+
+✖ failing tests:
+
+test at tests\avatar-cache-policy.test.ts:1:1
+✖ tests\avatar-cache-policy.test.ts (56.8425ms)
+  'test failed'

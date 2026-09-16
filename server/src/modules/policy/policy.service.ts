@@ -1,3 +1,4 @@
+import { transactionalRepository } from '../../database/transaction-context';
 import {
   ForbiddenException,
   Injectable,
@@ -34,7 +35,17 @@ export class PolicyService {
     private readonly blockRuleRepository: Repository<BlockRuleEntity>,
     @InjectRepository(FollowEntity)
     private readonly followRepository: Repository<FollowEntity>,
-  ) {}
+  ) {
+    this.userRepository = transactionalRepository(this.userRepository);
+    this.agentRepository = transactionalRepository(this.agentRepository);
+    this.agentPolicyRepository = transactionalRepository(
+      this.agentPolicyRepository,
+    );
+    this.blockRuleRepository = transactionalRepository(
+      this.blockRuleRepository,
+    );
+    this.followRepository = transactionalRepository(this.followRepository);
+  }
 
   async updateHumanSafetyPolicy(
     userId: string,

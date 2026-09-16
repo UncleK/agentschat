@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 abstract class AppSessionStorage {
@@ -30,6 +32,17 @@ abstract class AppSessionStorage {
 class SharedPreferencesAppSessionStorage implements AppSessionStorage {
   const SharedPreferencesAppSessionStorage();
 
+  static const _vault = FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
+  static Future<void> _pending = Future<void>.value();
+
+  Future<T> _serial<T>(Future<T> Function() operation) {
+    final next = _pending.then((_) => operation());
+    _pending = next.then<void>((_) {}, onError: (Object error, StackTrace stack) {});
+    return next;
+  }
+
   static const _tokenKey = 'app_session.token';
   static const _currentActiveAgentKey = 'app_session.current_active_agent';
 
@@ -38,7 +51,7 @@ class SharedPreferencesAppSessionStorage implements AppSessionStorage {
   @override
   Future<void> clear() async {
     final prefs = await _prefs;
-    await prefs.remove(_tokenKey);
+    await clearToken();
     await prefs.remove(_currentActiveAgentKey);
   }
 
@@ -49,10 +62,12 @@ class SharedPreferencesAppSessionStorage implements AppSessionStorage {
   }
 
   @override
-  Future<void> clearToken() async {
+  Future<void> clearToken() => _serial(() async {
+    // Remove fallback first so a failed vault deletion cannot restore it.
     final prefs = await _prefs;
     await prefs.remove(_tokenKey);
-  }
+    await _vault.delete(key: _tokenKey);
+  });
 
   @override
   Future<List<String>> readDismissedChatThreadIds({
@@ -81,11 +96,21 @@ class SharedPreferencesAppSessionStorage implements AppSessionStorage {
   }
 
   @override
-  Future<String?> readToken() async {
+  Future<String?> readToken() => _serial(() async {
     final prefs = await _prefs;
-    final value = prefs.getString(_tokenKey);
-    return _normalize(value);
-  }
+    final secure = await _vault.read(key: _tokenKey);
+    if (secure != null) {
+      await prefs.remove(_tokenKey);
+      return _normalize(secure);
+    }
+    final legacy = _normalize(prefs.getString(_tokenKey));
+    if (legacy != null) {
+      // A failed secure write leaves the original available for a later retry.
+      await _vault.write(key: _tokenKey, value: legacy);
+      await prefs.remove(_tokenKey);
+    }
+    return legacy;
+  });
 
   @override
   Future<void> writeCurrentActiveAgentId(String agentId) async {
@@ -112,10 +137,11 @@ class SharedPreferencesAppSessionStorage implements AppSessionStorage {
   }
 
   @override
-  Future<void> writeToken(String token) async {
+  Future<void> writeToken(String token) => _serial(() async {
+    await _vault.write(key: _tokenKey, value: token);
     final prefs = await _prefs;
-    await prefs.setString(_tokenKey, token);
-  }
+    await prefs.remove(_tokenKey);
+  });
 
   String? _normalize(String? value) {
     if (value == null || value.isEmpty) {

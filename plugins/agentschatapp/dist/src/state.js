@@ -1,3 +1,4 @@
+import { atomicStateWrite, lockedStateWrite, protectStatePath } from "./secure-state-file.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, normalize } from "node:path";
@@ -42,6 +43,7 @@ function normalizeState(slot, value) {
     const hasSafetyPolicy = typeof safetyPolicyRaw.activityLevel === "string"
         || typeof safetyPolicyRaw.allowProactiveInteractions === "boolean";
     return {
+        stateRevision: typeof raw.stateRevision === "number" ? raw.stateRevision : 0,
         stateSchemaVersion: typeof raw.stateSchemaVersion === "number" ? raw.stateSchemaVersion : DEFAULT_STATE_SCHEMA_VERSION,
         installationId: typeof raw.installationId === "string" && raw.installationId.length > 0
             ? raw.installationId
@@ -111,11 +113,13 @@ function normalizeState(slot, value) {
 export function normalizePluginStateRoot(root) {
     const normalizedPath = normalize(root);
     if (basename(normalizedPath).toLowerCase() === PLUGIN_ID) {
-        mkdirSync(normalizedPath, { recursive: true });
+        mkdirSync(normalizedPath, { recursive: true, mode: 0o700 });
+        protectStatePath(normalizedPath);
         return normalizedPath;
     }
     const pluginRoot = join(normalizedPath, "plugins", PLUGIN_ID);
-    mkdirSync(pluginRoot, { recursive: true });
+    mkdirSync(pluginRoot, { recursive: true, mode: 0o700 });
+    protectStatePath(pluginRoot);
     return pluginRoot;
 }
 export function resolveDefaultPluginStateRoot() {
@@ -135,8 +139,11 @@ export function resolveInstallationFilePath(store) {
     return join(resolveStore(store).pluginStateRoot, "installation.json");
 }
 export function resolveSlotStateDir(slot, store) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(slot))
+        throw new Error("Invalid state slot");
     const stateDir = join(resolveStore(store).pluginStateRoot, "slots", slot);
-    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+    protectStatePath(stateDir);
     return stateDir;
 }
 export function resolveSlotStateFilePath(slot, store) {
@@ -171,17 +178,26 @@ export function loadSlotState(slot, store) {
             mode: "public"
         };
     }
+    protectStatePath(statePath);
     return normalizeState(slot, JSON.parse(readFileSync(statePath, "utf8")));
 }
 export function saveSlotState(slot, state, store) {
     const normalizedState = normalizeState(slot, state);
     const statePath = resolveSlotStateFilePath(slot, store);
-    writeFileSync(statePath, JSON.stringify(normalizedState, null, 2), "utf8");
+    lockedStateWrite(statePath, () => {
+        const revision = existsSync(statePath) ? normalizeState(slot, JSON.parse(readFileSync(statePath, "utf8"))).stateRevision ?? 0 : 0;
+        if ((state.stateRevision ?? 0) !== revision)
+            throw new Error("Cannot overwrite stale state; reload before retrying");
+        normalizedState.stateRevision = revision + 1;
+        atomicStateWrite(statePath, normalizedState);
+        state.stateRevision = normalizedState.stateRevision;
+    });
 }
 export function clearSlotState(slot, store) {
     const targetStore = resolveStore(store);
     const installationId = loadOrCreateInstallationId(targetStore);
     saveSlotState(slot, {
+        stateRevision: loadSlotState(slot, targetStore).stateRevision,
         stateSchemaVersion: DEFAULT_STATE_SCHEMA_VERSION,
         installationId,
         agentSlotId: slot,
@@ -221,6 +237,7 @@ export function migrateLegacyStateIfNeeded(slot, store) {
     if (!source) {
         return { migrated: false };
     }
+    protectStatePath(source.path);
     const normalizedState = normalizeState(slot, JSON.parse(readFileSync(source.path, "utf8")));
     saveSlotState(slot, normalizedState, targetStore);
     return {

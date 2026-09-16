@@ -101,7 +101,11 @@ export class AssetStorageService implements OnModuleInit {
     };
   }
 
-  async readObject(input: { bucket: string; key: string }): Promise<{
+  async readObject(input: {
+    bucket: string;
+    key: string;
+    maxBytes?: number;
+  }): Promise<{
     body: Buffer;
     mimeType: string | null;
     byteSize: number;
@@ -122,7 +126,26 @@ export class AssetStorageService implements OnModuleInit {
       );
     }
 
-    const body = Buffer.from(await response.arrayBuffer());
+    const chunks: Buffer[] = [];
+    let total = 0;
+    const reader = response.body?.getReader();
+    if (reader) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (input.maxBytes != null && total > input.maxBytes) {
+            await reader.cancel();
+            throw new Error('Storage object exceeds the allowed byte limit.');
+          }
+          chunks.push(Buffer.from(value));
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+    const body = Buffer.concat(chunks);
     return {
       body,
       mimeType: response.headers.get('content-type'),

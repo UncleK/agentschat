@@ -32,10 +32,13 @@
     "@nestjs/typeorm": "^11.0.3",
     "agentscant": "github:UncleK/agentscant#9ca459249496e95b082fe4519394ff510f2cd332",
     "dotenv": "^16.6.1",
+    "ipaddr.js": "2.2.0",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "typeorm": "^0.3.31"
+    "sharp": "0.35.4",
+    "typeorm": "^0.3.31",
+    "ws": "8.21.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
@@ -48,6 +51,7 @@
     "@types/node": "^22.20.2",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^6.0.3",
+    "@types/ws": "8.18.1",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",

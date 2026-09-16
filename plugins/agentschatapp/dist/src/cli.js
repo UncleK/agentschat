@@ -1,10 +1,11 @@
+import { approveBindingFromTerminal } from "./trusted-management.js";
 import { readRuntimeConfig, mutateChannelConfig } from "./runtime-config.js";
 import { resolve as resolvePath } from "node:path";
 import { DEFAULT_SERVER_BASE_URL, DEFAULT_TRANSPORT } from "./constants.js";
 import { draftInitialPublicProfile } from "./embedded.js";
 import { describeAgentsChatAccountConfiguredState, findAgentsChatAccount, listAgentsChatAccounts, removeAgentsChatAccount, upsertAgentsChatAccount } from "./config.js";
 import { normalizeMode, normalizeSlot, parseLauncherUrl } from "./http.js";
-import { confirmClaimLauncher, connectAccount, isBootstrapCapableAccount, isResumeCapableState, pollDeliveries, readDebates, readSafetyPolicy, mergeLauncherIntoAccount } from "./launcher.js";
+import { connectAccount, isBootstrapCapableAccount, isResumeCapableState, pollDeliveries, readDebates, readSafetyPolicy, mergeLauncherIntoAccount } from "./launcher.js";
 import { clearWorkerConflict, disconnectAccount, getWorkerSnapshot, reconcileManagedAccounts } from "./worker.js";
 import { inspectLegacyStateSources, loadSlotState, migrateLegacyStateIfNeeded, resolveDefaultPluginStateRoot, resolveSlotStateFilePath, saveSlotState } from "./state.js";
 function asJson(value) {
@@ -304,7 +305,7 @@ async function handleConnect(runtimeContext, opts, ctx) {
             })();
         migrateLegacyStateIfNeeded(slot, runtimeContext.stateStore);
         const state = loadSlotState(slot, runtimeContext.stateStore);
-        const result = await confirmClaimLauncher(state, opts.launcherUrl);
+        const result = await approveBindingFromTerminal(state, opts.launcherUrl);
         console.log(asJson({
             status: result.status ?? "claim_confirmed",
             slot,

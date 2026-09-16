@@ -1,3 +1,30 @@
+// Only transport is replaced: production URL validation remains active.
+jest.mock('../../src/modules/federation/webhook-http', () => {
+  const real = jest.requireActual<
+    typeof import('../../src/modules/federation/webhook-http')
+  >('../../src/modules/federation/webhook-http');
+  return {
+    ...real,
+    postWebhook: async (
+      url: string,
+      body: string,
+      headers: Record<string, string>,
+      signal: AbortSignal,
+    ) => {
+      const match = /^https:\/\/webhook\.fixture\/(\d+)(\/.*)$/.exec(url);
+      if (!match) throw new Error('Unexpected synthetic webhook target');
+      const result = await fetch(`http://127.0.0.1:${match[1]}${match[2]}`, {
+        method: 'POST',
+        body,
+        headers,
+        signal,
+        redirect: 'error',
+      });
+      await result.body?.cancel();
+      return { ok: result.ok, status: result.status };
+    },
+  };
+});
 import { createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
 import { AddressInfo } from 'node:net';
@@ -267,7 +294,7 @@ describe('Authentication, delivery and owner runtime boundaries (e2e)', () => {
           agent.id,
           {
             transportMode: 'webhook',
-            webhookUrl: `http://127.0.0.1:${typedValue<AddressInfo>(webhook.address()).port}/events`,
+            webhookUrl: `https://webhook.fixture/${typedValue<AddressInfo>(webhook.address()).port}/events`,
           },
         );
         token = claim.accessToken;
@@ -318,7 +345,7 @@ describe('Authentication, delivery and owner runtime boundaries (e2e)', () => {
         agent.id,
         {
           transportMode: 'webhook',
-          webhookUrl: `http://127.0.0.1:${typedValue<AddressInfo>(webhook.address()).port}/events`,
+          webhookUrl: `https://webhook.fixture/${typedValue<AddressInfo>(webhook.address()).port}/events`,
         },
       );
       const queued = await context.app
@@ -470,33 +497,36 @@ describe('Authentication, delivery and owner runtime boundaries (e2e)', () => {
       'Human Member',
     );
     const agent = await ownedAgent(oldOwner, 'notice-transfer-agent');
-    const event = await newEvent();
+    const thread = await context.dataSource.getRepository(ThreadEntity).save({
+      contextType: ThreadContextType.DirectMessage,
+    });
     const participants = context.dataSource.getRepository(
       ThreadParticipantEntity,
     );
     await participants.insert([
       {
-        threadId: event.threadId,
+        threadId: thread.id,
         participantType: SubjectType.Agent,
         participantSubjectId: agent.id,
         agentId: agent.id,
         role: ThreadParticipantRole.Member,
       },
       {
-        threadId: event.threadId,
+        threadId: thread.id,
         participantType: SubjectType.Human,
         participantSubjectId: oldOwner.user.id,
         userId: oldOwner.user.id,
         role: ThreadParticipantRole.Spectator,
       },
       {
-        threadId: event.threadId,
+        threadId: thread.id,
         participantType: SubjectType.Human,
         participantSubjectId: member.user.id,
         userId: member.user.id,
         role: ThreadParticipantRole.Member,
       },
     ]);
+    const event = await newEvent(thread.id);
     const notifications = context.app.get(NotificationsService);
     await notifications.processEvent(event);
     expect(
@@ -505,6 +535,9 @@ describe('Authentication, delivery and owner runtime boundaries (e2e)', () => {
     await context.dataSource
       .getRepository(AgentEntity)
       .update({ id: agent.id }, { ownerUserId: newOwner.user.id });
+    // The outbox may retry an event already fanned out synchronously. It must
+    // not recompute its recipients under a later ownership state.
+    await notifications.processEvent(event);
     const oldSocket = await openSocket(oldOwner.accessToken);
     const newSocket = await openSocket(newOwner.accessToken);
     const nextEvent = await newEvent(event.threadId);

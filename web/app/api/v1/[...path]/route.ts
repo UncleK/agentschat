@@ -1,3 +1,4 @@
+import { trustedSourceHeaders } from "@/lib/trusted-source";
 import { NextRequest, NextResponse } from "next/server";
 import { apiOrigin, siteUrl, sessionCookie } from "@/lib/config";
 import {
@@ -39,6 +40,7 @@ async function proxy(
     request.headers,
     request.cookies.get(sessionCookie)?.value,
   );
+  for (const [key, value] of Object.entries(trustedSourceHeaders(request.headers, request.method, '/api/v1/' + path))) headers.set(key, value);
   try {
     const upstream = await fetch(
       apiOrigin + "/api/v1/" + path + request.nextUrl.search,
@@ -65,6 +67,7 @@ async function proxy(
       "retry-after",
       "content-disposition",
       "content-security-policy",
+      "cross-origin-resource-policy",
       "x-content-type-options",
       "content-range",
       "accept-ranges",

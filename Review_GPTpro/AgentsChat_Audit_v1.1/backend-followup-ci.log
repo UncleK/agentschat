@@ -1,0 +1,1012 @@
+﻿2026-09-16T00:25:31.1398537Z Current runner version: '2.337.0'
+2026-09-16T00:25:31.1425560Z ##[group]Runner Image Provisioner
+2026-09-16T00:25:31.1426886Z Hosted Compute Agent
+2026-09-16T00:25:31.1427487Z Version: 20260828.587
+2026-09-16T00:25:31.1428767Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+2026-09-16T00:25:31.1429553Z Build Date: 2026-08-28T16:44:25Z
+2026-09-16T00:25:31.1430330Z Worker ID: {4920cf91-e763-4dbf-90f7-4703263f73ee}
+2026-09-16T00:25:31.1431106Z Azure Region: eastus
+2026-09-16T00:25:31.1431677Z ##[endgroup]
+2026-09-16T00:25:31.1433340Z ##[group]Operating System
+2026-09-16T00:25:31.1434036Z Ubuntu
+2026-09-16T00:25:31.1434623Z 24.04.5
+2026-09-16T00:25:31.1435162Z LTS
+2026-09-16T00:25:31.1435679Z ##[endgroup]
+2026-09-16T00:25:31.1436357Z ##[group]Runner Image
+2026-09-16T00:25:31.1436975Z Image: ubuntu-24.04
+2026-09-16T00:25:31.1437576Z Version: 20260907.300.1
+2026-09-16T00:25:31.1439101Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260907.300/images/ubuntu/Ubuntu2404-Readme.md
+2026-09-16T00:25:31.1440814Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260907.300
+2026-09-16T00:25:31.1441830Z ##[endgroup]
+2026-09-16T00:25:31.1443079Z ##[group]GITHUB_TOKEN Permissions
+2026-09-16T00:25:31.1445350Z Contents: read
+2026-09-16T00:25:31.1446097Z Metadata: read
+2026-09-16T00:25:31.1446710Z Packages: read
+2026-09-16T00:25:31.1447329Z ##[endgroup]
+2026-09-16T00:25:31.1449694Z Secret source: Actions
+2026-09-16T00:25:31.1450799Z Cache mode: write
+2026-09-16T00:25:31.1451567Z Prepare workflow directory
+2026-09-16T00:25:31.1850274Z Prepare all required actions
+2026-09-16T00:25:31.1898804Z Getting action download info
+2026-09-16T00:25:31.4196807Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-09-16T00:25:31.5862426Z Download action repository 'pnpm/action-setup@v6' (SHA:0977fd99725f1db4007ccb2928dbb4e90d06cc86)
+2026-09-16T00:25:31.7092599Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+2026-09-16T00:25:31.8341983Z Download action repository 'actions/upload-artifact@v6' (SHA:b7c566a772e6b6bfb58ed0dc250532a479d7789f)
+2026-09-16T00:25:32.1078863Z Complete job name: backend-server-verification
+2026-09-16T00:25:32.2136909Z ##[group]Run actions/checkout@v7
+2026-09-16T00:25:32.2138634Z with:
+2026-09-16T00:25:32.2139551Z   repository: UncleK/agentschat
+2026-09-16T00:25:32.2149700Z   token: ***
+2026-09-16T00:25:32.2150621Z   ssh-strict: true
+2026-09-16T00:25:32.2151547Z   ssh-user: git
+2026-09-16T00:25:32.2152493Z   persist-credentials: true
+2026-09-16T00:25:32.2153526Z   clean: true
+2026-09-16T00:25:32.2154463Z   sparse-checkout-cone-mode: true
+2026-09-16T00:25:32.2155581Z   fetch-depth: 1
+2026-09-16T00:25:32.2156517Z   fetch-tags: false
+2026-09-16T00:25:32.2157459Z   show-progress: true
+2026-09-16T00:25:32.2158566Z   lfs: false
+2026-09-16T00:25:32.2159486Z   submodules: false
+2026-09-16T00:25:32.2160465Z   set-safe-directory: true
+2026-09-16T00:25:32.2161541Z   allow-unsafe-pr-checkout: false
+2026-09-16T00:25:32.2163006Z ##[endgroup]
+2026-09-16T00:25:32.3236387Z Syncing repository: UncleK/agentschat
+2026-09-16T00:25:32.3239676Z ##[group]Getting Git version info
+2026-09-16T00:25:32.3241261Z Working directory is '/home/runner/work/agentschat/agentschat'
+2026-09-16T00:25:32.3243349Z [command]/usr/bin/git version
+2026-09-16T00:25:32.3300942Z git version 2.55.0
+2026-09-16T00:25:32.3326894Z ##[endgroup]
+2026-09-16T00:25:32.3345314Z Temporarily overriding HOME='/home/runner/work/_temp/1e8f455b-667c-4acc-92aa-3b968ba2ed91' before making global git config changes
+2026-09-16T00:25:32.3350576Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-16T00:25:32.3354807Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/agentschat/agentschat
+2026-09-16T00:25:32.3409599Z Deleting the contents of '/home/runner/work/agentschat/agentschat'
+2026-09-16T00:25:32.3502152Z ##[group]Determining repository object format
+2026-09-16T00:25:32.3505094Z ##[endgroup]
+2026-09-16T00:25:32.3507128Z ##[group]Initializing the repository
+2026-09-16T00:25:32.3509257Z [command]/usr/bin/git init /home/runner/work/agentschat/agentschat
+2026-09-16T00:25:32.3546860Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-09-16T00:25:32.3550434Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-09-16T00:25:32.3552801Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-09-16T00:25:32.3554416Z hint: call:
+2026-09-16T00:25:32.3555229Z hint:
+2026-09-16T00:25:32.3556282Z hint: 	git config --global init.defaultBranch <name>
+2026-09-16T00:25:32.3557533Z hint:
+2026-09-16T00:25:32.3559554Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-09-16T00:25:32.3561746Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-09-16T00:25:32.3564034Z hint:
+2026-09-16T00:25:32.3564917Z hint: 	git branch -m <name>
+2026-09-16T00:25:32.3565956Z hint:
+2026-09-16T00:25:32.3567240Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-09-16T00:25:32.3569931Z Initialized empty Git repository in /home/runner/work/agentschat/agentschat/.git/
+2026-09-16T00:25:32.3576637Z [command]/usr/bin/git remote add origin https://github.com/UncleK/agentschat
+2026-09-16T00:25:32.3617820Z ##[endgroup]
+2026-09-16T00:25:32.3619677Z ##[group]Disabling automatic garbage collection
+2026-09-16T00:25:32.3621570Z [command]/usr/bin/git config --local gc.auto 0
+2026-09-16T00:25:32.3666397Z ##[endgroup]
+2026-09-16T00:25:32.3669369Z ##[group]Setting up auth
+2026-09-16T00:25:32.3671381Z Removing SSH command configuration
+2026-09-16T00:25:32.3675064Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-16T00:25:32.3715315Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-16T00:25:32.4117421Z Removing HTTP extra header
+2026-09-16T00:25:32.4124968Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-16T00:25:32.4167489Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-16T00:25:32.4391323Z Removing includeIf entries pointing to credentials config files
+2026-09-16T00:25:32.4395795Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-16T00:25:32.4431893Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-16T00:25:32.4664005Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-bec4b3db-bd3a-452a-81e6-ab24c9ae8c78.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-09-16T00:25:32.4708410Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/agentschat/agentschat/.git.path /home/runner/work/_temp/git-credentials-bec4b3db-bd3a-452a-81e6-ab24c9ae8c78.config
+2026-09-16T00:25:32.4746392Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/agentschat/agentschat/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-bec4b3db-bd3a-452a-81e6-ab24c9ae8c78.config
+2026-09-16T00:25:32.4787303Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-bec4b3db-bd3a-452a-81e6-ab24c9ae8c78.config
+2026-09-16T00:25:32.4824495Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-bec4b3db-bd3a-452a-81e6-ab24c9ae8c78.config
+2026-09-16T00:25:32.4854854Z ##[endgroup]
+2026-09-16T00:25:32.4860986Z ##[group]Fetching the repository
+2026-09-16T00:25:32.4863797Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +ddc143ea6bb5d645a879b69d4e4ff8df8c4de618:refs/remotes/pull/7/merge
+2026-09-16T00:25:33.3394136Z From https://github.com/UncleK/agentschat
+2026-09-16T00:25:33.3394989Z  * [new ref]         ddc143ea6bb5d645a879b69d4e4ff8df8c4de618 -> pull/7/merge
+2026-09-16T00:25:33.3399385Z ##[endgroup]
+2026-09-16T00:25:33.3400120Z ##[group]Determining the checkout info
+2026-09-16T00:25:33.3401019Z ##[endgroup]
+2026-09-16T00:25:33.3405284Z [command]/usr/bin/git sparse-checkout disable
+2026-09-16T00:25:33.3459119Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-09-16T00:25:33.3492403Z ##[group]Checking out the ref
+2026-09-16T00:25:33.3496345Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/7/merge
+2026-09-16T00:25:33.5447353Z Note: switching to 'refs/remotes/pull/7/merge'.
+2026-09-16T00:25:33.5459985Z 
+2026-09-16T00:25:33.5460609Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-09-16T00:25:33.5461332Z changes and commit them, and you can discard any commits you make in this
+2026-09-16T00:25:33.5461958Z state without impacting any branches by switching back to a branch.
+2026-09-16T00:25:33.5462320Z 
+2026-09-16T00:25:33.5463094Z If you want to create a new branch to retain commits you create, you may
+2026-09-16T00:25:33.5463697Z do so (now or later) by using -c with the switch command. Example:
+2026-09-16T00:25:33.5464167Z 
+2026-09-16T00:25:33.5464514Z   git switch -c <new-branch-name>
+2026-09-16T00:25:33.5464788Z 
+2026-09-16T00:25:33.5464961Z Or undo this operation with:
+2026-09-16T00:25:33.5465167Z 
+2026-09-16T00:25:33.5465542Z   git switch -
+2026-09-16T00:25:33.5466036Z 
+2026-09-16T00:25:33.5466688Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-09-16T00:25:33.5467102Z 
+2026-09-16T00:25:33.5467523Z HEAD is now at ddc143e Merge ee7ba2c478741e844ef32abcb5d822f6adf33dc9 into 1fe8354186009259c11df3a4cbb0adbd80325818
+2026-09-16T00:25:33.5469858Z ##[endgroup]
+2026-09-16T00:25:33.5527050Z [command]/usr/bin/git log -1 --format=%H
+2026-09-16T00:25:33.5562585Z ddc143ea6bb5d645a879b69d4e4ff8df8c4de618
+2026-09-16T00:25:33.5809560Z ##[group]Run pnpm/action-setup@v6
+2026-09-16T00:25:33.5809934Z with:
+2026-09-16T00:25:33.5810191Z   version: 10.33.0
+2026-09-16T00:25:33.5810468Z   dest: ~/setup-pnpm
+2026-09-16T00:25:33.5810766Z   run_install: null
+2026-09-16T00:25:33.5811037Z   cache: false
+2026-09-16T00:25:33.5811328Z   cache_dependency_path: pnpm-lock.yaml
+2026-09-16T00:25:33.5811688Z   package_json_file: package.json
+2026-09-16T00:25:33.5812015Z   standalone: false
+2026-09-16T00:25:33.5812292Z ##[endgroup]
+2026-09-16T00:25:33.7331679Z ##[group]Running self-installer...
+2026-09-16T00:25:36.9391926Z 
+2026-09-16T00:25:36.9393043Z added 1 package, and audited 2 packages in 3s
+2026-09-16T00:25:36.9393650Z 
+2026-09-16T00:25:36.9393813Z 1 package is looking for funding
+2026-09-16T00:25:36.9394167Z   run `npm fund` for details
+2026-09-16T00:25:36.9400099Z 
+2026-09-16T00:25:36.9400298Z found 0 vulnerabilities
+2026-09-16T00:25:37.5629508Z Checking for updates...
+2026-09-16T00:25:37.8770473Z Switching pnpm from v11.19.0 to v10.33.0...
+2026-09-16T00:25:38.3348180Z .../v11/910-1a0a79ad861-436d13112a4cd8a2 | Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-09-16T00:25:38.3371519Z .../v11/910-1a0a79ad861-436d13112a4cd8a2 |   +1 +
+2026-09-16T00:25:38.6010757Z .../v11/910-1a0a79ad861-436d13112a4cd8a2 | Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-09-16T00:25:39.0138894Z [WARN] Detected a pnpm v10 installation layout at PNPM_HOME. The pnpm shims at PNPM_HOME have been refreshed so the new version is active, but pnpm v11 expects bins in PNPM_HOME/bin. Run "pnpm setup" to migrate your PATH to the v11 layout.
+2026-09-16T00:25:39.0166549Z Successfully updated pnpm to v10.33.0
+2026-09-16T00:25:39.0462226Z ##[endgroup]
+2026-09-16T00:25:39.0462594Z Installation Completed!
+2026-09-16T00:25:39.0672229Z ##[group]Run actions/setup-node@v7
+2026-09-16T00:25:39.0672534Z with:
+2026-09-16T00:25:39.0672989Z   node-version: 22
+2026-09-16T00:25:39.0673213Z   cache: pnpm
+2026-09-16T00:25:39.0673460Z   cache-dependency-path: server/pnpm-lock.yaml
+2026-09-16T00:25:39.0673776Z   check-latest: false
+2026-09-16T00:25:39.0676496Z   token: ***
+2026-09-16T00:25:39.0676719Z   package-manager-cache: true
+2026-09-16T00:25:39.0676967Z env:
+2026-09-16T00:25:39.0677211Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:25:39.0677521Z ##[endgroup]
+2026-09-16T00:25:39.1970094Z Found in cache @ /opt/hostedtoolcache/node/22.23.2/x64
+2026-09-16T00:25:39.1973418Z ##[group]Environment details
+2026-09-16T00:25:41.7126413Z node: v22.23.2
+2026-09-16T00:25:41.7127014Z npm: 10.9.8
+2026-09-16T00:25:41.7127394Z yarn: 1.22.22
+2026-09-16T00:25:41.7129209Z ##[endgroup]
+2026-09-16T00:25:41.7154303Z [command]/home/runner/setup-pnpm/node_modules/.bin/bin/pnpm store path --silent
+2026-09-16T00:25:42.1460254Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-09-16T00:25:42.2282361Z Cache hit for: node-cache-Linux-x64-pnpm-2cf0ecf14ee5ffac91262c510c2cfe70f5f3869b2f93b69095e07101aa9b6a8f
+2026-09-16T00:25:42.5507292Z Received 47671611 of 47671611 (100.0%), 162.4 MBs/sec
+2026-09-16T00:25:42.5508881Z Cache Size: ~45 MB (47671611 B)
+2026-09-16T00:25:42.5548143Z [command]/usr/bin/tar -xf /home/runner/work/_temp/577b8d08-f87f-43ce-a2af-9c7ebf9c9215/cache.tzst -P -C /home/runner/work/agentschat/agentschat --use-compress-program unzstd
+2026-09-16T00:25:43.4751729Z Cache restored successfully
+2026-09-16T00:25:43.4785101Z Cache restored from key: node-cache-Linux-x64-pnpm-2cf0ecf14ee5ffac91262c510c2cfe70f5f3869b2f93b69095e07101aa9b6a8f
+2026-09-16T00:25:43.4952275Z ##[group]Run pnpm --dir server install --frozen-lockfile
+2026-09-16T00:25:43.4952783Z [36;1mpnpm --dir server install --frozen-lockfile[0m
+2026-09-16T00:25:43.5000543Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:25:43.5000903Z env:
+2026-09-16T00:25:43.5001176Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:25:43.5001502Z ##[endgroup]
+2026-09-16T00:25:43.8644611Z Lockfile is up to date, resolution step is skipped
+2026-09-16T00:25:43.9144905Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-09-16T00:25:44.0322747Z Packages: +682
+2026-09-16T00:25:44.0323759Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-09-16T00:25:44.5366554Z Packages are hard linked from the content-addressable store to the virtual store.
+2026-09-16T00:25:44.5368315Z   Content-addressable store is at: /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-09-16T00:25:44.5369408Z   Virtual store is at:             node_modules/.pnpm
+2026-09-16T00:25:44.5499688Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-install$ npm install
+2026-09-16T00:25:44.9164564Z Progress: resolved 682, reused 680, downloaded 0, added 397
+2026-09-16T00:25:45.9165076Z Progress: resolved 682, reused 680, downloaded 0, added 681
+2026-09-16T00:25:46.3823863Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-install: added 3 packages, and audited 4 packages in 2s
+2026-09-16T00:25:46.3830248Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-install: found 0 vulnerabilities
+2026-09-16T00:25:46.4263190Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-install: Done
+2026-09-16T00:25:46.4273386Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-run-prepack$ npm run prepack
+2026-09-16T00:25:46.5302552Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-run-prepack: > agentscant@0.2.0 prepack
+2026-09-16T00:25:46.5304600Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-run-prepack: > npm run build
+2026-09-16T00:25:46.6396929Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-run-prepack: > agentscant@0.2.0 build
+2026-09-16T00:25:46.6398737Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-run-prepack: > tsc -p tsconfig.json
+2026-09-16T00:25:47.9458790Z ...2406_0bf822da80b5880e6cd1a1c0adc9b1d0 npm-run-prepack: Done
+2026-09-16T00:25:47.9892705Z Progress: resolved 682, reused 680, downloaded 1, added 681
+2026-09-16T00:25:47.9904910Z Progress: resolved 682, reused 680, downloaded 1, added 682, done
+2026-09-16T00:25:48.3329272Z 
+2026-09-16T00:25:48.3329852Z dependencies:
+2026-09-16T00:25:48.3330311Z + @nestjs/common 11.2.3
+2026-09-16T00:25:48.3330741Z + @nestjs/core 11.2.3
+2026-09-16T00:25:48.3331223Z + @nestjs/platform-express 11.2.3
+2026-09-16T00:25:48.3331718Z + @nestjs/typeorm 11.0.3
+2026-09-16T00:25:48.3332321Z + agentscant 0.2.0
+2026-09-16T00:25:48.3332697Z + dotenv 16.6.1
+2026-09-16T00:25:48.3333070Z + ipaddr.js 2.2.0
+2026-09-16T00:25:48.3333424Z + pg 8.23.0
+2026-09-16T00:25:48.3333796Z + reflect-metadata 0.2.2
+2026-09-16T00:25:48.3334252Z + rxjs 7.8.2
+2026-09-16T00:25:48.3334615Z + sharp 0.35.4
+2026-09-16T00:25:48.3334963Z + typeorm 0.3.31
+2026-09-16T00:25:48.3335299Z + ws 8.21.3
+2026-09-16T00:25:48.3335480Z 
+2026-09-16T00:25:48.3335638Z devDependencies:
+2026-09-16T00:25:48.3336050Z + @eslint/eslintrc 3.3.7
+2026-09-16T00:25:48.3336462Z + @eslint/js 9.39.5
+2026-09-16T00:25:48.3336850Z + @nestjs/cli 11.0.24
+2026-09-16T00:25:48.3337263Z + @nestjs/schematics 11.1.0
+2026-09-16T00:25:48.3337712Z + @nestjs/testing 11.2.3
+2026-09-16T00:25:48.3338418Z + @types/express 5.0.6
+2026-09-16T00:25:48.3338817Z + @types/jest 30.0.0
+2026-09-16T00:25:48.3339203Z + @types/node 22.20.2
+2026-09-16T00:25:48.3339594Z + @types/pg 8.23.1
+2026-09-16T00:25:48.3340034Z + @types/supertest 6.0.3
+2026-09-16T00:25:48.3340441Z + @types/ws 8.18.1
+2026-09-16T00:25:48.3340792Z + eslint 9.39.4
+2026-09-16T00:25:48.3341239Z + eslint-config-prettier 10.1.8
+2026-09-16T00:25:48.3341773Z + eslint-plugin-prettier 5.5.6
+2026-09-16T00:25:48.3342205Z + globals 16.5.0
+2026-09-16T00:25:48.3342547Z + jest 30.5.1
+2026-09-16T00:25:48.3343261Z + prettier 3.9.6
+2026-09-16T00:25:48.3344063Z + source-map-support 0.5.21
+2026-09-16T00:25:48.3344588Z + supertest 7.2.2
+2026-09-16T00:25:48.3345022Z + ts-jest 29.4.12
+2026-09-16T00:25:48.3345445Z + ts-loader 9.6.2
+2026-09-16T00:25:48.3345860Z + ts-node 10.9.2
+2026-09-16T00:25:48.3346299Z + tsconfig-paths 4.2.0
+2026-09-16T00:25:48.3346763Z + typescript 5.9.3
+2026-09-16T00:25:48.3347236Z + typescript-eslint 8.70.0
+2026-09-16T00:25:48.3347592Z 
+2026-09-16T00:25:48.3561351Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-09-16T00:25:48.3562344Z │                                                                              │
+2026-09-16T00:25:48.3563392Z │   Ignored build scripts: @parcel/watcher@2.6.0, unrs-resolver@1.12.2.        │
+2026-09-16T00:25:48.3564499Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-09-16T00:25:48.3565508Z │   to run scripts.                                                            │
+2026-09-16T00:25:48.3566439Z │                                                                              │
+2026-09-16T00:25:48.3567574Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-09-16T00:25:48.3813078Z Done in 4.8s using pnpm v10.33.0
+2026-09-16T00:25:48.4080846Z ##[group]Run pnpm --dir server lint
+2026-09-16T00:25:48.4081197Z [36;1mpnpm --dir server lint[0m
+2026-09-16T00:25:48.4119130Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:25:48.4119522Z env:
+2026-09-16T00:25:48.4119788Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:25:48.4120117Z ##[endgroup]
+2026-09-16T00:25:48.7311985Z 
+2026-09-16T00:25:48.7312972Z > agents-chat-server@0.1.0 lint /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:25:48.7313803Z > eslint "{src,test}/**/*.ts"
+2026-09-16T00:25:48.7314180Z 
+2026-09-16T00:26:03.2172313Z ##[group]Run pnpm --dir server typecheck
+2026-09-16T00:26:03.2172689Z [36;1mpnpm --dir server typecheck[0m
+2026-09-16T00:26:03.2210104Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:26:03.2210467Z env:
+2026-09-16T00:26:03.2210737Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:26:03.2211060Z ##[endgroup]
+2026-09-16T00:26:03.5034686Z 
+2026-09-16T00:26:03.5035693Z > agents-chat-server@0.1.0 typecheck /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:26:03.5036718Z > tsc --noEmit -p tsconfig.build.json
+2026-09-16T00:26:03.5037572Z 
+2026-09-16T00:26:07.5503887Z ##[group]Run pnpm --dir server build
+2026-09-16T00:26:07.5504237Z [36;1mpnpm --dir server build[0m
+2026-09-16T00:26:07.5541845Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:26:07.5542212Z env:
+2026-09-16T00:26:07.5542478Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:26:07.5542798Z ##[endgroup]
+2026-09-16T00:26:07.8322557Z 
+2026-09-16T00:26:07.8323497Z > agents-chat-server@0.1.0 build /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:26:07.8324275Z > nest build
+2026-09-16T00:26:07.8324479Z 
+2026-09-16T00:26:13.9167256Z ##[group]Run pnpm --dir server test:unit
+2026-09-16T00:26:13.9167610Z [36;1mpnpm --dir server test:unit[0m
+2026-09-16T00:26:13.9205484Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:26:13.9205834Z env:
+2026-09-16T00:26:13.9206095Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:26:13.9206403Z ##[endgroup]
+2026-09-16T00:26:14.1976960Z 
+2026-09-16T00:26:14.1978160Z > agents-chat-server@0.1.0 test:unit /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:26:14.1978830Z > jest --config ./test/jest-unit.json
+2026-09-16T00:26:14.1979072Z 
+2026-09-16T00:26:15.8849385Z PASS src/modules/speech/speech.service.spec.ts
+2026-09-16T00:26:16.8939348Z PASS src/modules/assets/assets.service.spec.ts
+2026-09-16T00:26:17.1129658Z PASS src/modules/federation/webhook-http.spec.ts
+2026-09-16T00:26:17.4829635Z PASS src/modules/federation/federation-credentials.service.spec.ts
+2026-09-16T00:26:17.7269442Z PASS src/modules/health/health.service.spec.ts
+2026-09-16T00:26:17.7960307Z PASS src/modules/federation/federation.service.spec.ts
+2026-09-16T00:26:17.9700184Z PASS src/modules/auth/auth.service.spec.ts
+2026-09-16T00:26:18.0549440Z PASS src/config/environment.spec.ts
+2026-09-16T00:26:18.1209349Z PASS src/modules/assets/byte-range.spec.ts
+2026-09-16T00:26:18.1210170Z PASS src/modules/assets/avatar-raster.spec.ts
+2026-09-16T00:26:18.1724230Z PASS src/modules/auth/oauth.config.spec.ts
+2026-09-16T00:26:18.3142675Z PASS src/modules/content/content.controller.spec.ts
+2026-09-16T00:26:18.3551891Z 
+2026-09-16T00:26:18.3556046Z Test Suites: 12 passed, 12 total
+2026-09-16T00:26:18.3556893Z Tests:       69 passed, 69 total
+2026-09-16T00:26:18.3557381Z Snapshots:   0 total
+2026-09-16T00:26:18.3557780Z Time:        3.822 s
+2026-09-16T00:26:18.3558409Z Ran all test suites.
+2026-09-16T00:26:18.4296888Z ##[group]Run docker compose -f server/docker-compose.yml build minio
+2026-09-16T00:26:18.4297439Z [36;1mdocker compose -f server/docker-compose.yml build minio[0m
+2026-09-16T00:26:18.4298207Z [36;1mdocker compose -f server/docker-compose.yml up -d postgres redis minio[0m
+2026-09-16T00:26:18.4298636Z [36;1mfor attempt in $(seq 1 60); do[0m
+2026-09-16T00:26:18.4299118Z [36;1m  if docker exec agents-chat-postgres pg_isready -U agents_chat -d agents_chat; then break; fi[0m
+2026-09-16T00:26:18.4299609Z [36;1m  sleep 2[0m
+2026-09-16T00:26:18.4299844Z [36;1mdone[0m
+2026-09-16T00:26:18.4300189Z [36;1mdocker exec agents-chat-postgres pg_isready -U agents_chat -d agents_chat[0m
+2026-09-16T00:26:18.4300641Z [36;1mfor attempt in $(seq 1 60); do[0m
+2026-09-16T00:26:18.4301084Z [36;1m  if curl --fail --silent http://127.0.0.1:9000/minio/health/live; then break; fi[0m
+2026-09-16T00:26:18.4301522Z [36;1m  sleep 2[0m
+2026-09-16T00:26:18.4301730Z [36;1mdone[0m
+2026-09-16T00:26:18.4302062Z [36;1mcurl --fail --silent http://127.0.0.1:9000/minio/health/live[0m
+2026-09-16T00:26:18.4340138Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:26:18.4340493Z env:
+2026-09-16T00:26:18.4340749Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:26:18.4341063Z ##[endgroup]
+2026-09-16T00:26:18.9888713Z #1 [internal] load local bake definitions
+2026-09-16T00:26:19.0987037Z #1 reading from stdin 417B done
+2026-09-16T00:26:19.0987584Z #1 DONE 0.0s
+2026-09-16T00:26:19.0987804Z 
+2026-09-16T00:26:19.0988397Z #2 [internal] load build definition from Dockerfile
+2026-09-16T00:26:19.0989479Z #2 transferring dockerfile: 503B done
+2026-09-16T00:26:19.0989928Z #2 DONE 0.0s
+2026-09-16T00:26:19.0990129Z 
+2026-09-16T00:26:19.0990542Z #3 [auth] library/golang:pull token for registry-1.docker.io
+2026-09-16T00:26:19.2490213Z #3 DONE 0.0s
+2026-09-16T00:26:19.2490495Z 
+2026-09-16T00:26:19.2490953Z #4 [auth] library/alpine:pull token for registry-1.docker.io
+2026-09-16T00:26:19.2491589Z #4 DONE 0.0s
+2026-09-16T00:26:19.2491777Z 
+2026-09-16T00:26:19.2492077Z #5 [internal] load metadata for docker.io/library/golang:1.25-alpine
+2026-09-16T00:26:19.3720183Z #5 DONE 0.3s
+2026-09-16T00:26:19.3720453Z 
+2026-09-16T00:26:19.3720878Z #6 [internal] load metadata for docker.io/library/alpine:3.22
+2026-09-16T00:26:19.4880511Z #6 DONE 0.4s
+2026-09-16T00:26:19.4881927Z 
+2026-09-16T00:26:19.4882933Z #7 [internal] load .dockerignore
+2026-09-16T00:26:19.4884009Z #7 transferring context: 2B done
+2026-09-16T00:26:19.4884659Z #7 DONE 0.0s
+2026-09-16T00:26:19.4884945Z 
+2026-09-16T00:26:19.4885834Z #8 [stage-1 1/3] FROM docker.io/library/alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
+2026-09-16T00:26:19.4887327Z #8 resolve docker.io/library/alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce done
+2026-09-16T00:26:19.4889126Z #8 extracting sha256:f7ee36c9aa34bbb665f975c76e5c0d1607f0674b94c84cfb0061f87006ea5d10
+2026-09-16T00:26:19.5886237Z #8 sha256:f7ee36c9aa34bbb665f975c76e5c0d1607f0674b94c84cfb0061f87006ea5d10 3.79MB / 3.79MB 0.0s done
+2026-09-16T00:26:19.5887788Z #8 sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce 9.22kB / 9.22kB done
+2026-09-16T00:26:19.5889519Z #8 sha256:7c8cb692ae09657cbc4a3f3cbd0e8d5a2690ba38386aaaf252dbb060bf5eb2e6 1.02kB / 1.02kB done
+2026-09-16T00:26:19.5891129Z #8 sha256:b66e0ce64844f5c6435b0c4bfd965558199ab0f53270846861c979cb1ac29365 611B / 611B done
+2026-09-16T00:26:19.7430088Z #8 extracting sha256:f7ee36c9aa34bbb665f975c76e5c0d1607f0674b94c84cfb0061f87006ea5d10 0.1s done
+2026-09-16T00:26:19.7430767Z #8 DONE 0.2s
+2026-09-16T00:26:19.7431413Z 
+2026-09-16T00:26:19.7432798Z #9 [build 1/3] FROM docker.io/library/golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59
+2026-09-16T00:26:19.7434743Z #9 resolve docker.io/library/golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59 done
+2026-09-16T00:26:19.7436750Z #9 extracting sha256:fbbf4aee6bbb3850b92fe52557e4774388d45230d056794e085784549c4cb310 0.1s done
+2026-09-16T00:26:19.7440114Z #9 sha256:fbbf4aee6bbb3850b92fe52557e4774388d45230d056794e085784549c4cb310 245.06kB / 245.06kB 0.0s done
+2026-09-16T00:26:19.7441929Z #9 sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 60.29MB / 60.29MB 0.2s
+2026-09-16T00:26:19.7444488Z #9 sha256:91ca672d117ca07bb7383d7da745a895eff9a448fbb9c5afa4ebd76b1215c6f0 127B / 127B 0.1s done
+2026-09-16T00:26:19.7446923Z #9 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B 0.1s done
+2026-09-16T00:26:19.7448192Z #9 sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59 10.30kB / 10.30kB done
+2026-09-16T00:26:19.7449480Z #9 sha256:78c9e40f10516d7070156948a1747347cc5093022f06deeff3c9decd5faa3af7 1.92kB / 1.92kB done
+2026-09-16T00:26:19.7450588Z #9 sha256:07d6e65bb14b257e518eb70088f0c6826c86ff6185538bdb946bcda8e211d03b 2.19kB / 2.19kB done
+2026-09-16T00:26:19.7451646Z #9 extracting sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98
+2026-09-16T00:26:20.7911229Z #9 ...
+2026-09-16T00:26:20.7911713Z 
+2026-09-16T00:26:20.7912252Z #10 [stage-1 2/3] RUN apk add --no-cache ca-certificates curl
+2026-09-16T00:26:20.7913707Z #10 0.187 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/APKINDEX.tar.gz
+2026-09-16T00:26:20.7914512Z #10 0.281 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/APKINDEX.tar.gz
+2026-09-16T00:26:20.7915589Z #10 0.661 (1/10) Installing ca-certificates (20260611-r0)
+2026-09-16T00:26:20.7916495Z #10 0.691 (2/10) Installing brotli-libs (1.1.0-r2)
+2026-09-16T00:26:20.7917700Z #10 0.703 (3/10) Installing c-ares (1.34.8-r0)
+2026-09-16T00:26:20.7918799Z #10 0.708 (4/10) Installing libunistring (1.3-r0)
+2026-09-16T00:26:20.7919535Z #10 0.724 (5/10) Installing libidn2 (2.3.7-r0)
+2026-09-16T00:26:20.7920230Z #10 0.730 (6/10) Installing nghttp2-libs (1.69.0-r0)
+2026-09-16T00:26:20.7920737Z #10 0.735 (7/10) Installing libpsl (0.21.5-r3)
+2026-09-16T00:26:20.7921486Z #10 0.739 (8/10) Installing zstd-libs (1.5.7-r0)
+2026-09-16T00:26:20.7922215Z #10 0.751 (9/10) Installing libcurl (8.14.1-r3)
+2026-09-16T00:26:20.7922950Z #10 0.760 (10/10) Installing curl (8.14.1-r3)
+2026-09-16T00:26:20.7923663Z #10 0.765 Executing busybox-1.37.0-r20.trigger
+2026-09-16T00:26:20.7924441Z #10 0.774 Executing ca-certificates-20260611-r0.trigger
+2026-09-16T00:26:20.7925185Z #10 0.825 OK: 13 MiB in 26 packages
+2026-09-16T00:26:20.7925699Z #10 DONE 1.0s
+2026-09-16T00:26:20.7925922Z 
+2026-09-16T00:26:20.7926902Z #9 [build 1/3] FROM docker.io/library/golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59
+2026-09-16T00:26:24.1734828Z #9 extracting sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 4.4s done
+2026-09-16T00:26:24.5703372Z #9 extracting sha256:91ca672d117ca07bb7383d7da745a895eff9a448fbb9c5afa4ebd76b1215c6f0
+2026-09-16T00:26:24.7546809Z #9 extracting sha256:91ca672d117ca07bb7383d7da745a895eff9a448fbb9c5afa4ebd76b1215c6f0 done
+2026-09-16T00:26:24.7547607Z #9 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 done
+2026-09-16T00:26:24.7548460Z #9 DONE 5.2s
+2026-09-16T00:26:24.7548592Z 
+2026-09-16T00:26:24.7548756Z #11 [build 2/3] RUN apk add --no-cache git
+2026-09-16T00:26:25.4011017Z #11 0.796 ( 1/12) Installing brotli-libs (1.2.0-r1)
+2026-09-16T00:26:25.5542113Z #11 0.807 ( 2/12) Installing c-ares (1.34.8-r0)
+2026-09-16T00:26:25.5542879Z #11 0.811 ( 3/12) Installing libunistring (1.4.2-r0)
+2026-09-16T00:26:25.5543332Z #11 0.825 ( 4/12) Installing libidn2 (2.3.8-r0)
+2026-09-16T00:26:25.5543768Z #11 0.834 ( 5/12) Installing nghttp2-libs (1.69.0-r0)
+2026-09-16T00:26:25.5544156Z #11 0.843 ( 6/12) Installing libpsl (0.21.5-r3)
+2026-09-16T00:26:25.5544532Z #11 0.846 ( 7/12) Installing zstd-libs (1.5.7-r2)
+2026-09-16T00:26:25.5544912Z #11 0.856 ( 8/12) Installing libcurl (8.22.0-r0)
+2026-09-16T00:26:25.5545278Z #11 0.865 ( 9/12) Installing libexpat (2.8.4-r0)
+2026-09-16T00:26:25.5545922Z #11 0.878 (10/12) Installing pcre2 (10.48-r0)
+2026-09-16T00:26:25.5546300Z #11 0.886 (11/12) Installing git (2.54.0-r0)
+2026-09-16T00:26:25.5546698Z #11 0.950 (12/12) Installing git-init-template (2.54.0-r0)
+2026-09-16T00:26:25.7820187Z #11 0.953 Executing busybox-1.37.0-r31.trigger
+2026-09-16T00:26:25.7820917Z #11 0.970 OK: 20.6 MiB in 29 packages
+2026-09-16T00:26:25.7821455Z #11 DONE 1.0s
+2026-09-16T00:26:25.7821674Z 
+2026-09-16T00:26:25.7822424Z #12 [build 3/3] RUN GOBIN=/out go install github.com/minio/minio@9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
+2026-09-16T00:26:25.8700001Z #12 0.239 go: downloading github.com/minio/minio v0.0.0-20251015172955-9e49d5e7a648
+2026-09-16T00:26:27.4563937Z #12 1.824 go: downloading cloud.google.com/go/storage v1.52.0
+2026-09-16T00:26:27.6779050Z #12 1.837 go: downloading github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0
+2026-09-16T00:26:27.6779869Z #12 1.839 go: downloading github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0
+2026-09-16T00:26:27.6780712Z #12 1.896 go: downloading github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.1
+2026-09-16T00:26:27.7631506Z #12 2.132 go: downloading github.com/cespare/xxhash/v2 v2.3.0
+2026-09-16T00:26:27.8761376Z #12 2.156 go: downloading github.com/cheggaaa/pb v1.0.29
+2026-09-16T00:26:27.8761944Z #12 2.244 go: downloading github.com/coreos/go-oidc/v3 v3.14.1
+2026-09-16T00:26:27.9793116Z #12 2.245 go: downloading github.com/coreos/go-systemd/v22 v22.5.0
+2026-09-16T00:26:27.9794083Z #12 2.282 go: downloading github.com/cosnicolaou/pbzip2 v1.0.5
+2026-09-16T00:26:27.9794911Z #12 2.292 go: downloading github.com/dchest/siphash v1.2.3
+2026-09-16T00:26:27.9796053Z #12 2.320 go: downloading github.com/dustin/go-humanize v1.0.1
+2026-09-16T00:26:27.9796839Z #12 2.348 go: downloading github.com/fatih/color v1.18.0
+2026-09-16T00:26:28.0841419Z #12 2.365 go: downloading cloud.google.com/go v0.120.1
+2026-09-16T00:26:28.0842039Z #12 2.374 go: downloading github.com/felixge/fgprof v0.9.5
+2026-09-16T00:26:28.0842639Z #12 2.408 go: downloading github.com/go-openapi/loads v0.22.0
+2026-09-16T00:26:28.0843214Z #12 2.416 go: downloading github.com/golang-jwt/jwt/v4 v4.5.2
+2026-09-16T00:26:28.0843755Z #12 2.453 go: downloading github.com/google/uuid v1.6.0
+2026-09-16T00:26:28.1902673Z #12 2.479 go: downloading github.com/inconshreveable/mousetrap v1.1.0
+2026-09-16T00:26:28.1903367Z #12 2.500 go: downloading github.com/json-iterator/go v1.1.12
+2026-09-16T00:26:28.1903940Z #12 2.559 go: downloading github.com/klauspost/compress v1.18.0
+2026-09-16T00:26:28.8443127Z #12 3.212 go: downloading github.com/klauspost/filepathx v1.1.1
+2026-09-16T00:26:28.8444312Z #12 3.212 go: downloading github.com/klauspost/pgzip v1.2.6
+2026-09-16T00:26:28.9494167Z #12 3.213 go: downloading github.com/klauspost/readahead v1.4.0
+2026-09-16T00:26:28.9495078Z #12 3.213 go: downloading github.com/klauspost/reedsolomon v1.12.4
+2026-09-16T00:26:28.9495927Z #12 3.234 go: downloading github.com/lithammer/shortuuid/v4 v4.2.0
+2026-09-16T00:26:28.9496761Z #12 3.318 go: downloading github.com/miekg/dns v1.1.65
+2026-09-16T00:26:29.1540309Z #12 3.340 go: downloading github.com/minio/cli v1.24.2
+2026-09-16T00:26:29.1541670Z #12 3.372 go: downloading github.com/minio/console v1.7.7-0.20250905210349-2017f33b26e1
+2026-09-16T00:26:29.6239109Z #12 3.992 go: downloading github.com/minio/dnscache v0.1.1
+2026-09-16T00:26:29.7429222Z #12 3.992 go: downloading github.com/minio/dperf v0.6.3
+2026-09-16T00:26:29.7429747Z #12 3.992 go: downloading github.com/minio/highwayhash v1.0.3
+2026-09-16T00:26:29.7430247Z #12 3.992 go: downloading github.com/minio/kms-go/kes v0.3.1
+2026-09-16T00:26:29.7430754Z #12 4.112 go: downloading github.com/minio/madmin-go/v3 v3.0.109
+2026-09-16T00:26:29.9321600Z #12 4.301 go: downloading github.com/minio/minio-go/v7 v7.0.91
+2026-09-16T00:26:30.0676593Z #12 4.436 go: downloading github.com/minio/mux v1.9.2
+2026-09-16T00:26:30.0677268Z #12 4.436 go: downloading github.com/minio/pkg/v3 v3.1.3
+2026-09-16T00:26:30.2324888Z #12 4.601 go: downloading github.com/minio/selfupdate v0.6.0
+2026-09-16T00:26:30.2326531Z #12 4.601 go: downloading github.com/minio/sio v0.4.1
+2026-09-16T00:26:30.3694819Z #12 4.601 go: downloading github.com/minio/xxml v0.0.3
+2026-09-16T00:26:30.3695532Z #12 4.602 go: downloading github.com/minio/zipindex v0.4.0
+2026-09-16T00:26:30.3696261Z #12 4.738 go: downloading github.com/mitchellh/go-homedir v1.1.0
+2026-09-16T00:26:30.4872991Z #12 4.750 go: downloading github.com/philhofer/fwd v1.2.0
+2026-09-16T00:26:30.4893600Z #12 4.755 go: downloading github.com/pierrec/lz4/v4 v4.1.22
+2026-09-16T00:26:30.4897290Z #12 4.774 go: downloading github.com/pkg/errors v0.9.1
+2026-09-16T00:26:30.4898390Z #12 4.799 go: downloading github.com/pkg/sftp v1.13.9
+2026-09-16T00:26:30.4899321Z #12 4.800 go: downloading github.com/pkg/xattr v0.4.10
+2026-09-16T00:26:30.4900093Z #12 4.856 go: downloading github.com/prometheus/client_golang v1.22.0
+2026-09-16T00:26:30.6053744Z #12 4.943 go: downloading github.com/prometheus/client_model v0.6.2
+2026-09-16T00:26:30.6054757Z #12 4.943 go: downloading github.com/prometheus/procfs v0.16.1
+2026-09-16T00:26:30.6055623Z #12 4.943 go: downloading github.com/prometheus/common v0.63.0
+2026-09-16T00:26:30.6056436Z #12 4.974 go: downloading github.com/puzpuzpuz/xsync/v3 v3.5.1
+2026-09-16T00:26:30.7642676Z #12 5.003 go: downloading github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9
+2026-09-16T00:26:30.7643315Z #12 5.029 go: downloading github.com/rs/cors v1.11.1
+2026-09-16T00:26:30.7643782Z #12 5.031 go: downloading github.com/secure-io/sio-go v0.3.1
+2026-09-16T00:26:30.7644251Z #12 5.047 go: downloading github.com/shirou/gopsutil/v3 v3.24.5
+2026-09-16T00:26:30.7645017Z #12 5.131 go: downloading github.com/tinylib/msgp v1.4.0
+2026-09-16T00:26:30.9096250Z #12 5.174 go: downloading github.com/valyala/bytebufferpool v1.0.0
+2026-09-16T00:26:30.9097142Z #12 5.191 go: downloading github.com/zeebo/xxh3 v1.0.2
+2026-09-16T00:26:30.9097829Z #12 5.200 go: downloading go.etcd.io/etcd/api/v3 v3.5.21
+2026-09-16T00:26:30.9099302Z #12 5.227 go: downloading go.etcd.io/etcd/client/v3 v3.5.21
+2026-09-16T00:26:30.9099902Z #12 5.278 go: downloading go.uber.org/atomic v1.11.0
+2026-09-16T00:26:31.0676896Z #12 5.308 go: downloading goftp.io/server/v2 v2.0.1
+2026-09-16T00:26:31.0677709Z #12 5.330 go: downloading golang.org/x/crypto v0.37.0
+2026-09-16T00:26:31.0678946Z #12 5.436 go: downloading golang.org/x/oauth2 v0.29.0
+2026-09-16T00:26:31.2805135Z #12 5.471 go: downloading golang.org/x/sync v0.13.0
+2026-09-16T00:26:31.2813772Z #12 5.471 go: downloading golang.org/x/sys v0.32.0
+2026-09-16T00:26:31.2819911Z #12 5.486 go: downloading golang.org/x/term v0.31.0
+2026-09-16T00:26:31.2820816Z #12 5.498 go: downloading google.golang.org/api v0.230.0
+2026-09-16T00:26:31.7128950Z #12 6.081 go: downloading gopkg.in/yaml.v2 v2.4.0
+2026-09-16T00:26:31.8922815Z #12 6.111 go: downloading gopkg.in/yaml.v3 v3.0.1
+2026-09-16T00:26:31.9109476Z #12 6.280 go: downloading github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1
+2026-09-16T00:26:32.0393263Z #12 6.351 go: downloading github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2
+2026-09-16T00:26:32.0393960Z #12 6.408 go: downloading github.com/go-jose/go-jose/v4 v4.1.0
+2026-09-16T00:26:32.1504261Z #12 6.519 go: downloading github.com/mattn/go-colorable v0.1.14
+2026-09-16T00:26:32.3498786Z #12 6.544 go: downloading github.com/mattn/go-isatty v0.0.20
+2026-09-16T00:26:32.3509070Z #12 6.568 go: downloading github.com/google/pprof v0.0.0-20250422154841-e1f9c1950416
+2026-09-16T00:26:32.5884721Z #12 6.957 go: downloading github.com/mattn/go-runewidth v0.0.16
+2026-09-16T00:26:32.6943643Z #12 6.979 go: downloading cloud.google.com/go/compute/metadata v0.6.0
+2026-09-16T00:26:32.6944623Z #12 6.997 go: downloading cloud.google.com/go/iam v1.5.2
+2026-09-16T00:26:32.6945881Z #12 7.042 go: downloading github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.51.0
+2026-09-16T00:26:32.6947152Z #12 7.063 go: downloading github.com/googleapis/gax-go/v2 v2.14.1
+2026-09-16T00:26:32.8911899Z #12 7.089 go: downloading go.opentelemetry.io/contrib/detectors/gcp v1.35.0
+2026-09-16T00:26:32.8913012Z #12 7.109 go: downloading go.opentelemetry.io/otel v1.35.0
+2026-09-16T00:26:32.9052047Z #12 7.274 go: downloading go.opentelemetry.io/otel/sdk/metric v1.35.0
+2026-09-16T00:26:33.1345088Z #12 7.299 go: downloading go.opentelemetry.io/otel/sdk v1.35.0
+2026-09-16T00:26:33.1369391Z #12 7.353 go: downloading go.opentelemetry.io/otel/trace v1.35.0
+2026-09-16T00:26:33.7644528Z #12 8.133 go: downloading google.golang.org/genproto v0.0.0-20250422160041-2d3770c4ea7f
+2026-09-16T00:26:33.7645181Z #12 8.133 go: downloading google.golang.org/grpc v1.72.0
+2026-09-16T00:26:34.0898267Z #12 8.458 go: downloading google.golang.org/protobuf v1.36.6
+2026-09-16T00:26:34.3700007Z #12 8.739 go: downloading github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+2026-09-16T00:26:34.4927018Z #12 8.739 go: downloading github.com/modern-go/reflect2 v1.0.2
+2026-09-16T00:26:34.4928244Z #12 8.764 go: downloading github.com/go-openapi/analysis v0.23.0
+2026-09-16T00:26:34.4929537Z #12 8.764 go: downloading github.com/go-openapi/spec v0.21.0
+2026-09-16T00:26:34.4930593Z #12 8.835 go: downloading github.com/go-openapi/swag v0.23.1
+2026-09-16T00:26:34.4931597Z #12 8.861 go: downloading github.com/klauspost/cpuid/v2 v2.2.10
+2026-09-16T00:26:34.6759097Z #12 8.894 go: downloading golang.org/x/net v0.39.0
+2026-09-16T00:26:34.7166729Z #12 9.085 go: downloading github.com/go-openapi/errors v0.22.1
+2026-09-16T00:26:34.7167457Z #12 9.085 go: downloading github.com/go-openapi/runtime v0.28.0
+2026-09-16T00:26:34.8229606Z #12 9.192 go: downloading github.com/jessevdk/go-flags v1.6.1
+2026-09-16T00:26:34.9399603Z #12 9.205 go: downloading github.com/minio/mc v0.0.0-20250313080218-cf909e1063a9
+2026-09-16T00:26:34.9400528Z #12 9.206 go: downloading github.com/minio/websocket v1.6.0
+2026-09-16T00:26:34.9401023Z #12 9.218 go: downloading github.com/unrolled/secure v1.17.0
+2026-09-16T00:26:34.9401492Z #12 9.236 go: downloading github.com/go-openapi/strfmt v0.23.0
+2026-09-16T00:26:34.9401953Z #12 9.309 go: downloading github.com/ncw/directio v1.0.5
+2026-09-16T00:26:35.0611032Z #12 9.326 go: downloading aead.dev/mem v0.2.0
+2026-09-16T00:26:35.0611838Z #12 9.430 go: downloading github.com/prometheus/prom2json v1.4.2
+2026-09-16T00:26:35.1657627Z #12 9.481 go: downloading github.com/safchain/ethtool v0.5.10
+2026-09-16T00:26:35.1658622Z #12 9.529 go: downloading github.com/goccy/go-json v0.10.5
+2026-09-16T00:26:35.1659209Z #12 9.534 go: downloading github.com/minio/crc64nvme v1.0.1
+2026-09-16T00:26:35.2711075Z #12 9.534 go: downloading github.com/minio/md5-simd v1.1.2
+2026-09-16T00:26:35.2711852Z #12 9.543 go: downloading github.com/rs/xid v1.6.0
+2026-09-16T00:26:35.2712584Z #12 9.558 go: downloading github.com/go-ini/ini v1.67.0
+2026-09-16T00:26:35.2713108Z #12 9.562 go: downloading golang.org/x/time v0.11.0
+2026-09-16T00:26:35.2713591Z #12 9.587 go: downloading github.com/beevik/ntp v1.4.3
+2026-09-16T00:26:35.2714062Z #12 9.592 go: downloading go.uber.org/zap v1.27.0
+2026-09-16T00:26:35.2714576Z #12 9.597 go: downloading github.com/go-ldap/ldap/v3 v3.4.11
+2026-09-16T00:26:35.2715099Z #12 9.640 go: downloading github.com/rabbitmq/amqp091-go v1.10.0
+2026-09-16T00:26:35.3724651Z #12 9.669 go: downloading github.com/gobwas/ws v1.4.0
+2026-09-16T00:26:35.3725428Z #12 9.703 go: downloading github.com/IBM/sarama v1.45.1
+2026-09-16T00:26:35.3725932Z #12 9.732 go: downloading github.com/eclipse/paho.mqtt.golang v1.5.0
+2026-09-16T00:26:35.3726483Z #12 9.741 go: downloading github.com/elastic/go-elasticsearch/v7 v7.17.10
+2026-09-16T00:26:35.5191559Z #12 9.888 go: downloading github.com/go-sql-driver/mysql v1.9.2
+2026-09-16T00:26:35.6911119Z #12 9.895 go: downloading github.com/gomodule/redigo v1.9.2
+2026-09-16T00:26:35.6911970Z #12 9.895 go: downloading github.com/lib/pq v1.10.9
+2026-09-16T00:26:35.6912452Z #12 9.916 go: downloading github.com/nats-io/nats.go v1.41.2
+2026-09-16T00:26:35.6912903Z #12 9.925 go: downloading github.com/nats-io/stan.go v0.10.4
+2026-09-16T00:26:35.6913629Z #12 9.933 go: downloading github.com/nsqio/go-nsq v1.1.0
+2026-09-16T00:26:35.6914076Z #12 10.06 go: downloading github.com/xdg/scram v1.0.5
+2026-09-16T00:26:35.7942683Z #12 10.07 go: downloading github.com/buger/jsonparser v1.1.1
+2026-09-16T00:26:35.7943305Z #12 10.09 go: downloading aead.dev/mtls v0.2.1
+2026-09-16T00:26:35.7943908Z #12 10.10 go: downloading github.com/minio/kms-go/kms v0.5.1-0.20250225090116-4e64ce8d0f35
+2026-09-16T00:26:35.7944521Z #12 10.13 go: downloading github.com/minio/simdjson-go v0.4.5
+2026-09-16T00:26:35.7945020Z #12 10.16 go: downloading github.com/rjeczalik/notify v0.9.3
+2026-09-16T00:26:35.9097942Z #12 10.20 go: downloading github.com/lestrrat-go/jwx/v2 v2.1.4
+2026-09-16T00:26:35.9098892Z #12 10.28 go: downloading github.com/fatih/structs v1.1.0
+2026-09-16T00:26:36.1152036Z #12 10.30 go: downloading aead.dev/minisign v0.3.0
+2026-09-16T00:26:36.1153200Z #12 10.33 go: downloading github.com/kr/fs v0.1.0
+2026-09-16T00:26:36.1154859Z #12 10.33 go: downloading github.com/beorn7/perks v1.0.1
+2026-09-16T00:26:36.1156489Z #12 10.33 go: downloading github.com/tklauser/go-sysconf v0.3.15
+2026-09-16T00:26:36.1157800Z #12 10.35 go: downloading github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+2026-09-16T00:26:36.1159585Z #12 10.36 go: downloading github.com/gogo/protobuf v1.3.2
+2026-09-16T00:26:36.1160429Z #12 10.37 go: downloading github.com/golang/protobuf v1.5.4
+2026-09-16T00:26:36.1161688Z #12 10.37 go: downloading go.etcd.io/etcd/client/pkg/v3 v3.5.21
+2026-09-16T00:26:36.1162860Z #12 10.48 go: downloading github.com/kylelemons/godebug v1.1.0
+2026-09-16T00:26:36.1164173Z #12 10.48 go: downloading github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
+2026-09-16T00:26:36.2242064Z #12 10.49 go: downloading github.com/rivo/uniseg v0.4.7
+2026-09-16T00:26:36.2243311Z #12 10.51 go: downloading google.golang.org/genproto/googleapis/api v0.0.0-20250422160041-2d3770c4ea7f
+2026-09-16T00:26:36.2244772Z #12 10.51 go: downloading google.golang.org/genproto/googleapis/rpc v0.0.0-20250422160041-2d3770c4ea7f
+2026-09-16T00:26:36.2245943Z #12 10.53 go: downloading cloud.google.com/go/monitoring v1.24.2
+2026-09-16T00:26:36.2247302Z #12 10.59 go: downloading github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0
+2026-09-16T00:26:36.4695062Z #12 10.65 go: downloading github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.27.0
+2026-09-16T00:26:36.4696017Z #12 10.65 go: downloading github.com/go-logr/logr v1.4.2
+2026-09-16T00:26:36.4696607Z #12 10.65 go: downloading go.opentelemetry.io/otel/metric v1.35.0
+2026-09-16T00:26:36.4697176Z #12 10.67 go: downloading cloud.google.com/go/auth v0.16.0
+2026-09-16T00:26:36.4697799Z #12 10.69 go: downloading cloud.google.com/go/auth/oauth2adapt v0.2.8
+2026-09-16T00:26:36.4824621Z #12 10.85 go: downloading go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0
+2026-09-16T00:26:36.6467705Z #12 10.85 go: downloading github.com/mailru/easyjson v0.9.0
+2026-09-16T00:26:36.6468970Z #12 10.85 go: downloading github.com/go-openapi/jsonpointer v0.21.1
+2026-09-16T00:26:36.6469934Z #12 10.88 go: downloading github.com/go-openapi/jsonreference v0.21.0
+2026-09-16T00:26:36.6470851Z #12 10.89 go: downloading github.com/go-openapi/validate v0.24.0
+2026-09-16T00:26:36.6471703Z #12 10.90 go: downloading github.com/docker/go-units v0.5.0
+2026-09-16T00:26:36.6472726Z #12 10.90 go: downloading github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
+2026-09-16T00:26:36.6473776Z #12 10.90 go: downloading github.com/mitchellh/mapstructure v1.5.0
+2026-09-16T00:26:36.6474560Z #12 10.92 go: downloading github.com/oklog/ulid v1.3.1
+2026-09-16T00:26:36.6475342Z #12 10.92 go: downloading go.mongodb.org/mongo-driver v1.17.3
+2026-09-16T00:26:36.6476167Z #12 11.02 go: downloading github.com/charmbracelet/bubbles v0.20.0
+2026-09-16T00:26:36.7508104Z #12 11.12 go: downloading github.com/charmbracelet/bubbletea v1.3.4
+2026-09-16T00:26:36.8910658Z #12 11.18 go: downloading github.com/charmbracelet/lipgloss v1.0.0
+2026-09-16T00:26:36.8911872Z #12 11.26 go: downloading github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
+2026-09-16T00:26:37.0320334Z #12 11.28 go: downloading github.com/jedib0t/go-pretty/v6 v6.6.7
+2026-09-16T00:26:37.0320910Z #12 11.40 go: downloading github.com/mattn/go-ieproxy v0.0.12
+2026-09-16T00:26:37.1758909Z #12 11.49 go: downloading github.com/minio/colorjson v1.0.8
+2026-09-16T00:26:37.1760152Z #12 11.54 go: downloading github.com/minio/filepath v1.0.0
+2026-09-16T00:26:37.3339498Z #12 11.54 go: downloading github.com/muesli/reflow v0.3.0
+2026-09-16T00:26:37.3340296Z #12 11.57 go: downloading github.com/muesli/termenv v0.16.0
+2026-09-16T00:26:37.3340825Z #12 11.57 go: downloading github.com/olekukonko/tablewriter v0.0.5
+2026-09-16T00:26:37.3341309Z #12 11.59 go: downloading github.com/posener/complete v1.2.3
+2026-09-16T00:26:37.3341766Z #12 11.61 go: downloading github.com/tidwall/gjson v1.18.0
+2026-09-16T00:26:37.3342209Z #12 11.62 go: downloading github.com/vbauerster/mpb/v8 v8.9.3
+2026-09-16T00:26:37.3342663Z #12 11.64 go: downloading golang.org/x/text v0.24.0
+2026-09-16T00:26:37.3343186Z #12 11.70 go: downloading github.com/matttproud/golang_protobuf_extensions v1.0.4
+2026-09-16T00:26:37.4342565Z #12 11.73 go: downloading go.uber.org/multierr v1.11.0
+2026-09-16T00:26:37.4343311Z #12 11.75 go: downloading github.com/gobwas/httphead v0.1.0
+2026-09-16T00:26:37.4343794Z #12 11.77 go: downloading github.com/gobwas/pool v0.2.1
+2026-09-16T00:26:37.4344343Z #12 11.78 go: downloading github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
+2026-09-16T00:26:37.4345037Z #12 11.80 go: downloading github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667
+2026-09-16T00:26:37.4346199Z #12 11.80 go: downloading github.com/gorilla/websocket v1.5.3
+2026-09-16T00:26:37.5713178Z #12 11.83 go: downloading github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
+2026-09-16T00:26:37.5714947Z #12 11.83 go: downloading github.com/eapache/go-resiliency v1.7.0
+2026-09-16T00:26:37.5717035Z #12 11.85 go: downloading github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3
+2026-09-16T00:26:37.5718291Z #12 11.86 go: downloading github.com/eapache/queue v1.1.0
+2026-09-16T00:26:37.5719463Z #12 11.87 go: downloading github.com/hashicorp/go-multierror v1.1.1
+2026-09-16T00:26:37.5720378Z #12 11.88 go: downloading github.com/jcmturner/gofork v1.7.6
+2026-09-16T00:26:37.5721201Z #12 11.89 go: downloading github.com/jcmturner/gokrb5/v8 v8.4.4
+2026-09-16T00:26:37.5721974Z #12 11.94 go: downloading filippo.io/edwards25519 v1.1.0
+2026-09-16T00:26:37.7151021Z #12 11.94 go: downloading github.com/golang/snappy v1.0.0
+2026-09-16T00:26:37.7151892Z #12 11.94 go: downloading github.com/nats-io/nuid v1.0.1
+2026-09-16T00:26:37.7152661Z #12 11.96 go: downloading github.com/nats-io/nkeys v0.4.11
+2026-09-16T00:26:37.7153446Z #12 11.97 go: downloading github.com/minio/csvparser v1.0.0
+2026-09-16T00:26:37.7154261Z #12 11.97 go: downloading github.com/fraugster/parquet-go v0.12.0
+2026-09-16T00:26:37.7155106Z #12 12.08 go: downloading github.com/alecthomas/participle v0.7.1
+2026-09-16T00:26:37.8173460Z #12 12.11 go: downloading github.com/xdg/stringprep v1.0.3
+2026-09-16T00:26:37.8174020Z #12 12.11 go: downloading github.com/lestrrat-go/option v1.0.1
+2026-09-16T00:26:37.8174521Z #12 12.11 go: downloading github.com/lestrrat-go/blackmagic v1.0.2
+2026-09-16T00:26:37.8175003Z #12 12.13 go: downloading github.com/lestrrat-go/httprc v1.0.6
+2026-09-16T00:26:37.8175461Z #12 12.14 go: downloading github.com/lestrrat-go/iter v1.0.2
+2026-09-16T00:26:37.8175908Z #12 12.16 go: downloading github.com/tklauser/numcpus v0.10.0
+2026-09-16T00:26:37.8176374Z #12 12.16 go: downloading github.com/coreos/go-semver v0.3.1
+2026-09-16T00:26:37.8176814Z #12 12.17 go: downloading github.com/golang-jwt/jwt/v5 v5.2.2
+2026-09-16T00:26:37.8179017Z #12 12.18 go: downloading go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0
+2026-09-16T00:26:37.8179724Z #12 12.18 go: downloading github.com/go-logr/stdr v1.2.2
+2026-09-16T00:26:37.8186902Z #12 12.19 go: downloading go.opentelemetry.io/auto/sdk v1.1.0
+2026-09-16T00:26:37.9193865Z #12 12.20 go: downloading github.com/google/s2a-go v0.1.9
+2026-09-16T00:26:37.9194944Z #12 12.20 go: downloading github.com/googleapis/enterprise-certificate-proxy v0.3.6
+2026-09-16T00:26:37.9196037Z #12 12.21 go: downloading github.com/envoyproxy/go-control-plane/envoy v1.32.4
+2026-09-16T00:26:37.9196934Z #12 12.27 go: downloading github.com/felixge/httpsnoop v1.0.4
+2026-09-16T00:26:37.9197593Z #12 12.29 go: downloading github.com/josharian/intern v1.0.0
+2026-09-16T00:26:38.0242953Z #12 12.30 go: downloading github.com/charmbracelet/x/ansi v0.8.0
+2026-09-16T00:26:38.0245451Z #12 12.34 go: downloading github.com/charmbracelet/x/term v0.2.1
+2026-09-16T00:26:38.0246510Z #12 12.35 go: downloading github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
+2026-09-16T00:26:38.0247483Z #12 12.37 go: downloading github.com/muesli/cancelreader v0.2.2
+2026-09-16T00:26:38.0248681Z #12 12.39 go: downloading github.com/juju/ratelimit v1.0.2
+2026-09-16T00:26:38.1667277Z #12 12.54 go: downloading github.com/aymanbagabas/go-osc52/v2 v2.0.1
+2026-09-16T00:26:38.2791309Z #12 12.55 go: downloading github.com/lucasb-eyer/go-colorful v1.2.0
+2026-09-16T00:26:38.2792567Z #12 12.62 go: downloading github.com/tidwall/match v1.1.1
+2026-09-16T00:26:38.2793651Z #12 12.65 go: downloading github.com/tidwall/pretty v1.2.1
+2026-09-16T00:26:38.4228703Z #12 12.67 go: downloading github.com/prometheus/prometheus v0.303.0
+2026-09-16T00:26:38.4229875Z #12 12.79 go: downloading github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
+2026-09-16T00:26:38.6311587Z #12 12.79 go: downloading github.com/hashicorp/errwrap v1.1.0
+2026-09-16T00:26:38.6312549Z #12 12.79 go: downloading github.com/VividCortex/ewma v1.2.0
+2026-09-16T00:26:38.6313362Z #12 12.81 go: downloading github.com/hashicorp/go-uuid v1.0.3
+2026-09-16T00:26:38.6314187Z #12 12.82 go: downloading github.com/jcmturner/dnsutils/v2 v2.0.0
+2026-09-16T00:26:38.6314960Z #12 12.82 go: downloading github.com/apache/thrift v0.21.0
+2026-09-16T00:26:38.6315769Z #12 12.84 go: downloading github.com/lestrrat-go/httpcc v1.0.1
+2026-09-16T00:26:38.6316567Z #12 12.84 go: downloading github.com/spiffe/go-spiffe/v2 v2.5.0
+2026-09-16T00:26:38.6317511Z #12 12.86 go: downloading github.com/cncf/xds/go v0.0.0-20250326154945-ae57f3c0d45f
+2026-09-16T00:26:38.6318945Z #12 13.00 go: downloading github.com/envoyproxy/protoc-gen-validate v1.2.1
+2026-09-16T00:26:38.8572782Z #12 13.00 go: downloading github.com/jcmturner/rpc/v2 v2.0.3
+2026-09-16T00:26:38.8574053Z #12 13.03 go: downloading github.com/zeebo/errs v1.4.0
+2026-09-16T00:26:38.8576123Z #12 13.05 go: downloading cel.dev/expr v0.23.1
+2026-09-16T00:26:38.8577497Z #12 13.08 go: downloading github.com/jcmturner/aescts/v2 v2.0.0
+2026-09-16T00:28:13.4815873Z #12 DONE 107.9s
+2026-09-16T00:28:13.5941571Z 
+2026-09-16T00:28:13.5942362Z #13 [stage-1 3/3] COPY --from=build /out/minio /usr/bin/minio
+2026-09-16T00:28:13.8927678Z #13 DONE 0.3s
+2026-09-16T00:28:14.0443143Z 
+2026-09-16T00:28:14.0444193Z #14 exporting to image
+2026-09-16T00:28:14.0444847Z #14 exporting layers
+2026-09-16T00:28:14.1604814Z #14 exporting layers 0.3s done
+2026-09-16T00:28:14.1932362Z #14 writing image sha256:3e516df2fb78965d218a1f49fddb913a9b18527c2426828d086d003a9a1eaed4 done
+2026-09-16T00:28:14.1934128Z #14 naming to docker.io/library/agents-chat-minio:9e49d5e7 done
+2026-09-16T00:28:14.1934709Z #14 DONE 0.3s
+2026-09-16T00:28:14.1934904Z 
+2026-09-16T00:28:14.1935176Z #15 resolving provenance for metadata file
+2026-09-16T00:28:14.1935633Z #15 DONE 0.0s
+2026-09-16T00:28:14.1937580Z  minio  Built
+2026-09-16T00:28:14.2662013Z  redis Pulling 
+2026-09-16T00:28:14.2662460Z  postgres Pulling 
+2026-09-16T00:28:14.5547700Z  897d797d2723 Pulling fs layer 
+2026-09-16T00:28:14.5548543Z  d85eda7b0b14 Pulling fs layer 
+2026-09-16T00:28:14.5549073Z  9516b0cd89c9 Pulling fs layer 
+2026-09-16T00:28:14.5549537Z  de4b872bfdc3 Pulling fs layer 
+2026-09-16T00:28:14.5549967Z  2c96e5a02ba0 Pulling fs layer 
+2026-09-16T00:28:14.5550552Z  4f4fb700ef54 Pulling fs layer 
+2026-09-16T00:28:14.5550865Z  41caa0265cb5 Pulling fs layer 
+2026-09-16T00:28:14.5551121Z  2c96e5a02ba0 Waiting 
+2026-09-16T00:28:14.5551364Z  4f4fb700ef54 Waiting 
+2026-09-16T00:28:14.5551578Z  41caa0265cb5 Waiting 
+2026-09-16T00:28:14.5551791Z  de4b872bfdc3 Waiting 
+2026-09-16T00:28:14.5768761Z  55afa1ecc21d Already exists 
+2026-09-16T00:28:14.5789005Z  6a47e1b9b254 Pulling fs layer 
+2026-09-16T00:28:14.5789488Z  19a2a5ab27c1 Pulling fs layer 
+2026-09-16T00:28:14.5789973Z  5e81018bec01 Pulling fs layer 
+2026-09-16T00:28:14.5790274Z  be6f407f5414 Pulling fs layer 
+2026-09-16T00:28:14.5790816Z  6a47e1b9b254 Waiting 
+2026-09-16T00:28:14.5791239Z  f0e7204f9584 Pulling fs layer 
+2026-09-16T00:28:14.5791700Z  8225e2970a7f Pulling fs layer 
+2026-09-16T00:28:14.5792004Z  48d0d8b0e136 Pulling fs layer 
+2026-09-16T00:28:14.5792419Z  19a2a5ab27c1 Waiting 
+2026-09-16T00:28:14.5792849Z  27d0ba4f668a Pulling fs layer 
+2026-09-16T00:28:14.5793262Z  b053c4426c4a Pulling fs layer 
+2026-09-16T00:28:14.5793527Z  5e81018bec01 Waiting 
+2026-09-16T00:28:14.5793742Z  be6f407f5414 Waiting 
+2026-09-16T00:28:14.5794163Z  7f5de3d007ea Pulling fs layer 
+2026-09-16T00:28:14.5794402Z  f0e7204f9584 Waiting 
+2026-09-16T00:28:14.5794614Z  8225e2970a7f Waiting 
+2026-09-16T00:28:14.5794882Z  48d0d8b0e136 Waiting 
+2026-09-16T00:28:14.5795463Z  27d0ba4f668a Waiting 
+2026-09-16T00:28:14.5795864Z  b053c4426c4a Waiting 
+2026-09-16T00:28:14.5796479Z  7f5de3d007ea Waiting 
+2026-09-16T00:28:14.5798268Z  9516b0cd89c9 Downloading [>                                                  ]  3.487kB/194.3kB
+2026-09-16T00:28:14.5800911Z  897d797d2723 Downloading [>                                                  ]  48.54kB/3.647MB
+2026-09-16T00:28:14.5813759Z  d85eda7b0b14 Download complete 
+2026-09-16T00:28:14.5838310Z  9516b0cd89c9 Downloading [==================================================>]  194.3kB/194.3kB
+2026-09-16T00:28:14.5839557Z  9516b0cd89c9 Verifying Checksum 
+2026-09-16T00:28:14.5848653Z  9516b0cd89c9 Download complete 
+2026-09-16T00:28:14.6004097Z  897d797d2723 Verifying Checksum 
+2026-09-16T00:28:14.6005453Z  897d797d2723 Download complete 
+2026-09-16T00:28:14.6011943Z  897d797d2723 Extracting [>                                                  ]  65.54kB/3.647MB
+2026-09-16T00:28:14.6119278Z  2c96e5a02ba0 Downloading [==================================================>]     100B/100B
+2026-09-16T00:28:14.6120100Z  2c96e5a02ba0 Verifying Checksum 
+2026-09-16T00:28:14.6123038Z  2c96e5a02ba0 Download complete 
+2026-09-16T00:28:14.6164629Z  de4b872bfdc3 Downloading [>                                                  ]  130.5kB/12.42MB
+2026-09-16T00:28:14.6284362Z  4f4fb700ef54 Downloading [==================================================>]      32B/32B
+2026-09-16T00:28:14.6285442Z  4f4fb700ef54 Verifying Checksum 
+2026-09-16T00:28:14.6285974Z  4f4fb700ef54 Download complete 
+2026-09-16T00:28:14.6472232Z  41caa0265cb5 Downloading [==================================================>]     604B/604B
+2026-09-16T00:28:14.6473083Z  41caa0265cb5 Verifying Checksum 
+2026-09-16T00:28:14.6473608Z  41caa0265cb5 Download complete 
+2026-09-16T00:28:14.6561853Z  6a47e1b9b254 Downloading [==================================================>]     969B/969B
+2026-09-16T00:28:14.6563416Z  6a47e1b9b254 Download complete 
+2026-09-16T00:28:14.6575559Z  6a47e1b9b254 Extracting [==================================================>]     969B/969B
+2026-09-16T00:28:14.6581189Z  6a47e1b9b254 Extracting [==================================================>]     969B/969B
+2026-09-16T00:28:14.6744123Z  de4b872bfdc3 Verifying Checksum 
+2026-09-16T00:28:14.6744517Z  de4b872bfdc3 Download complete 
+2026-09-16T00:28:14.6783095Z  19a2a5ab27c1 Downloading [>                                                  ]  15.78kB/900.3kB
+2026-09-16T00:28:14.6832444Z  6a47e1b9b254 Pull complete 
+2026-09-16T00:28:14.6871266Z  5e81018bec01 Downloading [==================================================>]     172B/172B
+2026-09-16T00:28:14.6872118Z  5e81018bec01 Verifying Checksum 
+2026-09-16T00:28:14.6872929Z  5e81018bec01 Download complete 
+2026-09-16T00:28:14.6941270Z  19a2a5ab27c1 Download complete 
+2026-09-16T00:28:14.6945993Z  19a2a5ab27c1 Extracting [=>                                                 ]  32.77kB/900.3kB
+2026-09-16T00:28:14.7012929Z  897d797d2723 Extracting [======================>                            ]  1.638MB/3.647MB
+2026-09-16T00:28:14.7109421Z  be6f407f5414 Downloading [==================================================>]     116B/116B
+2026-09-16T00:28:14.7110864Z  be6f407f5414 Verifying Checksum 
+2026-09-16T00:28:14.7111698Z  be6f407f5414 Download complete 
+2026-09-16T00:28:14.7227803Z  f0e7204f9584 Downloading [>                                                  ]  539.1kB/111.3MB
+2026-09-16T00:28:14.7249637Z  8225e2970a7f Downloading [==================>                                ]  3.532kB/9.673kB
+2026-09-16T00:28:14.7252657Z  8225e2970a7f Downloading [==================================================>]  9.673kB/9.673kB
+2026-09-16T00:28:14.7253700Z  8225e2970a7f Verifying Checksum 
+2026-09-16T00:28:14.7254378Z  8225e2970a7f Download complete 
+2026-09-16T00:28:14.7256459Z  19a2a5ab27c1 Extracting [==================================================>]  900.3kB/900.3kB
+2026-09-16T00:28:14.7269480Z  19a2a5ab27c1 Extracting [==================================================>]  900.3kB/900.3kB
+2026-09-16T00:28:14.7397218Z  48d0d8b0e136 Download complete 
+2026-09-16T00:28:14.7448352Z  19a2a5ab27c1 Pull complete 
+2026-09-16T00:28:14.7460659Z  5e81018bec01 Extracting [==================================================>]     172B/172B
+2026-09-16T00:28:14.7468839Z  5e81018bec01 Extracting [==================================================>]     172B/172B
+2026-09-16T00:28:14.7504465Z  897d797d2723 Extracting [==================================================>]  3.647MB/3.647MB
+2026-09-16T00:28:14.7562319Z  27d0ba4f668a Downloading [==================================================>]     169B/169B
+2026-09-16T00:28:14.7570263Z  27d0ba4f668a Download complete 
+2026-09-16T00:28:14.7633213Z  5e81018bec01 Pull complete 
+2026-09-16T00:28:14.7650963Z  be6f407f5414 Extracting [==================================================>]     116B/116B
+2026-09-16T00:28:14.7659510Z  be6f407f5414 Extracting [==================================================>]     116B/116B
+2026-09-16T00:28:14.7697963Z  b053c4426c4a Downloading [============================>                      ]  3.532kB/6.112kB
+2026-09-16T00:28:14.7700566Z  b053c4426c4a Downloading [==================================================>]  6.112kB/6.112kB
+2026-09-16T00:28:14.7701880Z  b053c4426c4a Verifying Checksum 
+2026-09-16T00:28:14.7702737Z  b053c4426c4a Download complete 
+2026-09-16T00:28:14.7777502Z  be6f407f5414 Pull complete 
+2026-09-16T00:28:14.7866262Z  7f5de3d007ea Downloading [==================================================>]     185B/185B
+2026-09-16T00:28:14.7867189Z  7f5de3d007ea Verifying Checksum 
+2026-09-16T00:28:14.7868271Z  7f5de3d007ea Download complete 
+2026-09-16T00:28:14.7887145Z  897d797d2723 Pull complete 
+2026-09-16T00:28:14.7899427Z  d85eda7b0b14 Extracting [==================================================>]     952B/952B
+2026-09-16T00:28:14.7904626Z  d85eda7b0b14 Extracting [==================================================>]     952B/952B
+2026-09-16T00:28:14.8048548Z  d85eda7b0b14 Pull complete 
+2026-09-16T00:28:14.8061446Z  9516b0cd89c9 Extracting [========>                                          ]  32.77kB/194.3kB
+2026-09-16T00:28:14.8084539Z  9516b0cd89c9 Extracting [==================================================>]  194.3kB/194.3kB
+2026-09-16T00:28:14.8168120Z  9516b0cd89c9 Extracting [==================================================>]  194.3kB/194.3kB
+2026-09-16T00:28:14.8245996Z  f0e7204f9584 Downloading [==========>                                        ]  22.39MB/111.3MB
+2026-09-16T00:28:14.9258363Z  f0e7204f9584 Downloading [========================>                          ]  53.73MB/111.3MB
+2026-09-16T00:28:14.9935937Z  9516b0cd89c9 Pull complete 
+2026-09-16T00:28:14.9963322Z  de4b872bfdc3 Extracting [>                                                  ]  131.1kB/12.42MB
+2026-09-16T00:28:15.0259534Z  f0e7204f9584 Downloading [======================================>            ]  86.67MB/111.3MB
+2026-09-16T00:28:15.0994108Z  de4b872bfdc3 Extracting [===================>                               ]   4.85MB/12.42MB
+2026-09-16T00:28:15.1047726Z  f0e7204f9584 Verifying Checksum 
+2026-09-16T00:28:15.1049815Z  f0e7204f9584 Download complete 
+2026-09-16T00:28:15.1149493Z  f0e7204f9584 Extracting [>                                                  ]  557.1kB/111.3MB
+2026-09-16T00:28:15.1990728Z  de4b872bfdc3 Extracting [==============================================>    ]  11.67MB/12.42MB
+2026-09-16T00:28:15.2118408Z  de4b872bfdc3 Extracting [==================================================>]  12.42MB/12.42MB
+2026-09-16T00:28:15.2204399Z  f0e7204f9584 Extracting [=>                                                 ]  2.785MB/111.3MB
+2026-09-16T00:28:15.2464346Z  de4b872bfdc3 Pull complete 
+2026-09-16T00:28:15.2479500Z  2c96e5a02ba0 Extracting [==================================================>]     100B/100B
+2026-09-16T00:28:15.2483004Z  2c96e5a02ba0 Extracting [==================================================>]     100B/100B
+2026-09-16T00:28:15.2579281Z  2c96e5a02ba0 Pull complete 
+2026-09-16T00:28:15.2594803Z  4f4fb700ef54 Extracting [==================================================>]      32B/32B
+2026-09-16T00:28:15.2597880Z  4f4fb700ef54 Extracting [==================================================>]      32B/32B
+2026-09-16T00:28:15.2703200Z  4f4fb700ef54 Pull complete 
+2026-09-16T00:28:15.2717018Z  41caa0265cb5 Extracting [==================================================>]     604B/604B
+2026-09-16T00:28:15.2719750Z  41caa0265cb5 Extracting [==================================================>]     604B/604B
+2026-09-16T00:28:15.2845492Z  41caa0265cb5 Pull complete 
+2026-09-16T00:28:15.2916148Z  redis Pulled 
+2026-09-16T00:28:15.3232042Z  f0e7204f9584 Extracting [====>                                              ]  10.58MB/111.3MB
+2026-09-16T00:28:15.4246181Z  f0e7204f9584 Extracting [========>                                          ]   19.5MB/111.3MB
+2026-09-16T00:28:15.5249516Z  f0e7204f9584 Extracting [============>                                      ]  28.41MB/111.3MB
+2026-09-16T00:28:15.6289924Z  f0e7204f9584 Extracting [================>                                  ]  37.32MB/111.3MB
+2026-09-16T00:28:15.7337104Z  f0e7204f9584 Extracting [====================>                              ]  46.24MB/111.3MB
+2026-09-16T00:28:15.8346797Z  f0e7204f9584 Extracting [========================>                          ]  54.59MB/111.3MB
+2026-09-16T00:28:15.9411803Z  f0e7204f9584 Extracting [==========================>                        ]   59.6MB/111.3MB
+2026-09-16T00:28:16.0468881Z  f0e7204f9584 Extracting [==============================>                    ]   67.4MB/111.3MB
+2026-09-16T00:28:16.1503220Z  f0e7204f9584 Extracting [==================================>                ]  75.76MB/111.3MB
+2026-09-16T00:28:16.3285928Z  f0e7204f9584 Extracting [====================================>              ]  81.33MB/111.3MB
+2026-09-16T00:28:16.4431545Z  f0e7204f9584 Extracting [=====================================>             ]  82.44MB/111.3MB
+2026-09-16T00:28:16.5511766Z  f0e7204f9584 Extracting [======================================>            ]  85.23MB/111.3MB
+2026-09-16T00:28:16.6576915Z  f0e7204f9584 Extracting [========================================>          ]  89.69MB/111.3MB
+2026-09-16T00:28:16.7622315Z  f0e7204f9584 Extracting [==========================================>        ]  94.14MB/111.3MB
+2026-09-16T00:28:16.9042146Z  f0e7204f9584 Extracting [============================================>      ]  98.04MB/111.3MB
+2026-09-16T00:28:17.0109346Z  f0e7204f9584 Extracting [================================================>  ]  108.6MB/111.3MB
+2026-09-16T00:28:17.0598295Z  f0e7204f9584 Extracting [==================================================>]  111.3MB/111.3MB
+2026-09-16T00:28:17.5346085Z  f0e7204f9584 Pull complete 
+2026-09-16T00:28:17.5357549Z  8225e2970a7f Extracting [==================================================>]  9.673kB/9.673kB
+2026-09-16T00:28:17.5361551Z  8225e2970a7f Extracting [==================================================>]  9.673kB/9.673kB
+2026-09-16T00:28:17.5463132Z  8225e2970a7f Pull complete 
+2026-09-16T00:28:17.5473881Z  48d0d8b0e136 Extracting [==================================================>]     129B/129B
+2026-09-16T00:28:17.5477535Z  48d0d8b0e136 Extracting [==================================================>]     129B/129B
+2026-09-16T00:28:17.5590861Z  48d0d8b0e136 Pull complete 
+2026-09-16T00:28:17.5605116Z  27d0ba4f668a Extracting [==================================================>]     169B/169B
+2026-09-16T00:28:17.5608355Z  27d0ba4f668a Extracting [==================================================>]     169B/169B
+2026-09-16T00:28:17.5681312Z  27d0ba4f668a Pull complete 
+2026-09-16T00:28:17.5693410Z  b053c4426c4a Extracting [==================================================>]  6.112kB/6.112kB
+2026-09-16T00:28:17.5695915Z  b053c4426c4a Extracting [==================================================>]  6.112kB/6.112kB
+2026-09-16T00:28:17.5814215Z  b053c4426c4a Pull complete 
+2026-09-16T00:28:17.5827088Z  7f5de3d007ea Extracting [==================================================>]     185B/185B
+2026-09-16T00:28:17.5831619Z  7f5de3d007ea Extracting [==================================================>]     185B/185B
+2026-09-16T00:28:17.5925342Z  7f5de3d007ea Pull complete 
+2026-09-16T00:28:17.5979106Z  postgres Pulled 
+2026-09-16T00:28:17.6004119Z  Network server_default  Creating
+2026-09-16T00:28:17.6358755Z  Network server_default  Created
+2026-09-16T00:28:17.6369527Z  Volume "server_minio-data"  Creating
+2026-09-16T00:28:17.6383209Z  Volume "server_minio-data"  Created
+2026-09-16T00:28:17.6386843Z  Volume "server_postgres-data"  Creating
+2026-09-16T00:28:17.6395342Z  Volume "server_postgres-data"  Created
+2026-09-16T00:28:17.6398648Z  Volume "server_redis-data"  Creating
+2026-09-16T00:28:17.6406838Z  Volume "server_redis-data"  Created
+2026-09-16T00:28:17.6413059Z  Container agents-chat-postgres  Creating
+2026-09-16T00:28:17.6413442Z  Container agents-chat-redis  Creating
+2026-09-16T00:28:17.6413872Z  Container agents-chat-minio  Creating
+2026-09-16T00:28:17.6706481Z  Container agents-chat-redis  Created
+2026-09-16T00:28:17.6707443Z  Container agents-chat-minio  Created
+2026-09-16T00:28:17.6708817Z  Container agents-chat-postgres  Created
+2026-09-16T00:28:17.6721409Z  Container agents-chat-redis  Starting
+2026-09-16T00:28:17.6722393Z  Container agents-chat-postgres  Starting
+2026-09-16T00:28:17.6723359Z  Container agents-chat-minio  Starting
+2026-09-16T00:28:17.9388778Z  Container agents-chat-redis  Started
+2026-09-16T00:28:17.9509042Z  Container agents-chat-postgres  Started
+2026-09-16T00:28:17.9610527Z  Container agents-chat-minio  Started
+2026-09-16T00:28:18.0351015Z /var/run/postgresql:5432 - no response
+2026-09-16T00:28:20.0992311Z /var/run/postgresql:5432 - accepting connections
+2026-09-16T00:28:20.1507051Z /var/run/postgresql:5432 - accepting connections
+2026-09-16T00:28:20.1749892Z ##[group]Run pnpm --dir server test:integration
+2026-09-16T00:28:20.1750278Z [36;1mpnpm --dir server test:integration[0m
+2026-09-16T00:28:20.1788260Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:28:20.1788615Z env:
+2026-09-16T00:28:20.1788872Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:28:20.1789191Z ##[endgroup]
+2026-09-16T00:28:20.4576915Z 
+2026-09-16T00:28:20.4578124Z > agents-chat-server@0.1.0 test:integration /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:28:20.4579014Z > jest --config ./test/jest-integration.json --runInBand
+2026-09-16T00:28:20.4579335Z 
+2026-09-16T00:28:25.0895392Z (node:11341) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+2026-09-16T00:28:25.0897824Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-09-16T00:28:25.8627838Z PASS test/content/conversation-discovery.spec.ts
+2026-09-16T00:28:27.1433366Z PASS test/content/public-content-privacy.spec.ts
+2026-09-16T00:28:28.5291263Z PASS test/policy/safety-policies.spec.ts
+2026-09-16T00:28:29.6589165Z PASS test/federation/conformance.spec.ts
+2026-09-16T00:28:30.1719970Z PASS test/domain/thread-event-model.spec.ts
+2026-09-16T00:28:31.4019354Z PASS test/content/content-types.spec.ts
+2026-09-16T00:28:31.9304005Z PASS test/domain/domain-model.spec.ts
+2026-09-16T00:28:31.9321295Z 
+2026-09-16T00:28:31.9332847Z Test Suites: 7 passed, 7 total
+2026-09-16T00:28:31.9333468Z Tests:       32 passed, 32 total
+2026-09-16T00:28:31.9333952Z Snapshots:   0 total
+2026-09-16T00:28:31.9334369Z Time:        11.229 s
+2026-09-16T00:28:31.9334789Z Ran all test suites.
+2026-09-16T00:28:32.0922626Z ##[group]Run pnpm --dir server test:e2e --json --outputFile=../audit-e2e-results.json
+2026-09-16T00:28:32.0923260Z [36;1mpnpm --dir server test:e2e --json --outputFile=../audit-e2e-results.json[0m
+2026-09-16T00:28:32.0960663Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:28:32.0961012Z env:
+2026-09-16T00:28:32.0961270Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:28:32.0961579Z ##[endgroup]
+2026-09-16T00:28:32.3809605Z 
+2026-09-16T00:28:32.3810540Z > agents-chat-server@0.1.0 test:e2e /home/runner/work/agentschat/agentschat/server
+2026-09-16T00:28:32.3811667Z > jest --config ./test/jest-e2e.json --runInBand --testTimeout=30000 --json --outputFile=../audit-e2e-results.json
+2026-09-16T00:28:32.3812618Z 
+2026-09-16T00:28:41.1868542Z PASS test/content/dm-read.e2e-spec.ts (8.358 s)
+2026-09-16T00:28:42.0606528Z (node:11432) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+2026-09-16T00:28:42.0609082Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-09-16T00:28:44.6063927Z PASS test/debate/debate-state-machine.e2e-spec.ts
+2026-09-16T00:28:49.0405819Z PASS test/reliability/runtime-boundaries.e2e-spec.ts
+2026-09-16T00:28:50.7119663Z PASS test/ownership/claim-flow.e2e-spec.ts
+2026-09-16T00:28:52.0006875Z PASS test/auth/oauth.e2e-spec.ts
+2026-09-16T00:28:53.4110570Z PASS test/federation/actions.e2e-spec.ts
+2026-09-16T00:28:55.2001881Z PASS test/federation/delivery.e2e-spec.ts
+2026-09-16T00:28:56.9010799Z PASS test/content/forum-human-policy.e2e-spec.ts
+2026-09-16T00:28:57.6461245Z (node:11432) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+2026-09-16T00:28:58.5425934Z PASS test/moderation/moderation.e2e-spec.ts
+2026-09-16T00:28:59.8272450Z PASS test/follow/follow.e2e-spec.ts
+2026-09-16T00:29:01.6588773Z PASS test/audit/product-continuity.e2e-spec.ts
+2026-09-16T00:29:02.7021783Z (node:11432) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+2026-09-16T00:29:03.0126404Z PASS test/content/content-actions.e2e-spec.ts
+2026-09-16T00:29:04.1069477Z PASS test/auth/auth.e2e-spec.ts
+2026-09-16T00:29:05.3702065Z PASS test/agents/agent-safety-policy.e2e-spec.ts
+2026-09-16T00:29:07.4965192Z PASS test/federation/claim-request-delivery.e2e-spec.ts
+2026-09-16T00:29:08.5651913Z PASS test/federation/agent-read.e2e-spec.ts
+2026-09-16T00:29:09.5416384Z PASS test/audit/webhook-fairness.e2e-spec.ts
+2026-09-16T00:29:10.9933875Z PASS test/assets/image-upload.e2e-spec.ts
+2026-09-16T00:29:13.7576791Z PASS test/audit/binding-boundary.e2e-spec.ts
+2026-09-16T00:29:14.8069264Z PASS test/agents/agent-avatar.e2e-spec.ts
+2026-09-16T00:29:16.0062303Z PASS test/notifications/notifications.e2e-spec.ts
+2026-09-16T00:29:34.3354276Z PASS test/audit/poll-query.e2e-spec.ts (18.326 s)
+2026-09-16T00:29:36.0658758Z PASS test/audit/durable-actions.e2e-spec.ts
+2026-09-16T00:29:37.0604748Z PASS test/audit/websocket-protocol.e2e-spec.ts
+2026-09-16T00:29:38.1799904Z PASS test/audit/media-egress.e2e-spec.ts
+2026-09-16T00:29:53.2289703Z PASS test/audit/crash-recovery.e2e-spec.ts (15.045 s)
+2026-09-16T00:29:54.1320428Z PASS test/federation/claim.e2e-spec.ts
+2026-09-16T00:29:54.9087523Z PASS test/agents/public-bootstrap.e2e-spec.ts
+2026-09-16T00:29:55.9124927Z PASS test/realtime/realtime-fanout.e2e-spec.ts
+2026-09-16T00:29:56.7507857Z (node:11432) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+2026-09-16T00:29:56.9054331Z PASS test/agents/hall-directory.e2e-spec.ts
+2026-09-16T00:29:57.7369078Z PASS test/audit/outbox-recovery.e2e-spec.ts
+2026-09-16T00:29:58.5659341Z PASS test/audit/source-limits.e2e-spec.ts
+2026-09-16T00:29:59.5405082Z PASS test/auth/auth-rate-limit.e2e-spec.ts
+2026-09-16T00:29:59.8968789Z PASS test/app.e2e-spec.ts
+2026-09-16T00:29:59.8990931Z 
+2026-09-16T00:29:59.9000259Z Test Suites: 34 passed, 34 total
+2026-09-16T00:29:59.9000921Z Tests:       153 passed, 153 total
+2026-09-16T00:29:59.9001461Z Snapshots:   0 total
+2026-09-16T00:29:59.9001892Z Time:        87.308 s
+2026-09-16T00:29:59.9002315Z Ran all test suites.
+2026-09-16T00:29:59.9026134Z Test results written to: ../audit-e2e-results.json
+2026-09-16T00:30:00.1146038Z ##[group]Run actions/upload-artifact@v6
+2026-09-16T00:30:00.1146534Z with:
+2026-09-16T00:30:00.1146736Z   name: audit-v1.1-e2e
+2026-09-16T00:30:00.1146977Z   path: audit-e2e-results.json
+2026-09-16T00:30:00.1147236Z   if-no-files-found: warn
+2026-09-16T00:30:00.1147470Z   compression-level: 6
+2026-09-16T00:30:00.1147688Z   overwrite: false
+2026-09-16T00:30:00.1148264Z   include-hidden-files: false
+2026-09-16T00:30:00.1148525Z env:
+2026-09-16T00:30:00.1148771Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:30:00.1149088Z ##[endgroup]
+2026-09-16T00:30:00.2851520Z With the provided path, there will be 1 file uploaded
+2026-09-16T00:30:00.2865466Z Artifact name is valid!
+2026-09-16T00:30:00.2866015Z Root directory input is valid!
+2026-09-16T00:30:00.4832055Z Beginning upload of artifact content to blob storage
+2026-09-16T00:30:00.5370370Z Uploaded bytes 9495
+2026-09-16T00:30:00.5485328Z Finished uploading artifact content to blob storage!
+2026-09-16T00:30:00.5486783Z SHA256 digest of uploaded artifact zip is 8fc248b7910195dbba6e5afbdb08aa4768e12fc5f61370ff7c89004504ba1fec
+2026-09-16T00:30:00.5488119Z Finalizing artifact upload
+2026-09-16T00:30:00.7397625Z Artifact audit-v1.1-e2e.zip successfully finalized. Artifact ID 10424912290
+2026-09-16T00:30:00.7399460Z Artifact audit-v1.1-e2e has been successfully uploaded! Final size is 9495 bytes. Artifact ID is 10424912290
+2026-09-16T00:30:00.7403563Z Artifact download URL: https://github.com/UncleK/agentschat/actions/runs/35039935075/artifacts/10424912290
+2026-09-16T00:30:00.7531276Z ##[group]Run docker compose -f server/docker-compose.yml down -v
+2026-09-16T00:30:00.7531786Z [36;1mdocker compose -f server/docker-compose.yml down -v[0m
+2026-09-16T00:30:00.7569724Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:30:00.7570072Z env:
+2026-09-16T00:30:00.7570331Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-09-16T00:30:00.7570644Z ##[endgroup]
+2026-09-16T00:30:00.8313598Z  Container agents-chat-redis  Stopping
+2026-09-16T00:30:00.8314349Z  Container agents-chat-minio  Stopping
+2026-09-16T00:30:00.8314836Z  Container agents-chat-postgres  Stopping
+2026-09-16T00:30:01.0471039Z  Container agents-chat-minio  Stopped
+2026-09-16T00:30:01.0473460Z  Container agents-chat-minio  Removing
+2026-09-16T00:30:01.0561362Z  Container agents-chat-redis  Stopped
+2026-09-16T00:30:01.0562647Z  Container agents-chat-redis  Removing
+2026-09-16T00:30:01.0599698Z  Container agents-chat-minio  Removed
+2026-09-16T00:30:01.0662123Z  Container agents-chat-postgres  Stopped
+2026-09-16T00:30:01.0665371Z  Container agents-chat-postgres  Removing
+2026-09-16T00:30:01.0674384Z  Container agents-chat-redis  Removed
+2026-09-16T00:30:01.0713273Z  Container agents-chat-postgres  Removed
+2026-09-16T00:30:01.0728947Z  Network server_default  Removing
+2026-09-16T00:30:01.0731293Z  Volume server_postgres-data  Removing
+2026-09-16T00:30:01.0731902Z  Volume server_redis-data  Removing
+2026-09-16T00:30:01.0743619Z  Volume server_redis-data  Removed
+2026-09-16T00:30:01.0747482Z  Volume server_minio-data  Removing
+2026-09-16T00:30:01.1184760Z  Volume server_postgres-data  Removed
+2026-09-16T00:30:01.1219239Z  Volume server_minio-data  Removed
+2026-09-16T00:30:01.1926817Z  Network server_default  Removed
+2026-09-16T00:30:01.2044627Z Post job cleanup.
+2026-09-16T00:30:01.3156342Z Cache hit occurred on the primary key node-cache-Linux-x64-pnpm-2cf0ecf14ee5ffac91262c510c2cfe70f5f3869b2f93b69095e07101aa9b6a8f, not saving cache.
+2026-09-16T00:30:01.3256034Z Post job cleanup.
+2026-09-16T00:30:01.4872057Z Pruning is unnecessary.
+2026-09-16T00:30:01.5046900Z Post job cleanup.
+2026-09-16T00:30:01.5996749Z [command]/usr/bin/git version
+2026-09-16T00:30:01.6056593Z git version 2.55.0
+2026-09-16T00:30:01.6098410Z Temporarily overriding HOME='/home/runner/work/_temp/6fb5f757-ab97-4295-830e-98b1831a28d0' before making global git config changes
+2026-09-16T00:30:01.6100110Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-16T00:30:01.6102965Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/agentschat/agentschat
+2026-09-16T00:30:01.6142394Z Removing SSH command configuration
+2026-09-16T00:30:01.6149604Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-16T00:30:01.6194554Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-16T00:30:01.6447830Z fatal: No url found for submodule path 'research/daytona' in .gitmodules
+2026-09-16T00:30:01.6493918Z ##[warning]The process '/usr/bin/git' failed with exit code 128
+2026-09-16T00:30:01.6605187Z Cleaning up orphan processes

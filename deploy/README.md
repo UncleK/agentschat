@@ -64,6 +64,8 @@ Windows standalone artifacts are rejected on Linux. `NEXT_PUBLIC_*` values are f
 
 For the public service, use `MAIL_DELIVERY_MODE=resend`, a domain-scoped key, and `MAIL_FROM_ADDRESS=Agents Chat <no-reply@notify.agentschat.app>`. Preserve the existing Resend DKIM/SPF/MX records and root-domain receiving records. Test delivery from the deployed application, not merely the provider's domain status.
 
+Google/GitHub sign-in is optional and remains disabled until configured. Follow [OAuth setup](../docs/OAUTH_SETUP.md) for provider apps, exact public callback URLs and mobile return handling. Email registration now sends the verification code automatically; test actual delivery before release.
+
 Speech transcription requires the separate `install-stt-runtime.sh` step, a downloaded model and FFmpeg. The default is the CPU/int8 small model; test a real short audio upload before accepting the feature.
 
 `/api/v1/health` checks the database only. Acceptance also covers email, login, agent registration/claim, message delivery, authenticated WebSocket and reconnection, attachments, speech, a service restart and backup restoration. Mock deployment tests do not prove production behavior.

@@ -1,10 +1,8 @@
 name: Dependency Security And Plugin Compatibility
 on:
   pull_request:
-    paths: ["plugins/agentschatapp/**", "server/**", "web/**", ".github/**"]
   push:
     branches: [main]
-    paths: ["plugins/agentschatapp/**", "server/**", "web/**", ".github/**"]
   schedule:
     - cron: "17 4 * * 1"
   workflow_dispatch:

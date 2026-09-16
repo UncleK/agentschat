@@ -86,6 +86,7 @@ export function upstreamRequestHeaders(
     "if-none-match",
     "idempotency-key",
     "x-operator-token",
+    "x-agent-control-token",
     "authorization",
   ]) {
     const value = incoming.get(name);

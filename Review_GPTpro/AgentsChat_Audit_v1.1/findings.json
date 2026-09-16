@@ -1,0 +1,392 @@
+[
+  {
+    "id": "AC-01",
+    "priority": "P1",
+    "evidence": "static-confirmed",
+    "title": "未绑定 Agent 可在缺少原控制端授权时被他人绑定",
+    "paths": [
+      "server/src/modules/agents/agents.controller.ts",
+      "server/src/modules/agents/agents.service.ts",
+      "server/src/modules/content/content.service.ts"
+    ],
+    "functions": [
+      "requestClaim",
+      "confirmClaim",
+      "getDirectMessageThreads",
+      "getDirectMessageThreadMessages"
+    ],
+    "conditions": "已登录人类；目标在旧代码中为 Self（未绑定站内人类账户），且满足入口待处理申请条件。目标可能已有其他外部操作者，并非无主；此发现不涵盖任意已绑定其他人类账户的 Agent。",
+    "impact": "未经原控制端授权，目标 Agent 的站内关联被设为申请者；根据私信读取链，该账户可能取得目标已有私信读取资格。这不是合法领取无主 Agent，也未证明可控制宿主电脑。",
+    "fix": "保留免人类预注册的 public 接入和后续绑定，同时保留 bound 路线；关闭或重构人类单方绑定逻辑。原控制端有效凭证与操作者对目标账户的明确授权不可缺失；请求范围锁定、一次性消费、事务更新、并发互斥和审计；保留 agentId 与历史数据。不得通过强制预注册、取消 public 或删除未绑定身份修复。",
+    "tests": [
+      "CL-01",
+      "CL-02",
+      "CL-03",
+      "CL-04",
+      "ON-01",
+      "ON-02",
+      "ON-03",
+      "ON-04",
+      "ON-05",
+      "ON-06",
+      "ON-07",
+      "ON-08",
+      "ON-09"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/agents/agents.controller.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/agents/agents.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/content/content.service.ts"
+    ],
+    "product_context": "产品负责人已确认：Agent 可在人类未注册 APP 时先接入并按策略参与，人类以后注册并关联；旧 Self-owned 只是未绑定账户状态，不表示自主程度或无主。",
+    "product_contract": "PRODUCT_CONTRACT.md",
+    "authorization_note": "申请者持有 challenge 可用于交接，但不能代替原控制端证明；公共文本、claim.requested 推送及模型自述不是明确管理授权。",
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-02",
+    "priority": "P1",
+    "evidence": "static-confirmed; private-object-impact-conditional-on-key-knowledge",
+    "title": "profileMetadata 混合公开资料、所有者控制和私有存储指针",
+    "paths": [
+      "server/src/modules/federation/federation.service.ts",
+      "server/src/modules/agents/agents.service.ts",
+      "server/src/modules/assets/asset-storage.service.ts",
+      "deploy/compose.production.yml"
+    ],
+    "functions": [
+      "handleAgentProfileUpdate",
+      "readPublicAgentAvatar",
+      "readStoredAvatarMetadata"
+    ],
+    "conditions": "攻击者持有自己 Agent 的合法凭证；读取其他对象还需要知道可访问桶中的具体对象键。",
+    "impact": "Agent 可覆盖人类设置的紧急停止与关系限制；还可改写公开头像的存储指针，使后端以自身存储权限读取指定对象。",
+    "fix": "公开可写字段白名单；控制策略和存储元数据迁至服务端受保护结构；头像只接受校验过的自有资产引用；存储最小权限。 未绑定身份沿用平台安全默认策略和原运行端更严格的本地限制；不得借策略修复强制人类预注册。",
+    "tests": [
+      "MD-01",
+      "MD-02",
+      "MD-03"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/federation/federation.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/agents/agents.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/assets/asset-storage.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/deploy/compose.production.yml"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-03",
+    "priority": "P1",
+    "evidence": "static-confirmed; browser-exploit-not-replayed",
+    "title": "头像允许主动内容且公开响应没有独立沙箱",
+    "paths": [
+      "server/src/modules/agents/agents.service.ts",
+      "server/src/modules/agents/agents.controller.ts",
+      "server/src/modules/assets/image-moderation.service.ts",
+      "server/src/modules/assets/assets.controller.ts",
+      "web/next.config.ts"
+    ],
+    "functions": [
+      "normalizeAvatarMimeType",
+      "readPublicAgentAvatar"
+    ],
+    "conditions": "主动 SVG 等进入头像存储；受害者直接打开同源头像资源或另有允许主动内容的嵌入路径。普通 img 标签显示 SVG 不等于脚本执行。",
+    "impact": "存储型主动内容风险；同源执行条件成立时可在受害者会话权限下请求应用接口。没有证明实际浏览器利用成功或账户已被接管。",
+    "fix": "拒绝 SVG/HTML；校验文件内容并重编码允许的栅格图片；像素/体积上限；独立无 Cookie 媒体域；响应沙箱；处理历史已上传对象和缓存。",
+    "tests": [
+      "AV-01",
+      "AV-02",
+      "AV-03"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/agents/agents.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/agents/agents.controller.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/assets/image-moderation.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/assets/assets.controller.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/web/next.config.ts"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-04",
+    "priority": "P1",
+    "evidence": "static-confirmed; network-impact-deployment-dependent",
+    "title": "Webhook 任意出站请求存在 SSRF 边界缺口",
+    "paths": [
+      "server/src/modules/federation/federation.service.ts",
+      "server/src/modules/federation/federation-delivery.service.ts",
+      "deploy/compose.production.yml"
+    ],
+    "functions": [
+      "claimAgent",
+      "processDueWebhookDeliveries"
+    ],
+    "conditions": "可配置自己 Agent 的 webhookUrl 并触发投递；目标服务对后端进程网络可达。",
+    "impact": "后端被用于请求本机或内网 HTTP 服务；当前代码不支持据此断言完整响应内容可被外传。",
+    "fix": "短期关闭 Webhook、保留 polling；正式实现 HTTPS 目的地约束、解析与实际连接地址检查、特殊地址阻断、禁重定向、出站网络隔离。",
+    "tests": [
+      "SS-01",
+      "SS-02",
+      "SS-03"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/federation/federation.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/federation/federation-delivery.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/deploy/compose.production.yml"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-05",
+    "priority": "P1",
+    "evidence": "static-confirmed-in-repository-deployment-topology",
+    "title": "Next.js 反向代理使认证限流退化为所有用户共享额度",
+    "paths": [
+      "server/src/modules/auth/auth-rate-limit.guard.ts",
+      "web/app/api/session/route.ts",
+      "deploy/caddy/Caddyfile.example"
+    ],
+    "functions": [
+      "AuthRateLimitGuard"
+    ],
+    "conditions": "采用仓库中的 Caddy → Next.js BFF → Nest 拓扑；请求在后端表现为相同直接连接地址。",
+    "impact": "注册每小时 30 次、其他认证每分钟 180 次的 peer 预算成为共享限额；错误请求可挤占正常用户额度。",
+    "fix": "在明确可信代理边界内恢复客户端来源；剥离用户伪造转发头；IP、账户、全站容量分别计数；不要简单关闭限流或无条件信任 X-Forwarded-For。",
+    "tests": [
+      "RL-01",
+      "RL-02",
+      "RL-03",
+      "ON-10"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/auth/auth-rate-limit.guard.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/web/app/api/session/route.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/deploy/caddy/Caddyfile.example"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-06",
+    "priority": "P1",
+    "evidence": "static-confirmed-crash-window; kill-test-not-run",
+    "title": "Accepted action 的调度依赖进程内任务，重启恢复不完整",
+    "paths": [
+      "server/src/modules/federation/federation.service.ts"
+    ],
+    "functions": [
+      "submitAction",
+      "enqueueAcceptedAction",
+      "processAcceptedAction"
+    ],
+    "conditions": "保存 Accepted 后、执行前进程退出；或 Processing 中途退出。",
+    "impact": "已接受任务可能永久停留；相同幂等键重试返回旧记录，不能自动恢复。副作用与终态提交之间还存在恢复时的重复执行风险。",
+    "fix": "持久化任务领取、租约、超时回收和启动扫描；用 outbox 连接业务提交与投递；副作用具备数据库级幂等约束。",
+    "tests": [
+      "AQ-01",
+      "AQ-02",
+      "AQ-03"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/federation/federation.service.ts"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-07",
+    "priority": "P2",
+    "evidence": "static-confirmed-concurrency-window; database-race-not-run",
+    "title": "投递序号读取最大值后加一存在并发竞争",
+    "paths": [
+      "server/src/modules/federation/federation-delivery.service.ts",
+      "server/src/database/entities/delivery.entity.ts",
+      "server/src/modules/agents/agents.service.ts"
+    ],
+    "functions": [
+      "nextSequenceForRecipient",
+      "enqueueEventForRecipient",
+      "requestClaim"
+    ],
+    "conditions": "同一 recipient 的两个不同事件并发入队。",
+    "impact": "两次读到同一最大序号，一次插入违反唯一约束；在事件先提交、投递后入队的路径中形成缺失投递风险。唯一约束避免重复值，并不自动补发。",
+    "fix": "原子计数器或按收件人锁；唯一冲突重试；业务事件与 outbox 同事务；缺失投递对账。",
+    "tests": [
+      "DL-01",
+      "DL-02"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/federation/federation-delivery.service.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/database/entities/delivery.entity.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/agents/agents.service.ts"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-08",
+    "priority": "P2",
+    "evidence": "static-confirmed; load-impact-not-benchmarked",
+    "title": "长轮询和 ACK 路径加载收件人全部投递历史",
+    "paths": [
+      "server/src/modules/federation/federation-delivery.service.ts"
+    ],
+    "functions": [
+      "loadEarliestOutstandingDelivery"
+    ],
+    "conditions": "收件人投递历史增长；多个长轮询同时在线。",
+    "impact": "每次加载全部历史再在应用中筛选；空等待路径以 50ms 间隔重复，历史越长成本越高。",
+    "fix": "查询时过滤未终结状态并 ORDER BY/LIMIT；匹配复合或部分索引；ACK 仅查询请求 ID；取消感知、并发上限与历史清理。",
+    "tests": [
+      "PF-01",
+      "PF-02"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/federation/federation-delivery.service.ts"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-09",
+    "priority": "P2",
+    "evidence": "static-confirmed; failure-load-test-not-run",
+    "title": "Webhook 串行投递形成跨租户队头阻塞",
+    "paths": [
+      "server/src/modules/federation/federation-delivery.service.ts"
+    ],
+    "functions": [
+      "processDueWebhookDeliveries"
+    ],
+    "conditions": "Webhook 连接在遍历时遇到慢响应或 10 秒超时。",
+    "impact": "单个慢端点拖延后续端点；进程内防重入不能替代多实例下的数据库任务租约。",
+    "fix": "有限并发和公平调度；同一 Agent 有序、不同 Agent 隔离；失败退避、熔断、租约领取和有效期限制。",
+    "tests": [
+      "WH-01",
+      "WH-02"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/federation/federation-delivery.service.ts"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-10",
+    "priority": "P2",
+    "evidence": "local-extracted-helper-reproduced",
+    "title": "自写 WebSocket 帧解析与编码不满足完整协议处理",
+    "paths": [
+      "server/src/modules/realtime/realtime.service.ts"
+    ],
+    "functions": [
+      "decodeFrame",
+      "encodeFrame"
+    ],
+    "conditions": "正常 TCP 半包/粘包、64-bit 长度帧、未掩码帧或超过 65535 字节的出站载荷。",
+    "impact": "丢帧、错误 pong、错误长帧解析；大出站载荷抛出 RangeError。尚未证明可由远程请求直接导致整个进程崩溃。",
+    "fix": "用成熟 WebSocket 实现替换手工帧处理；明确 payload 上限、连接上限、心跳、背压和认证撤销行为。",
+    "tests": [
+      "WS-00",
+      "WS-01",
+      "WS-02",
+      "WS-03",
+      "WS-04",
+      "WS-05"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/server/src/modules/realtime/realtime.service.ts"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-11",
+    "priority": "P1-conditional",
+    "evidence": "static-boundary-gap; host-permissions-unverified",
+    "title": "公开社交内容继承所绑定 OpenClaw Agent 的工具与工作区权限",
+    "paths": [
+      "plugins/agentschatapp/src/embedded.ts",
+      "plugins/agentschatapp/src/channel.ts"
+    ],
+    "functions": [
+      "runEmbeddedReply",
+      "buildSessionKey"
+    ],
+    "conditions": "绑定的 OpenClaw Agent 具有敏感工具、文件或外部账户权限，且没有额外宿主沙箱和工具白名单。",
+    "impact": "间接提示词注入的影响可能越过社交回复范围。仅确认插件自身未在该入口强制形成硬隔离；没有验证宿主被控制。",
+    "fix": "公共社交使用独立 Agent/工作区/工具配置；默认只读或无工具；主人控制通道独立授权；敏感操作外部批准；会话命名包括平台、账户与线程。 未绑定身份的后续账户绑定通过原控制端可信管理入口取得明确授权，不由公共社交回复 worker 自动批准。",
+    "tests": [
+      "AI-01",
+      "AI-02",
+      "AI-03"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/plugins/agentschatapp/src/embedded.ts",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/plugins/agentschatapp/src/channel.ts"
+    ],
+    "terminology_note": "此处绑定 OpenClaw Agent 指宿主运行实例的选择，与该身份是否绑定站内人类账户不同；public 与 bound 均须隔离。",
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-12",
+    "priority": "P2",
+    "evidence": "static-confirmed-storage-choice; exposure-dependent-on-device-and-acl",
+    "title": "移动端令牌和插件状态存储缺少明确的敏感数据保护",
+    "paths": [
+      "app/lib/core/session/app_session_storage.dart",
+      "plugins/agentschatapp/src/state.ts"
+    ],
+    "functions": [
+      "writeToken",
+      "saveSlotState",
+      "resolveSlotStateDir"
+    ],
+    "conditions": "设备备份、文件访问权限或插件目录 ACL 暴露；插件写入中断。",
+    "impact": "移动端令牌保存在普通偏好存储；插件状态包含 accessToken 且写入未显式限制文件权限、未原子替换。并不等于远程可读或已经泄露。",
+    "fix": "使用系统安全存储并迁移清除旧 token；POSIX 0700/0600 与其他系统合适 ACL；原子临时文件替换、必要锁与备份脱敏。",
+    "tests": [
+      "ST-01",
+      "ST-02",
+      "ST-03"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/app/lib/core/session/app_session_storage.dart",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/plugins/agentschatapp/src/state.ts"
+    ],
+    "report_revision": "1.1"
+  },
+  {
+    "id": "AC-13",
+    "priority": "P2",
+    "evidence": "repository-configuration-and-ci-results-verified",
+    "title": "CI 通过但主分支缺少强制合入门禁",
+    "paths": [
+      ".github/workflows/backend-server-verification.yml",
+      ".github/workflows/dependency-security.yml"
+    ],
+    "functions": [
+      "main branch protection / repository rulesets / selected e2e bucket"
+    ],
+    "conditions": "所读取 main 分支 protected=false 且仓库 rulesets 列表为空；结论不涵盖外部发布审批系统。",
+    "impact": "现有成功检查不是强制合入约束；本次权限/崩溃边界不能依靠依赖审计替代。",
+    "fix": "设为 required checks、限制直接推送和 force push；为本次问题加入反向授权及故障注入测试；审查 Actions 固定 SHA 与更多生态依赖覆盖。",
+    "tests": [
+      "CI-01",
+      "CI-02"
+    ],
+    "source_commit": "1fe8354186009259c11df3a4cbb0adbd80325818",
+    "source_urls": [
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/.github/workflows/backend-server-verification.yml",
+      "https://github.com/UncleK/agentschat/blob/1fe8354186009259c11df3a4cbb0adbd80325818/.github/workflows/dependency-security.yml"
+    ],
+    "report_revision": "1.1"
+  }
+]

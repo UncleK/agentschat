@@ -419,7 +419,9 @@ export function mergeLauncherIntoAccount(base, launcherUrl) {
         displayName: normalizeOptionalString(launcher.displayName) ?? base.displayName
     };
 }
-export async function confirmClaimLauncher(state, launcherUrl) {
+export async function confirmClaimLauncher(state, launcherUrl, control) {
+    if (!control?.humanAccessToken)
+        throw new Error("Binding requires an authenticated human and explicit approval in the trusted management terminal.");
     if (!state.serverBaseUrl || !state.accessToken || !state.agentId) {
         throw new Error("Claim launcher requires an existing claimed slot.");
     }
@@ -436,17 +438,18 @@ export async function confirmClaimLauncher(state, launcherUrl) {
     if (!launcher.claimRequestId || !launcher.challengeToken) {
         throw new Error("Claim launcher requires claimRequestId and challengeToken.");
     }
-    const action = await submitAction(state.serverBaseUrl, state.accessToken, {
-        type: "claim.confirm",
-        payload: {
-            claimRequestId: launcher.claimRequestId,
-            challengeToken: launcher.challengeToken
-        }
-    }, `agentschatapp-plugin-claim-${launcher.claimRequestId}`);
-    if (typeof action.id !== "string" || action.id.length === 0) {
-        throw new Error("claim.confirm did not return an action id.");
+    const base = normalizeBaseUrl(state.serverBaseUrl);
+    const path = `${base}/api/v1/agents/${encodeURIComponent(state.agentId)}/claim-requests/${encodeURIComponent(launcher.claimRequestId)}`;
+    const preview = await httpJson("GET", `${path}/control-preview`, undefined, control.humanAccessToken, { "X-Agent-Control-Token": state.accessToken });
+    if (preview.agentId !== state.agentId || preview.purpose !== "bind_account" || typeof preview.accountId !== "string") {
+        throw new Error("Invalid management binding preview.");
     }
-    return await waitForActionCompletion(state.serverBaseUrl, state.accessToken, action.id);
+    if (!await control.approve(preview))
+        throw new Error("Binding was not approved by the local operator.");
+    return await httpJson("POST", `${path}/confirm`, {
+        challengeToken: launcher.challengeToken,
+        authorization: { purpose: "bind_account", accountId: preview.accountId, agentId: state.agentId, approved: true }
+    }, control.humanAccessToken, { "X-Agent-Control-Token": state.accessToken });
 }
 export async function connectAccount(account, state, logger, options) {
     const mergedAccount = mergeLauncherIntoAccount(account, account.launcherUrl);

@@ -1,0 +1,43 @@
+{
+  "readAtUTC": "2026-09-16 00:28:54 UTC",
+  "cacheRules": {
+    "success": true,
+    "status": 200,
+    "version": "1",
+    "rules": [
+      {
+        "ref": "agents_chat_private_bypass",
+        "expression": "(http.host in {\"agentschat.app\" \"www.agentschat.app\"} and not starts_with(http.request.uri.path, \"/_next/static/\"))",
+        "enabled": true,
+        "action_parameters": {
+          "cache": false
+        }
+      },
+      {
+        "ref": "agents_chat_immutable_static",
+        "expression": "(http.host in {\"agentschat.app\" \"www.agentschat.app\"} and starts_with(http.request.uri.path, \"/_next/static/\"))",
+        "enabled": true,
+        "action_parameters": {
+          "browser_ttl": {
+            "mode": "respect_origin"
+          },
+          "cache": true,
+          "edge_ttl": {
+            "mode": "respect_origin"
+          }
+        }
+      }
+    ]
+  },
+  "purge": {
+    "status": 200,
+    "success": true,
+    "prefixes": [
+      "agentschat.app/api/v1/agents/",
+      "www.agentschat.app/api/v1/agents/"
+    ],
+    "evidenceType": "transcription of successful Cloudflare purge API response in this task",
+    "objectsDeleted": false,
+    "productionCodeDeployed": false
+  }
+}

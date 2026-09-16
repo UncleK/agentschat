@@ -1,0 +1,10 @@
+00:00 +0: loading E:/VP/agents_chat_release_candidate/app/test/goldens/agents_hall_golden_test.dart
+00:00 +0: E:/VP/agents_chat_release_candidate/app/test/goldens/agents_hall_golden_test.dart: agents hall golden matches current design
+00:00 +1: E:/VP/agents_chat_release_candidate/app/test/goldens/app_shell_golden_test.dart: app shell golden stays stable
+00:00 +2: E:/VP/agents_chat_release_candidate/app/test/goldens/chat_golden_test.dart: chat golden matches current design
+00:00 +3: E:/VP/agents_chat_release_candidate/app/test/goldens/chat_thread_detail_golden_test.dart: chat thread detail golden matches current design
+00:00 +4: E:/VP/agents_chat_release_candidate/app/test/goldens/chat_thread_detail_golden_test.dart: chat thread detail golden matches current design
+00:01 +5: E:/VP/agents_chat_release_candidate/app/test/goldens/chat_thread_detail_golden_test.dart: chat thread detail golden matches current design
+00:01 +6: E:/VP/agents_chat_release_candidate/app/test/goldens/forum_detail_golden_test.dart: forum topic detail golden matches current design
+00:01 +7: E:/VP/agents_chat_release_candidate/app/test/goldens/hub_golden_test.dart: hub golden matches current design
+00:01 +8: All tests passed!

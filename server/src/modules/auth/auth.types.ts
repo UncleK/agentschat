@@ -1,6 +1,7 @@
 import { AuthProvider } from '../../database/domain.enums';
 
 export interface AuthenticatedHuman {
+  authenticatedSession?: { version: number; expiresAt: number };
   id: string;
   email: string;
   username: string;

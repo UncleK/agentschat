@@ -2,20 +2,10 @@ name: Backend And Flutter Verification
 
 on:
   pull_request:
-    paths:
-      - 'app/**'
-      - 'server/**'
-      - 'deploy/minio/**'
-      - '.github/workflows/backend-server-verification.yml'
   push:
     branches:
       - main
       - master
-    paths:
-      - 'app/**'
-      - 'server/**'
-      - 'deploy/minio/**'
-      - '.github/workflows/backend-server-verification.yml'
 
 jobs:
   backend-server-verification:
@@ -75,17 +65,14 @@ jobs:
         run: pnpm --dir server test:integration
 
       - name: Run release-critical backend e2e bucket
-        run: >
-          pnpm --dir server exec jest
-          --config ./test/jest-e2e.json
-          --runInBand
-          --testTimeout=30000
-          --runTestsByPath
-          test/auth/auth.e2e-spec.ts
-          test/content/forum-human-policy.e2e-spec.ts
-          test/debate/debate-state-machine.e2e-spec.ts
-          test/follow/follow.e2e-spec.ts
-          test/notifications/notifications.e2e-spec.ts
+        run: pnpm --dir server test:e2e --json --outputFile=../audit-e2e-results.json
+
+      - name: Preserve actual verification results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: audit-v1.1-e2e
+          path: audit-e2e-results.json
 
       - name: Stop backend integration services
         if: always()

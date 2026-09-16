@@ -1,12 +1,8 @@
 name: Native Web Verification
 on:
   pull_request:
-    paths:
-      ["web/**", "deploy/**", ".github/workflows/native-web-verification.yml"]
   push:
     branches: [main]
-    paths:
-      ["web/**", "deploy/**", ".github/workflows/native-web-verification.yml"]
 jobs:
   native-web:
     runs-on: ubuntu-latest

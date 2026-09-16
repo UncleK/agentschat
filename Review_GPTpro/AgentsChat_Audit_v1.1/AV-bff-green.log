@@ -1,0 +1,33 @@
+### Result
+{"acceptance":"AV-02","surface":"built Next.js BFF","results":[{"path":"/api/v1/agents/cdaba9fc-90a0-4649-86b5-a2998baf4008/avatar?v=1789517188122","status":200,"scriptExecuted":false},{"path":"/api/v1/agents/4ffc060a-fed0-44db-912b-d00d5498f0d1/avatar","status":200,"scriptExecuted":false},{"path":"/api/v1/agents/45e51b2d-98bb-4cc1-854e-399dce554152/avatar","status":403,"scriptExecuted":false},{"path":"/api/v1/agents/bc138807-f138-43d5-94b4-4dbfc9af4b66/avatar","status":403,"scriptExecuted":false},{"path":"/api/v1/agents/50d992b4-8e7f-4e56-ae09-215508c31a47/avatar","status":403,"scriptExecuted":false}],"permittedEmbedding":true}
+### Ran Playwright code
+```js
+await (async (page) => {
+  const base = 'http://127.0.0.1:55442';
+  const fixture = await (await page.request.get('http://127.0.0.1:55441/fixture')).json();
+  const results = [];
+  for (const path of [fixture.legal, fixture.legacyRaster, ...fixture.rejected]) {
+    const response = await page.goto(base + path);
+    const raster = path === fixture.legal || path === fixture.legacyRaster;
+    if (response.status() !== (raster ? 200 : 403)) throw new Error('BFF avatar status');
+    if (!(await page.evaluate(() => window.CANARY === undefined))) throw new Error('BFF avatar script executed');
+    if (raster) {
+      const headers = await response.allHeaders();
+      if (!headers['content-security-policy']?.includes('sandbox') || headers['x-content-type-options'] !== 'nosniff') throw new Error('BFF stripped isolation');
+      if (headers['cross-origin-resource-policy'] !== 'same-site') throw new Error('BFF stripped cross-origin resource policy');
+      if (!headers['cache-control'].includes('no-store')) throw new Error('BFF avatar cached');
+    }
+    results.push({ path, status: response.status(), scriptExecuted: false });
+  }
+  await page.goto(base + '/login');
+  await page.evaluate(path => { const image = document.createElement('img'); image.id = 'audit-bff-avatar'; image.src = path; document.body.append(image); }, fixture.legal);
+  await page.waitForFunction(() => document.getElementById('audit-bff-avatar').naturalWidth > 0);
+  return { acceptance: 'AV-02', surface: 'built Next.js BFF', results, permittedEmbedding: true };
+}
+)(page);
+```
+### Page
+- Page URL: http://127.0.0.1:55442/login
+- Page Title: 登录 | Agents Chat
+### Events
+- New console entries: .playwright-cli\console-2026-09-16T00-06-59-822Z.log#L20-L32

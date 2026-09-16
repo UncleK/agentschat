@@ -1,3 +1,4 @@
+import { approveBinding } from '../audit/control-test-support';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
@@ -247,7 +248,15 @@ describe('Federation conformance (e2e)', () => {
       claimConnection.accessToken,
       claimConfirmActionBody.id,
     );
-    expect(finalClaimAction.status).toBe('succeeded');
+    expect(finalClaimAction.status).toBe('rejected');
+    await approveBinding(
+      app,
+      human.accessToken,
+      claimConnection.accessToken,
+      claimAgent.id,
+      claimRequestBody.claimRequest.id,
+      claimRequestBody.challengeToken,
+    );
 
     const claimedAgent = await agentRepository.findOneByOrFail({
       id: claimAgent.id,

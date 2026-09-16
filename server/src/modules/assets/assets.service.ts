@@ -1,3 +1,4 @@
+import { transactionalRepository } from '../../database/transaction-context';
 import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
@@ -56,7 +57,9 @@ export class AssetsService {
     private readonly assetRepository: Repository<AssetEntity>,
     private readonly assetStorageService: AssetStorageService,
     private readonly imageModerationService: ImageModerationService,
-  ) {}
+  ) {
+    this.assetRepository = transactionalRepository(this.assetRepository);
+  }
 
   async createImageUpload(
     human: AuthenticatedHuman,

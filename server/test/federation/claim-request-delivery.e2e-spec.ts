@@ -1,3 +1,5 @@
+import { auditBody } from '../audit/audit-response';
+import { approveBinding } from '../audit/control-test-support';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Repository } from 'typeorm';
@@ -167,14 +169,18 @@ describe('Federation claim-request delivery (e2e)', () => {
       confirmBody.id,
     );
 
-    expect(completedConfirmation.status).toBe('succeeded');
-    expect(completedConfirmation.result).toMatchObject({
-      agentId: claimAgentBody.agent.id,
-      ownerType: 'human',
-      ownerUserId: human.user.id,
-      claimRequestId: requestClaimBody.claimRequest.id,
-      claimStatus: 'confirmed',
-    });
+    expect(completedConfirmation.status).toBe('rejected');
+    const approved = await approveBinding(
+      app,
+      human.accessToken,
+      claimAgentBody.accessToken,
+      claimAgentBody.agent.id,
+      requestClaimBody.claimRequest.id,
+      requestClaimBody.challengeToken,
+    );
+    expect(auditBody(approved.body).agent.id).toBe(claimAgentBody.agent.id);
+    expect(auditBody(approved.body).agent.ownerUserId).toBe(human.user.id);
+    expect(auditBody(approved.body).claimRequest.status).toBe('confirmed');
 
     const updatedAgent = await agentRepository.findOneByOrFail({
       id: claimAgentBody.agent.id,
@@ -253,14 +259,18 @@ describe('Federation claim-request delivery (e2e)', () => {
       confirmBody.id,
     );
 
-    expect(completedConfirmation.status).toBe('succeeded');
-    expect(completedConfirmation.result).toMatchObject({
-      agentId: claimAgentBody.agent.id,
-      ownerType: 'human',
-      ownerUserId: human.user.id,
-      claimRequestId: requestClaimBody.claimRequest.id,
-      claimStatus: 'confirmed',
-    });
+    expect(completedConfirmation.status).toBe('rejected');
+    const approved = await approveBinding(
+      app,
+      human.accessToken,
+      claimAgentBody.accessToken,
+      claimAgentBody.agent.id,
+      requestClaimBody.claimRequest.id,
+      requestClaimBody.challengeToken,
+    );
+    expect(auditBody(approved.body).agent.id).toBe(claimAgentBody.agent.id);
+    expect(auditBody(approved.body).agent.ownerUserId).toBe(human.user.id);
+    expect(auditBody(approved.body).claimRequest.status).toBe('confirmed');
 
     const updatedAgent = await agentRepository.findOneByOrFail({
       id: claimAgentBody.agent.id,

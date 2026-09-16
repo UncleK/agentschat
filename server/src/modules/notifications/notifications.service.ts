@@ -1,3 +1,9 @@
+import { enqueueDelivery } from '../../database/enqueue-delivery';
+import {
+  inTransaction,
+  transactionalRepository,
+  afterCommit,
+} from '../../database/transaction-context';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -10,8 +16,6 @@ import {
 import {
   AgentOwnerType,
   ThreadParticipantRole,
-  DeliveryChannel,
-  DeliveryStatus,
   EventActorType,
   FollowTargetType,
   SubjectType,
@@ -57,7 +61,27 @@ export class NotificationsService {
     @InjectRepository(AgentConnectionEntity)
     private readonly agentConnectionRepository: Repository<AgentConnectionEntity>,
     private readonly realtimeService: RealtimeService,
-  ) {}
+  ) {
+    this.agentRepository = transactionalRepository(this.agentRepository);
+    this.notificationRepository = transactionalRepository(
+      this.notificationRepository,
+    );
+    this.eventRepository = transactionalRepository(this.eventRepository);
+    this.followRepository = transactionalRepository(this.followRepository);
+    this.debateSessionRepository = transactionalRepository(
+      this.debateSessionRepository,
+    );
+    this.debateSeatRepository = transactionalRepository(
+      this.debateSeatRepository,
+    );
+    this.threadParticipantRepository = transactionalRepository(
+      this.threadParticipantRepository,
+    );
+    this.deliveryRepository = transactionalRepository(this.deliveryRepository);
+    this.agentConnectionRepository = transactionalRepository(
+      this.agentConnectionRepository,
+    );
+  }
 
   async processEventById(eventId: string): Promise<void> {
     const event = await this.eventRepository.findOneBy({ id: eventId });
@@ -70,6 +94,35 @@ export class NotificationsService {
   }
 
   async processEvent(event: EventEntity): Promise<void> {
+    await inTransaction(
+      this.eventRepository.manager.connection,
+      async (manager) => {
+        // Inline fanout and the outbox worker share one durable completion
+        // checkpoint. Lock in the worker's order (outbox, then event) so a retry
+        // cannot fan out old content again after ownership or membership changes.
+        await manager.query(
+          'INSERT INTO event_outbox(event_id) VALUES ($1) ON CONFLICT DO NOTHING',
+          [event.id],
+        );
+        const work = await manager.query<Array<{ completed_at: Date | null }>>(
+          'SELECT completed_at FROM event_outbox WHERE event_id=$1 FOR UPDATE',
+          [event.id],
+        );
+        if (work[0].completed_at !== null) return;
+        await manager.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+          [`notification:${event.id}`],
+        );
+        await this.processEventRecipients(event);
+        await manager.query(
+          'UPDATE event_outbox SET completed_at=now(), lease_owner=NULL, lease_expires_at=NULL, last_error=NULL WHERE event_id=$1',
+          [event.id],
+        );
+      },
+    );
+  }
+
+  private async processEventRecipients(event: EventEntity): Promise<void> {
     const recipients = await this.collectRecipients(event);
     const uniqueRecipients = new Map<string, NotificationRecipient>();
 
@@ -94,17 +147,21 @@ export class NotificationsService {
       );
     }
 
-    for (const recipient of uniqueRecipients.values()) {
+    for (const recipient of [...uniqueRecipients.values()].sort((a, b) =>
+      a.id.localeCompare(b.id),
+    )) {
       const notification = await this.upsertNotification(recipient, event);
 
       if (recipient.type === SubjectType.Human) {
         const bellState = await this.readBellState(recipient.id);
 
-        this.realtimeService.emitToHuman(recipient.id, {
-          type: 'notification.created',
-          notification: this.serializeNotification(notification),
-          bell: bellState,
-        });
+        afterCommit(() =>
+          this.realtimeService.emitToHuman(recipient.id, {
+            type: 'notification.created',
+            notification: this.serializeNotification(notification),
+            bell: bellState,
+          }),
+        );
 
         continue;
       }
@@ -219,6 +276,16 @@ export class NotificationsService {
     event: EventEntity,
   ): Promise<NotificationRecipient[]> {
     switch (event.eventType) {
+      case 'claim.requested':
+        return event.targetId
+          ? [
+              {
+                type: SubjectType.Agent,
+                id: event.targetId,
+                kind: 'claim.requested',
+              },
+            ]
+          : [];
       case 'dm.send':
         return this.collectDirectMessageRecipients(event);
       case 'forum.reply.create':
@@ -444,70 +511,11 @@ export class NotificationsService {
     event: EventEntity,
     recipientAgentId: string,
   ): Promise<void> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const existing = await this.deliveryRepository.findOneBy({
-        eventId: event.id,
-        recipientAgentId,
-      });
-
-      if (existing) {
-        return;
-      }
-
-      const [latestDelivery, connection] = await Promise.all([
-        this.deliveryRepository.find({
-          where: { recipientAgentId },
-          order: { sequence: 'DESC' },
-          take: 1,
-        }),
-        this.agentConnectionRepository.findOneBy({ agentId: recipientAgentId }),
-      ]);
-      const sequence = (latestDelivery[0]?.sequence ?? 0) + 1;
-
-      try {
-        await this.deliveryRepository.insert({
-          eventId: event.id,
-          recipientAgentId,
-          agentConnectionId: connection?.id ?? null,
-          sequence,
-          status: DeliveryStatus.Pending,
-          deliveryChannel: connection?.pollingEnabled
-            ? DeliveryChannel.Polling
-            : DeliveryChannel.Webhook,
-          attemptCount: 0,
-          nextAttemptAt: new Date(),
-          replayExpiresAt: new Date(Date.now() + this.replayWindowMs),
-          ackedAt: null,
-          deadLetteredAt: null,
-          lastAttemptAt: null,
-          lastError: null,
-        });
-        return;
-      } catch (error) {
-        if (
-          this.isUniqueConstraintViolation(
-            error,
-            'IDX_deliveries_event_recipient_unique',
-          )
-        ) {
-          return;
-        }
-
-        if (
-          this.isUniqueConstraintViolation(
-            error,
-            'IDX_deliveries_recipient_sequence_unique',
-          )
-        ) {
-          continue;
-        }
-
-        throw error;
-      }
-    }
-
-    throw new Error(
-      `Failed to enqueue delivery for event ${event.id} and recipient ${recipientAgentId}.`,
+    await enqueueDelivery(
+      this.deliveryRepository.manager.connection,
+      event.id,
+      recipientAgentId,
+      this.replayWindowMs,
     );
   }
 

@@ -206,6 +206,14 @@ class FakeApiClient extends ApiClient {
     String path, {
     Map<String, String>? queryParameters,
   }) {
+    if (path == '/auth/oauth/providers') {
+      return Future.value({
+        'providers': [
+          {'id': 'google', 'enabled': false},
+          {'id': 'github', 'enabled': false},
+        ],
+      });
+    }
     return _getHandlers.removeFirst()(path, queryParameters);
   }
 
@@ -656,7 +664,10 @@ class InMemoryAppSessionStorage implements AppSessionStorage {
     required String activeAgentId,
   }) async {
     return List<String>.unmodifiable(
-      _dismissedChatThreadIds[_dismissedChatThreadsKey(userId, activeAgentId)] ??
+      _dismissedChatThreadIds[_dismissedChatThreadsKey(
+            userId,
+            activeAgentId,
+          )] ??
           const <String>[],
     );
   }
@@ -687,12 +698,14 @@ class InMemoryAppSessionStorage implements AppSessionStorage {
     required String activeAgentId,
     required List<String> threadIds,
   }) async {
-    _dismissedChatThreadIds[_dismissedChatThreadsKey(userId, activeAgentId)] =
-        threadIds
-            .map((value) => value.trim())
-            .where((value) => value.isNotEmpty)
-            .toSet()
-            .toList(growable: false);
+    _dismissedChatThreadIds[_dismissedChatThreadsKey(
+      userId,
+      activeAgentId,
+    )] = threadIds
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
   }
 
   String _dismissedChatThreadsKey(String userId, String activeAgentId) {

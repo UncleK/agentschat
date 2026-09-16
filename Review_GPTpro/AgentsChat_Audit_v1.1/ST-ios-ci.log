@@ -1,0 +1,817 @@
+﻿2026-09-16T00:14:24.9603740Z Current runner version: '2.337.0'
+2026-09-16T00:14:24.9654030Z ##[group]Runner Image Provisioner
+2026-09-16T00:14:24.9655640Z Hosted Compute Agent
+2026-09-16T00:14:24.9656670Z Version: 20260828.587
+2026-09-16T00:14:24.9657820Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+2026-09-16T00:14:24.9659130Z Build Date: 2026-08-28T16:44:25Z
+2026-09-16T00:14:24.9660360Z Worker ID: {b529dbed-ff22-4678-bb7a-4e439a1be616}
+2026-09-16T00:14:24.9661680Z Azure Region: westus
+2026-09-16T00:14:24.9662830Z ##[endgroup]
+2026-09-16T00:14:24.9665740Z ##[group]Operating System
+2026-09-16T00:14:24.9666820Z macOS
+2026-09-16T00:14:24.9667700Z 15.7.9
+2026-09-16T00:14:24.9668600Z 24G830
+2026-09-16T00:14:24.9669850Z ##[endgroup]
+2026-09-16T00:14:24.9670890Z ##[group]Runner Image
+2026-09-16T00:14:24.9671960Z Image: macos-15-arm64
+2026-09-16T00:14:24.9673240Z Version: 20260907.0337.1
+2026-09-16T00:14:24.9675820Z Included Software: https://github.com/actions/runner-images/blob/macos-15-arm64/20260907.0337/images/macos/macos-15-arm64-Readme.md
+2026-09-16T00:14:24.9679730Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-15-arm64%2F20260907.0337
+2026-09-16T00:14:24.9681730Z ##[endgroup]
+2026-09-16T00:14:24.9684150Z ##[group]GITHUB_TOKEN Permissions
+2026-09-16T00:14:24.9689280Z Contents: read
+2026-09-16T00:14:24.9690720Z Metadata: read
+2026-09-16T00:14:24.9691700Z Packages: read
+2026-09-16T00:14:24.9692790Z ##[endgroup]
+2026-09-16T00:14:24.9696760Z Secret source: Actions
+2026-09-16T00:14:24.9697660Z Cache mode: write
+2026-09-16T00:14:24.9698220Z Prepare workflow directory
+2026-09-16T00:14:25.0122240Z Prepare all required actions
+2026-09-16T00:14:25.0164110Z Getting action download info
+2026-09-16T00:14:25.2086580Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-09-16T00:14:25.6545390Z Download action repository 'subosito/flutter-action@v2' (SHA:1a449444c387b1966244ae4d4f8c696479add0b2)
+2026-09-16T00:14:26.3679110Z Download action repository 'actions/upload-artifact@v6' (SHA:b7c566a772e6b6bfb58ed0dc250532a479d7789f)
+2026-09-16T00:14:26.6867000Z Getting action download info
+2026-09-16T00:14:26.7522670Z Download action repository 'actions/cache@v5' (SHA:caa296126883cff596d87d8935842f9db880ef25)
+2026-09-16T00:14:26.9652620Z Complete job name: ios-native-storage
+2026-09-16T00:14:27.0601690Z ##[group]Run actions/checkout@v7
+2026-09-16T00:14:27.0603470Z with:
+2026-09-16T00:14:27.0604130Z   repository: UncleK/agentschat
+2026-09-16T00:14:27.0610710Z   token: ***
+2026-09-16T00:14:27.0611270Z   ssh-strict: true
+2026-09-16T00:14:27.0611900Z   ssh-user: git
+2026-09-16T00:14:27.0612570Z   persist-credentials: true
+2026-09-16T00:14:27.0613210Z   clean: true
+2026-09-16T00:14:27.0613750Z   sparse-checkout-cone-mode: true
+2026-09-16T00:14:27.0615590Z   fetch-depth: 1
+2026-09-16T00:14:27.0617610Z   fetch-tags: false
+2026-09-16T00:14:27.0619640Z   show-progress: true
+2026-09-16T00:14:27.0621170Z   lfs: false
+2026-09-16T00:14:27.0622850Z   submodules: false
+2026-09-16T00:14:27.0625080Z   set-safe-directory: true
+2026-09-16T00:14:27.0626160Z   allow-unsafe-pr-checkout: false
+2026-09-16T00:14:27.0628130Z ##[endgroup]
+2026-09-16T00:14:27.5453200Z Syncing repository: UncleK/agentschat
+2026-09-16T00:14:27.5455110Z ##[group]Getting Git version info
+2026-09-16T00:14:27.5456050Z Working directory is '/Users/runner/work/agentschat/agentschat'
+2026-09-16T00:14:27.5470760Z [command]/opt/homebrew/bin/git version
+2026-09-16T00:14:27.6118060Z git version 2.55.0
+2026-09-16T00:14:27.6138460Z ##[endgroup]
+2026-09-16T00:14:27.6146130Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/6eea4a7c-b5b0-4a3a-b68d-88337763392c/.gitconfig'
+2026-09-16T00:14:27.6147950Z Temporarily overriding HOME='/Users/runner/work/_temp/6eea4a7c-b5b0-4a3a-b68d-88337763392c' before making global git config changes
+2026-09-16T00:14:27.6149590Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-16T00:14:27.6151110Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/agentschat/agentschat
+2026-09-16T00:14:27.6267790Z Deleting the contents of '/Users/runner/work/agentschat/agentschat'
+2026-09-16T00:14:27.6271820Z ##[group]Determining repository object format
+2026-09-16T00:14:27.6274460Z ##[endgroup]
+2026-09-16T00:14:27.6276690Z ##[group]Initializing the repository
+2026-09-16T00:14:27.6279080Z [command]/opt/homebrew/bin/git init /Users/runner/work/agentschat/agentschat
+2026-09-16T00:14:27.6537110Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-09-16T00:14:27.6538570Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-09-16T00:14:27.6539850Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-09-16T00:14:27.6541410Z hint: call:
+2026-09-16T00:14:27.6543280Z hint:
+2026-09-16T00:14:27.6545550Z hint: 	git config --global init.defaultBranch <name>
+2026-09-16T00:14:27.6546790Z hint:
+2026-09-16T00:14:27.6547920Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-09-16T00:14:27.6549850Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-09-16T00:14:27.6552020Z hint:
+2026-09-16T00:14:27.6552800Z hint: 	git branch -m <name>
+2026-09-16T00:14:27.6553770Z hint:
+2026-09-16T00:14:27.6554920Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-09-16T00:14:27.6558170Z Initialized empty Git repository in /Users/runner/work/agentschat/agentschat/.git/
+2026-09-16T00:14:27.6563660Z [command]/opt/homebrew/bin/git remote add origin https://github.com/UncleK/agentschat
+2026-09-16T00:14:27.6645690Z ##[endgroup]
+2026-09-16T00:14:27.6649270Z ##[group]Disabling automatic garbage collection
+2026-09-16T00:14:27.6651920Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-09-16T00:14:27.6726760Z ##[endgroup]
+2026-09-16T00:14:27.6729530Z ##[group]Setting up auth
+2026-09-16T00:14:27.6731850Z Removing SSH command configuration
+2026-09-16T00:14:27.6735380Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-16T00:14:27.6824960Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-16T00:14:27.8103890Z Removing HTTP extra header
+2026-09-16T00:14:27.8106860Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-16T00:14:27.8187550Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-16T00:14:27.9107750Z Removing includeIf entries pointing to credentials config files
+2026-09-16T00:14:27.9113410Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-16T00:14:27.9391030Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-16T00:14:28.1186250Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-5e89dc29-5da1-43e1-a930-337b5288b7bc.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-09-16T00:14:28.1491760Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/agentschat/agentschat/.git.path /Users/runner/work/_temp/git-credentials-5e89dc29-5da1-43e1-a930-337b5288b7bc.config
+2026-09-16T00:14:28.1651880Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/agentschat/agentschat/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-5e89dc29-5da1-43e1-a930-337b5288b7bc.config
+2026-09-16T00:14:28.1660660Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-5e89dc29-5da1-43e1-a930-337b5288b7bc.config
+2026-09-16T00:14:28.1664540Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-5e89dc29-5da1-43e1-a930-337b5288b7bc.config
+2026-09-16T00:14:28.1669010Z ##[endgroup]
+2026-09-16T00:14:28.1669990Z ##[group]Fetching the repository
+2026-09-16T00:14:28.1674180Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +0655d76471523dd272bc7e50caa9459c4f563f27:refs/remotes/pull/7/merge
+2026-09-16T00:14:29.9410960Z From https://github.com/UncleK/agentschat
+2026-09-16T00:14:29.9413910Z  * [new ref]         0655d76471523dd272bc7e50caa9459c4f563f27 -> pull/7/merge
+2026-09-16T00:14:29.9419390Z ##[endgroup]
+2026-09-16T00:14:29.9421170Z ##[group]Determining the checkout info
+2026-09-16T00:14:29.9422960Z ##[endgroup]
+2026-09-16T00:14:29.9424860Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-09-16T00:14:29.9541600Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-09-16T00:14:29.9623020Z ##[group]Checking out the ref
+2026-09-16T00:14:29.9625060Z [command]/opt/homebrew/bin/git checkout --progress --force refs/remotes/pull/7/merge
+2026-09-16T00:14:30.2255930Z HEAD is now at 0655d76 Merge c5599ef21fc0a28769f849f62cc0d868c04b4455 into 1fe8354186009259c11df3a4cbb0adbd80325818
+2026-09-16T00:14:30.2282080Z ##[endgroup]
+2026-09-16T00:14:30.2386820Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-09-16T00:14:30.2466220Z 0655d76471523dd272bc7e50caa9459c4f563f27
+2026-09-16T00:14:30.2864710Z ##[group]Run subosito/flutter-action@v2
+2026-09-16T00:14:30.2865120Z with:
+2026-09-16T00:14:30.2865410Z   flutter-version: 3.41.5
+2026-09-16T00:14:30.2865680Z   channel: stable
+2026-09-16T00:14:30.2866010Z   cache: true
+2026-09-16T00:14:30.2866350Z   architecture: ARM64
+2026-09-16T00:14:30.2866690Z   pub-cache-path: default
+2026-09-16T00:14:30.2867020Z   dry-run: false
+2026-09-16T00:14:30.2867450Z   git-source: https://github.com/flutter/flutter.git
+2026-09-16T00:14:30.2867830Z ##[endgroup]
+2026-09-16T00:14:30.2926100Z ##[start-action display=Make yq tool available on Windows runners;id=__subosito_flutter-action.__run]
+2026-09-16T00:14:30.2944220Z ##[end-action id=__subosito_flutter-action.__run;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-09-16T00:14:30.2947030Z ##[start-action display=Make setup script executable;id=__subosito_flutter-action.__run_2]
+2026-09-16T00:14:30.2993520Z ##[group]Run chmod +x "$GITHUB_ACTION_PATH/setup.sh"
+2026-09-16T00:14:30.2994100Z [36;1mchmod +x "$GITHUB_ACTION_PATH/setup.sh"[0m
+2026-09-16T00:14:30.3060360Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:14:30.3060830Z ##[endgroup]
+2026-09-16T00:14:30.3625310Z ##[end-action id=__subosito_flutter-action.__run_2;outcome=success;conclusion=success;duration_ms=67]
+2026-09-16T00:14:30.3628380Z ##[start-action display=Set action inputs;id=__subosito_flutter-action.flutter-action]
+2026-09-16T00:14:30.3675080Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh -p \
+2026-09-16T00:14:30.3675630Z [36;1m$GITHUB_ACTION_PATH/setup.sh -p \[0m
+2026-09-16T00:14:30.3676070Z [36;1m  -n '3.41.5' \[0m
+2026-09-16T00:14:30.3676380Z [36;1m  -f '' \[0m
+2026-09-16T00:14:30.3676790Z [36;1m  -a 'ARM64' \[0m
+2026-09-16T00:14:30.3677110Z [36;1m  -k '' \[0m
+2026-09-16T00:14:30.3677430Z [36;1m  -c '' \[0m
+2026-09-16T00:14:30.3677720Z [36;1m  -l '' \[0m
+2026-09-16T00:14:30.3678120Z [36;1m  -d 'default' \[0m
+2026-09-16T00:14:30.3678590Z [36;1m  -g 'https://github.com/flutter/flutter.git' \[0m
+2026-09-16T00:14:30.3679130Z [36;1m  stable[0m
+2026-09-16T00:14:30.3716150Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:14:30.3716600Z ##[endgroup]
+2026-09-16T00:14:30.7138420Z ##[end-action id=__subosito_flutter-action.flutter-action;outcome=success;conclusion=success;duration_ms=350]
+2026-09-16T00:14:30.7142760Z ##[start-action display=Cache Flutter;id=__subosito_flutter-action.cache-flutter]
+2026-09-16T00:14:30.7197980Z ##[group]Run actions/cache@v5
+2026-09-16T00:14:30.7198230Z with:
+2026-09-16T00:14:30.7198870Z   path: /Users/runner/hostedtoolcache/flutter/stable-3.41.5-arm64
+2026-09-16T00:14:30.7199340Z   key: flutter-macos-stable-3.41.5-arm64-2c9eb20739dfec95e2c74bd3dfa4601b0a8a36aa
+2026-09-16T00:14:30.7199720Z   enableCrossOsArchive: false
+2026-09-16T00:14:30.7199950Z   fail-on-cache-miss: false
+2026-09-16T00:14:30.7200170Z   lookup-only: false
+2026-09-16T00:14:30.7200380Z   save-always: false
+2026-09-16T00:14:30.7200570Z ##[endgroup]
+2026-09-16T00:14:30.9692030Z Cache not found for input keys: flutter-macos-stable-3.41.5-arm64-2c9eb20739dfec95e2c74bd3dfa4601b0a8a36aa
+2026-09-16T00:14:30.9709410Z ##[end-action id=__subosito_flutter-action.cache-flutter;outcome=success;conclusion=success;duration_ms=256]
+2026-09-16T00:14:30.9712030Z ##[start-action display=Cache pub dependencies;id=__subosito_flutter-action.cache-pub]
+2026-09-16T00:14:31.4078130Z ##[group]Run actions/cache@v5
+2026-09-16T00:14:31.4078700Z with:
+2026-09-16T00:14:31.4079120Z   path: /Users/runner/.pub-cache
+2026-09-16T00:14:31.4080710Z   key: flutter-pub-macos-stable-3.41.5-arm64-2c9eb20739dfec95e2c74bd3dfa4601b0a8a36aa-78458682cbc65fd95e0c606893429e1b7a57ed4ee5e2876e89e008399769bd9e
+2026-09-16T00:14:31.4082420Z   enableCrossOsArchive: false
+2026-09-16T00:14:31.4083060Z   fail-on-cache-miss: false
+2026-09-16T00:14:31.4083550Z   lookup-only: false
+2026-09-16T00:14:31.4084400Z   save-always: false
+2026-09-16T00:14:31.4085100Z ##[endgroup]
+2026-09-16T00:14:31.6749990Z Cache not found for input keys: flutter-pub-macos-stable-3.41.5-arm64-2c9eb20739dfec95e2c74bd3dfa4601b0a8a36aa-78458682cbc65fd95e0c606893429e1b7a57ed4ee5e2876e89e008399769bd9e
+2026-09-16T00:14:31.6768630Z ##[end-action id=__subosito_flutter-action.cache-pub;outcome=success;conclusion=success;duration_ms=705]
+2026-09-16T00:14:31.6774290Z ##[start-action display=Run setup script;id=__subosito_flutter-action.__run_3]
+2026-09-16T00:14:31.6816500Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh \
+2026-09-16T00:14:31.6816840Z [36;1m$GITHUB_ACTION_PATH/setup.sh \[0m
+2026-09-16T00:14:31.6817130Z [36;1m  -n '3.41.5' \[0m
+2026-09-16T00:14:31.6817320Z [36;1m  -a 'arm64' \[0m
+2026-09-16T00:14:31.6817600Z [36;1m  -c '/Users/runner/hostedtoolcache/flutter/stable-3.41.5-arm64' \[0m
+2026-09-16T00:14:31.6817950Z [36;1m  -d '/Users/runner/.pub-cache' \[0m
+2026-09-16T00:14:31.6818180Z [36;1m  stable[0m
+2026-09-16T00:14:31.6868110Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:14:31.6868440Z ##[endgroup]
+2026-09-16T00:14:32.0034700Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-09-16T00:14:32.0036280Z                                  Dload  Upload   Total   Spent    Left  Speed
+2026-09-16T00:14:32.0036750Z 
+2026-09-16T00:14:32.5062900Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-09-16T00:14:33.5111500Z   1 2041M    1 24.1M    0     0  48.4M      0  0:00:42 --:--:--  0:00:42 48.4M
+2026-09-16T00:14:34.5038910Z   4 2041M    4 93.1M    0     0  62.0M      0  0:00:32  0:00:01  0:00:31 61.9M
+2026-09-16T00:14:35.5025920Z   7 2041M    7  158M    0     0  63.2M      0  0:00:32  0:00:02  0:00:30 63.2M
+2026-09-16T00:14:36.5102460Z  11 2041M   11  226M    0     0  64.6M      0  0:00:31  0:00:03  0:00:28 64.6M
+2026-09-16T00:14:37.5115520Z  14 2041M   14  298M    0     0  66.2M      0  0:00:30  0:00:04  0:00:26 66.2M
+2026-09-16T00:14:38.5058540Z  18 2041M   18  372M    0     0  67.7M      0  0:00:30  0:00:05  0:00:25 69.6M
+2026-09-16T00:14:39.5099860Z  21 2041M   21  442M    0     0  68.0M      0  0:00:30  0:00:06  0:00:24 69.8M
+2026-09-16T00:14:40.5063160Z  24 2041M   24  496M    0     0  66.1M      0  0:00:30  0:00:07  0:00:23 67.6M
+2026-09-16T00:14:41.5036440Z  27 2041M   27  568M    0     0  66.8M      0  0:00:30  0:00:08  0:00:22 68.3M
+2026-09-16T00:14:42.5025900Z  30 2041M   30  632M    0     0  66.5M      0  0:00:30  0:00:09  0:00:21 66.7M
+2026-09-16T00:14:43.5027580Z  34 2041M   34  696M    0     0  66.3M      0  0:00:30  0:00:10  0:00:20 64.7M
+2026-09-16T00:14:44.5026920Z  37 2041M   37  771M    0     0  67.0M      0  0:00:30  0:00:11  0:00:19 65.8M
+2026-09-16T00:14:45.5042540Z  41 2041M   41  844M    0     0  67.5M      0  0:00:30  0:00:12  0:00:18 69.7M
+2026-09-16T00:14:46.5131230Z  45 2041M   45  921M    0     0  68.2M      0  0:00:29  0:00:13  0:00:16 70.7M
+2026-09-16T00:14:47.5122770Z  48 2041M   48  998M    0     0  68.8M      0  0:00:29  0:00:14  0:00:15 73.1M
+2026-09-16T00:14:48.5029900Z  52 2041M   52 1070M    0     0  69.0M      0  0:00:29  0:00:15  0:00:14 74.8M
+2026-09-16T00:14:49.5055940Z  55 2041M   55 1130M    0     0  68.5M      0  0:00:29  0:00:16  0:00:13 71.8M
+2026-09-16T00:14:50.5029790Z  58 2041M   58 1201M    0     0  68.6M      0  0:00:29  0:00:17  0:00:12 71.2M
+2026-09-16T00:14:51.5025320Z  61 2041M   61 1261M    0     0  68.2M      0  0:00:29  0:00:18  0:00:11 67.9M
+2026-09-16T00:14:52.5794330Z  65 2041M   65 1328M    0     0  68.1M      0  0:00:29  0:00:19  0:00:10 66.0M
+2026-09-16T00:14:53.5033180Z  67 2041M   67 1383M    0     0  67.2M      0  0:00:30  0:00:20  0:00:10 61.6M
+2026-09-16T00:14:54.5025920Z  70 2041M   70 1442M    0     0  67.0M      0  0:00:30  0:00:21  0:00:09 62.3M
+2026-09-16T00:14:55.5027580Z  74 2041M   74 1512M    0     0  67.2M      0  0:00:30  0:00:22  0:00:08 62.2M
+2026-09-16T00:14:56.5049470Z  77 2041M   77 1577M    0     0  67.1M      0  0:00:30  0:00:23  0:00:07 63.2M
+2026-09-16T00:14:57.5047480Z  80 2041M   80 1650M    0     0  67.3M      0  0:00:30  0:00:24  0:00:06 64.5M
+2026-09-16T00:14:58.5066310Z  84 2041M   84 1719M    0     0  67.4M      0  0:00:30  0:00:25  0:00:05 68.2M
+2026-09-16T00:14:59.5048470Z  87 2041M   87 1790M    0     0  67.5M      0  0:00:30  0:00:26  0:00:04 69.5M
+2026-09-16T00:15:00.5040740Z  91 2041M   91 1859M    0     0  67.6M      0  0:00:30  0:00:27  0:00:03 69.3M
+2026-09-16T00:15:01.5158420Z  94 2041M   94 1919M    0     0  67.3M      0  0:00:30  0:00:28  0:00:02 68.3M
+2026-09-16T00:15:02.5068980Z  97 2041M   97 1980M    0     0  67.1M      0  0:00:30  0:00:29  0:00:01 65.9M
+2026-09-16T00:15:02.5478330Z  99 2041M   99 2038M    0     0  66.8M      0  0:00:30  0:00:30 --:--:-- 63.7M
+2026-09-16T00:15:02.5481780Z 100 2041M  100 2041M    0     0  66.8M      0  0:00:30  0:00:30 --:--:-- 61.9M
+2026-09-16T00:15:48.0839420Z ##[end-action id=__subosito_flutter-action.__run_3;outcome=success;conclusion=success;duration_ms=76406]
+2026-09-16T00:15:48.0963000Z ##[group]Run flutter pub get
+2026-09-16T00:15:48.0963400Z [36;1mflutter pub get[0m
+2026-09-16T00:15:48.1328590Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:15:48.1328860Z env:
+2026-09-16T00:15:48.1329130Z   FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.41.5-arm64/flutter
+2026-09-16T00:15:48.1329460Z   PUB_CACHE: /Users/runner/.pub-cache
+2026-09-16T00:15:48.1329750Z ##[endgroup]
+2026-09-16T00:15:52.8537740Z Resolving dependencies...
+2026-09-16T00:15:53.1615770Z Downloading packages...
+2026-09-16T00:15:56.8396180Z   audio_session 0.2.3 (0.2.4 available)
+2026-09-16T00:15:56.8397140Z   clock 1.1.2 (1.1.3 available)
+2026-09-16T00:15:56.8397900Z   code_assets 1.0.0 (2.0.0 available)
+2026-09-16T00:15:56.8398920Z   cross_file 0.3.5+2 (0.3.5+5 available)
+2026-09-16T00:15:56.8399690Z   crypto 3.0.6 (3.0.7 available)
+2026-09-16T00:15:56.8400330Z   file_selector_linux 0.9.4 (0.9.4+1 available)
+2026-09-16T00:15:56.8401270Z   file_selector_macos 0.9.5 (0.9.5+1 available)
+2026-09-16T00:15:56.8402060Z   file_selector_windows 0.9.3+5 (0.9.3+6 available)
+2026-09-16T00:15:56.8403020Z   flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+2026-09-16T00:15:56.8403810Z   glob 2.1.3 (2.2.0 available)
+2026-09-16T00:15:56.8404520Z   hooks 1.0.3 (2.2.0 available)
+2026-09-16T00:15:56.8405180Z   image_picker 1.2.1 (1.2.3 available)
+2026-09-16T00:15:56.8405920Z   image_picker_android 0.8.13+16 (0.8.13+23 available)
+2026-09-16T00:15:56.8406790Z   image_picker_ios 0.8.13+6 (0.8.13+7 available)
+2026-09-16T00:15:56.8408190Z   intl 0.20.2 (0.20.3 available)
+2026-09-16T00:15:56.8408880Z   jni 1.0.0 (1.0.3 available)
+2026-09-16T00:15:56.8409520Z   jni_flutter 1.0.1 (1.0.3 available)
+2026-09-16T00:15:56.8411690Z   just_audio 0.10.5 (0.10.6 available)
+2026-09-16T00:15:56.8412620Z   matcher 0.12.19 (0.12.20 available)
+2026-09-16T00:15:56.8413320Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-09-16T00:15:56.8414150Z   meta 1.17.0 (1.19.0 available)
+2026-09-16T00:15:56.8414770Z   mime 2.0.0 (2.1.0 available)
+2026-09-16T00:15:56.8415430Z   native_toolchain_c 0.17.6 (0.19.4 available)
+2026-09-16T00:15:56.8416310Z   objective_c 9.3.0 (9.6.0 available)
+2026-09-16T00:15:56.8417020Z   package_config 2.2.0 (3.0.0 available)
+2026-09-16T00:15:56.8417770Z   path_provider 2.1.5 (2.1.6 available)
+2026-09-16T00:15:56.8418480Z   path_provider_linux 2.2.1 (2.2.2 available)
+2026-09-16T00:15:56.8419460Z   path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-09-16T00:15:56.8420170Z   platform 3.1.6 (3.2.0 available)
+2026-09-16T00:15:56.8420740Z   process 5.0.5 (5.0.6 available)
+2026-09-16T00:15:56.8421290Z   pub_semver 2.2.0 (2.2.1 available)
+2026-09-16T00:15:56.8421880Z   record 6.2.0 (7.1.1 available)
+2026-09-16T00:15:56.8422470Z   record_android 1.5.1 (2.2.0 available)
+2026-09-16T00:15:56.8423110Z   record_ios 1.2.0 (2.1.1 available)
+2026-09-16T00:15:56.8423930Z   record_linux 1.3.0 (2.1.1 available)
+2026-09-16T00:15:56.8424580Z   record_macos 1.2.1 (2.1.1 available)
+2026-09-16T00:15:56.8425420Z   record_platform_interface 1.5.0 (2.1.0 available)
+2026-09-16T00:15:56.8426140Z   record_use 0.6.0 (1.1.1 available)
+2026-09-16T00:15:56.8426720Z   record_web 1.3.0 (2.1.3 available)
+2026-09-16T00:15:56.8427300Z   record_windows 1.0.7 (2.3.0 available)
+2026-09-16T00:15:56.8427990Z   shared_preferences_android 2.4.23 (2.4.28 available)
+2026-09-16T00:15:56.8428770Z   shared_preferences_foundation 2.5.6 (2.5.7 available)
+2026-09-16T00:15:56.8429630Z   stack_trace 1.12.1 (1.12.2 available)
+2026-09-16T00:15:56.8430370Z   synchronized 3.4.0+1 (3.4.2 available)
+2026-09-16T00:15:56.8431070Z   test_api 0.7.10 (0.7.14 available)
+2026-09-16T00:15:56.8431860Z   url_launcher_android 6.3.30 (6.3.33 available)
+2026-09-16T00:15:56.8432570Z   uuid 4.5.3 (4.6.0 available)
+2026-09-16T00:15:56.8433290Z   vector_math 2.2.0 (2.4.2 available)
+2026-09-16T00:15:56.8433960Z   vm_service 15.0.2 (15.3.0 available)
+2026-09-16T00:15:56.8434700Z   webdriver 3.1.0 (3.2.0 available)
+2026-09-16T00:15:56.8436720Z   window_to_front 0.0.4 (1.0.0 available)
+2026-09-16T00:15:56.8437530Z   yaml 3.1.3 (3.1.4 available)
+2026-09-16T00:15:56.8438480Z Got dependencies!
+2026-09-16T00:15:56.8439280Z 52 packages have newer versions incompatible with dependency constraints.
+2026-09-16T00:15:56.8440380Z Try `flutter pub outdated` for more information.
+2026-09-16T00:15:58.2971140Z ##[group]Run runtime=$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r["isAvailable"] and r["name"].startswith("iOS")))')
+2026-09-16T00:15:58.2972370Z [36;1mruntime=$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r["isAvailable"] and r["name"].startswith("iOS")))')[0m
+2026-09-16T00:15:58.2973300Z [36;1mdevice=$(xcrun simctl create AgentsChat-Audit com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")[0m
+2026-09-16T00:15:58.2973860Z [36;1mecho "AUDIT_IOS_DEVICE=$device" >> "$GITHUB_ENV"[0m
+2026-09-16T00:15:58.2974260Z [36;1mxcrun simctl boot "$device"[0m
+2026-09-16T00:15:58.2974580Z [36;1mxcrun simctl bootstatus "$device" -b[0m
+2026-09-16T00:15:58.3017930Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:15:58.3018380Z env:
+2026-09-16T00:15:58.3018820Z   FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.41.5-arm64/flutter
+2026-09-16T00:15:58.3019390Z   PUB_CACHE: /Users/runner/.pub-cache
+2026-09-16T00:15:58.3019730Z ##[endgroup]
+2026-09-16T00:17:39.8750770Z Monitoring boot status for AgentsChat-Audit (4BA6C3FA-D29E-4EE7-9311-760AF30FBEB5).
+2026-09-16T00:17:39.9023880Z [2026-09-16 00:17:39 +0000] Status=2, isTerminal=NO, Elapsed=00:41.
+2026-09-16T00:17:39.9024320Z 	Waiting on Data Migration
+2026-09-16T00:17:39.9376820Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:39.9385890Z 		Migration Elapsed:00:34 seconds
+2026-09-16T00:17:39.9386140Z 
+2026-09-16T00:17:40.7550780Z [2026-09-16 00:17:40 +0000] Status=2, isTerminal=NO, Elapsed=00:42.
+2026-09-16T00:17:40.7576490Z 	Waiting on Data Migration
+2026-09-16T00:17:40.7577880Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:40.7578490Z 		Migration Elapsed:00:35 seconds
+2026-09-16T00:17:40.7580710Z 
+2026-09-16T00:17:41.7557620Z [2026-09-16 00:17:41 +0000] Status=2, isTerminal=NO, Elapsed=00:43.
+2026-09-16T00:17:41.7605430Z 	Waiting on Data Migration
+2026-09-16T00:17:41.7606030Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:41.7606580Z 		Migration Elapsed:00:36 seconds
+2026-09-16T00:17:41.7606770Z 
+2026-09-16T00:17:42.7261570Z [2026-09-16 00:17:42 +0000] Status=2, isTerminal=NO, Elapsed=00:44.
+2026-09-16T00:17:42.7418700Z 	Waiting on Data Migration
+2026-09-16T00:17:42.7530710Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:42.7650470Z 		Migration Elapsed:00:37 seconds
+2026-09-16T00:17:42.7795480Z 
+2026-09-16T00:17:43.7344440Z [2026-09-16 00:17:43 +0000] Status=2, isTerminal=NO, Elapsed=00:45.
+2026-09-16T00:17:43.7356800Z 	Waiting on Data Migration
+2026-09-16T00:17:43.7358820Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:43.7359630Z 		Migration Elapsed:00:38 seconds
+2026-09-16T00:17:43.7362520Z 
+2026-09-16T00:17:44.7758380Z [2026-09-16 00:17:44 +0000] Status=2, isTerminal=NO, Elapsed=00:46.
+2026-09-16T00:17:44.7862330Z 	Waiting on Data Migration
+2026-09-16T00:17:44.7975010Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:44.8118530Z 		Migration Elapsed:00:39 seconds
+2026-09-16T00:17:44.8234380Z 
+2026-09-16T00:17:45.8050290Z [2026-09-16 00:17:45 +0000] Status=2, isTerminal=NO, Elapsed=00:47.
+2026-09-16T00:17:45.8087270Z 	Waiting on Data Migration
+2026-09-16T00:17:45.8305130Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:45.8646010Z 		Migration Elapsed:00:40 seconds
+2026-09-16T00:17:45.8750510Z 
+2026-09-16T00:17:46.7836420Z [2026-09-16 00:17:46 +0000] Status=2, isTerminal=NO, Elapsed=00:48.
+2026-09-16T00:17:46.7861130Z 	Waiting on Data Migration
+2026-09-16T00:17:46.8068760Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:46.8184020Z 		Migration Elapsed:00:41 seconds
+2026-09-16T00:17:46.8491590Z 
+2026-09-16T00:17:47.7520060Z [2026-09-16 00:17:47 +0000] Status=2, isTerminal=NO, Elapsed=00:49.
+2026-09-16T00:17:47.7677860Z 	Waiting on Data Migration
+2026-09-16T00:17:47.7694030Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:47.7831190Z 		Migration Elapsed:00:42 seconds
+2026-09-16T00:17:47.7990380Z 
+2026-09-16T00:17:48.7283530Z [2026-09-16 00:17:48 +0000] Status=2, isTerminal=NO, Elapsed=00:50.
+2026-09-16T00:17:48.7337180Z 	Waiting on Data Migration
+2026-09-16T00:17:48.7380190Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:48.7381110Z 		Migration Elapsed:00:43 seconds
+2026-09-16T00:17:48.7381770Z 
+2026-09-16T00:17:49.7474580Z [2026-09-16 00:17:49 +0000] Status=2, isTerminal=NO, Elapsed=00:51.
+2026-09-16T00:17:49.7577200Z 	Waiting on Data Migration
+2026-09-16T00:17:49.7682300Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:49.7773620Z 		Migration Elapsed:00:44 seconds
+2026-09-16T00:17:49.7905210Z 
+2026-09-16T00:17:50.7415850Z [2026-09-16 00:17:50 +0000] Status=2, isTerminal=NO, Elapsed=00:52.
+2026-09-16T00:17:50.7517260Z 	Waiting on Data Migration
+2026-09-16T00:17:50.7621110Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:50.7724240Z 		Migration Elapsed:00:45 seconds
+2026-09-16T00:17:50.7750040Z 
+2026-09-16T00:17:51.7356250Z [2026-09-16 00:17:51 +0000] Status=2, isTerminal=NO, Elapsed=00:53.
+2026-09-16T00:17:51.7369600Z 	Waiting on Data Migration
+2026-09-16T00:17:51.7387090Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:51.7388070Z 		Migration Elapsed:00:46 seconds
+2026-09-16T00:17:51.7388540Z 
+2026-09-16T00:17:52.7298980Z [2026-09-16 00:17:52 +0000] Status=2, isTerminal=NO, Elapsed=00:54.
+2026-09-16T00:17:52.7304150Z 	Waiting on Data Migration
+2026-09-16T00:17:52.7305260Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:52.7305990Z 		Migration Elapsed:00:47 seconds
+2026-09-16T00:17:52.7306610Z 
+2026-09-16T00:17:53.7533800Z [2026-09-16 00:17:53 +0000] Status=2, isTerminal=NO, Elapsed=00:55.
+2026-09-16T00:17:53.7547680Z 	Waiting on Data Migration
+2026-09-16T00:17:53.7551290Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:53.7552050Z 		Migration Elapsed:00:48 seconds
+2026-09-16T00:17:53.7552370Z 
+2026-09-16T00:17:54.7462880Z [2026-09-16 00:17:54 +0000] Status=2, isTerminal=NO, Elapsed=00:56.
+2026-09-16T00:17:54.7474120Z 	Waiting on Data Migration
+2026-09-16T00:17:54.7475030Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:54.7475720Z 		Migration Elapsed:00:49 seconds
+2026-09-16T00:17:54.7475940Z 
+2026-09-16T00:17:55.7394240Z [2026-09-16 00:17:55 +0000] Status=2, isTerminal=NO, Elapsed=00:57.
+2026-09-16T00:17:55.7429770Z 	Waiting on Data Migration
+2026-09-16T00:17:55.7431870Z 		Reason:Running plugin com.apple.-0LaunchServicesMigrator (00LaunchServicesMigrator.migrator, user-agnostic)
+2026-09-16T00:17:55.7433860Z 		Migration Elapsed:00:50 seconds
+2026-09-16T00:17:55.7434220Z 
+2026-09-16T00:18:01.5331400Z [2026-09-16 00:18:01 +0000] Status=2, isTerminal=NO, Elapsed=01:03.
+2026-09-16T00:18:01.5333610Z 	Waiting on Data Migration
+2026-09-16T00:18:01.5339560Z 		Reason:Running plugin com.apple.securityd.KeychainMigrator (KeychainMigrator.migrator, user-agnostic)
+2026-09-16T00:18:01.6929250Z 		Migration Elapsed:00:51 seconds
+2026-09-16T00:18:01.6929910Z 
+2026-09-16T00:18:02.6822500Z [2026-09-16 00:18:02 +0000] Status=2, isTerminal=NO, Elapsed=01:04.
+2026-09-16T00:18:02.6823670Z 	Waiting on Data Migration
+2026-09-16T00:18:02.6824390Z 		Reason:Running plugin com.apple.managedconfiguration.migrator (MCProfile.migrator, user-agnostic)
+2026-09-16T00:18:02.6826130Z 		Migration Elapsed:00:55 seconds
+2026-09-16T00:18:02.6826630Z 
+2026-09-16T00:18:03.2516760Z [2026-09-16 00:18:03 +0000] Status=2, isTerminal=NO, Elapsed=01:04.
+2026-09-16T00:18:03.3359100Z 	Waiting on Data Migration
+2026-09-16T00:18:03.4169290Z 		Reason:Running plugin com.apple.managedconfiguration.migrator (MCProfile.migrator, user-agnostic)
+2026-09-16T00:18:03.4983780Z 		Migration Elapsed:00:57 seconds
+2026-09-16T00:18:03.5790440Z 
+2026-09-16T00:18:03.5830640Z [2026-09-16 00:18:03 +0000] Status=2, isTerminal=NO, Elapsed=01:05.
+2026-09-16T00:18:03.5831380Z 	Waiting on Data Migration
+2026-09-16T00:18:03.5832190Z 		Reason:Running plugin com.apple.managedconfiguration.migrator (MCProfile.migrator, user-agnostic)
+2026-09-16T00:18:03.5832910Z 		Migration Elapsed:00:57 seconds
+2026-09-16T00:18:03.6601950Z 
+2026-09-16T00:18:04.4870990Z [2026-09-16 00:18:04 +0000] Status=2, isTerminal=NO, Elapsed=01:06.
+2026-09-16T00:18:04.5681270Z 	Waiting on Data Migration
+2026-09-16T00:18:04.5689550Z 		Reason:Running plugin com.apple.managedconfiguration.migrator (MCProfile.migrator, user-agnostic)
+2026-09-16T00:18:04.6519660Z 		Migration Elapsed:00:58 seconds
+2026-09-16T00:18:04.7330080Z 
+2026-09-16T00:18:06.0053620Z [2026-09-16 00:18:05 +0000] Status=2, isTerminal=NO, Elapsed=01:07.
+2026-09-16T00:18:06.0057570Z 	Waiting on Data Migration
+2026-09-16T00:18:06.0887720Z 		Reason:Running plugin com.apple.managedconfiguration.migrator (MCProfile.migrator, user-agnostic)
+2026-09-16T00:18:06.2504750Z 		Migration Elapsed:00:59 seconds
+2026-09-16T00:18:06.3294860Z 
+2026-09-16T00:18:06.8192930Z [2026-09-16 00:18:06 +0000] Status=2, isTerminal=NO, Elapsed=01:08.
+2026-09-16T00:18:06.8284150Z 	Waiting on Data Migration
+2026-09-16T00:18:06.8285120Z 		Reason:Running plugin com.apple.managedconfiguration.migrator (MCProfile.migrator, user-agnostic)
+2026-09-16T00:18:06.8285870Z 		Migration Elapsed:01:00 seconds
+2026-09-16T00:18:06.8286330Z 
+2026-09-16T00:18:08.1299250Z [2026-09-16 00:18:07 +0000] Status=2, isTerminal=NO, Elapsed=01:09.
+2026-09-16T00:18:08.5371170Z 	Waiting on Data Migration
+2026-09-16T00:18:08.6195120Z 		Reason:Running plugin com.apple.managedconfiguration.migrator (MCProfile.migrator, user-agnostic)
+2026-09-16T00:18:08.6247990Z 		Migration Elapsed:01:01 seconds
+2026-09-16T00:18:08.6248580Z 
+2026-09-16T00:18:08.6249260Z [2026-09-16 00:18:08 +0000] Status=2, isTerminal=NO, Elapsed=01:10.
+2026-09-16T00:18:08.6250560Z 	Waiting on Data Migration
+2026-09-16T00:18:08.6251690Z 		Reason:Running plugin com.apple.MobileSafari.migrator (MobileSafari.migrator)
+2026-09-16T00:18:08.6253420Z 		Migration Elapsed:01:02 seconds
+2026-09-16T00:18:08.6254170Z 
+2026-09-16T00:18:09.1151190Z [2026-09-16 00:18:09 +0000] Status=2, isTerminal=NO, Elapsed=01:10.
+2026-09-16T00:18:09.1956620Z 	Waiting on Data Migration
+2026-09-16T00:18:09.1963960Z 		Reason:Running plugin com.apple.locationd.migrator (CoreLocationMigrator.migrator)
+2026-09-16T00:18:09.2807550Z 		Migration Elapsed:01:03 seconds
+2026-09-16T00:18:09.5280170Z 
+2026-09-16T00:18:11.0554790Z [2026-09-16 00:18:10 +0000] Status=2, isTerminal=NO, Elapsed=01:12.
+2026-09-16T00:18:11.1368550Z 	Waiting on Data Migration
+2026-09-16T00:18:11.3014060Z 		Reason:Running plugin com.apple.PreferencesMigrator (PreferencesMigrator.migrator)
+2026-09-16T00:18:11.4626680Z 		Migration Elapsed:01:04 seconds
+2026-09-16T00:18:11.4627750Z 
+2026-09-16T00:18:13.9423090Z [2026-09-16 00:18:13 +0000] Status=4, isTerminal=NO, Elapsed=01:14.
+2026-09-16T00:18:14.0247550Z 	Waiting on System App
+2026-09-16T00:18:14.1080280Z 
+2026-09-16T00:18:14.5605560Z [2026-09-16 00:18:14 +0000] Status=4, isTerminal=NO, Elapsed=01:16.
+2026-09-16T00:18:14.6425440Z 	Waiting on System App
+2026-09-16T00:18:14.7261770Z 
+2026-09-16T00:18:15.4588500Z [2026-09-16 00:18:15 +0000] Status=4, isTerminal=NO, Elapsed=01:17.
+2026-09-16T00:18:15.4592840Z 	Waiting on System App
+2026-09-16T00:18:15.4594700Z 
+2026-09-16T00:18:19.9408790Z [2026-09-16 00:18:19 +0000] Status=4294967295, isTerminal=YES, Elapsed=01:21.
+2026-09-16T00:18:19.9411130Z 	Finished
+2026-09-16T00:18:20.0247620Z 
+2026-09-16T00:18:23.2725340Z ##[group]Run set -o pipefail
+2026-09-16T00:18:23.2726870Z [36;1mset -o pipefail[0m
+2026-09-16T00:18:23.2727390Z [36;1mmkdir -p audit-results[0m
+2026-09-16T00:18:23.2727940Z [36;1mfor phase in migrate restart logged-out; do[0m
+2026-09-16T00:18:23.2729230Z [36;1m  flutter drive --keep-app-running --target integration_test/session_storage_native_test.dart --driver test_driver/session_storage_test.dart -d "$AUDIT_IOS_DEVICE" --dart-define=STORAGE_AUDIT_PHASE="$phase" 2>&1 | tee "audit-results/ios-$phase.log"[0m
+2026-09-16T00:18:23.2730520Z [36;1m  xcrun simctl terminate "$AUDIT_IOS_DEVICE" com.example.agentsChatApp[0m
+2026-09-16T00:18:23.2731490Z [36;1mdone[0m
+2026-09-16T00:18:30.2289970Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:18:30.2293530Z env:
+2026-09-16T00:18:30.2294080Z   FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.41.5-arm64/flutter
+2026-09-16T00:18:30.2295350Z   PUB_CACHE: /Users/runner/.pub-cache
+2026-09-16T00:18:30.2296590Z   AUDIT_IOS_DEVICE: 4BA6C3FA-D29E-4EE7-9311-760AF30FBEB5
+2026-09-16T00:18:30.2303230Z ##[endgroup]
+2026-09-16T00:20:32.3336410Z Resolving dependencies...
+2026-09-16T00:20:32.9517110Z Downloading packages...
+2026-09-16T00:20:33.2555460Z   audio_session 0.2.3 (0.2.4 available)
+2026-09-16T00:20:33.2591020Z   clock 1.1.2 (1.1.3 available)
+2026-09-16T00:20:33.2591880Z   code_assets 1.0.0 (2.0.0 available)
+2026-09-16T00:20:33.2592530Z   cross_file 0.3.5+2 (0.3.5+5 available)
+2026-09-16T00:20:33.2593070Z   crypto 3.0.6 (3.0.7 available)
+2026-09-16T00:20:33.2593460Z   file_selector_linux 0.9.4 (0.9.4+1 available)
+2026-09-16T00:20:33.2593970Z   file_selector_macos 0.9.5 (0.9.5+1 available)
+2026-09-16T00:20:33.2594380Z   file_selector_windows 0.9.3+5 (0.9.3+6 available)
+2026-09-16T00:20:33.2594900Z   flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+2026-09-16T00:20:33.2595670Z   glob 2.1.3 (2.2.0 available)
+2026-09-16T00:20:33.2596100Z   hooks 1.0.3 (2.2.0 available)
+2026-09-16T00:20:33.2596950Z   image_picker 1.2.1 (1.2.3 available)
+2026-09-16T00:20:33.2599320Z   image_picker_android 0.8.13+16 (0.8.13+23 available)
+2026-09-16T00:20:33.2604590Z   image_picker_ios 0.8.13+6 (0.8.13+7 available)
+2026-09-16T00:20:33.2605350Z   intl 0.20.2 (0.20.3 available)
+2026-09-16T00:20:33.2605870Z   jni 1.0.0 (1.0.3 available)
+2026-09-16T00:20:33.2606350Z   jni_flutter 1.0.1 (1.0.3 available)
+2026-09-16T00:20:33.2606860Z   just_audio 0.10.5 (0.10.6 available)
+2026-09-16T00:20:33.2607400Z   matcher 0.12.19 (0.12.20 available)
+2026-09-16T00:20:33.2607970Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-09-16T00:20:33.2608460Z   meta 1.17.0 (1.19.0 available)
+2026-09-16T00:20:33.2609090Z   mime 2.0.0 (2.1.0 available)
+2026-09-16T00:20:33.2609520Z   native_toolchain_c 0.17.6 (0.19.4 available)
+2026-09-16T00:20:33.2610210Z   objective_c 9.3.0 (9.6.0 available)
+2026-09-16T00:20:33.2610620Z   package_config 2.2.0 (3.0.0 available)
+2026-09-16T00:20:33.2611050Z   path_provider 2.1.5 (2.1.6 available)
+2026-09-16T00:20:33.2611480Z   path_provider_linux 2.2.1 (2.2.2 available)
+2026-09-16T00:20:33.2612090Z   path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-09-16T00:20:33.2612710Z   platform 3.1.6 (3.2.0 available)
+2026-09-16T00:20:33.2613060Z   process 5.0.5 (5.0.6 available)
+2026-09-16T00:20:33.2613990Z   pub_semver 2.2.0 (2.2.1 available)
+2026-09-16T00:20:33.2614350Z   record 6.2.0 (7.1.1 available)
+2026-09-16T00:20:33.2614840Z   record_android 1.5.1 (2.2.0 available)
+2026-09-16T00:20:33.2615360Z   record_ios 1.2.0 (2.1.1 available)
+2026-09-16T00:20:33.2615940Z   record_linux 1.3.0 (2.1.1 available)
+2026-09-16T00:20:33.2616420Z   record_macos 1.2.1 (2.1.1 available)
+2026-09-16T00:20:33.2620020Z   record_platform_interface 1.5.0 (2.1.0 available)
+2026-09-16T00:20:33.2620910Z   record_use 0.6.0 (1.1.1 available)
+2026-09-16T00:20:33.2622790Z   record_web 1.3.0 (2.1.3 available)
+2026-09-16T00:20:33.2642250Z   record_windows 1.0.7 (2.3.0 available)
+2026-09-16T00:20:33.2697710Z   shared_preferences_android 2.4.23 (2.4.28 available)
+2026-09-16T00:20:33.2698610Z   shared_preferences_foundation 2.5.6 (2.5.7 available)
+2026-09-16T00:20:33.2699140Z   stack_trace 1.12.1 (1.12.2 available)
+2026-09-16T00:20:33.2699440Z   synchronized 3.4.0+1 (3.4.2 available)
+2026-09-16T00:20:33.2701790Z   test_api 0.7.10 (0.7.14 available)
+2026-09-16T00:20:33.2702360Z   url_launcher_android 6.3.30 (6.3.33 available)
+2026-09-16T00:20:33.2702720Z   uuid 4.5.3 (4.6.0 available)
+2026-09-16T00:20:33.2703410Z   vector_math 2.2.0 (2.4.2 available)
+2026-09-16T00:20:33.2703800Z   vm_service 15.0.2 (15.3.0 available)
+2026-09-16T00:20:33.2705270Z   webdriver 3.1.0 (3.2.0 available)
+2026-09-16T00:20:33.2707010Z   window_to_front 0.0.4 (1.0.0 available)
+2026-09-16T00:20:33.2708640Z   yaml 3.1.3 (3.1.4 available)
+2026-09-16T00:20:33.2709130Z Got dependencies!
+2026-09-16T00:20:33.2709970Z 52 packages have newer versions incompatible with dependency constraints.
+2026-09-16T00:20:33.2710790Z Try `flutter pub outdated` for more information.
+2026-09-16T00:20:57.3629980Z Running pod install...                                           2,414ms
+2026-09-16T00:22:52.1252230Z Running Xcode build...                                          
+2026-09-16T00:22:52.1303710Z Xcode build done.                                           114.7s
+2026-09-16T00:23:20.5206110Z VMServiceFlutterDriver: Connecting to Flutter application at http://127.0.0.1:53358/uzu4bwemdrk=/
+2026-09-16T00:23:20.6412980Z VMServiceFlutterDriver: Isolate found with number: 6816753977494627
+2026-09-16T00:23:20.6804150Z VMServiceFlutterDriver: Isolate 6816753977494627 is runnable.
+2026-09-16T00:23:20.6842050Z VMServiceFlutterDriver: Isolate is paused at start.
+2026-09-16T00:23:20.6843920Z VMServiceFlutterDriver: Attempting to resume isolate
+2026-09-16T00:23:20.8203510Z VMServiceFlutterDriver: Connected to Flutter application.
+2026-09-16T00:23:21.1897750Z All tests passed.
+2026-09-16T00:23:21.2708010Z Leaving the application running.
+2026-09-16T00:23:28.9731420Z Resolving dependencies...
+2026-09-16T00:23:29.4015560Z Downloading packages...
+2026-09-16T00:23:29.6282700Z   audio_session 0.2.3 (0.2.4 available)
+2026-09-16T00:23:29.6292160Z   clock 1.1.2 (1.1.3 available)
+2026-09-16T00:23:29.6293590Z   code_assets 1.0.0 (2.0.0 available)
+2026-09-16T00:23:29.6295630Z   cross_file 0.3.5+2 (0.3.5+5 available)
+2026-09-16T00:23:29.6299700Z   crypto 3.0.6 (3.0.7 available)
+2026-09-16T00:23:29.6301910Z   file_selector_linux 0.9.4 (0.9.4+1 available)
+2026-09-16T00:23:29.6305880Z   file_selector_macos 0.9.5 (0.9.5+1 available)
+2026-09-16T00:23:29.6309240Z   file_selector_windows 0.9.3+5 (0.9.3+6 available)
+2026-09-16T00:23:29.6310430Z   flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+2026-09-16T00:23:29.6311610Z   glob 2.1.3 (2.2.0 available)
+2026-09-16T00:23:29.6312410Z   hooks 1.0.3 (2.2.0 available)
+2026-09-16T00:23:29.6315040Z   image_picker 1.2.1 (1.2.3 available)
+2026-09-16T00:23:29.6315940Z   image_picker_android 0.8.13+16 (0.8.13+23 available)
+2026-09-16T00:23:29.6318280Z   image_picker_ios 0.8.13+6 (0.8.13+7 available)
+2026-09-16T00:23:29.6321110Z   intl 0.20.2 (0.20.3 available)
+2026-09-16T00:23:29.6322550Z   jni 1.0.0 (1.0.3 available)
+2026-09-16T00:23:29.6323360Z   jni_flutter 1.0.1 (1.0.3 available)
+2026-09-16T00:23:29.6324430Z   just_audio 0.10.5 (0.10.6 available)
+2026-09-16T00:23:29.6326090Z   matcher 0.12.19 (0.12.20 available)
+2026-09-16T00:23:29.6327170Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-09-16T00:23:29.6327930Z   meta 1.17.0 (1.19.0 available)
+2026-09-16T00:23:29.6328810Z   mime 2.0.0 (2.1.0 available)
+2026-09-16T00:23:29.6329700Z   native_toolchain_c 0.17.6 (0.19.4 available)
+2026-09-16T00:23:29.6330780Z   objective_c 9.3.0 (9.6.0 available)
+2026-09-16T00:23:29.6332060Z   package_config 2.2.0 (3.0.0 available)
+2026-09-16T00:23:29.6333630Z   path_provider 2.1.5 (2.1.6 available)
+2026-09-16T00:23:29.6334490Z   path_provider_linux 2.2.1 (2.2.2 available)
+2026-09-16T00:23:29.6335950Z   path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-09-16T00:23:29.6454720Z   platform 3.1.6 (3.2.0 available)
+2026-09-16T00:23:29.6541190Z   process 5.0.5 (5.0.6 available)
+2026-09-16T00:23:29.6542880Z   pub_semver 2.2.0 (2.2.1 available)
+2026-09-16T00:23:29.6545020Z   record 6.2.0 (7.1.1 available)
+2026-09-16T00:23:29.6545900Z   record_android 1.5.1 (2.2.0 available)
+2026-09-16T00:23:29.6548510Z   record_ios 1.2.0 (2.1.1 available)
+2026-09-16T00:23:29.6549870Z   record_linux 1.3.0 (2.1.1 available)
+2026-09-16T00:23:29.6556320Z   record_macos 1.2.1 (2.1.1 available)
+2026-09-16T00:23:29.6556900Z   record_platform_interface 1.5.0 (2.1.0 available)
+2026-09-16T00:23:29.6557190Z   record_use 0.6.0 (1.1.1 available)
+2026-09-16T00:23:29.6557440Z   record_web 1.3.0 (2.1.3 available)
+2026-09-16T00:23:29.6932410Z   record_windows 1.0.7 (2.3.0 available)
+2026-09-16T00:23:29.6932970Z   shared_preferences_android 2.4.23 (2.4.28 available)
+2026-09-16T00:23:29.6933280Z   shared_preferences_foundation 2.5.6 (2.5.7 available)
+2026-09-16T00:23:29.6933760Z   stack_trace 1.12.1 (1.12.2 available)
+2026-09-16T00:23:29.7065350Z   synchronized 3.4.0+1 (3.4.2 available)
+2026-09-16T00:23:29.7078990Z   test_api 0.7.10 (0.7.14 available)
+2026-09-16T00:23:29.7079240Z   url_launcher_android 6.3.30 (6.3.33 available)
+2026-09-16T00:23:29.7079660Z   uuid 4.5.3 (4.6.0 available)
+2026-09-16T00:23:29.7080020Z   vector_math 2.2.0 (2.4.2 available)
+2026-09-16T00:23:29.7080400Z   vm_service 15.0.2 (15.3.0 available)
+2026-09-16T00:23:29.7080630Z   webdriver 3.1.0 (3.2.0 available)
+2026-09-16T00:23:29.7080910Z   window_to_front 0.0.4 (1.0.0 available)
+2026-09-16T00:23:29.7083270Z   yaml 3.1.3 (3.1.4 available)
+2026-09-16T00:23:29.7084000Z Got dependencies!
+2026-09-16T00:23:29.7085070Z 52 packages have newer versions incompatible with dependency constraints.
+2026-09-16T00:23:29.7086090Z Try `flutter pub outdated` for more information.
+2026-09-16T00:24:13.1189710Z Running Xcode build...                                          
+2026-09-16T00:24:13.1229960Z Xcode build done.                                           30.9s
+2026-09-16T00:24:25.9002050Z VMServiceFlutterDriver: Connecting to Flutter application at http://127.0.0.1:54066/tQoG6t6tWk4=/
+2026-09-16T00:24:26.0363120Z VMServiceFlutterDriver: Isolate found with number: 7764639457096391
+2026-09-16T00:24:26.0582690Z VMServiceFlutterDriver: Isolate 7764639457096391 is runnable.
+2026-09-16T00:24:26.0619910Z VMServiceFlutterDriver: Isolate is paused at start.
+2026-09-16T00:24:26.0621570Z VMServiceFlutterDriver: Attempting to resume isolate
+2026-09-16T00:24:26.1527970Z flutter: 00:00 +0: ST-01 native vault restart
+2026-09-16T00:24:26.1605380Z VMServiceFlutterDriver: Connected to Flutter application.
+2026-09-16T00:24:26.6714120Z flutter: 00:00 +1: (tearDownAll)
+2026-09-16T00:24:26.6804320Z flutter: 00:00 +2: All tests passed!
+2026-09-16T00:24:26.6805530Z All tests passed.
+2026-09-16T00:24:26.6904390Z Leaving the application running.
+2026-09-16T00:24:29.2690770Z Resolving dependencies...
+2026-09-16T00:24:29.5163670Z Downloading packages...
+2026-09-16T00:24:29.6275120Z   audio_session 0.2.3 (0.2.4 available)
+2026-09-16T00:24:29.6379680Z   clock 1.1.2 (1.1.3 available)
+2026-09-16T00:24:29.6579160Z   code_assets 1.0.0 (2.0.0 available)
+2026-09-16T00:24:29.6683120Z   cross_file 0.3.5+2 (0.3.5+5 available)
+2026-09-16T00:24:29.6757280Z   crypto 3.0.6 (3.0.7 available)
+2026-09-16T00:24:29.6767050Z   file_selector_linux 0.9.4 (0.9.4+1 available)
+2026-09-16T00:24:29.6768090Z   file_selector_macos 0.9.5 (0.9.5+1 available)
+2026-09-16T00:24:29.6774560Z   file_selector_windows 0.9.3+5 (0.9.3+6 available)
+2026-09-16T00:24:29.6776380Z   flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+2026-09-16T00:24:29.6780160Z   glob 2.1.3 (2.2.0 available)
+2026-09-16T00:24:29.6786630Z   hooks 1.0.3 (2.2.0 available)
+2026-09-16T00:24:29.6789800Z   image_picker 1.2.1 (1.2.3 available)
+2026-09-16T00:24:29.6794150Z   image_picker_android 0.8.13+16 (0.8.13+23 available)
+2026-09-16T00:24:29.6810620Z   image_picker_ios 0.8.13+6 (0.8.13+7 available)
+2026-09-16T00:24:29.6818920Z   intl 0.20.2 (0.20.3 available)
+2026-09-16T00:24:29.6828290Z   jni 1.0.0 (1.0.3 available)
+2026-09-16T00:24:29.6830910Z   jni_flutter 1.0.1 (1.0.3 available)
+2026-09-16T00:24:29.6831370Z   just_audio 0.10.5 (0.10.6 available)
+2026-09-16T00:24:29.6832010Z   matcher 0.12.19 (0.12.20 available)
+2026-09-16T00:24:29.6832660Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-09-16T00:24:29.6833090Z   meta 1.17.0 (1.19.0 available)
+2026-09-16T00:24:29.6833450Z   mime 2.0.0 (2.1.0 available)
+2026-09-16T00:24:29.6833930Z   native_toolchain_c 0.17.6 (0.19.4 available)
+2026-09-16T00:24:29.6834280Z   objective_c 9.3.0 (9.6.0 available)
+2026-09-16T00:24:29.6834710Z   package_config 2.2.0 (3.0.0 available)
+2026-09-16T00:24:29.6835210Z   path_provider 2.1.5 (2.1.6 available)
+2026-09-16T00:24:29.6835590Z   path_provider_linux 2.2.1 (2.2.2 available)
+2026-09-16T00:24:29.6835990Z   path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-09-16T00:24:29.6836440Z   platform 3.1.6 (3.2.0 available)
+2026-09-16T00:24:29.6836770Z   process 5.0.5 (5.0.6 available)
+2026-09-16T00:24:29.6837120Z   pub_semver 2.2.0 (2.2.1 available)
+2026-09-16T00:24:29.6848830Z   record 6.2.0 (7.1.1 available)
+2026-09-16T00:24:29.6849900Z   record_android 1.5.1 (2.2.0 available)
+2026-09-16T00:24:29.6850440Z   record_ios 1.2.0 (2.1.1 available)
+2026-09-16T00:24:29.6850850Z   record_linux 1.3.0 (2.1.1 available)
+2026-09-16T00:24:29.6851240Z   record_macos 1.2.1 (2.1.1 available)
+2026-09-16T00:24:29.6851650Z   record_platform_interface 1.5.0 (2.1.0 available)
+2026-09-16T00:24:29.6852070Z   record_use 0.6.0 (1.1.1 available)
+2026-09-16T00:24:29.6852830Z   record_web 1.3.0 (2.1.3 available)
+2026-09-16T00:24:29.6853080Z   record_windows 1.0.7 (2.3.0 available)
+2026-09-16T00:24:29.6853440Z   shared_preferences_android 2.4.23 (2.4.28 available)
+2026-09-16T00:24:29.6853860Z   shared_preferences_foundation 2.5.6 (2.5.7 available)
+2026-09-16T00:24:29.6854240Z   stack_trace 1.12.1 (1.12.2 available)
+2026-09-16T00:24:29.6854560Z   synchronized 3.4.0+1 (3.4.2 available)
+2026-09-16T00:24:29.6854900Z   test_api 0.7.10 (0.7.14 available)
+2026-09-16T00:24:29.6855450Z   url_launcher_android 6.3.30 (6.3.33 available)
+2026-09-16T00:24:29.6855840Z   uuid 4.5.3 (4.6.0 available)
+2026-09-16T00:24:29.6856180Z   vector_math 2.2.0 (2.4.2 available)
+2026-09-16T00:24:29.6856540Z   vm_service 15.0.2 (15.3.0 available)
+2026-09-16T00:24:29.6856920Z   webdriver 3.1.0 (3.2.0 available)
+2026-09-16T00:24:29.6857300Z   window_to_front 0.0.4 (1.0.0 available)
+2026-09-16T00:24:29.6857620Z   yaml 3.1.3 (3.1.4 available)
+2026-09-16T00:24:29.6858080Z Got dependencies!
+2026-09-16T00:24:29.6858420Z 52 packages have newer versions incompatible with dependency constraints.
+2026-09-16T00:24:29.6859070Z Try `flutter pub outdated` for more information.
+2026-09-16T00:25:33.5603360Z Running Xcode build...                                          
+2026-09-16T00:25:33.5839270Z Xcode build done.                                           48.7s
+2026-09-16T00:25:50.2283400Z VMServiceFlutterDriver: Connecting to Flutter application at http://127.0.0.1:54592/GT7b5WAoWSA=/
+2026-09-16T00:25:50.3840800Z VMServiceFlutterDriver: Isolate found with number: 7634893287945367
+2026-09-16T00:25:50.4552480Z VMServiceFlutterDriver: Isolate 7634893287945367 is runnable.
+2026-09-16T00:25:50.4626090Z VMServiceFlutterDriver: Isolate is paused at start.
+2026-09-16T00:25:50.4628290Z VMServiceFlutterDriver: Attempting to resume isolate
+2026-09-16T00:25:50.6291430Z flutter: 00:00 +0: ST-01 native vault logged-out
+2026-09-16T00:25:50.6460300Z VMServiceFlutterDriver: Connected to Flutter application.
+2026-09-16T00:25:51.3314610Z flutter: 00:00 +1: (tearDownAll)
+2026-09-16T00:25:51.3416440Z flutter: 00:00 +2: All tests passed!
+2026-09-16T00:25:51.3526880Z All tests passed.
+2026-09-16T00:25:51.3868330Z Leaving the application running.
+2026-09-16T00:25:52.9616140Z ##[group]Run flutter build ios --release --no-codesign
+2026-09-16T00:25:52.9620310Z [36;1mflutter build ios --release --no-codesign[0m
+2026-09-16T00:25:53.2307730Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:25:53.2310370Z env:
+2026-09-16T00:25:53.2313290Z   FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.41.5-arm64/flutter
+2026-09-16T00:25:53.2315000Z   PUB_CACHE: /Users/runner/.pub-cache
+2026-09-16T00:25:53.2316280Z   AUDIT_IOS_DEVICE: 4BA6C3FA-D29E-4EE7-9311-760AF30FBEB5
+2026-09-16T00:25:53.2317370Z ##[endgroup]
+2026-09-16T00:25:54.2789540Z Resolving dependencies...
+2026-09-16T00:25:54.7091690Z Downloading packages...
+2026-09-16T00:25:54.8966670Z   audio_session 0.2.3 (0.2.4 available)
+2026-09-16T00:25:54.8968220Z   clock 1.1.2 (1.1.3 available)
+2026-09-16T00:25:54.8969770Z   code_assets 1.0.0 (2.0.0 available)
+2026-09-16T00:25:54.8970900Z   cross_file 0.3.5+2 (0.3.5+5 available)
+2026-09-16T00:25:54.8972040Z   crypto 3.0.6 (3.0.7 available)
+2026-09-16T00:25:54.8973370Z   file_selector_linux 0.9.4 (0.9.4+1 available)
+2026-09-16T00:25:54.8974400Z   file_selector_macos 0.9.5 (0.9.5+1 available)
+2026-09-16T00:25:54.8975380Z   file_selector_windows 0.9.3+5 (0.9.3+6 available)
+2026-09-16T00:25:54.8977160Z   flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+2026-09-16T00:25:54.8980600Z   glob 2.1.3 (2.2.0 available)
+2026-09-16T00:25:54.8981570Z   hooks 1.0.3 (2.2.0 available)
+2026-09-16T00:25:54.8982700Z   image_picker 1.2.1 (1.2.3 available)
+2026-09-16T00:25:54.8983970Z   image_picker_android 0.8.13+16 (0.8.13+23 available)
+2026-09-16T00:25:54.8984950Z   image_picker_ios 0.8.13+6 (0.8.13+7 available)
+2026-09-16T00:25:54.8986190Z   intl 0.20.2 (0.20.3 available)
+2026-09-16T00:25:54.8986770Z   jni 1.0.0 (1.0.3 available)
+2026-09-16T00:25:54.8987980Z   jni_flutter 1.0.1 (1.0.3 available)
+2026-09-16T00:25:54.8988820Z   just_audio 0.10.5 (0.10.6 available)
+2026-09-16T00:25:54.8989740Z   matcher 0.12.19 (0.12.20 available)
+2026-09-16T00:25:54.8990760Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-09-16T00:25:54.8991700Z   meta 1.17.0 (1.19.0 available)
+2026-09-16T00:25:54.8992580Z   mime 2.0.0 (2.1.0 available)
+2026-09-16T00:25:54.8993720Z   native_toolchain_c 0.17.6 (0.19.4 available)
+2026-09-16T00:25:54.8994690Z   objective_c 9.3.0 (9.6.0 available)
+2026-09-16T00:25:54.8995570Z   package_config 2.2.0 (3.0.0 available)
+2026-09-16T00:25:54.8997200Z   path_provider 2.1.5 (2.1.6 available)
+2026-09-16T00:25:54.8998210Z   path_provider_linux 2.2.1 (2.2.2 available)
+2026-09-16T00:25:54.8999100Z   path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-09-16T00:25:54.9000090Z   platform 3.1.6 (3.2.0 available)
+2026-09-16T00:25:54.9001100Z   process 5.0.5 (5.0.6 available)
+2026-09-16T00:25:54.9002090Z   pub_semver 2.2.0 (2.2.1 available)
+2026-09-16T00:25:54.9002730Z   record 6.2.0 (7.1.1 available)
+2026-09-16T00:25:54.9003740Z   record_android 1.5.1 (2.2.0 available)
+2026-09-16T00:25:54.9004930Z   record_ios 1.2.0 (2.1.1 available)
+2026-09-16T00:25:54.9005810Z   record_linux 1.3.0 (2.1.1 available)
+2026-09-16T00:25:54.9006950Z   record_macos 1.2.1 (2.1.1 available)
+2026-09-16T00:25:54.9007850Z   record_platform_interface 1.5.0 (2.1.0 available)
+2026-09-16T00:25:54.9009070Z   record_use 0.6.0 (1.1.1 available)
+2026-09-16T00:25:54.9009680Z   record_web 1.3.0 (2.1.3 available)
+2026-09-16T00:25:54.9012360Z   record_windows 1.0.7 (2.3.0 available)
+2026-09-16T00:25:54.9013140Z   shared_preferences_android 2.4.23 (2.4.28 available)
+2026-09-16T00:25:54.9014340Z   shared_preferences_foundation 2.5.6 (2.5.7 available)
+2026-09-16T00:25:54.9016040Z   stack_trace 1.12.1 (1.12.2 available)
+2026-09-16T00:25:54.9016810Z   synchronized 3.4.0+1 (3.4.2 available)
+2026-09-16T00:25:54.9017910Z   test_api 0.7.10 (0.7.14 available)
+2026-09-16T00:25:54.9018700Z   url_launcher_android 6.3.30 (6.3.33 available)
+2026-09-16T00:25:54.9020120Z   uuid 4.5.3 (4.6.0 available)
+2026-09-16T00:25:54.9021010Z   vector_math 2.2.0 (2.4.2 available)
+2026-09-16T00:25:54.9023610Z   vm_service 15.0.2 (15.3.0 available)
+2026-09-16T00:25:54.9024550Z   webdriver 3.1.0 (3.2.0 available)
+2026-09-16T00:25:54.9025470Z   window_to_front 0.0.4 (1.0.0 available)
+2026-09-16T00:25:54.9026390Z   yaml 3.1.3 (3.1.4 available)
+2026-09-16T00:25:54.9027320Z Got dependencies!
+2026-09-16T00:25:54.9028400Z 52 packages have newer versions incompatible with dependency constraints.
+2026-09-16T00:25:54.9029520Z Try `flutter pub outdated` for more information.
+2026-09-16T00:25:56.2482890Z Warning: Building for device with codesigning disabled. You will have to manually codesign before deploying to device.
+2026-09-16T00:26:06.9492150Z Building com.example.agentsChatApp for device (ios-release)...
+2026-09-16T00:28:44.6535560Z Running Xcode build...                                          
+2026-09-16T00:28:44.6709450Z Xcode build done.                                           154.3s
+2026-09-16T00:28:46.8901360Z ✓ Built build/ios/iphoneos/Runner.app (41.7MB)
+2026-09-16T00:28:47.1466700Z ##[group]Run actions/upload-artifact@v6
+2026-09-16T00:28:47.1467260Z with:
+2026-09-16T00:28:47.1467540Z   name: ios-native-storage-results
+2026-09-16T00:28:47.1467990Z   path: app/audit-results
+2026-09-16T00:28:47.1468370Z   if-no-files-found: warn
+2026-09-16T00:28:47.1468900Z   compression-level: 6
+2026-09-16T00:28:47.1469350Z   overwrite: false
+2026-09-16T00:28:47.1475260Z   include-hidden-files: false
+2026-09-16T00:28:47.1475720Z env:
+2026-09-16T00:28:47.1476260Z   FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.41.5-arm64/flutter
+2026-09-16T00:28:47.1476990Z   PUB_CACHE: /Users/runner/.pub-cache
+2026-09-16T00:28:47.1477350Z   AUDIT_IOS_DEVICE: 4BA6C3FA-D29E-4EE7-9311-760AF30FBEB5
+2026-09-16T00:28:47.1477800Z ##[endgroup]
+2026-09-16T00:28:48.5789640Z With the provided path, there will be 3 files uploaded
+2026-09-16T00:28:48.5814560Z Artifact name is valid!
+2026-09-16T00:28:48.5909800Z Root directory input is valid!
+2026-09-16T00:28:48.9778750Z Beginning upload of artifact content to blob storage
+2026-09-16T00:28:49.1772720Z Uploaded bytes 3688
+2026-09-16T00:28:49.1925370Z Finished uploading artifact content to blob storage!
+2026-09-16T00:28:49.1943020Z SHA256 digest of uploaded artifact zip is 5a2a2f6cf9007c129c970111c249f8ca3c54b5085383a65fc80a3231df66ac1d
+2026-09-16T00:28:49.1950140Z Finalizing artifact upload
+2026-09-16T00:28:49.4143810Z Artifact ios-native-storage-results.zip successfully finalized. Artifact ID 10424622316
+2026-09-16T00:28:49.4156860Z Artifact ios-native-storage-results has been successfully uploaded! Final size is 3688 bytes. Artifact ID is 10424622316
+2026-09-16T00:28:49.4158700Z Artifact download URL: https://github.com/UncleK/agentschat/actions/runs/35039143916/artifacts/10424622316
+2026-09-16T00:28:49.4671700Z ##[group]Run xcrun simctl delete "$AUDIT_IOS_DEVICE"
+2026-09-16T00:28:49.4673490Z [36;1mxcrun simctl delete "$AUDIT_IOS_DEVICE"[0m
+2026-09-16T00:28:49.5697380Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-16T00:28:49.5699710Z env:
+2026-09-16T00:28:49.5701030Z   FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.41.5-arm64/flutter
+2026-09-16T00:28:49.5702420Z   PUB_CACHE: /Users/runner/.pub-cache
+2026-09-16T00:28:49.5703580Z   AUDIT_IOS_DEVICE: 4BA6C3FA-D29E-4EE7-9311-760AF30FBEB5
+2026-09-16T00:28:49.5704620Z ##[endgroup]
+2026-09-16T00:28:56.5289640Z Post job cleanup.
+2026-09-16T00:28:56.5302050Z ##[start-action display=Cache pub dependencies;id=__8640c9e0-e010-438d-909d-6f0c1b20f2af.cache-pub]
+2026-09-16T00:28:57.3087020Z Post job cleanup.
+2026-09-16T00:28:57.6276430Z [command]/opt/homebrew/bin/gtar --posix -cf cache.tzst --exclude cache.tzst -P -C /Users/runner/work/agentschat/agentschat --files-from manifest.txt --delay-directory-restore --use-compress-program zstdmt
+2026-09-16T00:29:05.2455810Z Sent 45852810 of 45852810 (100.0%), 69.7 MBs/sec
+2026-09-16T00:29:05.3280550Z Cache saved with key: flutter-pub-macos-stable-3.41.5-arm64-2c9eb20739dfec95e2c74bd3dfa4601b0a8a36aa-78458682cbc65fd95e0c606893429e1b7a57ed4ee5e2876e89e008399769bd9e
+2026-09-16T00:29:05.3386690Z ##[end-action id=__8640c9e0-e010-438d-909d-6f0c1b20f2af.cache-pub;outcome=success;conclusion=success;duration_ms=8808]
+2026-09-16T00:29:05.3410280Z ##[start-action display=Cache Flutter;id=__8640c9e0-e010-438d-909d-6f0c1b20f2af.cache-flutter]
+2026-09-16T00:29:05.3501440Z Post job cleanup.
+2026-09-16T00:29:05.5415110Z [command]/opt/homebrew/bin/gtar --posix -cf cache.tzst --exclude cache.tzst -P -C /Users/runner/work/agentschat/agentschat --files-from manifest.txt --delay-directory-restore --use-compress-program zstdmt
+2026-09-16T00:29:25.2261240Z Sent 0 of 2106104426 (0.0%), 0.0 MBs/sec
+2026-09-16T00:29:26.2268100Z Sent 0 of 2106104426 (0.0%), 0.0 MBs/sec
+2026-09-16T00:29:27.2285460Z Sent 0 of 2106104426 (0.0%), 0.0 MBs/sec
+2026-09-16T00:29:28.2310470Z Sent 536870912 of 2106104426 (25.5%), 127.8 MBs/sec
+2026-09-16T00:29:29.2324030Z Sent 536870912 of 2106104426 (25.5%), 102.3 MBs/sec
+2026-09-16T00:29:30.2332240Z Sent 536870912 of 2106104426 (25.5%), 85.2 MBs/sec
+2026-09-16T00:29:31.2330630Z Sent 872415232 of 2106104426 (41.4%), 118.7 MBs/sec
+2026-09-16T00:29:32.2335350Z Sent 1073741824 of 2106104426 (51.0%), 127.8 MBs/sec
+2026-09-16T00:29:33.2406580Z Sent 1073741824 of 2106104426 (51.0%), 113.6 MBs/sec
+2026-09-16T00:29:34.2351040Z Sent 1275068416 of 2106104426 (60.5%), 121.5 MBs/sec
+2026-09-16T00:29:35.2356640Z Sent 1476395008 of 2106104426 (70.1%), 127.9 MBs/sec
+2026-09-16T00:29:36.2362380Z Sent 1610612736 of 2106104426 (76.5%), 127.9 MBs/sec
+2026-09-16T00:29:37.2363910Z Sent 1904777834 of 2106104426 (90.4%), 139.6 MBs/sec
+2026-09-16T00:29:38.2361060Z Sent 2038995562 of 2106104426 (96.8%), 138.8 MBs/sec
+2026-09-16T00:29:38.7744810Z Sent 2106104426 of 2106104426 (100.0%), 138.0 MBs/sec
+2026-09-16T00:29:38.8859400Z Cache saved with key: flutter-macos-stable-3.41.5-arm64-2c9eb20739dfec95e2c74bd3dfa4601b0a8a36aa
+2026-09-16T00:29:38.9431990Z ##[end-action id=__8640c9e0-e010-438d-909d-6f0c1b20f2af.cache-flutter;outcome=success;conclusion=success;duration_ms=33601]
+2026-09-16T00:29:38.9631220Z Post job cleanup.
+2026-09-16T00:29:39.1406300Z [command]/opt/homebrew/bin/git version
+2026-09-16T00:29:39.1691320Z git version 2.55.0
+2026-09-16T00:29:39.1727410Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/5318bc99-3eae-411b-b37c-454eb6b131cc/.gitconfig'
+2026-09-16T00:29:39.1744580Z Temporarily overriding HOME='/Users/runner/work/_temp/5318bc99-3eae-411b-b37c-454eb6b131cc' before making global git config changes
+2026-09-16T00:29:39.1745600Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-16T00:29:39.1747590Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/agentschat/agentschat
+2026-09-16T00:29:39.1907180Z Removing SSH command configuration
+2026-09-16T00:29:39.1908590Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-16T00:29:39.1999720Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-16T00:29:39.3303050Z fatal: No url found for submodule path 'research/daytona' in .gitmodules
+2026-09-16T00:29:39.3387880Z ##[warning]The process '/opt/homebrew/bin/git' failed with exit code 128
+2026-09-16T00:29:39.3548990Z Cleaning up orphan processes
+2026-09-16T00:29:39.6452520Z Terminate orphan process: pid (48483) (ibtoold)
+2026-09-16T00:29:39.6826800Z Terminate orphan process: pid (48482) (ibtoold)
+2026-09-16T00:29:39.8397960Z Terminate orphan process: pid (23309) (ibtoold)
+2026-09-16T00:29:39.9633040Z Terminate orphan process: pid (21533) (adb)

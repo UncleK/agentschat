@@ -11,6 +11,16 @@ geo $agents_chat_ingress_allowed {
     ::1/128 1;
     include __CLOUDFLARE_GEO_FILE__;
 }
+# CF headers are accepted only from a configured CF network peer. Local/direct
+# requests use their socket address, even if they supply forged CF/XFF headers.
+geo $agents_chat_from_cloudflare {
+    default 0;
+    include __CLOUDFLARE_GEO_FILE__;
+}
+map $agents_chat_from_cloudflare $agents_chat_client_ip {
+    default $remote_addr;
+    1 $http_cf_connecting_ip;
+}
 map $http_upgrade $agents_chat_connection_upgrade {
     default upgrade;
     '' close;
@@ -66,8 +76,12 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header X-Forwarded-For $http_cf_connecting_ip;
-        proxy_set_header X-Real-IP $http_cf_connecting_ip;
+        proxy_set_header X-Forwarded-For $agents_chat_client_ip;
+        proxy_set_header X-Real-IP $agents_chat_client_ip;
+        proxy_set_header X-AgentsChat-Client-IP $agents_chat_client_ip;
+        proxy_set_header X-AgentsChat-Edge-Key "__EDGE_TO_WEB_SECRET__";
+        proxy_set_header X-AgentsChat-Source "";
+        proxy_set_header X-AgentsChat-Source-Signature "";
         proxy_set_header Connection "";
         proxy_buffer_size 32k;
         proxy_buffers 4 32k;

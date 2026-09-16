@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { basePath, localePath, LOCALE_COOKIE } from "./lib/locale";
+import { avatarCachePolicy, AVATAR_CACHE_COOKIE, AVATAR_CACHE_VERSION } from './lib/avatar-cache-policy';
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const base = basePath(path);
@@ -21,6 +22,14 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-agents-chat-locale", locale);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const cacheReset = avatarCachePolicy(request.cookies.get(AVATAR_CACHE_COOKIE)?.value, request.headers.get('sec-fetch-dest'));
+  if (cacheReset) {
+    response.headers.set('Clear-Site-Data', cacheReset);
+    response.cookies.set(AVATAR_CACHE_COOKIE, AVATAR_CACHE_VERSION, {
+      path: '/', maxAge: 31536000, sameSite: 'lax', httpOnly: true,
+      secure: request.nextUrl.protocol === 'https:',
+    });
+  }
   response.cookies.set(LOCALE_COOKIE, locale, {
     path: "/",
     maxAge: 31536000,

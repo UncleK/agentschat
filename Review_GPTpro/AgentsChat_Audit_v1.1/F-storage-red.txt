@@ -1,0 +1,37 @@
+00:00 +0: loading E:/VP/agents_chat_release_candidate/app/test/core/session/session_storage_security_test.dart
+00:00 +0: ST-01 migrates token before removing legacy plaintext
+00:00 +0 -1: ST-01 migrates token before removing legacy plaintext [E]
+  Expected: 'synthetic-legacy'
+    Actual: <null>
+     Which: not an <Instance of 'String'>
+  
+  package:matcher                                            expect
+  package:flutter_test/src/widget_tester.dart 473:18         expect
+  test\core\session\session_storage_security_test.dart 16:5  main.<fn>
+  
+00:00 +0 -1: ST-01 writes only to vault and logout clears both stores
+00:00 +0 -2: ST-01 writes only to vault and logout clears both stores [E]
+  Expected: 'synthetic-new'
+    Actual: <null>
+     Which: not an <Instance of 'String'>
+  
+  package:matcher                                            expect
+  package:flutter_test/src/widget_tester.dart 473:18         expect
+  test\core\session\session_storage_security_test.dart 21:5  main.<fn>
+  
+00:00 +0 -2: ST-01 secure token wins over stale legacy copy
+00:00 +0 -3: ST-01 secure token wins over stale legacy copy [E]
+  Expected: 'secure-current'
+    Actual: 'synthetic-legacy'
+     Which: is different.
+            Expected: secure-curr ...
+              Actual: synthetic-l ...
+                       ^
+             Differ at offset 1
+  
+  package:matcher                                            expect
+  package:flutter_test/src/widget_tester.dart 473:18         expect
+  test\core\session\session_storage_security_test.dart 29:5  main.<fn>
+  
+00:00 +0 -3: ST-01 logout ordered after migration cannot resurrect token
+00:00 +1 -3: Some tests failed.

@@ -79,14 +79,17 @@ prepare_caddy() {
   validate_domain "$domain"
   local template="$release/deploy/caddy/Caddyfile.example"
   [[ "$PROXY_SERVER" != nginx ]] || template="$release/deploy/nginx/agents-chat.conf.example"
-  APP_DOMAIN="$domain" node - "$template" "$target" <<'RENDER'
+  APP_DOMAIN="$domain" node --env-file="$WEB_ENV_FILE" - "$template" "$target" <<'RENDER'
 const fs=require('node:fs');let text=fs.readFileSync(process.argv[2],'utf8');
 for (const key of ['APP_DOMAIN','API_PORT','WEB_PORT','TLS_CERT_FILE','TLS_KEY_FILE','CLOUDFLARE_GEO_FILE']) {
  const value=process.env[key]||'';
  if (/[\r\n;{}]/.test(value)) throw new Error('Invalid proxy setting '+key);
  text=text.replaceAll('__'+key+'__',value);
 }
-fs.writeFileSync(process.argv[3],text);
+const edgeSecret=process.env.EDGE_TO_WEB_SECRET||'';
+if (edgeSecret && !/^[A-Za-z0-9_-]{32,256}$/.test(edgeSecret)) throw new Error('EDGE_TO_WEB_SECRET must be 32-256 URL-safe characters');
+text=text.replaceAll('__EDGE_TO_WEB_SECRET__',edgeSecret);
+fs.writeFileSync(process.argv[3],text,{mode:0o640});
 RENDER
   validate_proxy_fragment "$target"
 }
@@ -145,7 +148,10 @@ install_release_configuration() {
     APP_ROOT="$APP_ROOT" APP_USER="$APP_USER" ENV_FILE="$ENV_FILE" WEB_ENV_FILE="$WEB_ENV_FILE" OPS_DIR="$OPS_DIR" node - "$release/deploy/systemd/$unit" "$temp" <<'NODE'
 const fs=require('node:fs');let text=fs.readFileSync(process.argv[2],'utf8');
 for(const [a,b] of [['/opt/agents-chat',process.env.APP_ROOT],['/etc/agents-chat/server.env',process.env.ENV_FILE],['/etc/agents-chat/web.env',process.env.WEB_ENV_FILE],['/opt/ops',process.env.OPS_DIR],['User=agentschat','User='+process.env.APP_USER],['Group=agentschat','Group='+process.env.APP_USER]])text=text.split(a).join(b);
-fs.writeFileSync(process.argv[3],text);
+const edgeSecret=process.env.EDGE_TO_WEB_SECRET||'';
+if (edgeSecret && !/^[A-Za-z0-9_-]{32,256}$/.test(edgeSecret)) throw new Error('EDGE_TO_WEB_SECRET must be 32-256 URL-safe characters');
+text=text.replaceAll('__EDGE_TO_WEB_SECRET__',edgeSecret);
+fs.writeFileSync(process.argv[3],text,{mode:0o640});
 NODE
     atomic_install "$temp" "$SYSTEMD_DIR/$unit"
   done

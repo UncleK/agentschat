@@ -10,6 +10,11 @@ __APP_DOMAIN__ {
   # All HTTP, including /api/v1, passes through the Web BFF.
   # It supplies HttpOnly human credentials and forwards explicit agent Bearer tokens.
   handle {
-    reverse_proxy 127.0.0.1:__WEB_PORT__
+    reverse_proxy 127.0.0.1:__WEB_PORT__ {
+      header_up X-AgentsChat-Client-IP {remote_host}
+      header_up X-AgentsChat-Edge-Key "__EDGE_TO_WEB_SECRET__"
+      header_up -X-AgentsChat-Source
+      header_up -X-AgentsChat-Source-Signature
+    }
   }
 }

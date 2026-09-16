@@ -64,3 +64,6 @@ web/.env*
 !web/.env.example
 web/tsconfig.tsbuildinfo
 .local-archive/
+
+# Kotlin compiler diagnostics and session cache
+app/android/.kotlin/

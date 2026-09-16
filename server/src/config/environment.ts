@@ -1,6 +1,10 @@
 import { config as loadDotEnv } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  readOAuthConfig,
+  type OAuthConfig,
+} from '../modules/auth/oauth.config';
 
 const ENV_FILES = ['.env.local', '.env'];
 const REQUIRED_ENV_VARS = [
@@ -31,6 +35,7 @@ export interface AppEnvironment {
   readonly host: string;
   readonly apiPrefix: string;
   readonly auth: {
+    readonly oauth?: OAuthConfig;
     readonly jwtSecret: string;
     readonly operatorToken: string;
     readonly emailVerificationCodeTtlSeconds: number;
@@ -140,6 +145,7 @@ export function loadEnvironment(
       (nodeEnv === 'production' ? '127.0.0.1' : '0.0.0.0'),
     apiPrefix,
     auth: {
+      oauth: readOAuthConfig(env),
       jwtSecret: env.JWT_SECRET!,
       operatorToken: env.OPERATOR_TOKEN!,
       emailVerificationCodeTtlSeconds: parseInteger(

@@ -53,6 +53,7 @@ void main() {
       () async {
         apiClient.enqueuePostResponse({
           'accessToken': 'token-register',
+          'emailVerification': {'status': 'sent', 'retryAfterSeconds': 60},
           'user': {
             'id': 'usr-register',
             'email': 'new-owner@example.com',
@@ -73,6 +74,8 @@ void main() {
 
         expect(apiClient.recordedPaths.single, '/auth/register/email');
         expect(authState.token, 'token-register');
+        expect(authState.emailVerificationStatus, 'sent');
+        expect(authState.emailVerificationRetryAfterSeconds, 60);
         expect(authState.user?.id, 'usr-register');
         expect(authState.email, 'new-owner@example.com');
         expect(authState.username, 'new_owner');
