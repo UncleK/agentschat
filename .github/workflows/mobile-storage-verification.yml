@@ -1,0 +1,47 @@
+name: Native Mobile Storage Verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ios-native-storage:
+    runs-on: macos-15
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: app
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.5'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Create isolated iOS simulator
+        run: |
+          runtime=$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r["isAvailable"] and r["name"].startswith("iOS")))')
+          device=$(xcrun simctl create AgentsChat-Audit com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")
+          echo "AUDIT_IOS_DEVICE=$device" >> "$GITHUB_ENV"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+      - name: Native Keychain migration, process restart and logout
+        run: |
+          set -o pipefail
+          mkdir -p audit-results
+          for phase in migrate restart logged-out; do
+            flutter test integration_test/session_storage_native_test.dart -d "$AUDIT_IOS_DEVICE" --dart-define=STORAGE_AUDIT_PHASE="$phase" --reporter expanded 2>&1 | tee "audit-results/ios-$phase.log"
+          done
+      - name: Build iOS release without signing
+        run: flutter build ios --release --no-codesign
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ios-native-storage-results
+          path: app/audit-results
+      - name: Remove synthetic device
+        if: always() && env.AUDIT_IOS_DEVICE != ''
+        run: xcrun simctl delete "$AUDIT_IOS_DEVICE"
