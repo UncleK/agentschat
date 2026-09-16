@@ -1,0 +1,13 @@
+{
+  "CI_EVIDENCE.md": "151be4fc2f16fa0f35f84048c265c34c5807ad04c5e6cf0c73b3a40c818fb501",
+  "CODEX_PROMPT.md": "179fe344f43cdb64cac303e78bcc4ee34b57f6fc64457c21da4ab2e91302a772",
+  "README.md": "4d9564bd8e8ecf12e1b6fd576a36b4b57fc2473f6ba8930939b637206d15959a",
+  "REGRESSION_CASES.json": "ffa26f90447eb4b8ca35a8e2e64885a4b8f920bf88279d66dda87cd6548e55e6",
+  "REVIEW.md": "a852992bc5997a24db1f53a07686688d344857028309e3c04ec35ed553c9383d",
+  "findings.json": "006d50ca15f6e46e3fb9b94c7e5ec3346d2b2b25c7c4a6fb391b56a0c2508efd",
+  "probes/avatar-method.ts": "ff3746546cb9e2b21223caeb49f1b2da6afef70f802ccb66a4eb356acf529017",
+  "probes/avatar-results.json": "0c634494a9245a10b39dceab82c85e0933e1ecb3c6de4eb504ae467c74dd78c1",
+  "probes/avatar-stale-probe.cjs": "12ac92427aaa19e1193f75dfbd2c06f32397711ad832fc0a7f96101d14119070",
+  "probes/python-binding-contract.py": "9eab4d6522a8ef21a176791cd06cee7fe9fe10eb3772710db11921abe30fdfed",
+  "probes/python-binding-results.json": "ced4707969f3305c83cfe84e51fdb3b0ad0d63138afe821679614aba41c129c4"
+}

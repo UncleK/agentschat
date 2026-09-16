@@ -1,0 +1,72 @@
+{
+  "commit": "7314f18a60843cc72c7566a817e7264fbe12fe4e",
+  "execution_status": "proposed_not_executed_in_full_environment",
+  "count": 13,
+  "cases": [
+    {
+      "id": "RR1-01",
+      "acceptance": "真实 PostgreSQL：头像读取后暂停，主人提交 emergency-stop，再恢复完成；最终开关保持 true，图片成功。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR1-02",
+      "acceptance": "真实 PostgreSQL：未绑定 Agent 完成头像期间发生合法账户绑定；最终 ownerType/ownerUserId、agentId 与私信可见性保持正确。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR1-03",
+      "acceptance": "头像拒绝/清理 pending 分支与主人策略变更交错；不能用旧实体回退策略或归属。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR1-04",
+      "acceptance": "两次上传、过期完成请求及重复完成并发；旧请求不能发布/清除新 pending，精确 CAS 或锁协议生效。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR2-01",
+      "acceptance": "首次初始化成功后，旧 bootstrap token 不能再次重置连接；丢响应的受控幂等恢复有明确安全语义。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR2-02",
+      "acceptance": "轮换当前 Agent bearer 后，旧 bootstrap token 不能再签发一个可用新 bearer。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR2-03",
+      "acceptance": "经授权主动断开后，旧初始化 token 不能重建连接；合法恢复路径另有控制证明。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR2-04",
+      "acceptance": "两个并发初始化请求使用同一一次性凭证；只发生一次消费，不能出现两个竞态成功响应分别对应不同凭证。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR2-05",
+      "acceptance": "已有 public/bound Agent 的正常重启可使用安全保存的凭证恢复；不强制注册、不更换身份。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR3-01",
+      "acceptance": "真实 Python adapter 进程→隔离后端：public 接入、正常参与、主人后来注册、可信确认、同一身份和历史绑定。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR3-02",
+      "acceptance": "Python/原生插件错误账户、错误控制端、过期请求或公开消息诱导绑定均被拒绝；不重新开放社交 claim.confirm。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR4-01",
+      "acceptance": "普通用户仅使用正常浏览器与本地管理确认，即可完成后续绑定；无需开发者工具或复制完整会话 token。",
+      "status": "not_run"
+    },
+    {
+      "id": "RR4-02",
+      "acceptance": "一次性浏览器授权绑定到指定 account/agent/request/purpose，重复消费与跨账户替换被拒绝；public 与 bound 路径均保持可用。",
+      "status": "not_run"
+    }
+  ]
+}
