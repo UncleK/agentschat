@@ -52,6 +52,7 @@ import {
 
 interface ClaimAgentInput {
   claimToken?: string;
+  recoveryKey?: string;
   transportMode?: string;
   webhookUrl?: string | null;
   pollingEnabled?: boolean;
@@ -179,6 +180,25 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
     );
     const webhookUrl = input.webhookUrl?.trim() || null;
     if (webhookUrl) validateWebhookUrl(webhookUrl);
+    const recoveryKey = input.recoveryKey;
+    if (
+      recoveryKey !== undefined &&
+      (typeof recoveryKey !== 'string' || !/^[a-f0-9]{64}$/.test(recoveryKey))
+    ) {
+      throw new FederationHttpException(
+        400,
+        'invalid_recovery_key',
+        'recoveryKey must be a locally generated 32-byte hex secret.',
+      );
+    }
+    const tokenHash = this.federationCredentialsService.hashValue(claimToken);
+    const requestHash = this.federationCredentialsService.hashValue(
+      JSON.stringify({
+        transportMode,
+        webhookUrl,
+        capabilities: input.capabilities ?? {},
+      }),
+    );
 
     if (
       (transportMode === ConnectionTransportMode.Webhook ||
@@ -199,9 +219,65 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
         const connectionRepository = manager.getRepository(
           AgentConnectionEntity,
         );
+        const persistedAgent = await agentRepository.findOneOrFail({
+          where: { id: agent.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        const [consumed] = await manager.query<
+          Array<{
+            token_hash: string;
+            recovery_hash: string | null;
+            request_hash: string | null;
+            connection_id: string | null;
+            consumed_at: Date | null;
+            recovery_expires_at: Date | null;
+          }>
+        >('SELECT * FROM agent_bootstrap_consumptions WHERE agent_id=$1', [
+          agent.id,
+        ]);
         let connection = await connectionRepository.findOneBy({
           agentId: agent.id,
         });
+
+        if (
+          consumed?.consumed_at ||
+          connection ||
+          (consumed && consumed.token_hash !== tokenHash)
+        ) {
+          const recovered =
+            connection && recoveryKey
+              ? this.federationCredentialsService.recoverInitialAccessToken(
+                  connection.id,
+                  tokenHash,
+                  recoveryKey,
+                )
+              : null;
+          if (
+            consumed &&
+            connection &&
+            recovered &&
+            consumed.token_hash === tokenHash &&
+            consumed.connection_id === connection.id &&
+            consumed.request_hash === requestHash &&
+            consumed.recovery_hash ===
+              this.federationCredentialsService.hashValue(recoveryKey!) &&
+            consumed.recovery_expires_at &&
+            consumed.recovery_expires_at.getTime() > Date.now() &&
+            connection.tokenHash ===
+              this.federationCredentialsService.hashValue(recovered)
+          ) {
+            return {
+              connection,
+              accessToken: recovered,
+              webhookSecret: connection.webhookSecret,
+            };
+          }
+          throw new FederationHttpException(
+            409,
+            'bootstrap_consumed',
+            'Initialization was consumed or revoked. Resume with the saved agent credential or use authorized account recovery.',
+          );
+        }
 
         if (!connection) {
           connection = await connectionRepository.save(
@@ -218,10 +294,15 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
           );
         }
 
-        const accessToken =
-          this.federationCredentialsService.generateAgentAccessToken(
-            connection.id,
-          );
+        const accessToken = recoveryKey
+          ? this.federationCredentialsService.recoverInitialAccessToken(
+              connection.id,
+              tokenHash,
+              recoveryKey,
+            )
+          : this.federationCredentialsService.generateAgentAccessToken(
+              connection.id,
+            );
         const webhookSecret =
           transportMode === ConnectionTransportMode.Webhook ||
           transportMode === ConnectionTransportMode.Hybrid
@@ -243,9 +324,6 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
         connection.lastSeenAt = new Date();
         connection.capabilities = input.capabilities ?? {};
 
-        const persistedAgent = await agentRepository.findOneByOrFail({
-          id: agent.id,
-        });
         const nextProfileMetadata: Record<string, unknown> =
           persistedAgent.profileMetadata['invitationPending'] == true
             ? {
@@ -262,9 +340,34 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
         ) {
           persistedAgent.status = AgentStatus.Online;
         }
-        await agentRepository.save(persistedAgent);
+        await agentRepository
+          .createQueryBuilder()
+          .update()
+          .set({
+            lastSeenAt: persistedAgent.lastSeenAt,
+            profileMetadata: () => 'CAST(:claimMetadata AS jsonb)',
+            status: persistedAgent.status,
+          })
+          .where('id = :id', { id: agent.id })
+          .setParameter('claimMetadata', JSON.stringify(nextProfileMetadata))
+          .execute();
 
         const savedConnection = await connectionRepository.save(connection);
+        await manager.query(
+          `INSERT INTO agent_bootstrap_consumptions
+          (agent_id,token_hash,recovery_hash,request_hash,connection_id,consumed_at,recovery_expires_at)
+          VALUES ($1,$2,$3,$4,$5,now(),now()+interval '5 minutes')
+          ON CONFLICT(agent_id) DO UPDATE SET token_hash=$2,recovery_hash=$3,request_hash=$4,connection_id=$5,consumed_at=now(),recovery_expires_at=now()+interval '5 minutes'`,
+          [
+            agent.id,
+            tokenHash,
+            recoveryKey
+              ? this.federationCredentialsService.hashValue(recoveryKey)
+              : null,
+            requestHash,
+            connection.id,
+          ],
+        );
 
         return {
           connection: savedConnection,
@@ -311,31 +414,40 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
   }
 
   async rotateAgentToken(agent: AuthenticatedFederatedAgent) {
-    const connection = await this.agentConnectionRepository.findOneBy({
-      id: agent.connectionId,
-      agentId: agent.id,
-    });
-
-    if (!connection) {
-      throw new FederationHttpException(
-        404,
-        'connection_not_found',
-        'The agent connection was not found.',
+    return inTransaction(this.dataSource, async (manager) => {
+      await manager.getRepository(AgentEntity).findOneOrFail({
+        where: { id: agent.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const connections = manager.getRepository(AgentConnectionEntity);
+      const connection = await connections.findOne({
+        where: { id: agent.connectionId, agentId: agent.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (
+        !connection ||
+        !agent.credentialHash ||
+        connection.tokenHash !== agent.credentialHash
+      ) {
+        throw new FederationHttpException(
+          401,
+          'invalid_agent_token',
+          'The control credential was revoked.',
+        );
+      }
+      const accessToken =
+        this.federationCredentialsService.generateAgentAccessToken(
+          connection.id,
+        );
+      await connections.update(connection.id, {
+        tokenHash: this.federationCredentialsService.hashValue(accessToken),
+      });
+      await manager.query(
+        'UPDATE agent_bootstrap_consumptions SET recovery_expires_at=now() WHERE agent_id=$1',
+        [agent.id],
       );
-    }
-
-    const accessToken =
-      this.federationCredentialsService.generateAgentAccessToken(connection.id);
-    connection.tokenHash =
-      this.federationCredentialsService.hashValue(accessToken);
-    await this.markAgentConnectionActive(agent, false, {
-      connectionTokenHash: connection.tokenHash,
+      return { accessToken, rotatedAt: new Date().toISOString() };
     });
-
-    return {
-      accessToken,
-      rotatedAt: new Date().toISOString(),
-    };
   }
 
   async submitAction(

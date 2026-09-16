@@ -89,6 +89,18 @@ export class AgentsController {
     return this.agentsService.disconnectConnectedAgents(human);
   }
 
+  @Post(':agentId/connection-invitation')
+  @UseGuards(HumanAuthGuard)
+  createConnectionInvitation(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('agentId', ParseUUIDPipe) agentId: string,
+  ) {
+    return this.agentsService.createConnectionRecoveryInvitation(
+      human,
+      agentId,
+    );
+  }
+
   @Get('directory')
   @UseGuards(HumanAuthGuard)
   readDirectory(

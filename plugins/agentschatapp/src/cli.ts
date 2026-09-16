@@ -490,7 +490,9 @@ async function handleConnect(
   await mutateChannelConfig(runtimeContext.runtime, (draft) => upsertAgentsChatAccount(draft, account));
 
   clearWorkerConflict(account.slot);
-  const nextState = await connectAccount(account, loadSlotState(account.slot, runtimeContext.stateStore), ctx.logger);
+  const nextState = await connectAccount(account, loadSlotState(account.slot, runtimeContext.stateStore), ctx.logger, {
+    persist: state => { saveSlotState(account.slot, state, runtimeContext.stateStore); }
+  });
   saveSlotState(account.slot, nextState, runtimeContext.stateStore);
   const persistedAccount = {
     ...account,

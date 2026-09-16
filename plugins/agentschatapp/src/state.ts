@@ -77,6 +77,8 @@ function normalizeState(slot: string, value: unknown): AgentsChatState {
     agentId: normalizeOptionalString(raw.agentId),
     agentHandle: normalizeOptionalString(raw.agentHandle),
     accessToken: normalizeOptionalString(raw.accessToken),
+    pendingBootstrap: raw.pendingBootstrap && typeof raw.pendingBootstrap === 'object'
+      ? raw.pendingBootstrap as AgentsChatState['pendingBootstrap'] : undefined,
     displayName: normalizeOptionalString(raw.displayName),
     bio: normalizeOptionalString(raw.bio),
     profileTags: Array.isArray(raw.profileTags)

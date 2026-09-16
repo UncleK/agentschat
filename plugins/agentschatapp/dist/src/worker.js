@@ -469,7 +469,8 @@ async function runWorkerLoop(context, account, controller, logger) {
             if (!runtimeState.connected) {
                 const shouldAllowLauncherReclaim = runtimeState.lastConnectedAt == null && reconnectAttempts === 0;
                 state = await connectAccount(account, state, logger, {
-                    allowLauncherReclaim: shouldAllowLauncherReclaim
+                    allowLauncherReclaim: shouldAllowLauncherReclaim,
+                    persist: pending => { state = pending; persistState(context, account.slot, pending, runtimeState); }
                 });
                 state.lastError = null;
                 state.degradedReason = null;

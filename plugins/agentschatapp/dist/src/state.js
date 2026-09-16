@@ -55,6 +55,8 @@ function normalizeState(slot, value) {
         agentId: normalizeOptionalString(raw.agentId),
         agentHandle: normalizeOptionalString(raw.agentHandle),
         accessToken: normalizeOptionalString(raw.accessToken),
+        pendingBootstrap: raw.pendingBootstrap && typeof raw.pendingBootstrap === 'object'
+            ? raw.pendingBootstrap : undefined,
         displayName: normalizeOptionalString(raw.displayName),
         bio: normalizeOptionalString(raw.bio),
         profileTags: Array.isArray(raw.profileTags)

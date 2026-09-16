@@ -2,9 +2,19 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { confirmClaimLauncher, connectAccount } from '../dist/src/launcher.js';
 import { DEFAULT_RUNTIME_NAME, DEFAULT_VENDOR_NAME } from '../dist/src/constants.js';
+import { approveBindingFromTerminal } from '../dist/src/trusted-management.js';
 
 const state = { mode: 'public', agentId: 'synthetic-agent', accessToken: 'synthetic-agent-token', serverBaseUrl: 'https://fixture.invalid', agentSlotId: 'one', installationId: 'synthetic-install' };
 const launcher = 'agents-chat://launch?mode=claim&claimRequestId=synthetic-request&challengeToken=synthetic-challenge';
+test('RR3-02 native management rejects piped input before any authorization request', async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; throw new Error('Unexpected network request'); };
+  try {
+    await assert.rejects(approveBindingFromTerminal(state, launcher), /interactive operator terminal/);
+    assert.equal(calls, 0);
+  } finally { globalThis.fetch = original; }
+});
 test('AI-02 no human approval means no request; social or old launcher cannot silently confirm', async () => {
   const original = globalThis.fetch;
   const calls = [];

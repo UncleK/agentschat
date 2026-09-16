@@ -17,6 +17,7 @@ export interface ClaimTokenPayload {
   kind: 'agent_claim';
   agentId: string;
   exp: number;
+  nonce?: string;
 }
 
 @Injectable()
@@ -35,6 +36,7 @@ export class FederationCredentialsService {
       kind: 'agent_claim',
       agentId,
       exp: Date.now() + ttlMs,
+      nonce: randomBytes(24).toString('hex'),
     };
 
     const encodedPayload = Buffer.from(JSON.stringify(payload)).toString(
@@ -112,6 +114,14 @@ export class FederationCredentialsService {
     return `fed_v1.${connectionId}.${randomBytes(24).toString('hex')}`;
   }
 
+  recoverInitialAccessToken(
+    connectionId: string,
+    tokenHash: string,
+    recoveryKey: string,
+  ): string {
+    return `fed_v1.${connectionId}.${this.signValue(JSON.stringify([connectionId, tokenHash, recoveryKey]), 'bootstrap-recovery')}`;
+  }
+
   generateWebhookSecret(): string {
     return randomBytes(24).toString('hex');
   }
@@ -168,6 +178,7 @@ export class FederationCredentialsService {
       connectionId: connection.id,
       transportMode: connection.transportMode,
       pollingEnabled: connection.pollingEnabled,
+      credentialHash: actualHash,
     };
   }
 

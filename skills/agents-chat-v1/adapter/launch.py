@@ -4,11 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import mimetypes
 import os
 import re
+import secrets
+import subprocess
+import tempfile
+import getpass
 import sys
 import time
 import uuid
@@ -53,6 +58,15 @@ class AdapterNetworkError(RuntimeError):
         self.url = url
         self.details = details
         super().__init__(f"Network error for {method} {url}: {details}")
+
+
+class NoCredentialRedirect(request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # A redirected API/storage endpoint must never receive controller proofs.
+        return None
+
+
+HTTP_OPENER = request.build_opener(NoCredentialRedirect())
 
 
 def parse_args() -> argparse.Namespace:
@@ -123,7 +137,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--challenge-token",
-        help="Claim launcher challenge token for claim.confirm.",
+        help="Claim launcher challenge for the trusted browser/terminal binding flow.",
     )
     parser.add_argument(
         "--expires-at",
@@ -325,7 +339,7 @@ def http_json(
         method=method,
     )
     try:
-        with request.urlopen(req, timeout=30) as response:
+        with HTTP_OPENER.open(req, timeout=30) as response:
             body = response.read().decode("utf-8")
             return json.loads(body) if body else {}
     except error.HTTPError as exc:
@@ -349,7 +363,7 @@ def http_bytes(
         method=method,
     )
     try:
-        with request.urlopen(req, timeout=30) as response:
+        with HTTP_OPENER.open(req, timeout=30) as response:
             return response.read()
     except error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
@@ -398,10 +412,21 @@ def load_state(state_dir: Path) -> dict[str, Any]:
 
 def save_state(state_dir: Path, state: dict[str, Any]) -> None:
     state_file = state_file_path(state_dir)
-    state_file.write_text(
-        json.dumps(state, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
+    # Secret-bearing state must be private before bytes are written, and atomic.
+    if os.name == 'nt':
+        subprocess.run(['icacls', str(state_dir), '/inheritance:r', '/grant:r', f'{getpass.getuser()}:(OI)(CI)F'], check=True, capture_output=True)
+    else:
+        state_dir.chmod(0o700)
+    fd, temp_name = tempfile.mkstemp(dir=state_dir, prefix='.state-')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+            json.dump(state, stream, indent=2, sort_keys=True)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_name, state_file)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
 
 
 def load_or_create_installation(state_root: Path) -> dict[str, Any]:
@@ -934,10 +959,13 @@ def claim_agent(
     transport_mode: str | None,
     webhook_url: str | None,
     capabilities: dict[str, Any] | None,
+    recovery_key: str | None = None,
 ) -> dict[str, Any]:
     url = f"{normalize_base_url(server_base_url)}/api/v1/agents/claim"
     normalized_transport_mode = normalize_transport_mode(transport_mode)
     payload: dict[str, Any] = {"claimToken": claim_token}
+    if recovery_key:
+        payload['recoveryKey'] = recovery_key
     if normalized_transport_mode:
         payload["transportMode"] = normalized_transport_mode
     if webhook_url:
@@ -952,30 +980,6 @@ def claim_agent(
         "POST",
         url,
         payload,
-    )
-
-
-def submit_claim_confirmation(
-    server_base_url: str,
-    access_token: str,
-    claim_request_id: str,
-    challenge_token: str,
-) -> dict[str, Any]:
-    url = f"{normalize_base_url(server_base_url)}/api/v1/actions"
-    return http_json(
-        "POST",
-        url,
-        {
-            "type": "claim.confirm",
-            "payload": {
-                "claimRequestId": claim_request_id,
-                "challengeToken": challenge_token,
-            },
-        },
-        access_token=access_token,
-        extra_headers={
-            "Idempotency-Key": f"adapter-claim-confirm-{uuid.uuid4()}",
-        },
     )
 
 
@@ -1049,49 +1053,37 @@ def confirm_claim_via_existing_slot(
             "Claim launcher requires claimRequestId and challengeToken."
         )
 
-    action = submit_claim_confirmation(
-        current_server_base_url,
-        access_token,
-        claim_request_id,
-        challenge_token,
-    )
-    action_id = action.get("id")
-    if not isinstance(action_id, str) or not action_id:
-        raise RuntimeError("Claim confirmation did not return an action id.")
-
-    deadline = time.time() + 30
-    while True:
-        action_state = read_action(
-            current_server_base_url,
-            access_token,
-            action_id,
-        )
-        status = action_state.get("status")
-        if status == "succeeded":
-            print(
-                json.dumps(
-                    {
-                        "status": "claim_confirmed",
-                        "slot": slot,
-                        "agentId": target_agent_id,
-                        "claimRequestId": claim_request_id,
-                    },
-                    ensure_ascii=True,
-                )
-            )
-            return state
-
-        if status in {"failed", "rejected"}:
-            raise RuntimeError(
-                f"Claim confirmation {status}: {json.dumps(action_state.get('error', {}), ensure_ascii=True)}"
-            )
-
-        if time.time() >= deadline:
-            raise RuntimeError(
-                "Timed out while waiting for claim confirmation to complete."
-            )
-
-        time.sleep(1)
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise RuntimeError('Binding requires an interactive original-controller terminal; pipes and social messages cannot approve it.')
+    base = normalize_base_url(current_server_base_url)
+    device = http_json('POST', f'{base}/api/v1/binding-devices', {
+        'requestId': claim_request_id, 'challengeToken': challenge_token,
+    }, access_token=access_token)
+    # The browser URL contains only a lookup code, never the controller proof.
+    print(f"Open in your browser: {base}/binding/authorize?code={device['userCode']}", flush=True)
+    deadline = time.monotonic() + 600
+    while time.monotonic() < deadline:
+        preview = http_json('POST', f"{base}/api/v1/binding-devices/{device['id']}/poll", {
+            'deviceSecret': device['deviceSecret'],
+        }, access_token=access_token)
+        if preview.get('status') == 'approved':
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError('Browser authorization timed out.')
+    if preview.get('purpose') != 'bind_account' or preview.get('agentId') != current_agent_id or preview.get('requestId') != claim_request_id:
+        raise RuntimeError('Authorization scope does not match this slot and request.')
+    print(json.dumps(preview, ensure_ascii=True, indent=2), flush=True)
+    expected = f"BIND {preview['accountId']} {current_agent_id}"
+    answer = input(f'Grant this account management and existing private-history access. Type {expected}: ')
+    if answer != expected:
+        raise RuntimeError('Binding was not approved by the local operator.')
+    http_json('POST', f"{base}/api/v1/binding-devices/{device['id']}/confirm", {
+        'deviceSecret': device['deviceSecret'], 'challengeToken': challenge_token,
+        'authorization': {'purpose':'bind_account', 'accountId':preview['accountId'], 'agentId':current_agent_id, 'requestId':claim_request_id, 'approved':True},
+    }, access_token=access_token)
+    print(json.dumps({'status':'claim_confirmed','slot':slot,'agentId':current_agent_id,'claimRequestId':claim_request_id}), flush=True)
+    return state
 
 
 def send_profile_update(
@@ -1514,20 +1506,36 @@ def connect_if_needed(
     state: dict[str, Any],
     config: dict[str, str],
     slot: str,
+    state_dir: Path | None = None,
 ) -> dict[str, Any]:
     mode = normalize_mode(config.get("mode"))
     if mode == "claim":
         return confirm_claim_via_existing_slot(state, config, slot)
 
     if (
-        mode == "public"
-        and state.get("accessToken")
+        state.get("accessToken")
         and state.get("serverBaseUrl")
     ):
-        return state
+        if normalize_base_url(config['server_base_url']) != normalize_base_url(str(state['serverBaseUrl'])):
+            raise RuntimeError('Existing slot belongs to another server.')
+        try:
+            http_json('GET', f"{normalize_base_url(str(state['serverBaseUrl']))}/api/v1/agents/self/safety-policy", access_token=str(state['accessToken']))
+            return state
+        except AdapterHttpError as exc:
+            if exc.status_code != 401 or mode != 'bound' or not (config.get('claim_token') or config.get('bootstrap_path') or state.get('pendingBootstrap')):
+                raise
 
     previous_agent_id = state.get("agentId")
-    if mode == "public":
+    pending = state.get('pendingBootstrap')
+    if pending:
+        if pending['serverBaseUrl'] != normalize_base_url(config['server_base_url']):
+            raise RuntimeError('Pending initialization belongs to another server.')
+        bootstrap = {'claimToken': pending['claimToken']}
+    elif previous_agent_id:
+        if mode != 'bound' or not (config.get('claim_token') or config.get('bootstrap_path')):
+            raise RuntimeError('Existing identity has no current credential. Use authorized recovery; do not recreate it.')
+        bootstrap = read_bound_bootstrap(config)
+    elif mode == "public":
         bootstrap_response = bootstrap_public_agent(config)
         bootstrap = bootstrap_response.get("bootstrap", {})
     else:
@@ -1539,6 +1547,15 @@ def connect_if_needed(
             f"{mode.capitalize()} bootstrap did not return a claimToken."
         )
 
+    if previous_agent_id:
+        # Routing consistency only; the server still verifies signature/expiry/consumption.
+        parts = claim_token.split('.')
+        if len(parts) != 4 or parts[:2] != ['claim', 'v1']:
+            raise RuntimeError('Recovery invitation is malformed.')
+        invitation = json.loads(base64.urlsafe_b64decode(parts[2] + '=' * (-len(parts[2]) % 4)))
+        if invitation.get('agentId') != previous_agent_id:
+            raise RuntimeError('Recovery invitation targets another identity; the existing slot was preserved.')
+
     capabilities = None
     if config.get("capabilities_json"):
         capabilities = parse_json_object(
@@ -1546,12 +1563,18 @@ def connect_if_needed(
             "capabilitiesJson",
         )
 
+    if state_dir is None:
+        raise RuntimeError('Initialization requires private persistent state storage.')
+    recovery_key = pending['recoveryKey'] if pending else secrets.token_hex(32)
+    state['pendingBootstrap'] = {'serverBaseUrl': normalize_base_url(config['server_base_url']), 'claimToken': claim_token, 'recoveryKey': recovery_key}
+    save_state(state_dir, state)
     claim_response = claim_agent(
         config["server_base_url"],
         claim_token,
         config.get("transport_mode"),
         config.get("webhook_url"),
         capabilities,
+        recovery_key,
     )
     access_token = claim_response.get("accessToken")
     agent = claim_response.get("agent", {})
@@ -1564,21 +1587,10 @@ def connect_if_needed(
     claimed_agent_id = agent.get("id")
     if not isinstance(claimed_agent_id, str) or not claimed_agent_id:
         raise RuntimeError("Claim response did not return an agent id.")
+    if previous_agent_id and claimed_agent_id != previous_agent_id:
+        raise RuntimeError('Recovery response changed identity; the existing slot was preserved.')
 
-    if isinstance(claimed_agent_id, str) and claimed_agent_id:
-        if previous_agent_id == claimed_agent_id:
-            warn(
-                f"slot '{slot}' is re-claiming agentId {claimed_agent_id}. "
-                "If this agent is currently online elsewhere, the older live "
-                "connection will be replaced."
-            )
-        else:
-            warn(
-                f"slot '{slot}' claimed agentId {claimed_agent_id}. "
-                "In v1, an agentId only has one active live connection. "
-                "Claiming the same agentId from another runtime later will "
-                "replace the older connection."
-            )
+    warn(f"slot '{slot}' initialized agentId {claimed_agent_id}; future restarts use the saved credential.")
 
     next_state = {
         **state,
@@ -1604,6 +1616,7 @@ def connect_if_needed(
         ),
         "webhookUrl": webhook.get("url") if isinstance(webhook, dict) else None,
     }
+    next_state.pop('pendingBootstrap', None)
     return next_state
 
 
@@ -1817,7 +1830,7 @@ def main() -> int:
         state["localAgentId"] = config.get("local_agent_id")
     elif previous_state.get("localAgentId"):
         state["localAgentId"] = previous_state.get("localAgentId")
-    state = connect_if_needed(state, config, slot)
+    state = connect_if_needed(state, config, slot, state_dir)
     state["runtimeName"] = config.get("runtime_name")
     state["vendorName"] = config.get("vendor_name")
     save_state(state_dir, state)

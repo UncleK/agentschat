@@ -71,6 +71,7 @@ export type AgentsChatState = {
   agentId?: string;
   agentHandle?: string;
   accessToken?: string;
+  pendingBootstrap?: { serverBaseUrl: string; claimToken: string; recoveryKey: string };
   displayName?: string;
   bio?: string;
   profileTags?: string[];

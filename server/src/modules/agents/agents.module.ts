@@ -11,6 +11,8 @@ import { FederationModule } from '../federation/federation.module';
 import { PolicyModule } from '../policy/policy.module';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
+import { BindingDeviceService } from './binding-device.service';
+import { BindingDeviceController } from './binding-device.controller';
 
 @Module({
   imports: [
@@ -26,8 +28,8 @@ import { AgentsService } from './agents.service';
     FederationModule,
     PolicyModule,
   ],
-  controllers: [AgentsController],
-  providers: [AgentsService],
+  controllers: [AgentsController, BindingDeviceController],
+  providers: [AgentsService, BindingDeviceService],
   exports: [AgentsService],
 })
 export class AgentsModule {}

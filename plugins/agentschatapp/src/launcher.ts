@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename, resolve as resolvePath } from "node:path";
 
@@ -329,10 +329,11 @@ async function claimAgent(
   serverBaseUrl: string,
   claimToken: string,
   transportMode: AgentsChatState["transportMode"],
-  webhookUrl?: string
+  webhookUrl?: string,
+  recoveryKey?: string
 ): Promise<AgentsChatClaimResponse> {
   const payload: Record<string, unknown> = {
-    claimToken
+    claimToken, recoveryKey
   };
   if (transportMode) {
     payload.transportMode = transportMode;
@@ -385,7 +386,8 @@ async function validateExistingSession(
 async function bootstrapOrClaimAccount(
   account: AgentsChatAccountConfig,
   priorState: AgentsChatState,
-  logger: LoggerLike
+  logger: LoggerLike,
+  persist?: (state: AgentsChatState) => void
 ): Promise<AgentsChatState> {
   const mergedAccount = mergeLauncherIntoAccount(account, account.launcherUrl);
   const mode = normalizeMode(mergedAccount.mode);
@@ -394,7 +396,11 @@ async function bootstrapOrClaimAccount(
   );
 
   let claimToken: string | undefined;
-  if (mode === "public") {
+  const pending = priorState.pendingBootstrap;
+  if (pending && pending.serverBaseUrl !== serverBaseUrl) throw new Error('Pending initialization belongs to another server.');
+  if (pending) {
+    claimToken = pending.claimToken;
+  } else if (mode === "public") {
     if (!mergedAccount.serverBaseUrl && !priorState.serverBaseUrl) {
       throw new AgentsChatConnectionStateError(
         "bootstrap_required",
@@ -420,11 +426,17 @@ async function bootstrapOrClaimAccount(
     throw new Error("Bootstrap did not produce a claimToken.");
   }
 
+  if (!persist) throw new Error('Initialization requires durable private state storage before sending credentials.');
+  const recoveryKey = pending?.recoveryKey ?? randomBytes(32).toString('hex');
+  priorState = { ...priorState, serverBaseUrl, pendingBootstrap: {serverBaseUrl,claimToken,recoveryKey} };
+  persist(priorState);
+
   const claimResponse = await claimAgent(
     serverBaseUrl,
     claimToken,
     normalizeTransport(mergedAccount.transport ?? DEFAULT_TRANSPORT),
-    mergedAccount.webhookBaseUrl
+    mergedAccount.webhookBaseUrl,
+    recoveryKey
   );
   const agent = asRecord(claimResponse.agent);
   const transport = asRecord(claimResponse.transport);
@@ -448,6 +460,7 @@ async function bootstrapOrClaimAccount(
     mode,
     serverBaseUrl,
     accessToken,
+    pendingBootstrap: undefined,
     agentId,
     agentHandle: normalizeOptionalString(agent.handle) ?? priorState.agentHandle,
     displayName: mergedAccount.displayName ?? priorState.displayName,
@@ -462,6 +475,7 @@ async function bootstrapOrClaimAccount(
     conflictState: null
   };
 
+  persist(nextState);
   logger.info(
     priorState.agentId === agentId
       ? `Agents Chat slot '${mergedAccount.slot}' re-claimed agentId ${agentId}.`
@@ -658,6 +672,7 @@ export async function connectAccount(
   logger: LoggerLike,
   options?: {
     allowLauncherReclaim?: boolean;
+    persist?: (state: AgentsChatState) => void;
   }
 ): Promise<AgentsChatState> {
   const mergedAccount = mergeLauncherIntoAccount(account, account.launcherUrl);
@@ -696,7 +711,7 @@ export async function connectAccount(
         logger.warn(
           `Agents Chat slot '${normalizedAccount.slot}' could not resume existing token, attempting a single launcher reclaim.`
         );
-        return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger);
+        return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger, options?.persist);
       }
       throw new AgentsChatConnectionStateError(
         "conflict",
@@ -707,7 +722,7 @@ export async function connectAccount(
 
   if (normalizedState.agentId) {
     if (normalizedAccount.mode === "bound" && normalizedAccount.launcherUrl) {
-      return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger);
+      return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger, options?.persist);
     }
     throw new AgentsChatConnectionStateError(
       "resume_incomplete",
@@ -724,7 +739,7 @@ export async function connectAccount(
     );
   }
 
-  return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger);
+  return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger, options?.persist);
 }
 
 export async function readDirectory(

@@ -67,12 +67,19 @@ jobs:
       - name: Run release-critical backend e2e bucket
         run: pnpm --dir server test:e2e --json --outputFile=../audit-e2e-results.json
 
+      - name: Verify actual Python terminal and browser binding against isolated PostgreSQL
+        run: bash server/test/audit/run-binding-browser.sh
+
       - name: Preserve actual verification results
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: audit-v1.1-e2e
-          path: audit-e2e-results.json
+          name: audit-v1.2-verification
+          path: |
+            audit-e2e-results.json
+            output/reaudit/browser-result.txt
+            output/reaudit/pty-result.json
+            output/reaudit/web-build.log
 
       - name: Stop backend integration services
         if: always()
