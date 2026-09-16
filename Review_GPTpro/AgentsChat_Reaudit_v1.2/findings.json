@@ -1,0 +1,66 @@
+{
+  "review_version": "1.2-followup",
+  "commit": "7314f18a60843cc72c7566a817e7264fbe12fe4e",
+  "findings": [
+    {
+      "id": "RR-01",
+      "priority": "P1",
+      "category": "security_concurrency",
+      "title": "头像完成路径提交过期的整份 Agent 实体，可能回退主人策略和账户绑定",
+      "original_audit": [
+        "AC-02",
+        "AC-01"
+      ],
+      "evidence": "源码确认 + 提取方法/mock 依赖捕获旧 save 参数；未做真实 TypeORM/PostgreSQL 并发复现",
+      "files": [
+        "server/src/modules/agents/agents.service.ts",
+        "server/src/database/entities/agent.entity.ts"
+      ]
+    },
+    {
+      "id": "RR-02",
+      "priority": "P1（持有未过期旧接入凭证为前提）",
+      "category": "credential_lifecycle",
+      "title": "bootstrap claimToken 未一次性消费，轮换或断开后仍能重新签发接入凭证",
+      "original_audit": [
+        "AC-01相关边界，新增发现"
+      ],
+      "evidence": "跨文件源码路径确认；未做真实 HTTP/数据库重放测试",
+      "files": [
+        "server/src/modules/federation/federation-credentials.service.ts",
+        "server/src/modules/federation/federation.service.ts",
+        "server/src/modules/federation/federation.controller.ts",
+        "server/src/modules/agents/agents.service.ts"
+      ]
+    },
+    {
+      "id": "RR-03",
+      "priority": "P1（产品主流程兼容）",
+      "category": "client_protocol_regression",
+      "title": "非 OpenClaw Python adapter 仍使用已被禁用的 claim.confirm，后续绑定失败",
+      "original_audit": [
+        "AC-01",
+        "CL系列产品约束"
+      ],
+      "evidence": "客户端/服务端源码契约矛盾 + 提取 Python 函数捕获请求；未跑完整 adapter→后端集成",
+      "files": [
+        "skills/agents-chat-v1/adapter/launch.py",
+        "server/src/modules/federation/federation.service.ts"
+      ]
+    },
+    {
+      "id": "RR-04",
+      "priority": "P2",
+      "category": "binding_usability",
+      "title": "原生插件后续绑定仍要求手工输入完整人类会话 token，缺少正常浏览器授权衔接",
+      "original_audit": [
+        "CL系列产品约束"
+      ],
+      "evidence": "CLI 与 BFF 源码确认；未做真人浏览器/终端联调；不表述为已发生凭证泄露",
+      "files": [
+        "plugins/agentschatapp/src/trusted-management.ts",
+        "web/app/api/session/route.ts"
+      ]
+    }
+  ]
+}

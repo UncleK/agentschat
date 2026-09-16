@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-09-16T05:04:03.5427165Z",
+  "baseline": "7314f18a60843cc72c7566a817e7264fbe12fe4e",
+  "legacyPythonBinding": "rejected: control_authorization_required",
+  "browser": "Chromium through actual Web BFF and Nest API",
+  "terminal": "actual Python process in Windows ConPTY",
+  "publicParticipation": "actual Python forum.topic.create before any human registration",
+  "browserAloneDidNotBind": true,
+  "explicitTerminalApproval": true,
+  "httpOnlySession": true,
+  "humanBearerCopied": false,
+  "sameAgentId": true,
+  "ownerMatched": true,
+  "grantStatus": "consumed",
+  "historyCount": 1,
+  "browserVerificationScript": "passed",
+  "linuxPtyDriver": "not_run_locally",
+  "production": "not accessed"
+}

@@ -1,0 +1,74 @@
+{
+  "reviewVersion": "1.2",
+  "date": "2026-09-16",
+  "repository": "UncleK/agentschat",
+  "baseline": "7314f18a60843cc72c7566a817e7264fbe12fe4e",
+  "codeCommit": "cbf211fc44bb599f852f23f2c0616c9a7af51870",
+  "branch": "codex/reaudit-v1.2",
+  "scope": "isolated local verification; no production access or publication",
+  "summary": {
+    "backendUnit": {"passed": 69, "failed": 0, "evidence": "unit-after.json"},
+    "backendIntegration": {"passed": 32, "failed": 0, "evidence": "integration-after.json"},
+    "backendE2eFinal": {"suites": 38, "passed": 177, "failed": 0, "skipped": 0, "evidence": "e2e-final.json"},
+    "nativePlugin": {"passed": 16, "failed": 0, "command": "npm --prefix plugins/agentschatapp test"},
+    "web": {"passed": 49, "failed": 0, "command": "npm --prefix web test"},
+    "powershellInstaller": {"passed": 3, "failed": 0, "command": "python skills/agents-chat-v1/adapter/installer_repo_test.py --shell powershell -v"},
+    "backendLintTypecheckBuild": "passed",
+    "nativeBuild": "passed",
+    "webTypecheckBuild": "passed",
+    "bashSyntax": "passed",
+    "realBrowserAndPythonTerminal": {"status": "passed", "evidence": "browser-cli-actual.json", "terminal": "Windows ConPTY", "browser": "Chromium via Playwright CLI 0.1.20"}
+  },
+  "failedAttempts": [
+    {"phase": "RR-01 before fix", "evidence": "rr01-before.json", "failed": 6},
+    {"phase": "RR-02 before fix", "evidence": "rr02-before.json", "failed": 5},
+    {"phase": "RR-03/04 before device implementation", "evidence": "rr03-04-before.json", "failed": 2},
+    {"phase": "additional confirmed boundaries", "evidence": ["rr01-expiry-before.json", "rr01-invitation-before.json", "rr02-rotation-before.json", "client-recovery-redirect-before.json"]},
+    {"phase": "final full e2e first attempt", "exitCode": 3221226505, "resultFileProduced": false, "status": "process_crash_not_passed", "rootCause": "not established", "subsequentIsolatedRerun": "e2e-final.json"}
+  ],
+  "cases": [
+    {"id":"RR1-01","status":"passed_local","evidence":"e2e-final.json","testFile":"avatar-concurrency.e2e-spec.ts","coverage":"PostgreSQL and actual object I/O; completion barrier preserves concurrent emergency stop"},
+    {"id":"RR1-02","status":"passed_local","evidence":"e2e-final.json","testFile":"avatar-concurrency.e2e-spec.ts","coverage":"legal binding during completion; same ID, current owner, private history retained, owner access and stranger denial, visibility unchanged"},
+    {"id":"RR1-03","status":"passed_local","evidence":"e2e-final.json","testFile":"avatar-concurrency.e2e-spec.ts","coverage":"rejection/cleanup barriers preserve concurrent policy and binding"},
+    {"id":"RR1-04","status":"passed_local","evidence":"e2e-final.json","testFile":"avatar-concurrency.e2e-spec.ts","coverage":"replacement pending upload, expiry and duplicate completion CAS"},
+    {"id":"RR2-01","status":"passed_local","evidence":"e2e-final.json","testFiles":["bootstrap-lifecycle.e2e-spec.ts","adapter-process.e2e-spec.ts"],"coverage":"old link denied; same proof and parameters recover identical bearer; native process actually loses HTTP response and resumes saved proof"},
+    {"id":"RR2-02","status":"passed_local","evidence":"e2e-final.json","testFile":"bootstrap-lifecycle.e2e-spec.ts","coverage":"rotation invalidates original bootstrap and recovery proof; stale authenticated principal cannot rotate again"},
+    {"id":"RR2-03","status":"passed_local","evidence":"e2e-final.json","testFiles":["bootstrap-lifecycle.e2e-spec.ts","adapter-process.e2e-spec.ts"],"coverage":"disconnect keeps consumption; old link denied; authenticated owner issues fresh same-ID recovery; actual Python recovers and restarts"},
+    {"id":"RR2-04","status":"passed_local","evidence":"e2e-final.json","testFile":"bootstrap-lifecycle.e2e-spec.ts","coverage":"concurrent distinct recovery proofs yield one success, one conflict, one connection"},
+    {"id":"RR2-05","status":"passed_local","evidence":["e2e-final.json","client-process-final.json"],"testFile":"adapter-process.e2e-spec.ts","coverage":"actual Python public and bound restart preserve ID and bearer and can post; native saved-session tests also pass"},
+    {"id":"RR3-01","status":"passed_local","evidence":["browser-cli-actual.json","browser-approved.png"],"coverage":"actual Python public onboarding and post precede normal human registration, browser login and real terminal binding; same ID/history"},
+    {"id":"RR3-02","status":"passed_local","evidence":["e2e-final.json","client-process-final.json"],"testFiles":["binding-device.e2e-spec.ts","adapter-process.e2e-spec.ts","plugins/agentschatapp/test/management-continuity.test.mjs"],"coverage":"server wrong account/control/scope/secret, expired grant and revoked session rejected; social claim.confirm rejected; Python and native non-TTY denied before management requests; native SDK tool isolation retained","boundary":"native plugin interactive browser positive flow was not separately exercised"},
+    {"id":"RR4-01","status":"passed_local","evidence":"browser-cli-actual.json","coverage":"normal browser login with HttpOnly session, no human bearer copying, explicit original-controller ConPTY approval"},
+    {"id":"RR4-02","status":"passed_local","evidence":["browser-cli-actual.json","e2e-final.json"],"coverage":"scope substitution and replay denied; concurrent confirm commits one ownership change/audit/consumption; browser alone unbound; public/bound retained"}
+  ],
+  "notRun": [
+    "GitHub required checks on the new commit; no push made to public repository",
+    "Linux run-binding-browser.sh end-to-end / pty.fork driver; Windows real browser and ConPTY equivalent passed",
+    "Flutter analyze, tests, integration/goldens and release build in this run",
+    "production deployment, production migration and production acceptance",
+    "large existing-database migration timing and rollback rehearsal",
+    "native plugin interactive browser positive path as a separate end-to-end run"
+  ],
+  "residualConditions": [
+    "CAS-losing avatar object writes can leave unreferenced sanitized storage objects; garbage collection is outside this change",
+    "unbound identity with every controller proof lost remains unrecoverable through public claim",
+    "lost-response recovery is limited to five minutes and original token expiry before any rotation or disconnect",
+    "external hosts must isolate operator state/process tools from social execution; TTY alone is not an OS sandbox",
+    "new authorization page is currently Chinese including its English URL alias",
+    "do not delete consumption tombstones or run old vulnerable application code as a security rollback"
+  ],
+  "cleanup": {
+    "fixtureDatabase": "dropped using fixture stop endpoint",
+    "browserSessions": "closed",
+    "webFixtureProcesses": "stopped",
+    "temporaryCredentialFiles": "removed by exact verified file paths",
+    "dedicatedContainers": "agentschat-reaudit-postgres and agentschat-reaudit-minio removed; unrelated containers preserved",
+    "earlierRecursiveCleanup": "automatic review rejected with blocked by policy; exact-leaf cleanup subsequently succeeded"
+  },
+  "releaseDecision": {
+    "localSecurityRegressions": "passed within recorded coverage",
+    "productPositiveAcceptance": "passed locally",
+    "requiredChecks": "not_run_for_this_commit",
+    "expandProduction": "not_approved_by_this_task"
+  }
+}

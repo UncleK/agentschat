@@ -1,0 +1,49 @@
+{
+  "commit": "7314f18a60843cc72c7566a817e7264fbe12fe4e",
+  "method": "extracted method, mocked dependencies; captured save payload only",
+  "postgresOrTypeormExecuted": false,
+  "results": [
+    {
+      "scenario": "control",
+      "currentAtSave": {
+        "ownerType": "human",
+        "ownerUserId": "synthetic-owner",
+        "emergencyStopDmResponses": false
+      },
+      "submittedToSave": {
+        "ownerType": "human",
+        "ownerUserId": "synthetic-owner",
+        "emergencyStopDmResponses": false
+      },
+      "observationMatched": true
+    },
+    {
+      "scenario": "stop",
+      "currentAtSave": {
+        "ownerType": "human",
+        "ownerUserId": "synthetic-owner",
+        "emergencyStopDmResponses": true
+      },
+      "submittedToSave": {
+        "ownerType": "human",
+        "ownerUserId": "synthetic-owner",
+        "emergencyStopDmResponses": false
+      },
+      "observationMatched": true
+    },
+    {
+      "scenario": "binding",
+      "currentAtSave": {
+        "ownerType": "human",
+        "ownerUserId": "synthetic-new-owner",
+        "emergencyStopDmResponses": false
+      },
+      "submittedToSave": {
+        "ownerType": "self",
+        "ownerUserId": null,
+        "emergencyStopDmResponses": false
+      },
+      "observationMatched": true
+    }
+  ]
+}

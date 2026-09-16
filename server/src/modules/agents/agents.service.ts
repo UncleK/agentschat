@@ -1,4 +1,5 @@
 import { UserEntity } from '../../database/entities/user.entity';
+import { inTransaction } from '../../database/transaction-context';
 import {
   sanitizeAvatar,
   AVATAR_MAX_BYTES,
@@ -317,15 +318,38 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       await this.findOrPruneReusableHumanOwnedInvitation(owner.id);
 
     if (reusableInvitation) {
-      reusableInvitation.profileMetadata = this.withInvitationIssuedAt({
-        ...reusableInvitation.profileMetadata,
-        [AgentsService.allowInitialHandleClaimKey]: true,
+      const refreshed = await this.dataSource.transaction(async (manager) => {
+        const agents = manager.getRepository(AgentEntity);
+        const current = await agents.findOne({
+          where: { id: reusableInvitation.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (
+          !current ||
+          current.ownerUserId !== owner.id ||
+          current.profileMetadata.invitationPending !== true ||
+          (await manager
+            .getRepository(AgentConnectionEntity)
+            .existsBy({ agentId: current.id }))
+        )
+          return false;
+        const metadata = this.withInvitationIssuedAt({
+          ...current.profileMetadata,
+          [AgentsService.allowInitialHandleClaimKey]: true,
+        });
+        await agents
+          .createQueryBuilder()
+          .update()
+          .set({ profileMetadata: () => 'CAST(:metadata AS jsonb)' })
+          .where('id=:id', { id: current.id })
+          .setParameter('metadata', JSON.stringify(metadata))
+          .execute();
+        return true;
       });
-      const refreshedInvitation =
-        await this.agentRepository.save(reusableInvitation);
-      return this.buildHumanOwnedAgentInvitationResponse(
-        refreshedInvitation.id,
-      );
+      if (refreshed)
+        return this.buildHumanOwnedAgentInvitationResponse(
+          reusableInvitation.id,
+        );
     }
 
     const agent = await this.agentRepository.save(
@@ -599,16 +623,17 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       fileName,
     );
 
-    persistedAgent.profileMetadata = {
-      ...persistedAgent.profileMetadata,
-      [AgentsService.pendingAvatarUploadMetadataKey]: {
-        bucket: storageBucket,
-        key: storageKey,
-        mimeType,
-        expiresAt: expiresAt.toISOString(),
+    await this.updateAvatarFields(agent.id, null, (current) => ({
+      profileMetadata: {
+        ...current.profileMetadata,
+        [AgentsService.pendingAvatarUploadMetadataKey]: {
+          bucket: storageBucket,
+          key: storageKey,
+          mimeType,
+          expiresAt: expiresAt.toISOString(),
+        },
       },
-    };
-    await this.agentRepository.save(persistedAgent);
+    }));
 
     return {
       upload: {
@@ -670,10 +695,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (moderation.status === AssetModerationStatus.Rejected) {
-      persistedAgent.profileMetadata = this.clearPendingAvatarUpload(
-        persistedAgent.profileMetadata,
-      );
-      await this.agentRepository.save(persistedAgent);
+      await this.updateAvatarFields(agent.id, pendingUpload, (current) => ({
+        profileMetadata: this.clearPendingAvatarUpload(current.profileMetadata),
+      }));
       throw new ForbiddenException(
         moderation.reason
           ? `Avatar upload rejected: ${moderation.reason}.`
@@ -699,26 +723,72 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       body: raster,
     });
     const updatedAt = new Date();
-    persistedAgent.profileMetadata = this.withStoredAvatarMetadata(
-      this.clearPendingAvatarUpload(persistedAgent.profileMetadata),
-      {
-        bucket: pendingUpload.bucket,
-        key: publicKey,
-        mimeType: 'image/png',
-        updatedAt: updatedAt.toISOString(),
-      },
-    );
-    persistedAgent.avatarUrl = this.buildAgentAvatarPath(
-      persistedAgent.id,
-      updatedAt.getTime(),
-    );
-    await this.agentRepository.save(persistedAgent);
+    const avatarUrl = this.buildAgentAvatarPath(agent.id, updatedAt.getTime());
+    await this.updateAvatarFields(agent.id, pendingUpload, (current) => ({
+      profileMetadata: this.withStoredAvatarMetadata(
+        this.clearPendingAvatarUpload(current.profileMetadata),
+        {
+          bucket: pendingUpload.bucket,
+          key: publicKey,
+          mimeType: 'image/png',
+          updatedAt: updatedAt.toISOString(),
+        },
+      ),
+      avatarUrl,
+    }));
 
     return {
-      avatarUrl: persistedAgent.avatarUrl,
+      avatarUrl,
       mimeType: 'image/png',
       updatedAt: updatedAt.toISOString(),
     };
+  }
+
+  // Never carry the entity read before object I/O into a database write.
+  // Serialize publication/cleanup/issuance and compare the exact upload version.
+  private async updateAvatarFields(
+    agentId: string,
+    expected: { bucket: string; key: string; expiresAt: string } | null,
+    patch: (current: AgentEntity) => {
+      profileMetadata: Record<string, unknown>;
+      avatarUrl?: string;
+    },
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(AgentEntity);
+      const current = await repository.findOne({
+        where: { id: agentId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!current)
+        throw new NotFoundException(`Agent ${agentId} was not found.`);
+      if (expected) {
+        const pending = this.readPendingAvatarUpload(current.profileMetadata);
+        if (
+          !pending ||
+          pending.bucket !== expected.bucket ||
+          pending.key !== expected.key ||
+          pending.expiresAt !== expected.expiresAt
+        ) {
+          throw new ConflictException(
+            'Avatar upload expired, was replaced, or was already completed.',
+          );
+        }
+      }
+      const change = patch(current);
+      await repository
+        .createQueryBuilder()
+        .update()
+        .set({
+          ...(change.avatarUrl !== undefined
+            ? { avatarUrl: change.avatarUrl }
+            : {}),
+          profileMetadata: () => 'CAST(:avatarMetadata AS jsonb)',
+        })
+        .where('id = :agentId', { agentId })
+        .setParameter('avatarMetadata', JSON.stringify(change.profileMetadata))
+        .execute();
+    });
   }
 
   async readPublicAgentAvatar(agentId: string): Promise<{
@@ -759,48 +829,87 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   async disconnectConnectedAgents(
     owner: AuthenticatedHuman,
   ): Promise<DisconnectConnectedAgentsResponse> {
-    const agents = await this.agentRepository.find({
-      where: {
-        ownerType: AgentOwnerType.Human,
-        ownerUserId: owner.id,
-      },
-      relations: {
-        connection: true,
-      },
+    return this.dataSource.transaction(async (manager) => {
+      const agents = await manager.getRepository(AgentEntity).find({
+        where: { ownerType: AgentOwnerType.Human, ownerUserId: owner.id },
+        order: { id: 'ASC' },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const ids = agents.map((agent) => agent.id);
+      if (!ids.length) return { disconnectedCount: 0 };
+      const connections = manager.getRepository(AgentConnectionEntity);
+      const existing = await connections.findBy({ agentId: In(ids) });
+      if (!existing.length) return { disconnectedCount: 0 };
+      const connectedIds = existing.map((connection) => connection.agentId);
+      await connections.delete(existing.map((connection) => connection.id));
+      await manager.query(
+        'UPDATE agent_bootstrap_consumptions SET recovery_expires_at=now() WHERE agent_id=ANY($1::uuid[])',
+        [connectedIds],
+      );
+      const offline = agents
+        .filter(
+          (agent) =>
+            connectedIds.includes(agent.id) &&
+            agent.status !== AgentStatus.Suspended,
+        )
+        .map((agent) => agent.id);
+      if (offline.length)
+        await manager
+          .getRepository(AgentEntity)
+          .update({ id: In(offline) }, { status: AgentStatus.Offline });
+      return { disconnectedCount: existing.length };
     });
-    const connectionIds = agents
-      .map((agent) => agent.connection?.id)
-      .filter((connectionId): connectionId is string => connectionId != null);
-    const disconnectableAgentIds = agents
-      .filter(
-        (agent) =>
-          agent.connection != null && agent.status !== AgentStatus.Suspended,
-      )
-      .map((agent) => agent.id);
+  }
 
-    if (connectionIds.length === 0) {
-      return {
-        disconnectedCount: 0,
-      };
-    }
-
-    await this.dataSource.transaction(async (manager) => {
-      await manager.getRepository(AgentConnectionEntity).delete(connectionIds);
-      if (disconnectableAgentIds.length > 0) {
-        await manager.getRepository(AgentEntity).update(
-          {
-            id: In(disconnectableAgentIds),
-          },
-          {
-            status: AgentStatus.Offline,
-          },
+  async createConnectionRecoveryInvitation(
+    owner: AuthenticatedHuman,
+    agentId: string,
+  ) {
+    return this.dataSource.transaction(async (manager) => {
+      const account = await manager.getRepository(UserEntity).findOne({
+        where: { id: owner.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (
+        !account ||
+        !owner.authenticatedSession ||
+        account.authTokenVersion !== owner.authenticatedSession.version ||
+        owner.authenticatedSession.expiresAt <= Date.now()
+      ) {
+        throw new ForbiddenException('Human session expired or was revoked.');
+      }
+      await this.assertHumanOwnsAgent(
+        owner.id,
+        agentId,
+        manager.getRepository(AgentEntity),
+        true,
+      );
+      if (
+        await manager.getRepository(AgentConnectionEntity).existsBy({ agentId })
+      ) {
+        throw new ConflictException(
+          'Disconnect the existing connection before issuing recovery authorization.',
         );
       }
+      const result = this.buildHumanOwnedAgentInvitationResponse(agentId);
+      await manager.query(
+        `INSERT INTO agent_bootstrap_consumptions(agent_id,token_hash) VALUES($1,$2)
+        ON CONFLICT(agent_id) DO UPDATE SET token_hash=$2,recovery_hash=NULL,request_hash=NULL,connection_id=NULL,consumed_at=NULL,recovery_expires_at=NULL`,
+        [agentId, this.hashToken(result.invitation.claimToken)],
+      );
+      const audits = manager.getRepository(AuditLogEntity);
+      await audits.save(
+        audits.create({
+          actorType: EventActorType.Human,
+          actorUserId: owner.id,
+          action: 'agent.connection.recovery_issued',
+          entityType: 'agent',
+          entityId: agentId,
+          payload: { purpose: 'initialize_connection' },
+        }),
+      );
+      return result;
     });
-
-    return {
-      disconnectedCount: connectionIds.length,
-    };
   }
 
   async readDirectory(
@@ -1375,7 +1484,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     }
     if (!challengeToken?.trim())
       throw new BadRequestException('challengeToken is required.');
-    return this.dataSource.transaction(async (manager) => {
+    return inTransaction(this.dataSource, async (manager) => {
       // Common lock order: human, agent, connection, request. Recheck credential under
       // the connection lock so a concurrent revocation cannot authorize a bind.
       const account = await manager.getRepository(UserEntity).findOne({
@@ -2157,6 +2266,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     bucket: string;
     key: string;
     mimeType: string;
+    expiresAt: string;
   } | null {
     const raw = metadata[AgentsService.pendingAvatarUploadMetadataKey];
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -2168,13 +2278,22 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     const key = typeof record.key === 'string' ? record.key.trim() : '';
     const mimeType =
       typeof record.mimeType === 'string' ? record.mimeType.trim() : '';
-    if (!bucket || !key || !mimeType) {
+    const expiresAt =
+      typeof record.expiresAt === 'string' ? record.expiresAt : '';
+    if (
+      !bucket ||
+      !key ||
+      !mimeType ||
+      !Number.isFinite(Date.parse(expiresAt)) ||
+      Date.parse(expiresAt) <= Date.now()
+    ) {
       return null;
     }
     return {
       bucket,
       key,
       mimeType,
+      expiresAt,
     };
   }
 

@@ -9,6 +9,7 @@ export interface AuthenticatedFederatedAgent {
   connectionId: string;
   transportMode: ConnectionTransportMode;
   pollingEnabled: boolean;
+  credentialHash?: string;
 }
 
 export interface FederationErrorPayload {

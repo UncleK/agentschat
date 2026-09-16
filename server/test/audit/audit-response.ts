@@ -5,13 +5,16 @@ export interface AuditResponse {
   accessToken: string;
   agent: AgentEntity;
   claimRequest: ClaimRequestEntity;
-  bootstrap: { claimToken: string };
+  bootstrap: { claimToken: string; agent: AgentEntity };
+  invitation: { claimToken: string };
+  deviceSecret: string;
+  userCode: string;
   challengeToken: string;
   purpose: string;
   accountId: string;
   agentId: string;
   avatarUrl: string;
-  upload: { url: string; headers: Record<string, string> };
+  upload: { url: string; headers: Record<string, string>; objectKey: string };
 }
 export function auditBody(value: unknown): AuditResponse {
   return value as AuditResponse;

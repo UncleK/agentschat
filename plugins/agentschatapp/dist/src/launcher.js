@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename, resolve as resolvePath } from "node:path";
 import { DEFAULT_ACTION_TIMEOUT_SECONDS, DEFAULT_RUNTIME_NAME, DEFAULT_SERVER_BASE_URL, DEFAULT_TRANSPORT, DEFAULT_VENDOR_NAME } from "./constants.js";
@@ -217,9 +217,9 @@ async function readBoundBootstrap(serverBaseUrl, launcherValues) {
         : `${normalizeBaseUrl(serverBaseUrl)}${bootstrapPath.startsWith("/") ? bootstrapPath : `/${bootstrapPath}`}`;
     return await httpJson("GET", url);
 }
-async function claimAgent(serverBaseUrl, claimToken, transportMode, webhookUrl) {
+async function claimAgent(serverBaseUrl, claimToken, transportMode, webhookUrl, recoveryKey) {
     const payload = {
-        claimToken
+        claimToken, recoveryKey
     };
     if (transportMode) {
         payload.transportMode = transportMode;
@@ -254,12 +254,18 @@ async function validateExistingSession(state, account) {
     }
     return validated;
 }
-async function bootstrapOrClaimAccount(account, priorState, logger) {
+async function bootstrapOrClaimAccount(account, priorState, logger, persist) {
     const mergedAccount = mergeLauncherIntoAccount(account, account.launcherUrl);
     const mode = normalizeMode(mergedAccount.mode);
     const serverBaseUrl = normalizeBaseUrl(mergedAccount.serverBaseUrl ?? priorState.serverBaseUrl ?? DEFAULT_SERVER_BASE_URL);
     let claimToken;
-    if (mode === "public") {
+    const pending = priorState.pendingBootstrap;
+    if (pending && pending.serverBaseUrl !== serverBaseUrl)
+        throw new Error('Pending initialization belongs to another server.');
+    if (pending) {
+        claimToken = pending.claimToken;
+    }
+    else if (mode === "public") {
         if (!mergedAccount.serverBaseUrl && !priorState.serverBaseUrl) {
             throw new AgentsChatConnectionStateError("bootstrap_required", `Agents Chat slot '${mergedAccount.slot}' needs serverBaseUrl before public bootstrap can start.`);
         }
@@ -278,7 +284,12 @@ async function bootstrapOrClaimAccount(account, priorState, logger) {
     if (!claimToken) {
         throw new Error("Bootstrap did not produce a claimToken.");
     }
-    const claimResponse = await claimAgent(serverBaseUrl, claimToken, normalizeTransport(mergedAccount.transport ?? DEFAULT_TRANSPORT), mergedAccount.webhookBaseUrl);
+    if (!persist)
+        throw new Error('Initialization requires durable private state storage before sending credentials.');
+    const recoveryKey = pending?.recoveryKey ?? randomBytes(32).toString('hex');
+    priorState = { ...priorState, serverBaseUrl, pendingBootstrap: { serverBaseUrl, claimToken, recoveryKey } };
+    persist(priorState);
+    const claimResponse = await claimAgent(serverBaseUrl, claimToken, normalizeTransport(mergedAccount.transport ?? DEFAULT_TRANSPORT), mergedAccount.webhookBaseUrl, recoveryKey);
     const agent = asRecord(claimResponse.agent);
     const transport = asRecord(claimResponse.transport);
     const polling = asRecord(transport.polling);
@@ -296,6 +307,7 @@ async function bootstrapOrClaimAccount(account, priorState, logger) {
         mode,
         serverBaseUrl,
         accessToken,
+        pendingBootstrap: undefined,
         agentId,
         agentHandle: normalizeOptionalString(agent.handle) ?? priorState.agentHandle,
         displayName: mergedAccount.displayName ?? priorState.displayName,
@@ -309,6 +321,7 @@ async function bootstrapOrClaimAccount(account, priorState, logger) {
         degradedReason: null,
         conflictState: null
     };
+    persist(nextState);
     logger.info(priorState.agentId === agentId
         ? `Agents Chat slot '${mergedAccount.slot}' re-claimed agentId ${agentId}.`
         : `Agents Chat slot '${mergedAccount.slot}' claimed agentId ${agentId}.`);
@@ -484,14 +497,14 @@ export async function connectAccount(account, state, logger, options) {
             }
             if (options?.allowLauncherReclaim !== false && normalizedAccount.mode === "bound" && normalizedAccount.launcherUrl) {
                 logger.warn(`Agents Chat slot '${normalizedAccount.slot}' could not resume existing token, attempting a single launcher reclaim.`);
-                return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger);
+                return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger, options?.persist);
             }
             throw new AgentsChatConnectionStateError("conflict", `Agents Chat slot '${normalizedAccount.slot}' can no longer resume agentId ${normalizedState.agentId}; token may have been replaced by another runtime.`);
         }
     }
     if (normalizedState.agentId) {
         if (normalizedAccount.mode === "bound" && normalizedAccount.launcherUrl) {
-            return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger);
+            return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger, options?.persist);
         }
         throw new AgentsChatConnectionStateError("resume_incomplete", `Agents Chat slot '${normalizedAccount.slot}' already belongs to agentId ${normalizedState.agentId}, but the persisted state is incomplete.`);
     }
@@ -500,7 +513,7 @@ export async function connectAccount(account, state, logger, options) {
             ? `Agents Chat slot '${normalizedAccount.slot}' needs a launcherUrl before it can claim a bound agent.`
             : `Agents Chat slot '${normalizedAccount.slot}' needs serverBaseUrl before it can bootstrap a public agent.`);
     }
-    return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger);
+    return await bootstrapOrClaimAccount(normalizedAccount, normalizedState, logger, options?.persist);
 }
 export async function readDirectory(serverBaseUrl, accessToken) {
     return await httpJson("GET", `${normalizeBaseUrl(serverBaseUrl)}/api/v1/agents/directory/self`, undefined, accessToken);

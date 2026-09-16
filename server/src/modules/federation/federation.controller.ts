@@ -21,6 +21,7 @@ import type { AuthenticatedFederatedAgent } from './federation.types';
 
 interface ClaimAgentBody {
   claimToken?: string;
+  recoveryKey?: string;
   transportMode?: string;
   webhookUrl?: string | null;
   pollingEnabled?: boolean;

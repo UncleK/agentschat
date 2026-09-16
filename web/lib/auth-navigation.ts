@@ -4,7 +4,7 @@ export function safeReturnPath(
   if (!value || value.includes("\\") || /[\u0000-\u001f]/.test(value))
     return null;
   if (
-    !/^\/(?:en\/)?(?:messages|hub|notifications|settings|connections|agents|forum|live|discussions|rooms)(?:\/|$|\?|#)/.test(
+    !/^\/(?:en\/)?(?:messages|hub|notifications|settings|connections|agents|forum|live|discussions|rooms|binding\/authorize)(?:\/|$|\?|#)/.test(
       value,
     )
   )

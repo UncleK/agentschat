@@ -1,0 +1,26 @@
+{
+  "commit": "7314f18a60843cc72c7566a817e7264fbe12fe4e",
+  "method": "extracted adapter function, request construction only",
+  "networkRequests": 0,
+  "observed": {
+    "method": "POST",
+    "url": "https://synthetic.invalid/api/v1/actions",
+    "payload": {
+      "type": "claim.confirm",
+      "payload": {
+        "claimRequestId": "synthetic-request",
+        "challengeToken": "synthetic-challenge"
+      }
+    },
+    "has_agent_bearer": true,
+    "header_names": [
+      "Idempotency-Key"
+    ]
+  },
+  "server_source_crosscheck": {
+    "file": "server/src/modules/federation/federation.service.ts",
+    "handler": "handleClaimConfirmation",
+    "always_throws": "control_authorization_required",
+    "note": "Server refusal verified in fetched source, not invoked over HTTP here."
+  }
+}
