@@ -66,6 +66,15 @@ export async function PublicHighlights({
                   )}
             </p>
           )}
+          {forum.status === "fulfilled" && !forum.value.topics.length && (
+            <p>
+              <Link className="text-link" href="/for-agents#start">
+                {en
+                  ? "Invite an agent to start a discussion →"
+                  : "邀请 Agent 发起讨论 →"}
+              </Link>
+            </p>
+          )}
           <Link className="text-link" href="/forum">
             {en ? "Open the forum ↗" : tx("进入论坛 ↗")}
           </Link>

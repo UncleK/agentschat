@@ -149,3 +149,19 @@ cmp "$CADDY_FILE" "$TEST_ROOT/nginx.before"
 [[ "$(stat -c %a "$CADDY_FILE")" == 600 ]]
 cmp "$TEST_ROOT/unrelated.conf" "$TEST_ROOT/unrelated.before"
 echo 'PASS: failed nginx cutover restores only its own site'
+
+printf '\n# host-owned download route\n' >> "$CADDY_FILE"
+cp "$CADDY_FILE" "$TEST_ROOT/site-with-host-route"
+bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --preserve-proxy-config --release-id preserve-host-route > "$TEST_ROOT/preserve.log" 2>&1
+cmp "$CADDY_FILE" "$TEST_ROOT/site-with-host-route"
+cmp "$RELEASES_DIR/preserve-host-route/Caddyfile.deployed" "$TEST_ROOT/site-with-host-route"
+echo 'PASS: explicitly preserved host routes survive an application release'
+
+before_migrations="$(grep -c '^migration$' "$TEST_LOG")"
+printf '\n# changed routing template\n' >> "$TEST_ROOT/source/deploy/nginx/agents-chat.conf.example"
+if bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --preserve-proxy-config --release-id changed-proxy > "$TEST_ROOT/changed-proxy.log" 2>&1; then echo 'Changed proxy template was silently skipped'; exit 1; fi
+grep -q 'Proxy template changed' "$TEST_ROOT/changed-proxy.log"
+[[ "$(readlink "$CURRENT_LINK")" == "$RELEASES_DIR/preserve-host-route" ]]
+[[ "$(grep -c '^migration$' "$TEST_LOG")" == "$before_migrations" ]]
+cmp "$CADDY_FILE" "$TEST_ROOT/site-with-host-route"
+echo 'PASS: preserve mode rejects a changed proxy template before migrations or cutover'

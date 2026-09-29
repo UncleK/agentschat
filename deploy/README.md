@@ -53,6 +53,12 @@ sudo /opt/agents-chat/ops/deploy-release.sh --git-ref <full-commit-sha>
 sudo /opt/agents-chat/ops/rollback-release.sh
 ```
 
+For an application release on a host with additional reviewed routes in its site
+configuration, use `--preserve-proxy-config` after confirming ports, domain, TLS
+and edge authentication settings are unchanged. This validates and preserves the
+current site byte-for-byte. It refuses a first deployment or a changed proxy
+template, so routing/security template updates still require reconciliation.
+
 A lock serializes releases. Both locked builds finish before migrations. Infrastructure readiness is checked before migration; an existing release is backed up first. The script snapshots only its own proxy site, units and operation scripts, switches the release symlink, restarts API/Web, validates the complete ingress configuration, reloads the selected proxy, and checks database health, HTML, BFF, OpenAPI and WebSocket routing. Failed cutovers restore the previous release and project configuration. Successful releases record `.source-commit`, `.previous-release` and `.release-ready`.
 
 Database migrations are not reversed by application rollback. Keep schemas compatible with the previous release. For a data migration, quiesce writes and transfer the database and object store together; a new empty installation is not an old-data migration.

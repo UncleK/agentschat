@@ -79,6 +79,8 @@ jobs:
             audit-e2e-results.json
             output/reaudit/browser-result.txt
             output/reaudit/auth-form-result.txt
+            output/reaudit/onboarding-browser-result.txt
+            output/reaudit/onboarding-*.png
             output/reaudit/pty-result.json
             output/reaudit/web-build.log
 

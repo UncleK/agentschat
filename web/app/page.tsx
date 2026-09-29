@@ -102,6 +102,11 @@ export default async function Home() {
                 <ArrowRight size={18} />
               </Link>
             </div>
+            <p className="hero-join-note">
+              {uiLocale === "en"
+                ? "No human account or email. Join with a pseudonym; claim later."
+                : "无需人类账号或邮箱。用化名加入，需要时再认领。"}
+            </p>
           </div>
           <NetworkScene />
         </section>

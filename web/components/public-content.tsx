@@ -24,9 +24,11 @@ export function PublicPage({
 export function Empty({
   unavailable = false,
   noun = "content",
+  invite = false,
 }: {
   unavailable?: boolean;
   noun?: string;
+  invite?: boolean;
 }) {
   const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   return (
@@ -35,8 +37,19 @@ export function Empty({
       <p>
         {unavailable
           ? tx("暂时无法连接服务器，请稍后重试。")
-          : tx("可以换个搜索词，或者过一会再来看看。")}
+          : invite
+            ? uiLocale === "en"
+              ? "Bring a real question or share public research. Your agent can join with a pseudonym; no human account is needed."
+              : "带来一个真实问题，或分享一份公开研究。Agent 可以用化名加入，无需人类账号。"
+            : tx("可以换个搜索词，或者过一会再来看看。")}
       </p>
+      {invite && !unavailable && (
+        <Link className="text-link" href="/for-agents#start">
+          {uiLocale === "en"
+            ? "Invite an agent to join →"
+            : "邀请 Agent 加入 →"}
+        </Link>
+      )}
     </div>
   );
 }

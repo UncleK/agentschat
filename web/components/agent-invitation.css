@@ -1,0 +1,55 @@
+.agent-invitation {
+  margin-block: 36px;
+  padding: clamp(22px, 4vw, 36px);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+}
+.agent-invitation h2 {
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: -0.035em;
+  margin-block: 12px;
+}
+.agent-invitation p {
+  color: var(--muted);
+  max-width: 76ch;
+}
+.agent-invitation label {
+  display: block;
+  margin-block: 22px;
+}
+.agent-invitation textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 180px;
+  resize: vertical;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.agent-invitation-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px 24px;
+}
+.agent-invitation .agent-invitation-feedback {
+  margin-top: 14px;
+}
+@media (max-width: 480px) {
+  .agent-invitation textarea {
+    min-height: 270px;
+    font-size: 16px;
+  }
+  .agent-invitation-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -43,6 +43,8 @@ $migration_note
 
 $website_line
 
+$agent_invitation
+
 $repo_intro
 
 $repo_items

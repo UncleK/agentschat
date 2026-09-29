@@ -6,8 +6,9 @@ release_init
 REPO_DIR="${REPO_DIR:-$APP_ROOT/repo}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-agents-chat}"
 USE_PREBUILT_WEB="false"
+PRESERVE_PROXY_CONFIG="false"
 GIT_REF="" SOURCE_DIR="" RELEASE_ID=""
-usage() { echo 'Usage: deploy-release.sh (--git-ref REF | --source-dir PATH) [--release-id ID] [--use-prebuilt-web]'; }
+usage() { echo 'Usage: deploy-release.sh (--git-ref REF | --source-dir PATH) [--release-id ID] [--use-prebuilt-web] [--preserve-proxy-config]'; }
 while (( $# )); do
   case "$1" in
     --git-ref|--source-dir|--release-id)
@@ -15,6 +16,7 @@ while (( $# )); do
       case "$1" in --git-ref) GIT_REF="$2";; --source-dir) SOURCE_DIR="$2";; --release-id) RELEASE_ID="$2";; esac
       shift 2;;
     --use-prebuilt-web) USE_PREBUILT_WEB=true; shift;;
+    --preserve-proxy-config) PRESERVE_PROXY_CONFIG=true; shift;;
     -h|--help) usage; exit 0;;
     *) usage >&2; exit 1;;
   esac
@@ -74,7 +76,19 @@ else
 fi
 require_file "$RELEASE_DIR/web/package-lock.json"
 chown -R "$APP_USER:$APP_USER" "$RELEASE_DIR"
-prepare_caddy "$RELEASE_DIR" "$RELEASE_DIR/Caddyfile.next"
+if [[ "$PRESERVE_PROXY_CONFIG" == true ]]; then
+  # Preserve reviewed host additions only when this release does not change the
+  # proxy template. Never silently skip a routing/security template update.
+  [[ -n "$PREVIOUS_RELEASE" ]] || { echo 'Preserving proxy configuration requires an existing release.' >&2; exit 1; }
+  require_file "$CADDY_FILE"
+  proxy_template=deploy/caddy/Caddyfile.example
+  [[ "$PROXY_SERVER" != nginx ]] || proxy_template=deploy/nginx/agents-chat.conf.example
+  cmp -s "$PREVIOUS_RELEASE/$proxy_template" "$RELEASE_DIR/$proxy_template" || { echo 'Proxy template changed; reconcile host configuration before deploying.' >&2; exit 1; }
+  cp -p "$CADDY_FILE" "$RELEASE_DIR/Caddyfile.next"
+  validate_proxy_fragment "$RELEASE_DIR/Caddyfile.next"
+else
+  prepare_caddy "$RELEASE_DIR" "$RELEASE_DIR/Caddyfile.next"
+fi
 # Finish both builds before touching the live schema, service definitions, or release pointer.
 sudo -u "$APP_USER" env "PATH=$PATH" bash -se -- "$RELEASE_DIR" <<'BUILD'
 cd "$1/server"

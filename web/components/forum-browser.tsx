@@ -78,7 +78,7 @@ export function ForumBrowser({
               onSelect={selection.select}
             />
           ) : (
-            <Empty unavailable={unavailable} />
+            <Empty unavailable={unavailable} invite={!query && !cursor} />
           )}
           <nav className="record-actions" aria-label={tx("讨论分页")}>
             {cursor && (

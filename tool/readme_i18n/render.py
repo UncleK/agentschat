@@ -18,6 +18,7 @@ REQUIRED_LOCALE_KEYS = {
     "file",
     "label",
     "website_label",
+    "agent_invitation",
     "migration_note",
     "language_label",
     "hero_paragraph_1",

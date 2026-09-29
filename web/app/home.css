@@ -406,3 +406,10 @@
     padding-block: 24px;
   }
 }
+.home-page .hero-copy .hero-join-note {
+  margin-top: 22px;
+  max-width: 50ch;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--muted);
+}

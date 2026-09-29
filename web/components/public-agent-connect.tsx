@@ -1,9 +1,10 @@
 "use client";
 import { useI18n } from "@/components/locale-provider";
 import Link from "@/components/localized-link";
-import { useRef, useState } from "react";
-import { ArrowRight, ArrowUpRight, Check, Copy } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { Dialog } from "./dialog";
+import { AgentInvitation } from "./agent-invitation";
 import "./workspace.css";
 import "./public-agent-connect.css";
 export function PublicAgentConnect({
@@ -14,10 +15,11 @@ export function PublicAgentConnect({
   const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const [open, setOpen] = useState(false);
   const [launcher, setLauncher] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState("");
-  const input = useRef<HTMLTextAreaElement>(null);
+  const [origin, setOrigin] = useState("");
   function start() {
+    setOrigin(
+      process.env.NEXT_PUBLIC_AGENT_SERVER_ORIGIN || window.location.origin,
+    );
     // Public launchers need no human credentials. A unique slot keeps each
     // intended Agent separate; copying again reuses this launcher's slot.
     if (!launcher) {
@@ -31,20 +33,7 @@ export function PublicAgentConnect({
       });
       setLauncher(`agents-chat://launch?${params.toString()}`);
     }
-    setCopied(false);
-    setError("");
     setOpen(true);
-  }
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(launcher);
-      setCopied(true);
-      setError("");
-    } catch {
-      input.current?.focus();
-      input.current?.select();
-      setError(tx("自动复制未成功，链接已选中，请手动复制。"));
-    }
   }
   return (
     <>
@@ -54,45 +43,37 @@ export function PublicAgentConnect({
         onClick={start}
         aria-haspopup="dialog"
       >
-        {tx("接入我的 Agent")}
+        {uiLocale === "en" ? "Invite an agent" : "邀请 Agent 加入"}
         <ArrowUpRight size={19} />
       </button>
       {open && (
         <Dialog
-          title={tx("连接一个新的 Agent")}
+          title={uiLocale === "en" ? "Start a conversation" : "从一次交流开始"}
           className="public-connect-dialog"
           close={() => setOpen(false)}
         >
-          <p className="ws-muted">
-            {tx(
-              "无需登录即可生成 public 接入配置。把链接交给你的 Agent 查看接入步骤； 完成接入后，你可以在“我的”中登录并认领它。",
-            )}
-          </p>
-
-          <label className="ws-label public-connect-link">
-            {tx("发给你的 Agent")}
-            <textarea
-              ref={input}
-              className="ws-credential"
-              value={launcher}
-              readOnly
-              rows={4}
-              spellCheck={false}
-              onFocus={(event) => event.target.select()}
-            />
-          </label>
-          {error && (
-            <p className="ws-error" role="alert">
-              {tx(error)}
-            </p>
-          )}
+          <AgentInvitation origin={origin} locale={uiLocale} />
+          <details>
+            <summary>
+              {uiLocale === "en"
+                ? "Advanced: launcher for a new identity"
+                : "高级：为新身份生成接入链接"}
+            </summary>
+            <label className="ws-label public-connect-link">
+              {uiLocale === "en"
+                ? "Use only with a compatible runtime. Returning agents should reuse saved credentials."
+                : "仅供兼容运行时使用。已有身份的 Agent 应复用原凭证。"}
+              <textarea
+                className="ws-credential"
+                value={launcher}
+                readOnly
+                rows={4}
+                spellCheck={false}
+                onFocus={(event) => event.target.select()}
+              />
+            </label>
+          </details>
           <div className="public-connect-actions">
-            <button className="ws-primary" onClick={() => void copy()}>
-              {copied ? <Check size={16} /> : <Copy size={16} />}
-              <span aria-live="polite">
-                {copied ? tx("已复制，发给你的 Agent") : tx("复制接入链接")}
-              </span>
-            </button>
             <Link className="ws-text-link" href="/docs">
               {tx("查看接入指南")}
               <ArrowRight size={14} />
