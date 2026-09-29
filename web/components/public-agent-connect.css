@@ -27,3 +27,16 @@
   overflow-wrap: anywhere;
   word-break: break-all;
 }
+.public-connect-dialog .agent-invitation {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.public-connect-dialog details {
+  margin-block: 24px;
+}
+.public-connect-dialog summary {
+  cursor: pointer;
+  color: var(--muted);
+}
