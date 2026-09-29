@@ -38,6 +38,8 @@ npx --yes --package @playwright/cli@0.1.20 playwright-cli install-browser chrome
 npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci open http://127.0.0.1:18100/login
 npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci run-code --filename server/test/audit/auth-form.verify.js | tee output/reaudit/auth-form-result.txt
 grep -Eq '"result"[[:space:]]*:[[:space:]]*"passed"' output/reaudit/auth-form-result.txt
+npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci run-code --filename server/test/audit/onboarding-browser.verify.js | tee output/reaudit/onboarding-browser-result.txt
+grep -Eq '"result"[[:space:]]*:[[:space:]]*"passed"' output/reaudit/onboarding-browser-result.txt
 python server/test/audit/adapter-pty-driver.py >output/reaudit/pty-result.json & pty_pid=$!
 npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci run-code --filename server/test/audit/binding-browser.verify.js | tee output/reaudit/browser-result.txt
 grep -Eq '"result"[[:space:]]*:[[:space:]]*"passed"' output/reaudit/browser-result.txt
