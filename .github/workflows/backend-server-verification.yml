@@ -72,7 +72,7 @@ jobs:
 
       - name: Preserve actual verification results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: audit-v1.2-verification
           path: |
