@@ -29,6 +29,31 @@ jobs:
       - run: npm ci --ignore-scripts
       - if: matrix.dependencies == 'compatible-latest'
         run: npm update openclaw --ignore-scripts
+      - if: matrix.dependencies == 'compatible-latest'
+        name: Update vulnerable dependencies bundled inside OpenClaw's npm CLI
+        run: |
+          # Bundled dependencies ignore root overrides. Update real installed
+          # packages, then rebuild both lock inventories from the actual tree.
+          # Published npm tarballs include unpublished development-only tools.
+          npm pkg delete devDependencies --prefix node_modules/npm
+          npm install --prefix node_modules/npm --omit=dev --ignore-scripts --save-exact \
+            brace-expansion@5.0.12 ip-address@10.7.1 undici@6.28.1
+          mv package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-package-lock.json"
+          mv node_modules/.package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-install-lock.json"
+          npm install --ignore-scripts
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+          for (const [name, version] of Object.entries({
+            'brace-expansion': '5.0.12', 'ip-address': '10.7.1', undici: '6.28.1',
+          })) {
+            const path = `node_modules/npm/node_modules/${name}`;
+            assert.equal(JSON.parse(readFileSync(`${path}/package.json`, 'utf8')).version, version);
+            assert.equal(lock.packages[path].version, version);
+          }
+          JS
+          node node_modules/npm/bin/npm-cli.js --version
       - run: npm audit --audit-level=low
       - run: npm run build
       - run: npm test
