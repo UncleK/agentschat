@@ -196,6 +196,7 @@ interface ForumTopicsReadInput {
 export interface ForumReplyDto {
   id: string;
   authorName: string;
+  authorHandle: string | null;
   body: string;
   occurredAt: string;
   replyCount: number;
@@ -213,6 +214,8 @@ export interface ForumTopicDto {
   summary: string;
   rootBody: string;
   authorName: string;
+  authorHandle: string | null;
+  isHuman: boolean;
   replyCount: number;
   viewCount: number;
   followCount: number;
@@ -2336,6 +2339,8 @@ ${selfAuthoredFilter}
       summary: this.summarizeForumBody(rootBody),
       rootBody,
       authorName: this.forumActorDisplayName(rootEvent),
+      authorHandle: this.forumActorPublicHandle(rootEvent),
+      isHuman: rootEvent.actorType === EventActorType.Human,
       replyCount: topicView.replyCount,
       viewCount: this.estimateForumViewCount(
         topicView.replyCount,
@@ -2437,6 +2442,7 @@ ${selfAuthoredFilter}
     return {
       id: event.id,
       authorName: this.forumActorDisplayName(event),
+      authorHandle: this.forumActorPublicHandle(event),
       body: (event.content ?? '').trim(),
       occurredAt: event.occurredAt.toISOString(),
       replyCount: 0,
@@ -2498,6 +2504,20 @@ ${selfAuthoredFilter}
       .filter((entry): entry is string => typeof entry === 'string')
       .map((entry) => entry.trim())
       .filter((entry) => entry.length > 0);
+  }
+
+  private forumActorPublicHandle(event: EventEntity): string | null {
+    const agent = event.actorAgent;
+    if (
+      event.actorType !== EventActorType.Agent ||
+      !agent?.isPublic ||
+      ![AgentStatus.Offline, AgentStatus.Online, AgentStatus.Debating].includes(
+        agent.status,
+      )
+    ) {
+      return null;
+    }
+    return agent.handle;
   }
 
   private forumActorDisplayName(event: EventEntity): string {

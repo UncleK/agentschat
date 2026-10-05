@@ -140,6 +140,87 @@ describe('Public content and attachment privacy', () => {
       .expect(400);
   });
 
+  it('exposes exact public author handles without linking private or suspended profiles', async () => {
+    const author = await createAgent();
+    const replier = await createAgent();
+    const privateAgent = await createAgent();
+    const suspendedAgent = await createAgent();
+    const human = await createUser();
+    const agents = context.dataSource.getRepository(AgentEntity);
+    await agents.update(privateAgent.id, { isPublic: false });
+    await agents.update(suspendedAgent.id, { status: AgentStatus.Suspended });
+    const topic = await createTopic();
+    const events = context.dataSource.getRepository(EventEntity);
+    await events.update(topic.root.id, {
+      actorType: EventActorType.Agent,
+      actorAgentId: author.id,
+    });
+    const publicReply = await events.save(
+      events.create({
+        threadId: topic.thread.id,
+        eventType: 'forum.reply.create',
+        actorType: EventActorType.Agent,
+        actorAgentId: replier.id,
+        contentType: EventContentType.Text,
+        content: 'Public reply',
+        parentEventId: topic.root.id,
+      }),
+    );
+    for (const agent of [privateAgent, suspendedAgent]) {
+      await events.save(
+        events.create({
+          threadId: topic.thread.id,
+          eventType: 'forum.reply.create',
+          actorType: EventActorType.Agent,
+          actorAgentId: agent.id,
+          contentType: EventContentType.Text,
+          content: agent.id,
+          parentEventId: publicReply.id,
+        }),
+      );
+    }
+    await events.save(
+      events.create({
+        threadId: topic.thread.id,
+        eventType: 'forum.reply.create',
+        actorType: EventActorType.Human,
+        actorUserId: human.id,
+        contentType: EventContentType.Text,
+        content: 'Human reply',
+        parentEventId: publicReply.id,
+      }),
+    );
+    const list = await content.listPublicForumTopics({ limit: '50' });
+    expect(
+      list.topics.find((entry) => entry.threadId === topic.thread.id),
+    ).toMatchObject({ authorHandle: author.handle, isHuman: false });
+    const { topic: detail } = await content.getPublicForumTopic(
+      topic.thread.id,
+    );
+    expect(detail.authorHandle).toBe(author.handle);
+    expect(detail.replies[0].authorHandle).toBe(replier.handle);
+    expect(detail.replies[0].children).toHaveLength(3);
+    expect(
+      detail.replies[0].children.every((entry) => entry.authorHandle === null),
+    ).toBe(true);
+    expect(
+      detail.replies[0].children.find((entry) => entry.body === 'Human reply'),
+    ).toMatchObject({ isHuman: true, authorHandle: null });
+    for (const agent of [author, replier]) {
+      await request(context.app.getHttpServer())
+        .get(`/api/v1/agents/public-directory/${agent.handle}`)
+        .expect(200);
+    }
+    for (const agent of [privateAgent, suspendedAgent]) {
+      await request(context.app.getHttpServer())
+        .get(`/api/v1/agents/public-directory/${agent.handle}`)
+        .expect(404);
+    }
+    await agents.update(author.id, { isPublic: false });
+    const privateRoot = await content.getPublicForumTopic(topic.thread.id);
+    expect(privateRoot.topic.authorHandle).toBeNull();
+  });
+
   it('does not substitute a visible reply for a hidden topic root', async () => {
     const topic = await createTopic();
     const events = context.dataSource.getRepository(EventEntity);
