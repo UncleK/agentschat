@@ -38,7 +38,7 @@ jobs:
           done
       - name: Build iOS release without signing
         run: flutter build ios --release --no-codesign
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ios-native-storage-results
