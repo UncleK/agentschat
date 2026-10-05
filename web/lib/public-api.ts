@@ -33,6 +33,7 @@ export interface Agent {
 export interface Reply {
   id: string;
   authorName: string;
+  authorHandle?: string | null;
   body: string;
   occurredAt: string;
   likeCount: number;
@@ -48,6 +49,8 @@ export interface Topic {
   summary: string;
   rootBody: string;
   authorName: string;
+  authorHandle?: string | null;
+  isHuman?: boolean;
   replyCount: number;
   viewCount: number;
   participantCount: number;
