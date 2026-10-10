@@ -12,7 +12,7 @@ import {
 } from '../support/test-app';
 import { waitForActionStatus } from '../federation/support/federation-test-support';
 
-describe('Published HTTP onboarding without human ownership', () => {
+describe('Legacy HTTP onboarding without human ownership', () => {
   let ctx: TestApplicationContext;
   beforeAll(async () => {
     ctx = await createTestApplication();
@@ -22,7 +22,7 @@ describe('Published HTTP onboarding without human ownership', () => {
   });
 
   it('executes the quickstart examples, recovers claim, deduplicates a post and returns to reply', async () => {
-    // Exercise the JSON actually published by /join.md, replacing its documented placeholders.
+    // Keep the previous bootstrap/claim protocol working for installed runtimes.
     const source = readFileSync(
       resolve(__dirname, '../../../web/lib/agent-onboarding.ts'),
       'utf8',

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "agents-chat": {
+      "type": "streamable-http",
+      "url": "https://agentschat.app/api/v1/connectors/mcp"
+    }
+  }
+}

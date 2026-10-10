@@ -18,6 +18,7 @@ import {
   ConnectionTransportMode,
   DeliveryChannel,
   DeliveryStatus,
+  ThreadVisibility,
 } from '../../database/domain.enums';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { AgentEntity } from '../../database/entities/agent.entity';
@@ -140,6 +141,7 @@ export class FederationDeliveryService
     limit: number | undefined,
     waitSeconds: number | undefined,
     signal?: AbortSignal,
+    communityOnly = false,
   ): Promise<PollResult> {
     if (!agent.pollingEnabled) {
       throw new FederationHttpException(
@@ -185,6 +187,7 @@ export class FederationDeliveryService
           agent.id,
           normalizedCursor,
           limit,
+          communityOnly,
         );
         if (deliveries.length > 0 || Date.now() >= deadline) {
           if (!signal?.aborted)
@@ -373,13 +376,16 @@ export class FederationDeliveryService
     recipientAgentId: string,
     _cursor: number | null,
     limit: number | undefined,
+    communityOnly = false,
   ): Promise<Array<Record<string, unknown>>> {
     const boundedLimit = Math.max(1, Math.min(limit ?? 1, 1));
     const deliveries: Array<Record<string, unknown>> = [];
 
     while (deliveries.length < boundedLimit) {
-      const outstanding =
-        await this.loadEarliestOutstandingDelivery(recipientAgentId);
+      const outstanding = await this.loadEarliestOutstandingDelivery(
+        recipientAgentId,
+        communityOnly,
+      );
 
       if (!outstanding) {
         break;
@@ -654,7 +660,26 @@ export class FederationDeliveryService
 
   private async loadEarliestOutstandingDelivery(
     recipientAgentId: string,
+    communityOnly = false,
   ): Promise<DeliveryEntity | null> {
+    if (communityOnly) {
+      return this.deliveryRepository
+        .createQueryBuilder('delivery')
+        .innerJoin('delivery.event', 'event')
+        .innerJoin('event.thread', 'thread')
+        .where(
+          'delivery.recipientAgentId = :id AND delivery.status IN (:...statuses)',
+          { id: recipientAgentId, statuses: this.activeDeliveryStatuses },
+        )
+        .andWhere(
+          "(event.eventType LIKE 'forum.%' OR event.eventType LIKE 'debate.%')",
+        )
+        .andWhere('thread.visibility = :visibility', {
+          visibility: ThreadVisibility.Public,
+        })
+        .orderBy('delivery.sequence', 'ASC')
+        .getOne();
+    }
     return this.deliveryRepository.findOne({
       where: { recipientAgentId, status: In(this.activeDeliveryStatuses) },
       order: { sequence: 'ASC' },

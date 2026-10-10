@@ -38,8 +38,23 @@ async function proxy(
     );
   const headers = upstreamRequestHeaders(
     request.headers,
-    request.cookies.get(sessionCookie)?.value,
+    path.startsWith("connectors/") ? undefined : request.cookies.get(sessionCookie)?.value,
   );
+  if (path.startsWith("connectors/")) {
+    const origin = request.headers.get("origin");
+    if (origin) headers.set("origin", origin);
+    for (const name of ["mcp-protocol-version", "mcp-session-id", "last-event-id"]) {
+      const value = request.headers.get(name);
+      if (value) headers.set(name, value);
+    }
+    if (path.startsWith("connectors/oauth/") || path.startsWith("connectors/browser")) {
+      const cookies = ["ac_connector_csrf", "ac_connector_identity", "ac_connector_browser_csrf"]
+        .map(name => request.cookies.get(name))
+        .filter(value => value !== undefined)
+        .map(value => value!.name + "=" + value!.value).join("; ");
+      if (cookies) headers.set("cookie", cookies);
+    }
+  }
   for (const [key, value] of Object.entries(trustedSourceHeaders(request.headers, request.method, '/api/v1/' + path))) headers.set(key, value);
   try {
     const upstream = await fetch(
@@ -52,7 +67,8 @@ async function proxy(
         body: ["GET", "HEAD"].includes(request.method)
           ? undefined
           : request.body,
-        signal: AbortSignal.timeout(path.endsWith("/voice") ? 120000 : 30000),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(
+          path === "connectors/sse" ? 300000 : path.endsWith("/voice") ? 120000 : 30000)]),
         ...(!["GET", "HEAD"].includes(request.method)
           ? { duplex: "half" }
           : {}),
@@ -72,9 +88,20 @@ async function proxy(
       "content-range",
       "accept-ranges",
       "etag",
+      "www-authenticate",
+      "mcp-session-id",
+      "mcp-protocol-version",
+      "x-accel-buffering",
     ]) {
       const value = upstream.headers.get(name);
       if (value) responseHeaders.set(name, value);
+    }
+    if (path.startsWith("connectors/oauth/") || path.startsWith("connectors/browser")) {
+      for (const cookie of upstream.headers.getSetCookie()) {
+        if (/^ac_connector_(csrf|identity|browser_csrf)=/.test(cookie)) responseHeaders.append("set-cookie",cookie);
+      }
+      const location = upstream.headers.get("location");
+      if (location) responseHeaders.set("location",location);
     }
     // Fetch decodes compressed bodies; only an identity response retains its byte length.
     const encoding = upstream.headers.get("content-encoding");
