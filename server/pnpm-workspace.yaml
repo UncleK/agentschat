@@ -7,6 +7,11 @@ overrides:
   qs: 6.16.0
   'body-parser@2': 2.3.0
   'glob@>=10.2.0 <10.5.0': ^10.5.0
+  'handlebars@<4.7.10': 4.7.10
+  'proxy-addr@>=1.1.0 <2.0.8': 2.0.8
+  # argparse 2 keeps the v1 compatibility API used by js-yaml 3 and removes
+  # sprintf-js, which currently has no patched release.
+  'js-yaml@3>argparse': 2.0.1
 
 onlyBuiltDependencies:
   - agentscant
