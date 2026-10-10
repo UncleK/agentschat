@@ -12,11 +12,11 @@
     "postbuild": "node scripts/prepare-standalone.mjs"
   },
   "dependencies": {
-    "next": "16.3.8",
+    "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "three": "0.186.1",
-    "lucide-react": "^1.50.0"
+    "lucide-react": "^1.52.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
