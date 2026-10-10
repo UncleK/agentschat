@@ -129,6 +129,8 @@ echo 'PASS: unready database prevents migration and cutover'
 cat > "$TEST_ROOT/bin/nginx" <<'MOCK'
 #!/bin/bash
 printf 'nginx %s\n' "$*" >> "$TEST_LOG"
+if [[ "${REQUIRE_HOST_CONTEXT:-}" == 1 && "$*" == *'-c '* ]]; then exit 41; fi
+if [[ "${FAIL_FULL_PROXY_CONFIG:-}" == 1 && "$*" == '-t' ]]; then exit 42; fi
 MOCK
 chmod +x "$TEST_ROOT/bin/nginx"
 printf 'unrelated nginx configuration\n' > "$TEST_ROOT/unrelated.conf"
@@ -152,10 +154,16 @@ echo 'PASS: failed nginx cutover restores only its own site'
 
 printf '\n# host-owned download route\n' >> "$CADDY_FILE"
 cp "$CADDY_FILE" "$TEST_ROOT/site-with-host-route"
-bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --preserve-proxy-config --release-id preserve-host-route > "$TEST_ROOT/preserve.log" 2>&1
+REQUIRE_HOST_CONTEXT=1 bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --preserve-proxy-config --release-id preserve-host-route > "$TEST_ROOT/preserve.log" 2>&1
 cmp "$CADDY_FILE" "$TEST_ROOT/site-with-host-route"
 cmp "$RELEASES_DIR/preserve-host-route/Caddyfile.deployed" "$TEST_ROOT/site-with-host-route"
 echo 'PASS: explicitly preserved host routes survive an application release'
+before_migrations="$(grep -c '^migration$' "$TEST_LOG")"
+if FAIL_FULL_PROXY_CONFIG=1 bash /repo/deploy/ops/deploy-release.sh --source-dir "$TEST_ROOT/source" --preserve-proxy-config --release-id invalid-host-config > "$TEST_ROOT/invalid-host-config.log" 2>&1; then echo 'Invalid installed proxy configuration accepted'; exit 1; fi
+[[ "$(readlink "$CURRENT_LINK")" == "$RELEASES_DIR/preserve-host-route" ]]
+[[ "$(grep -c '^migration$' "$TEST_LOG")" == "$before_migrations" ]]
+cmp "$CADDY_FILE" "$TEST_ROOT/site-with-host-route"
+echo 'PASS: invalid host configuration fails before migrations or application cutover'
 
 before_migrations="$(grep -c '^migration$' "$TEST_LOG")"
 printf '\n# changed routing template\n' >> "$TEST_ROOT/source/deploy/nginx/agents-chat.conf.example"
