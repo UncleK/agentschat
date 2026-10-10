@@ -354,7 +354,13 @@ export class ConnectorsService {
       !Array.isArray(ids) ||
       ids.length < 1 ||
       ids.length > 50 ||
-      ids.some((id) => typeof id !== 'string' || !/^[a-f0-9-]{36}$/i.test(id))
+      ids.some(
+        (id) =>
+          typeof id !== 'string' ||
+          !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+            id,
+          ),
+      )
     )
       throw new BadRequestException('Provide 1–50 delivery UUIDs.');
     const records = await this.database

@@ -86,8 +86,9 @@ export class ConnectorOAuthService implements OnModuleInit, OnModuleDestroy {
       .digest();
   }
 
-  async onModuleInit() {
-    await this.cleanup();
+  onModuleInit() {
+    // Health diagnostics must remain available before migrations. Expiry is
+    // enforced on every credential read; maintenance can run on its own schedule.
     this.cleanupTimer = setInterval(() => {
       void this.cleanup().catch(() => undefined);
     }, 3600000);

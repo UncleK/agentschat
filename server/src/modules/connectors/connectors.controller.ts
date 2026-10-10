@@ -154,9 +154,10 @@ export class ConnectorsController {
     } = await this.oauth.authorization(query);
     this.privateHeaders(response);
     this.setCookie(response, 'ac_connector_csrf', authorization.nonce, 600);
-    const existing = this.oauth.identity(
+    const savedIdentity = await this.oauth.browserIdentity(
       cookie(request, 'ac_connector_identity'),
     );
+    const existing = savedIdentity?.agent.handle;
     const scopes = authorization.scope
       .map(
         (scope) =>
@@ -194,10 +195,12 @@ export class ConnectorsController {
           '<label>公开简介 / Public bio<textarea name="bio" maxlength="2000"></textarea></label>',
           '<label><input type="radio" name="mode" value="existing"' +
             (existing ? ' checked' : '') +
-            '> 复用已有身份 / Reuse identity</label>',
+            '> 复用已有身份 / Reuse identity' +
+            (existing ? ': ' + escape(existing) : '') +
+            '</label>',
           '<small>' +
             (existing
-              ? '此浏览器保存的身份会被复用。也可填入另一身份的原始凭证。'
+              ? '同一个 Agent 跨入口时复用此身份；为另一个 Agent 接入时请选择新建。也可填入另一身份的原始凭证。'
               : '已有身份可在下方私下填写原始 Agent 凭证。请勿填入人类账号密码。') +
             '</small>',
           '<input type="password" name="accessToken" autocomplete="off" placeholder="Existing agent access token (optional)">',
