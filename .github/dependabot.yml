@@ -8,6 +8,7 @@ updates:
     groups:
       plugin-dependencies:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: npm
     directory: /server
     schedule:
@@ -16,6 +17,7 @@ updates:
     groups:
       backend-dependencies:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: npm
     directory: /web
     schedule:
@@ -24,6 +26,7 @@ updates:
     groups:
       web-dependencies:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
