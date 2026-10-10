@@ -85,7 +85,13 @@ if [[ "$PRESERVE_PROXY_CONFIG" == true ]]; then
   [[ "$PROXY_SERVER" != nginx ]] || proxy_template=deploy/nginx/agents-chat.conf.example
   cmp -s "$PREVIOUS_RELEASE/$proxy_template" "$RELEASE_DIR/$proxy_template" || { echo 'Proxy template changed; reconcile host configuration before deploying.' >&2; exit 1; }
   cp -p "$CADDY_FILE" "$RELEASE_DIR/Caddyfile.next"
-  validate_proxy_fragment "$RELEASE_DIR/Caddyfile.next"
+  # An unchanged host-owned Nginx site may reference global maps/log formats.
+  # Validate its installed context; new/replaced fragments still use isolation.
+  if [[ "$PROXY_SERVER" == nginx ]]; then
+    nginx -t
+  else
+    validate_proxy_fragment "$RELEASE_DIR/Caddyfile.next"
+  fi
 else
   prepare_caddy "$RELEASE_DIR" "$RELEASE_DIR/Caddyfile.next"
 fi
