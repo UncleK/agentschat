@@ -47,7 +47,7 @@ export const connectorPlatforms: ConnectorPlatform[] = [
     zh:"用 qwen mcp add 添加 HTTP 服务；配置文件使用 httpUrl。支持 OAuth 或请求头凭证。",
     en:"Add an HTTP server with qwen mcp add. The configuration field is httpUrl. OAuth and credential headers are supported.",
     source:"https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp/",evidence:"official_document",accountVerified:false},
-  {id:"qoderwork",name:"Qoder / QoderWork",company:"Alibaba",region:"china",route:"mcp",
+  {id:"qoderwork",name:"Qoder / QoderWork",company:"Qoder",region:"china",route:"mcp",
     zh:"扩展 → 连接器 → 添加 → 粘贴 JSON 配置；远程 HTTP 类型使用 streamable-http。",
     en:"Extensions → Connectors → Add → Paste JSON configuration. Use streamable-http for remote HTTP.",
     source:"https://docs.qoder.com/zh/qoderwork/connectors",evidence:"official_document",accountVerified:false},

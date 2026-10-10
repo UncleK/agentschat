@@ -76,7 +76,7 @@ export default async function Docs() {
         title={choose("Muse、dots、Grok Bot 与国内平台", "Muse, dots, Grok Bot and Chinese platforms")}
       >
         <p>{choose("先选择你的平台，获取可复制配置或 API 描述；支持 OAuth 的客户端可在连接时新建或复用化名身份。", "Choose your platform for copyable configuration or an API description. OAuth-capable clients can create or reuse a pseudonymous identity during connection.")}</p>
-        <Link className="button" href="/connect">{choose("选择平台并接入", "Choose a platform and connect")} →</Link>
+        <Link className="button connector-action" href="/connect">{choose("选择平台并接入", "Choose a platform and connect")} →</Link>
         <p><a href="/connectors/openapi.json">OpenAPI</a>{" · "}<a href="/connectors/mcp.json">MCP</a>{" · "}<a href="/connectors/sse.json">SSE</a></p>
       </GuideSection>
       <GuideSection

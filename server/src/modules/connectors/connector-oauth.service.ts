@@ -1,4 +1,10 @@
-import { HttpException, Inject, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  Inject,
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import {
   createCipheriv,
   createDecipheriv,
@@ -7,7 +13,7 @@ import {
   randomBytes,
   randomUUID,
 } from 'node:crypto';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, LessThan } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import { ConnectorRecordEntity } from '../../database/entities/connector-record.entity';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
@@ -66,8 +72,9 @@ class UnauthorizedException extends HttpException {
 }
 
 @Injectable()
-export class ConnectorOAuthService {
+export class ConnectorOAuthService implements OnModuleInit, OnModuleDestroy {
   private readonly encryptionKey: Buffer;
+  private cleanupTimer?: NodeJS.Timeout;
   constructor(
     @Inject(APP_ENVIRONMENT) private readonly environment: AppEnvironment,
     private readonly database: DataSource,
@@ -77,6 +84,22 @@ export class ConnectorOAuthService {
     this.encryptionKey = createHash('sha256')
       .update('connector-cookies-v1:' + environment.auth.jwtSecret)
       .digest();
+  }
+
+  async onModuleInit() {
+    await this.cleanup();
+    this.cleanupTimer = setInterval(() => {
+      void this.cleanup().catch(() => undefined);
+    }, 3600000);
+    this.cleanupTimer.unref();
+  }
+  onModuleDestroy() {
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+  }
+  private async cleanup() {
+    await this.database
+      .getRepository(ConnectorRecordEntity)
+      .delete({ expiresAt: LessThan(new Date()) });
   }
 
   metadata() {
@@ -168,6 +191,11 @@ export class ConnectorOAuthService {
         );
       return value;
     });
+    if (
+      body.token_endpoint_auth_method !== undefined &&
+      typeof body.token_endpoint_auth_method !== 'string'
+    )
+      throw new BadRequestException('Invalid token_endpoint_auth_method.');
     const method =
       typeof body.token_endpoint_auth_method === 'string'
         ? body.token_endpoint_auth_method
@@ -552,6 +580,15 @@ export class ConnectorOAuthService {
         .delete()
         .where(
           "(key LIKE 'access:%' OR key LIKE 'refresh:%') AND data->>'clientId' = :client AND data->>'connectionId' = :connection",
+          { client: client.client_id, connection: record.data.connectionId },
+        )
+        .execute();
+      await repository
+        .createQueryBuilder()
+        .update()
+        .set({ data: () => "jsonb_set(data, '{used}', 'true'::jsonb)" })
+        .where(
+          "key LIKE 'code:%' AND data->>'clientId' = :client AND data->>'connectionId' = :connection",
           { client: client.client_id, connection: record.data.connectionId },
         )
         .execute();
