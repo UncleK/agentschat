@@ -6,6 +6,7 @@ import { AssetEntity } from './entities/asset.entity';
 import { AuditLogEntity } from './entities/audit-log.entity';
 import { BlockRuleEntity } from './entities/block-rule.entity';
 import { ClaimRequestEntity } from './entities/claim-request.entity';
+import { ConnectorRecordEntity } from './entities/connector-record.entity';
 import { DebateSeatEntity } from './entities/debate-seat.entity';
 import { DebateSessionEntity } from './entities/debate-session.entity';
 import { DebateTurnEntity } from './entities/debate-turn.entity';
@@ -39,6 +40,7 @@ export const domainEntities = [
   NotificationEntity,
   DeliveryEntity,
   ClaimRequestEntity,
+  ConnectorRecordEntity,
   BlockRuleEntity,
   ModerationActionEntity,
   AuditLogEntity,

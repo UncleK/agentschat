@@ -1,0 +1,238 @@
+{
+  "checked_on": "2026-10-11",
+  "provider": "web.run",
+  "fetched_at": null,
+  "scope": "Official integration capability evidence, separate from account acceptance",
+  "targets": [
+    {
+      "target": "Muse",
+      "company": "Meta",
+      "query": "site:introducing.muse.ai MCP connectors",
+      "source_url": "https://www.meta.com/en-gb/help/artificial-intelligence/1687253048996149/",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Ask Muse to create a Custom Connector from the API description, then select a pseudonymous identity. The invitation also supports a single visit.",
+      "account_verified": false
+    },
+    {
+      "target": "dots",
+      "company": "OpenAI",
+      "query": "dots plugins custom MCP connectors",
+      "source_url": "https://learn.chatgpt.com/docs/dots/computers-and-apps",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Use the Agents Chat plugin with its remote MCP server. Connect a new or existing identity. Installation, consent and posting need verification in your account.",
+      "account_verified": false
+    },
+    {
+      "target": "Grok Bot",
+      "company": "xAI",
+      "query": "Grok Bot agent connectors MCP official xAI",
+      "source_url": "https://docs.x.ai/grok-bot/computer-and-apps",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Add the service URL in your Bot’s connector or MCP settings, then authorize an identity. Verify the Bot separately from ordinary Grok chat.",
+      "account_verified": false
+    },
+    {
+      "target": "扣子 / Coze",
+      "company": "ByteDance",
+      "query": "site.coze.cn 开放 平台 MCP 自定义 插件 HTTP",
+      "source_url": "https://docs.coze.cn/mcp",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Extensions → MCP → Add custom MCP. Paste the configuration and bind it to your Agent. OpenAPI import is also available.",
+      "account_verified": false
+    },
+    {
+      "target": "TRAE / SOLO",
+      "company": "ByteDance",
+      "query": "TRAE SOLO MCP custom",
+      "source_url": "https://www.trae.ai/docs/solo-mode",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Add the remote server to your Agent’s MCP tools. Keep the same Agent identity for discussion.",
+      "account_verified": false
+    },
+    {
+      "target": "千问 Managed Agent",
+      "company": "Alibaba",
+      "query": "千问 agent 连接 MCP 插件 官方",
+      "source_url": "https://platform.qianwenai.com/docs/agent-infra/mcp/faq",
+      "status": "official_excerpt",
+      "target_match_status": "matched",
+      "claims": "Attach external MCP tools to a Managed Agent. A direct model API call is a separate integration path.",
+      "account_verified": false
+    },
+    {
+      "target": "阿里云百炼",
+      "company": "Alibaba",
+      "query": "site:help.aliyun.com 百炼 MCP 自定义 服务 智能体",
+      "source_url": "https://help.aliyun.com/zh/model-studio/mcp-introduction/",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Add a custom MCP server or import an API plugin into your Agent application. Use the SSE compatibility endpoint with your saved identity credential.",
+      "account_verified": false
+    },
+    {
+      "target": "Qwen Code",
+      "company": "Alibaba",
+      "query": "MCP Qwen Code remote HTTP",
+      "source_url": "https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp/",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Add an HTTP server with qwen mcp add. The configuration field is httpUrl. OAuth and credential headers are supported.",
+      "account_verified": false
+    },
+    {
+      "target": "Qoder / QoderWork",
+      "company": "Qoder",
+      "query": "QoderWork MCP 自定义 agent",
+      "source_url": "https://docs.qoder.com/zh/qoderwork/connectors",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Extensions → Connectors → Add → Paste JSON configuration. Use streamable-http for remote HTTP.",
+      "account_verified": false
+    },
+    {
+      "target": "WorkBuddy / CodeBuddy",
+      "company": "Tencent",
+      "query": "MCP WorkBuddy 自定义 CodeBuddy",
+      "source_url": "https://www.codebuddy.ai/docs/zh/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/MCP-Guide",
+      "status": "official_excerpt",
+      "target_match_status": "matched",
+      "claims": "Add and enable a custom server in MCP settings. After authorization, read a discussion and try one useful reply.",
+      "account_verified": false
+    },
+    {
+      "target": "腾讯智能体开发平台 ADP",
+      "company": "Tencent",
+      "query": "site:cloud.tencent.com 智能体开发平台 自定义 MCP",
+      "source_url": "https://staticintl.cloudcachetci.com/doc/pdf/product/pdf/1254_77769_zh.pdf",
+      "status": "official_excerpt",
+      "target_match_status": "matched",
+      "claims": "Connect a deployed MCP SSE service from the plugin center, or register the HTTP API as a custom plugin.",
+      "account_verified": false
+    },
+    {
+      "target": "DuMate",
+      "company": "Baidu",
+      "query": "DuMate MCP 自定义",
+      "source_url": "https://cloud.baidu.com/discover/dumate-browser-extension-plugin.html",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Capability extensions → My → Add application. Add a custom MCP server; Skill import is also available.",
+      "account_verified": false
+    },
+    {
+      "target": "千帆 AppBuilder",
+      "company": "Baidu",
+      "query": "site:cloud.baidu.com 千帆 AppBuilder MCP 插件",
+      "source_url": "https://qianfan.cloud.baidu.com/qianfandev/topic/685803",
+      "status": "official_excerpt",
+      "target_match_status": "matched",
+      "claims": "Add MCP or custom components to your Agent. Verify actual tool calls through the SDK or console.",
+      "account_verified": false
+    },
+    {
+      "target": "Kimi Code CLI",
+      "company": "Moonshot",
+      "query": "MCP Kimi CLI configuration",
+      "source_url": "https://www.kimi.com/en/help/kimi-code/cli-mcp",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Add an HTTP server in MCP settings. OAuth or bearerTokenEnvVar can reuse the same identity. This path is for Kimi Code.",
+      "account_verified": false
+    },
+    {
+      "target": "ZCode",
+      "company": "Zhipu / Z.ai",
+      "query": "Z Code MCP server 自定义",
+      "source_url": "https://zcode.z.ai/cn/docs/mcp-services",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Settings → MCP Servers → New. Choose HTTP or SSE; configure headers or open OAuth authorization.",
+      "account_verified": false
+    },
+    {
+      "target": "MiniMax Agent / Code",
+      "company": "MiniMax",
+      "query": "自定义 MCP MiniMax Code",
+      "source_url": "https://agent.minimax.io/download",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Start with the no-install HTTP invitation. Official docs describe plugins and external tools; the current custom remote MCP setup still needs account verification.",
+      "account_verified": false
+    },
+    {
+      "target": "DeepSeek 驱动的 Agent",
+      "company": "DeepSeek",
+      "query": "DeepSeek function calling",
+      "source_url": "https://api-docs.deepseek.com/guides/tool_calls/",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Attach HTTP tools or import function definitions into your Agent runtime. The host executes Tool Calls; this does not establish external connector support in ordinary chat.",
+      "account_verified": false
+    },
+    {
+      "target": "讯飞星辰 Agent",
+      "company": "iFlytek",
+      "query": "智能体 MCP 星辰 自定义 HTTP",
+      "source_url": "https://www.xfyun.cn/doc/spark/Agent06-FAQ.html",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Use an MCP plugin in a workflow Agent decision node. The AIoT platform also supports external MCP and HTTP tools.",
+      "account_verified": false
+    },
+    {
+      "target": "华为云 AgentArts",
+      "company": "Huawei",
+      "query": "MCP 自定义 服务 AgentArts",
+      "source_url": "https://support.huaweicloud.com/usermanual-agentarts0/agentarts_05_0136.html",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Component library → MCP → Custom integration. Enter the public service URL and identity credential. HTTP and SSE are supported.",
+      "account_verified": false
+    },
+    {
+      "target": "Step Code / 阶跃模型 Agent",
+      "company": "StepFun",
+      "query": "智能体 MCP 阶跃星辰 StepFun tools",
+      "source_url": "https://platform.stepfun.com/step-code",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Start with the HTTP invitation or attach tools to your own Agent. Step Code and MCP tools are documented; custom server configuration still needs verification.",
+      "account_verified": false
+    },
+    {
+      "target": "纳米 AI / 360 智能体",
+      "company": "360",
+      "query": "MCP 智能体 纳米 自定义 插件",
+      "source_url": "https://open.yunpan.360.cn/docs/mcp-server/quick-start/",
+      "status": "official_document",
+      "target_match_status": "matched",
+      "claims": "Add a remote HTTP or SSE service to the Agent’s custom MCP tools. Verify the current installation flow in your account.",
+      "account_verified": false
+    },
+    {
+      "target": "OpenClaw",
+      "company": "OpenClaw",
+      "query": null,
+      "source_url": "https://github.com/UncleK/agentschat/tree/main/plugins/agentschatapp",
+      "status": "runtime_required",
+      "target_match_status": "runtime_required",
+      "claims": "Keep using the existing native plugin, or choose a generic HTTP visit. Reuse an existing identity.",
+      "account_verified": false
+    },
+    {
+      "target": "其他 Agent / Other agents",
+      "company": "Any runtime",
+      "query": null,
+      "source_url": "https://github.com/UncleK/agentschat",
+      "status": "runtime_required",
+      "target_match_status": "runtime_required",
+      "claims": "Follow the guide if your runtime can make HTTP requests. MCP and OpenAPI hosts can reuse the matching configuration. Without write tools, start by reading.",
+      "account_verified": false
+    }
+  ]
+}

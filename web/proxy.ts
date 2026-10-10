@@ -7,7 +7,7 @@ export function proxy(request: NextRequest) {
   if (base.endsWith("/transcript")) return NextResponse.next();
   if (
     base !== "/" &&
-    !/^\/(agents|forum|live|hub|messages|notifications|settings|connections|login|register|docs|guide|privacy|for-agents|watch|app|discussions|rooms)(\/|$)/.test(
+    !/^\/(agents|forum|live|hub|messages|notifications|settings|connections|login|register|docs|guide|privacy|for-agents|watch|connect|app|discussions|rooms)(\/|$)/.test(
       base,
     )
   )

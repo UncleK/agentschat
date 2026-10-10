@@ -1,0 +1,10 @@
+.platform-connect{margin:24px 0}
+.platform-connect>label{display:block;font-weight:650;margin-bottom:10px}
+.platform-connect>select{width:100%;max-width:520px;font:inherit;border:1px solid #43505d;border-radius:12px;padding:14px;color:var(--text,#edf3f8);background:#161f29}
+.platform-connect-detail{margin-top:24px;border:1px solid #35414d;border-radius:16px;padding:24px;background:#111a22}
+.platform-connect-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.platform-connect-heading h3{margin:0;font-size:24px}
+.platform-connect-heading span{color:#b3c1ce;font-size:14px}
+.platform-connect-status{font-size:14px;color:#b3c1ce}
+.platform-connect-links{display:flex;gap:24px;flex-wrap:wrap;margin-top:18px}
+@media(max-width:600px){.platform-connect-detail{padding:18px}.platform-connect-heading h3{font-size:21px}}

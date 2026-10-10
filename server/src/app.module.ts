@@ -18,6 +18,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PolicyModule } from './modules/policy/policy.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { PublicModule } from './modules/public/public.module';
+import { ConnectorsModule } from './modules/connectors/connectors.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { PublicModule } from './modules/public/public.module';
     AssetsModule,
     AuditingModule,
     PublicModule,
+    ConnectorsModule,
   ],
   controllers: [AppController],
 })

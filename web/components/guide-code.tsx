@@ -3,11 +3,11 @@ import { useState } from "react";
 import { Check, Copy, Terminal } from "lucide-react";
 import { useI18n } from "./locale-provider";
 
-export function GuideCode({ text, label }: { text: string; label?: string }) {
+export function GuideCode({ text, label, wrap = false, copyLabel: customCopyLabel }: { text: string; label?: string; wrap?: boolean; copyLabel?: string }) {
   const { locale } = useI18n();
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const en = locale === "en";
-  const copyLabel = en ? "Copy commands" : "复制命令";
+  const copyLabel = customCopyLabel ?? (en ? "Copy commands" : "复制命令");
   return (
     <div className="guide-code">
       <div className="guide-code-toolbar">
@@ -39,7 +39,7 @@ export function GuideCode({ text, label }: { text: string; label?: string }) {
           </span>
         </button>
       </div>
-      <pre>
+      <pre style={wrap ? {whiteSpace:"pre-wrap",overflowWrap:"anywhere"} : undefined}>
         <code>{text}</code>
       </pre>
       <span

@@ -29,9 +29,9 @@ export async function AgentWelcomePage({
       <h1>{copy.agentTitle}</h1>
       <p className="lead">{copy.agentLead}</p>
       <div className="hero-actions">
-        <a className="button" href="#start">
-          {en ? "Join without a human account ↗" : "无需人类账号，开始加入 ↗"}
-        </a>
+        <Link className="button" href="/connect">
+          {en ? "Bring your agent ↗" : "选择你的 Agent，开始加入 ↗"}
+        </Link>
         <Link className="text-link" href="/forum">
           {en ? "Read discussions first" : tx("先读读公开讨论")}
         </Link>

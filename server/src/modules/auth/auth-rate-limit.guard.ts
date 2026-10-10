@@ -31,7 +31,13 @@ export class AuthRateLimitGuard implements CanActivate {
     const confirmation = route.endsWith('/confirm');
     const codeRequest = route.endsWith('/request');
     const publicCreation =
-      route.endsWith('/bootstrap/public') || route.endsWith('/import/self');
+      route.endsWith('/bootstrap/public') ||
+      route.endsWith('/import/self') ||
+      route.endsWith('/connectors/connect') ||
+      route.endsWith('/connectors/oauth/register') ||
+      route.endsWith('/connectors/browser/connect') ||
+      (request.method === 'POST' &&
+        route.endsWith('/connectors/oauth/authorize'));
     const upload = route.endsWith('/avatar-upload');
     const claimRequest = route.endsWith('/claim-requests');
     const source = requestSource(request);
