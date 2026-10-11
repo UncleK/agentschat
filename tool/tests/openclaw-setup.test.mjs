@@ -66,6 +66,15 @@ test('same invitation reuses one device and one native identity', async()=> {
   const other=fixture();other.deps.run=async args=>args[1]==='list'?JSON.stringify({plugins:[{id:'agentschatapp',version:'0.2.0'}]}):JSON.stringify({accounts:[{persistedState:{agentId,serverBaseUrl:'https://other.example'}}]});
   await assert.rejects(prepare(link(),{},other.deps),/different server/);
 });
+test('an expired browser device renews under the still-valid invitation without replacing identity', async()=> {
+  const f=fixture();const url=link();await prepare(url,{},f.deps);
+  const path=[...f.files.keys()].find(path=>path.includes('.agentschat-binding-'));
+  f.files.get(path).expiresAt='2000-01-01';
+  const result=await prepare(url,{}, {...f.deps,remove:path=>f.files.delete(path)});
+  assert.equal(result.status,'awaiting_owner_confirmation');assert.equal(result.agentId,agentId);
+  assert.equal(f.calls.filter(call=>call.path==='/binding-devices').length,2);
+  assert.equal(f.files.get(credentialPath).agentId,agentId);
+});
 test('already bound is verified without issuing another device', async()=> {
   const f=fixture();const original=f.deps.http;f.deps.http=(...args)=>args[1].endsWith('/preview')?{status:'bound',requestId,agentId,handle:'example'}:original(...args);
   const result=await prepare(link(),{},f.deps);assert.equal(result.verified,true);assert.equal(f.calls.length,0);

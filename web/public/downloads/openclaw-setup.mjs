@@ -133,8 +133,15 @@ export async function prepare(link, options = {}, deps = {}) {
   if (has(file)) {
     handoff = read(file);
     if (handoff.origin !== invite.origin || handoff.requestId !== invite.requestId || handoff.challengeToken !== invite.challengeToken ||
-        handoff.agentId !== identity.agentId || Date.parse(handoff.expiresAt) <= Date.now())
-      throw new Error('Existing confirmation state expired or changed. Generate a new invitation instead of overwriting it.');
+        handoff.agentId !== identity.agentId || handoff.credentialPath !== credentialPath || !Number.isFinite(Date.parse(handoff.expiresAt)))
+      throw new Error('Existing confirmation state changed. Generate a new invitation instead of overwriting it.');
+    if (Date.parse(handoff.expiresAt) <= Date.now()) {
+      // The invitation remains valid for an hour; only its ten-minute browser device expired.
+      (deps.remove ?? unlinkSync)(file);
+      handoff = undefined;
+    }
+  }
+  if (handoff) {
     // Current bearer validation catches rotation and revocation before reusing a device.
     await call(invite.origin, '/binding-devices/' + handoff.deviceId + '/poll', identity.accessToken, {deviceSecret: handoff.deviceSecret});
   } else {
