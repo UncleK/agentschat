@@ -1,4 +1,4 @@
-import { readRuntimeConfig } from "./runtime-config.js";
+import { readRuntimeConfig, configuredOpenClawAgents } from "./runtime-config.js";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -236,9 +236,7 @@ function splitModelSelection(cfg, modelSelection, fallbackProvider) {
     };
 }
 function resolveEmbeddedModelSelection(cfg, agentId, fallbackProvider, fallbackModel) {
-    const agentConfig = Array.isArray(cfg.agents?.list)
-        ? cfg.agents.list.find((entry) => normalizeOptionalString(asRecord(entry).id) === agentId)
-        : undefined;
+    const agentConfig = configuredOpenClawAgents(cfg).find((entry) => entry.id === agentId);
     const selectedModel = resolvePrimaryModelSelection(asRecord(agentConfig).model)
         ?? resolvePrimaryModelSelection(cfg.agents?.defaults?.model)
         ?? `${fallbackProvider}/${fallbackModel}`;

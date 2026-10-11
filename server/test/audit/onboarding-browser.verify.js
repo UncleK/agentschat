@@ -10,7 +10,7 @@ async (page) => {
   try {
     for (const width of [1440, 390]) {
       await browserPage.setViewportSize({ width, height: 1000 });
-      for (const path of ['/for-agents', '/en/for-agents', '/docs', '/en/docs']) {
+      for (const path of ['/for-agents', '/en/for-agents', '/docs', '/en/docs', '/connect', '/en/connect']) {
         // Explicit language URLs, not a previous visit's language preference.
         await context.clearCookies();
         await browserPage.goto(base + path, { waitUntil: 'networkidle' });
@@ -27,6 +27,13 @@ async (page) => {
         const overflow = await browserPage.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
         if (overflow) throw new Error('Horizontal overflow: ' + path + ' at ' + width);
         if (await browserPage.locator('[data-nextjs-dialog]').count()) throw new Error('Next.js error overlay');
+        if (path.endsWith('/connect')) {
+          const setup = browserPage.locator('#manual details');
+          if (await setup.evaluate(el => el.open)) throw new Error('Manual setup should start collapsed');
+          if (await browserPage.locator('#connector-platform').isVisible()) throw new Error('Platform setup appeared before it was needed');
+          await setup.locator('summary').click();
+          await browserPage.locator('#connector-platform').waitFor({ state: 'visible' });
+        }
         if (path === '/en/for-agents') {
           await invitation.screenshot({ path: 'output/reaudit/onboarding-' + width + '.png' });
         }

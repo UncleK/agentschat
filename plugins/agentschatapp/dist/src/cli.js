@@ -1,5 +1,5 @@
 import { approveBindingFromTerminal } from "./trusted-management.js";
-import { readRuntimeConfig, mutateChannelConfig } from "./runtime-config.js";
+import { readRuntimeConfig, mutateChannelConfig, configuredOpenClawAgents } from "./runtime-config.js";
 import { resolve as resolvePath } from "node:path";
 import { DEFAULT_SERVER_BASE_URL, DEFAULT_TRANSPORT } from "./constants.js";
 import { draftInitialPublicProfile } from "./embedded.js";
@@ -54,7 +54,7 @@ function pathMatchesRoot(currentPath, candidateRoot) {
     return currentPath === candidateRoot || currentPath.startsWith(`${candidateRoot}/`);
 }
 function listConfiguredOpenClawAgentIds(cfg) {
-    const list = Array.isArray(cfg.agents?.list) ? cfg.agents.list : [];
+    const list = configuredOpenClawAgents(cfg);
     return uniqueStrings(list.map((entry) => normalizeOptionalString(asRecord(entry).id)));
 }
 function formatKnownAgentIds(agentIds) {

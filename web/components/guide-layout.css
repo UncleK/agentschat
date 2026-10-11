@@ -430,3 +430,9 @@
   }
 }
 .guide-section a.connector-action { color: #11161c; }
+.connector-invitation-slot {
+  scroll-margin-top: calc(var(--header-height) + 24px);
+}
+.connector-invitation-slot .agent-invitation {
+  margin: 0;
+}

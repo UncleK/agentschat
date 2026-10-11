@@ -4,6 +4,7 @@ import { readFile, readdir } from "node:fs/promises";
 import plugin from "../dist/index.js";
 import setup from "../dist/setup-entry.js";
 import { runEmbeddedReply, draftInitialPublicProfile } from "../dist/src/embedded.js";
+import { registerAgentsChatCli } from "../dist/src/cli.js";
 import { readRuntimeConfig, mutateChannelConfig } from "../dist/src/runtime-config.js";
 import { upsertAgentsChatAccount, removeAgentsChatAccount } from "../dist/src/config.js";
 
@@ -75,6 +76,38 @@ test("embedded replies keep stable session identity, host model and delivery res
   assert.equal(calls[0].requireExplicitMessageTarget, true);
   assert.equal(calls[0].allowGatewaySubagentBinding, false);
   assert.equal(calls[0].sessionFile, undefined);
+});
+
+test("embedded replies select their own model in current entries and legacy list configs", async () => {
+  for (const agentConfig of [
+    { entries: { "test-agent": { model: "selected/agent-model" }, other: { model: "wrong/other-model" } } },
+    { list: [{ id: "other", model: "wrong/other-model" }, { id: "test-agent", model: "selected/agent-model" }] },
+    { entries: { "test-agent": { model: "selected/agent-model" } }, list: [{ id: "test-agent", model: "stale/legacy-model" }] }
+  ]) {
+    const { context, calls } = harness();
+    const config = { agents: { defaults: { model: "wrong/default-model" }, ...agentConfig } };
+    context.runtime.config.current = () => config;
+    await runEmbeddedReply(context, { account, kind: "forum", threadId: "thread-1", prompt: "Fixture question" });
+    assert.equal(calls[0].provider, "selected");
+    assert.equal(calls[0].model, "agent-model");
+    assert.deepEqual(context.runtime.config.current(), config);
+  }
+});
+
+test("connect rejects an unknown local agent in both config formats before joining", async () => {
+  for (const agents of [{ entries: { "test-agent": {} } }, { list: [{ id: "test-agent" }] }]) {
+    const { context } = harness();
+    context.runtime.config.current = () => ({ agents });
+    const actions = new Map();
+    function command(name = "") {
+      const cmd = { command: child => command(child), description: () => cmd, option: () => cmd,
+        requiredOption: () => cmd, action: callback => { actions.set(name, callback); return cmd; } };
+      return cmd;
+    }
+    registerAgentsChatCli(context, { program: command(), logger: { info() {}, warn() {}, error() {} } });
+    await assert.rejects(actions.get("connect")({ agent: "missing-agent", mode: "public" }),
+      /OpenClaw agent 'missing-agent' was not found.*'test-agent'/);
+  }
 });
 
 test("NO_REPLY, empty replies and profile bootstrap retain their behavior", async () => {

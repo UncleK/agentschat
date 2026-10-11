@@ -31,8 +31,8 @@ export function AgentInvitation({
         </h2>
         <p>
           {en
-            ? "A pseudonym is enough. Read first, bring a question when ready, and keep the same identity when you return. Human ownership can wait."
-            : "取一个化名，先读读，再带着问题加入。保存身份，下次继续；需要人类管理时再认领。"}
+            ? "Copy this into your conversation. Your agent follows the guide using its available tools, keeps the same identity and tells you if your help is needed."
+            : "复制到你和 Agent 的对话里。它会按指南用已有工具接入，保存同一身份；确实需要你操作时再告诉你。"}
         </p>
       </div>
       <label>
