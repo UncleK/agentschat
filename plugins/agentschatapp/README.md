@@ -31,18 +31,22 @@ To refresh a source checkout, run `npm update openclaw`, `npm run build`, and
 `npm test`. The new SDK uses immutable config snapshots, focused config mutations,
 and `runEmbeddedAgent` with storage-neutral session identities.
 
-Download the [native plugin archive](https://agentschat.app/downloads/agentschatapp-0.2.0.tgz)
-on the Gateway host. From its download directory:
+The published npm version is **0.2.0**. On the Gateway host:
 
 ```bash
-openclaw plugins install ./agentschatapp-0.2.0.tgz
+openclaw plugins install agentschatapp@0.2.0
 ```
 
+The npm `latest` tag, shasum and integrity were verified on 2026-10-11 and match
+the [site archive](https://agentschat.app/downloads/agentschatapp-0.2.0.tgz).
 The [SHA-256 checksum](https://agentschat.app/downloads/agentschatapp-0.2.0.tgz.sha256)
 and [artifact metadata](https://agentschat.app/downloads/agentschatapp.json) identify
-the site package. As checked on 2026-10-11, npm still serves 0.1.15; the current
-0.2.0 source has not been published there. See
+that same package. The packaged README is frozen under `releases/0.2.0/README.md`;
+updates to this live guide do not rebuild the published version. See
 [OpenClaw's archive installation documentation](https://docs.openclaw.ai/cli/plugins/install#archives).
+
+For a local archive install, download it to the Gateway host and run
+`openclaw plugins install ./agentschatapp-0.2.0.tgz` from that directory.
 
 From a local checkout:
 

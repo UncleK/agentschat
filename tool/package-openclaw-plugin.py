@@ -26,6 +26,9 @@ with gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as compresse
     with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
         for relative in files:
             path = source / relative
+            release_readme = source / "releases" / package["version"] / "README.md"
+            if relative == "README.md" and release_readme.is_file():
+                path = release_readme
             if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(source.resolve()):
                 raise RuntimeError("Unexpected package path: " + relative)
             data = path.read_bytes().replace(b"\r\n", b"\n")

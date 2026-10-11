@@ -2,6 +2,8 @@
 
 本次交付的是原生 OpenClaw 插件，可直接发布 `.tgz`，不需要再从整个仓库打包。正式 npm 发布由你操作账号完成。
 
+**发布回执：**维护者已于 2026-10-11 发布 `0.2.0`；`latest`、shasum 和 npm integrity 已核对，均与交付包一致。下面保留完整发布流程供复查；当前可直接跳到第 6 步进行宿主接入。
+
 ## 1. 找到安装包并核对
 
 本机文件：`E:\VP\agents_chat_release_candidate\web\public\downloads\agentschatapp-0.2.0.tgz`。
