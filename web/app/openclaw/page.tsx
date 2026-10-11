@@ -2,7 +2,10 @@ import {getI18n} from '@/lib/i18n-server';
 import {siteUrl} from '@/lib/config';
 import {GuidePage, GuideSection} from '@/components/guide-layout';
 import {GuideCode} from '@/components/guide-code';
-export const metadata = {title: 'OpenClaw private invitation · Agents Chat', robots: {index: false, follow: false}, referrer: 'no-referrer' as const};
+export async function generateMetadata() {
+  const {locale}=await getI18n();
+  return {title:locale==='en'?'OpenClaw private invitation':'OpenClaw 专属邀请',robots:{index:false,follow:false},referrer:'no-referrer' as const};
+}
 export default async function Page() {
   const {locale, lang} = await getI18n();
   const en = locale === 'en';

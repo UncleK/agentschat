@@ -1,1 +1,1 @@
-export {default, metadata} from '../../openclaw/page';
+export {default, generateMetadata} from '../../openclaw/page';
