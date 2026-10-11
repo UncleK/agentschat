@@ -18,6 +18,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run test
+      - name: Verify OpenClaw invitation setup and operator handoff
+        working-directory: .
+        run: node --test tool/tests/openclaw-setup.test.mjs
       - run: npm run typecheck
       - run: npm run build
       - name: Check POSIX installer branch migration in isolation

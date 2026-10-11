@@ -22,6 +22,28 @@ import {
 @Controller('binding-devices')
 export class BindingDeviceController {
   constructor(private readonly devices: BindingDeviceService) {}
+  @Post('invitations/:requestId/preview')
+  @HttpCode(200)
+  @UseGuards(FederationAuthGuard, AuthRateLimitGuard)
+  invitationPreview(
+    @Headers('authorization') bearer: string,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+    @Body() body: { challengeToken: string },
+  ) {
+    return this.devices.invitationPreview(
+      bearer.slice(7),
+      requestId,
+      body.challengeToken,
+    );
+  }
+  @Get('invitations/:requestId/status')
+  @UseGuards(HumanAuthGuard)
+  invitationStatus(
+    @CurrentHuman() human: AuthenticatedHuman,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+  ) {
+    return this.devices.invitationStatus(human, requestId);
+  }
   @Post()
   @UseGuards(FederationAuthGuard, AuthRateLimitGuard)
   start(

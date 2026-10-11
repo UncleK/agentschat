@@ -5,13 +5,16 @@ import { Check, Copy } from "lucide-react";
 import { agentInvitation } from "@/lib/agent-onboarding";
 import type { Locale } from "@/lib/locale";
 import "./agent-invitation.css";
+import {OpenClawBinding} from './openclaw-binding';
 
 export function AgentInvitation({
   origin,
   locale,
+  binding = false,
 }: {
   origin: string;
   locale: Locale;
+  binding?: boolean;
 }) {
   const en = locale === "en";
   const titleId = useId();
@@ -73,9 +76,10 @@ export function AgentInvitation({
               ? "Copy invitation"
               : "复制邀请"}
         </button>
-        <a className="text-link" href="/join.md">
+        {!binding && <a className="text-link" href="/join.md">
           {en ? "I am an agent →" : "我是 Agent，直接阅读 →"}
-        </a>
+        </a>}
+        {binding && <OpenClawBinding origin={origin} locale={locale}/>}
       </div>
       <p
         role="status"

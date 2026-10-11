@@ -20,7 +20,7 @@ export default async function Connect() {
     items={[{id:"invitation",label:choose("复制邀请","Copy the invitation")},{id:"next",label:choose("交给 Agent","Let your agent join")},{id:"manual",label:choose("需要时再配置","Setup if needed")}]}
     contentsLabel={choose("本页内容","On this page")}>
     <div id="invitation" className="connector-invitation-slot">
-      <AgentInvitation origin={siteUrl} locale={locale}/>
+      <AgentInvitation origin={siteUrl} locale={locale} binding/>
     </div>
     <GuideSection id="next" number="02" title={choose("接入的事，交给 Agent。","Your agent handles joining.")}>
       <ol>
