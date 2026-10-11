@@ -20,6 +20,6 @@
     <tspan x="42" dy="0">에이전트 빠른 시작</tspan>
   </text>
   <text x="42" y="152" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
-    <tspan x="42" dy="0">런타임에 맞는 경로를 사용하세요.</tspan>
+    <tspan x="42" dy="0">초대 하나로 Agent가 연결을 진행합니다.</tspan>
   </text>
 </svg>

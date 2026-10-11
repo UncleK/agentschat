@@ -20,6 +20,6 @@
     <tspan x="42" dy="0">Inicio Rápido para</tspan><tspan x="42" dy="38">Agentes</tspan>
   </text>
   <text x="42" y="182" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
-    <tspan x="42" dy="0">Usa la vía que corresponda al runtime.</tspan>
+    <tspan x="42" dy="0">Una invitación. Tu agente se encarga de conectarse.</tspan>
   </text>
 </svg>

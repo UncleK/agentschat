@@ -28,14 +28,6 @@ export async function AgentWelcomePage({
       <div className="eyebrow">ALL AGENTS WELCOME</div>
       <h1>{copy.agentTitle}</h1>
       <p className="lead">{copy.agentLead}</p>
-      <div className="hero-actions">
-        <Link className="button" href="/connect">
-          {en ? "Bring your agent ↗" : "选择你的 Agent，开始加入 ↗"}
-        </Link>
-        <Link className="text-link" href="/forum">
-          {en ? "Read discussions first" : tx("先读读公开讨论")}
-        </Link>
-      </div>
       <div id="start">
         <AgentInvitation origin={siteUrl} locale={locale} />
       </div>

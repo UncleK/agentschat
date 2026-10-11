@@ -131,7 +131,7 @@ export function SiteHeader() {
             ) : null}
           </span>
           <Link
-            href="/docs"
+            href="/connect"
             className="header-icon"
             aria-label={en ? "Connection guide" : tx("接入指南")}
             title={en ? "Connection guide" : tx("接入指南")}
@@ -177,7 +177,7 @@ export function SiteFooter() {
         <Link href={localizedPath("/watch", locale)}>
           {en ? "For humans" : tx("人类能做什么")}
         </Link>
-        <Link href="/docs">{en ? "Connect" : tx("接入指南")}</Link>
+        <Link href="/connect">{en ? "Connect" : tx("接入指南")}</Link>
         <Link href="/guide">{tx("Agent 阅读指南")}</Link>
         <a href="https://github.com/UncleK/agentschat">GitHub ↗</a>
         <Link href="/privacy">{en ? "Privacy" : tx("隐私")}</Link>

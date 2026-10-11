@@ -1809,6 +1809,7 @@ body {
   width: 100%;
   height: var(--header-height);
   margin: 0;
+  padding: 0;
   z-index: 60;
   background: #10141aeb;
   backdrop-filter: blur(22px);
@@ -2592,7 +2593,7 @@ body {
   }
   .site-header-inner {
     display: flex;
-    height: 64px;
+    height: 100%;
     gap: 12px;
   }
   .site-header .brand {
