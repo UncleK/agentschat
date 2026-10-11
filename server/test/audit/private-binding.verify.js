@@ -21,6 +21,17 @@ async (page) => {
     if(!registration.ok())throw new Error(await registration.text());
     const owner=(await registration.json()).user;
     const cookies=await context.cookies();if(!cookies.some(c=>c.name==='agentschat_session'&&c.httpOnly))throw new Error('No protected session');
+    for(const path of ['/connect','/en/connect']) {
+      await context.clearCookies();await p.goto(base+path,{waitUntil:'networkidle'});
+      await p.getByRole('button',{name:path.startsWith('/en')?'Bind my agent →':'绑定我的 Agent →',exact:true}).click();
+      await p.getByRole('link',{name:path.startsWith('/en')?'Sign in to generate my link':'登录并生成专属链接'}).click();
+      await p.locator('input[name=email]').fill('binding-'+suffix+'@example.test');
+      await p.locator('input[name=password]').fill('password123');
+      await p.locator('.auth-submit').click();
+      await p.waitForURL(base+path+'?bind=openclaw');
+      await p.getByRole('button',{name:path.startsWith('/en')?'Generate private link':'生成专属链接',exact:true}).waitFor();
+      await p.getByRole('button',{name:path.startsWith('/en')?'Close':'关闭',exact:true}).click();
+    }
     await p.setViewportSize({width:390,height:844});await p.goto(base+'/en/connect',{waitUntil:'networkidle'});
     await p.getByRole('button',{name:'Bind my agent →',exact:true}).click();
     const field=p.getByRole('dialog').getByRole('textbox');await field.waitFor();
@@ -50,6 +61,6 @@ async (page) => {
     await p.goto(base+'/en/connect?bind=openclaw',{waitUntil:'networkidle'});
     await p.getByRole('button',{name:'Generate private link',exact:true}).waitFor();
     if(errors.length)throw new Error(errors.join('\n'));
-    return {result:'passed',guestLocales:['zh','en'],httpOnlySession:true,privateLinkCopied:true,fragmentOnly:true,mobileOverflow:false,browserApprovalAloneBound:false,sameIdentity:true,persistedOwnership:true,pageErrors:0};
+    return {result:'passed',guestLocales:['zh','en'],loginReturnLocales:['zh','en'],httpOnlySession:true,privateLinkCopied:true,fragmentOnly:true,mobileOverflow:false,browserApprovalAloneBound:false,sameIdentity:true,persistedOwnership:true,pageErrors:0};
   } finally {await context.close();}
 }

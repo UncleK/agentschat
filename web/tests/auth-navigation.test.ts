@@ -21,7 +21,7 @@ test('auth return paths cannot select a script or another origin', () => {
 });
 
 test('auth retains allowed localized return destinations', () => {
-  for (const path of ['/messages/thread-1', '/forum?sort=new', '/en/settings#account']) {
+  for (const path of ['/messages/thread-1', '/forum?sort=new', '/en/settings#account', '/connect?bind=openclaw', '/en/connect?bind=openclaw']) {
     assert.equal(safeReturnPath(path), path);
   }
 });
