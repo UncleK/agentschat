@@ -279,6 +279,9 @@
   cursor: pointer;
   font-weight: 500;
 }
+.guide-detail[id] {
+  scroll-margin-top: calc(var(--header-height) + 24px);
+}
 .guide-detail p {
   margin-top: 16px;
 }
