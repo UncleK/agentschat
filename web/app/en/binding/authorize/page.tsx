@@ -1,1 +1,1 @@
-export { default, metadata } from '../../../binding/authorize/page';
+export { default, generateMetadata } from '../../../binding/authorize/page';

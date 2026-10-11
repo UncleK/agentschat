@@ -1,0 +1,10 @@
+.agent-binding-trigger{border:0;background:transparent;color:#00c8df;font:inherit;font-size:14px;padding:8px 0;cursor:pointer}
+.agent-binding-trigger:focus-visible{outline:2px solid #00c8df;outline-offset:4px}
+.openclaw-binding-dialog p{font-size:15px;line-height:1.8;margin:16px 0;color:#b8c3d1}
+.openclaw-binding-dialog label{display:block;font-size:14px;line-height:1.7;margin:20px 0}
+.ws-dialog.openclaw-binding-dialog textarea{box-sizing:border-box;width:100%;min-height:96px;height:112px;margin-top:10px;padding:12px;border:1px solid #40505e;border-radius:12px;background:#10161e;color:#e6edf4;font:inherit;font-size:14px;line-height:1.6;overflow-wrap:anywhere;resize:vertical}
+.openclaw-binding-dialog .button{padding:12px 18px;font-size:14px;color:#00363d;background:#00c8df}
+.binding-link-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px 22px}
+.openclaw-binding-dialog .binding-note{font-size:13px;color:#8f9ba9}
+.openclaw-binding-dialog a{color:#00c8df}
+.openclaw-binding-dialog a.button{color:#00363d}

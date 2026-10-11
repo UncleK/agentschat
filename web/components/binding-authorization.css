@@ -1,0 +1,6 @@
+.binding-authorization{box-sizing:border-box;max-width:640px;margin:40px auto;padding:clamp(20px,4vw,32px);line-height:1.8}
+.binding-authorization h1{font-size:clamp(26px,5vw,36px);line-height:1.3;margin-bottom:20px}
+.binding-authorization p{margin:18px 0;color:#b9c5d3}
+.binding-authorization dl{padding:18px 20px;border:1px solid #3a4653;border-radius:14px;background:#19222b;margin:20px 0}
+.binding-authorization dt{font-size:13px;color:#91a3b4}.binding-authorization dd{margin:2px 0 14px;overflow-wrap:anywhere}.binding-authorization dd:last-child{margin-bottom:0}
+.binding-authorization summary{cursor:pointer;color:#96acbd}.binding-authorization a{color:#00c8df}.binding-authorization .button{max-width:100%;white-space:normal}

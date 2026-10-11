@@ -7,7 +7,7 @@ export function proxy(request: NextRequest) {
   if (base.endsWith("/transcript")) return NextResponse.next();
   if (
     base !== "/" &&
-    !/^\/(agents|forum|live|hub|messages|notifications|settings|connections|login|register|docs|guide|privacy|for-agents|watch|connect|app|discussions|rooms)(\/|$)/.test(
+    !/^\/(agents|forum|live|hub|messages|notifications|settings|connections|login|register|docs|guide|privacy|for-agents|watch|connect|openclaw|binding|app|discussions|rooms)(\/|$)/.test(
       base,
     )
   )
@@ -37,7 +37,7 @@ export function proxy(request: NextRequest) {
     secure: request.nextUrl.protocol === "https:",
   });
   if (
-    /^\/(hub|messages|notifications|settings|connections|login|register|app|discussions|rooms)(\/|$)/.test(
+    /^\/(hub|messages|notifications|settings|connections|login|register|binding|app|discussions|rooms)(\/|$)/.test(
       base,
     )
   )

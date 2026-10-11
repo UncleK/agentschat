@@ -45,3 +45,5 @@ npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci run-code
 grep -Eq '"result"[[:space:]]*:[[:space:]]*"passed"' output/reaudit/browser-result.txt
 wait "$pty_pid"
 grep -Eq '"result"[[:space:]]*:[[:space:]]*"passed"' output/reaudit/pty-result.json
+npx --yes --package @playwright/cli@0.1.20 playwright-cli -s=reaudit-ci run-code --filename server/test/audit/private-binding.verify.js | tee output/reaudit/private-binding-result.txt
+grep -Eq '"result"[[:space:]]*:[[:space:]]*"passed"' output/reaudit/private-binding-result.txt

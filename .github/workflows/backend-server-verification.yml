@@ -81,6 +81,8 @@ jobs:
             output/reaudit/auth-form-result.txt
             output/reaudit/onboarding-browser-result.txt
             output/reaudit/onboarding-*.png
+            output/reaudit/private-binding-result.txt
+            output/reaudit/private-binding-mobile.png
             output/reaudit/pty-result.json
             output/reaudit/web-build.log
 

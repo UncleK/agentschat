@@ -13,6 +13,7 @@ import { UserEntity } from '../../database/entities/user.entity';
 import { AgentEntity } from '../../database/entities/agent.entity';
 import {
   ClaimRequestStatus,
+  AgentOwnerType,
   EventActorType,
 } from '../../database/domain.enums';
 import { AuditLogEntity } from '../../database/entities/audit-log.entity';
@@ -51,6 +52,131 @@ export class BindingDeviceService {
     private readonly credentials: FederationCredentialsService,
     private readonly agents: AgentsService,
   ) {}
+
+  async invitationPreview(token: string, requestId: string, challenge: string) {
+    if (typeof challenge !== 'string' || !challenge.trim())
+      throw new BadRequestException('A binding challenge is required.');
+    const control = await this.credentials.authenticateAgentToken(token);
+    return inTransaction(this.db, async (m) => {
+      const agent = await m.getRepository(AgentEntity).findOne({
+        where: { id: control.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!agent) throw new NotFoundException('Agent not found.');
+      const claim = await m.getRepository(ClaimRequestEntity).findOne({
+        where: { id: requestId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (
+        !claim ||
+        claim.challengeTokenHash !== hash(challenge.trim()) ||
+        (claim.agentId && claim.agentId !== control.id)
+      )
+        throw new ForbiddenException(
+          'Binding request does not match this controller.',
+        );
+      if (
+        claim.status !== ClaimRequestStatus.Confirmed &&
+        (claim.status !== ClaimRequestStatus.Pending ||
+          claim.expiresAt.getTime() <= Date.now())
+      )
+        throw new ConflictException('Binding request expired or consumed.');
+      if (
+        agent.ownerType === AgentOwnerType.Human &&
+        agent.ownerUserId !== claim.requestedByUserId
+      )
+        throw new ConflictException(
+          'This Agent already belongs to another account.',
+        );
+      const bound =
+        agent.ownerType === AgentOwnerType.Human &&
+        agent.ownerUserId === claim.requestedByUserId;
+      if (claim.status === ClaimRequestStatus.Confirmed && !bound)
+        throw new ConflictException(
+          'The current ownership no longer matches this invitation.',
+        );
+      if (bound && claim.status === ClaimRequestStatus.Pending) {
+        // A new invitation to an already-owned Agent grants no new ownership.
+        await m.getRepository(ClaimRequestEntity).update(claim.id, {
+          agentId: agent.id,
+          status: ClaimRequestStatus.Confirmed,
+          confirmedAt: new Date(),
+        });
+      }
+      const account = await m
+        .getRepository(UserEntity)
+        .findOneByOrFail({ id: claim.requestedByUserId });
+      return {
+        status: bound ? 'bound' : 'ready',
+        requestId,
+        accountId: account.id,
+        accountName: account.displayName,
+        agentId: agent.id,
+        handle: agent.handle,
+        displayName: agent.displayName,
+        expiresAt: claim.expiresAt.toISOString(),
+      };
+    });
+  }
+
+  async invitationStatus(human: AuthenticatedHuman, requestId: string) {
+    const claim = await this.db.getRepository(ClaimRequestEntity).findOne({
+      where: { id: requestId },
+      relations: { agent: true },
+    });
+    if (!claim) throw new NotFoundException('Binding invitation not found.');
+    if (claim.requestedByUserId !== human.id)
+      throw new ForbiddenException(
+        'This invitation belongs to another account.',
+      );
+    if (claim.status === ClaimRequestStatus.Confirmed) {
+      const agent = claim.agent;
+      const bound =
+        agent?.ownerType === AgentOwnerType.Human &&
+        agent.ownerUserId === human.id;
+      return {
+        status: bound ? 'bound' : 'ownership_changed',
+        requestId,
+        agent: bound
+          ? {
+              id: agent.id,
+              handle: agent.handle,
+              displayName: agent.displayName,
+            }
+          : null,
+      };
+    }
+    if (
+      claim.expiresAt.getTime() <= Date.now() ||
+      claim.status !== ClaimRequestStatus.Pending
+    )
+      return {
+        status:
+          claim.status === ClaimRequestStatus.Rejected
+            ? 'cancelled'
+            : 'expired',
+        requestId,
+        agent: null,
+      };
+    const [device] = await this.db.query<
+      Array<{ status: string; user_code: string }>
+    >(
+      "SELECT status,user_code FROM binding_devices WHERE request_id=$1 AND account_id=$2 AND status<>'consumed' AND expires_at>now() ORDER BY created_at DESC LIMIT 1",
+      [requestId, human.id],
+    );
+    return {
+      status: device
+        ? device.status === 'approved'
+          ? 'awaiting_controller'
+          : 'awaiting_browser'
+        : 'pending',
+      requestId,
+      agent: null,
+      verificationPath: device
+        ? `/binding/authorize?code=${device.user_code}`
+        : null,
+    };
+  }
 
   async start(controlToken: string, requestId: string, challenge: string) {
     if (

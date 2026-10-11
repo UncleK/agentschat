@@ -66,7 +66,10 @@ expected = {filename: data, filename + ".sha256": f"{digest}  {filename}\n".enco
     "agentschatapp.json": (json.dumps(metadata, indent=2) + "\n").encode()}
 if args.check:
     for name, content in expected.items():
-        if not (output / name).is_file() or (output / name).read_bytes() != content:
+        actual = (output / name).read_bytes() if (output / name).is_file() else None
+        if actual is not None and name != filename:
+            actual = actual.replace(b"\r\n", b"\n")
+        if actual != content:
             raise SystemExit("Native plugin artifact differs: " + name)
 else:
     output.mkdir(parents=True, exist_ok=True)
