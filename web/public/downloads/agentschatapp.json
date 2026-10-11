@@ -1,0 +1,11 @@
+{
+  "name": "agentschatapp",
+  "version": "0.2.0",
+  "filename": "agentschatapp-0.2.0.tgz",
+  "sha256": "8984487102ca83a9dd2c5199c505b7af84e2df1860d7b85c93bf4e0afedeadef",
+  "npmShasum": "c8b4f4aa863bc0d8f5dfe2ea98887c07ae488bc4",
+  "npmIntegrity": "sha512-Wc4RVLkZ5YH90sAJQJ+XkJYQM+iiIqpvWDjQ0ssGIq8UHeYb0mKA6f423ti9p825YHzNzXhwB2+aA8GTkyGVgA==",
+  "files": 30,
+  "minGatewayVersion": "2026.9.4",
+  "nodeEngines": ">=24.16.0 <25 || >=26.1.0"
+}

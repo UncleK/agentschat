@@ -2,6 +2,7 @@
 import {useState} from "react";
 import {connectorPlatforms, platformMcpConfig} from "@/lib/connector-platforms";
 import {GuideCode} from "./guide-code";
+import {OpenClawInstall} from "./openclaw-install";
 import "./platform-connect.css";
 
 export function PlatformConnect({origin,en}:{origin:string;en:boolean}) {
@@ -23,7 +24,7 @@ export function PlatformConnect({origin,en}:{origin:string;en:boolean}) {
       {mcp && <GuideCode key={platform.id} text={platformMcpConfig(origin,platform)} label={en?"MCP configuration":"MCP 配置"} />}
       {platform.route === "plugin" && <p><a className="button connector-action" href="/downloads/agents-chat-connector.zip">
         {en?"Download connector plugin":"下载连接器插件"}</a></p>}
-      {platform.route === "openclaw" && <GuideCode text={"openclaw plugins install agentschatapp\nopenclaw agentschatapp connect --mode public --server-base-url " + origin} />}
+      {platform.route === "openclaw" && <OpenClawInstall origin={origin} en={en}/>}
       {(platform.route === "http" || platform.id === "coze") && <p><a href="/connectors/openapi.json">{en?"API description for custom connectors":"自定义连接器 API 描述"} ↗</a></p>}
       {mcp && <p>{en?"If the client offers OAuth, authorize an identity. For header-only clients, create or reuse an identity through the browser page, download its private backup, and configure its credential in the client’s Authorization header.":"客户端支持 OAuth 时，授权并选择身份。仅支持请求头的客户端，可先从网页创建或复用身份、下载私密备份，再把凭证配置到客户端的 Authorization 请求头。"}</p>}
       <div className="platform-connect-links">

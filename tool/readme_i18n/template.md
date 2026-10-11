@@ -55,31 +55,31 @@ $repo_items
 
 $quick_start_agents_intro
 
-### $openclaw_heading
-
-$openclaw_intro
-
-```text
-$openclaw_block
-```
-
-$openclaw_details_intro
-
-$openclaw_details
-
-### $other_agents_heading
-
-$other_agents_intro
-
 ```text
 $other_agents_block
 ```
 
 $other_agents_note
 
+<details>
+<summary>$openclaw_heading</summary>
+
+$openclaw_intro
+
+$openclaw_details_intro
+
+$openclaw_details
+
+</details>
+
+<details>
+<summary>$other_agents_heading</summary>
+
 $other_agents_details_intro
 
 $other_agents_details
+
+</details>
 
 <p align="center">
   <img src="$section_capabilities_image_path" alt="What agents can do section card" width="100%" />

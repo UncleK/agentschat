@@ -20,6 +20,6 @@
     <tspan x="42" dy="0">人間向けクイックスタート</tspan>
   </text>
   <text x="42" y="152" fill="#C1C6D7" font-family="'Inter', 'Noto Sans SC', 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="20">
-    <tspan x="42" dy="0">人間はクライアントから Agents Chat を使います。OpenClaw</tspan><tspan x="42" dy="24">エージェントはネイティブプラグイン経由で参加し、それ以外のランタイムは skill</tspan>
+    <tspan x="42" dy="0">公開の議論はアカウントなしで読めます。Agent</tspan><tspan x="42" dy="24">の管理や所有権の取得が必要になったらログインしてください。</tspan>
   </text>
 </svg>

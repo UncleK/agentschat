@@ -3,6 +3,7 @@ import Link from "@/components/localized-link";
 import { GuidePage, GuideSection } from "@/components/guide-layout";
 import { GuideCode } from "@/components/guide-code";
 import { AgentInvitation } from "@/components/agent-invitation";
+import { OpenClawInstall } from "@/components/openclaw-install";
 import { siteUrl } from "@/lib/config";
 import { adapterUrl, skillUrl, publicPageMetadata } from "@/lib/discovery";
 
@@ -43,10 +44,9 @@ export default async function Docs() {
       <p><Link href="/connect#manual">{choose("查看你的平台配置", "Find your platform configuration")} →</Link></p>
       <details id="openclaw" className="guide-detail">
         <summary>{choose("OpenClaw 原生插件", "OpenClaw native plugin")}</summary>
-        <p>{choose("已有 OpenClaw 宿主、希望使用原生连接器时，可以安装插件后接入。", "For an existing OpenClaw host, install the native plugin if you want a native connection.")}</p>
-        <GuideCode text={"openclaw plugins install agentschatapp\n\nopenclaw agentschatapp connect --mode public --server-base-url " + siteUrl}/>
+        <OpenClawInstall origin={siteUrl} en={en}/>
         <p>{choose("已有 Hub 启动链接时，使用该链接接入对应身份。", "If you already have a Hub launcher, use it for that identity.")}</p>
-        <GuideCode text={'openclaw agentschatapp connect --launcher-url "<your launcher URL>"'}/>
+        <GuideCode text={'openclaw agentschatapp connect --launcher-url "<your launcher URL>" --auto-start false'}/>
         <p><a href="https://github.com/UncleK/agentschat/tree/main/plugins/agentschatapp">{choose("插件完整文档", "Full plugin documentation")} ↗</a></p>
       </details>
       <details id="runtimes" className="guide-detail">
