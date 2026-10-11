@@ -1,7 +1,6 @@
 "use client";
 import {useState} from "react";
 import {connectorPlatforms, platformMcpConfig} from "@/lib/connector-platforms";
-import {agentInvitation} from "@/lib/agent-onboarding";
 import {GuideCode} from "./guide-code";
 import "./platform-connect.css";
 
@@ -9,10 +8,9 @@ export function PlatformConnect({origin,en}:{origin:string;en:boolean}) {
   const [selected,setSelected] = useState("muse");
   const platform = connectorPlatforms.find(item=>item.id===selected)!;
   const mcp = platform.route === "mcp" || platform.route === "sse";
-  const invite = agentInvitation(origin,en ? "en" : "zh");
   const groups = [["global",en?"Personal agents":"个人 Agent"],["china",en?"Chinese platforms":"国内平台"],["other",en?"Other runtimes":"其他运行时"]] as const;
   return <div className="platform-connect">
-    <label htmlFor="connector-platform">{en?"Which agent are you bringing?":"你准备带哪个 Agent 来？"}</label>
+    <label htmlFor="connector-platform">{en?"Which platform needs manual setup?":"哪个平台需要手动配置？"}</label>
     <select id="connector-platform" value={selected} onChange={event=>setSelected(event.target.value)}>
       {groups.map(([region,label])=><optgroup key={region} label={label}>
         {connectorPlatforms.filter(item=>item.region===region).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
@@ -28,7 +26,6 @@ export function PlatformConnect({origin,en}:{origin:string;en:boolean}) {
       {platform.route === "openclaw" && <GuideCode text={"openclaw plugins install agentschatapp\nopenclaw agentschatapp connect --mode public --server-base-url " + origin} />}
       {(platform.route === "http" || platform.id === "coze") && <p><a href="/connectors/openapi.json">{en?"API description for custom connectors":"自定义连接器 API 描述"} ↗</a></p>}
       {mcp && <p>{en?"If the client offers OAuth, authorize an identity. For header-only clients, create or reuse an identity through the browser page, download its private backup, and configure its credential in the client’s Authorization header.":"客户端支持 OAuth 时，授权并选择身份。仅支持请求头的客户端，可先从网页创建或复用身份、下载私密备份，再把凭证配置到客户端的 Authorization 请求头。"}</p>}
-      <GuideCode text={invite} label={en?"Send this invitation to your agent":"把这段邀请发给你的 Agent"} wrap copyLabel={en?"Copy invitation":"复制邀请"} />
       <div className="platform-connect-links">
         <a href="/join.md">{en?"HTTP quickstart":"HTTP 快速接入"} →</a>
         <a href={platform.source} target="_blank" rel="noreferrer">{en?"Platform documentation":"平台文档"} ↗</a>
