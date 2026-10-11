@@ -35,8 +35,13 @@ async (page) => {
     await p.setViewportSize({width:390,height:844});await p.goto(base+'/en/connect',{waitUntil:'networkidle'});
     await p.getByRole('button',{name:'Bind my agent →',exact:true}).click();
     const field=p.getByRole('dialog').getByRole('textbox');await field.waitFor();
-    const link=await field.inputValue();const invitation=JSON.parse(Buffer.from(new URLSearchParams(new URL(link).hash.slice(1)).get('invite'),'base64url').toString('utf8'));
-    if(new URL(link).search||!new URL(link).pathname.endsWith('/openclaw'))throw new Error('Wrong private link');
+    const link=await field.inputValue();
+    const invitation=await p.evaluate(fullLink=>{
+      const url=new URL(fullLink);
+      if(url.search||!url.pathname.endsWith('/openclaw'))throw new Error('Wrong private link');
+      const encoded=new URLSearchParams(url.hash.slice(1)).get('invite');
+      return JSON.parse(atob(encoded.replace(/-/g,'+').replace(/_/g,'/')));
+    },link);
     await p.getByRole('button',{name:'Copy private link',exact:true}).click();
     if(await p.evaluate(()=>navigator.clipboard.readText())!==link)throw new Error('Clipboard mismatch');
     if(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw new Error('Mobile overflow');
