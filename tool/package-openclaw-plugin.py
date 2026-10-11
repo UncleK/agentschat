@@ -21,6 +21,7 @@ files = sorted(path.removeprefix("plugins/agentschatapp/") for path in tracked i
     or path.startswith("plugins/agentschatapp/dist/") and path.endswith(".js")))
 assert {"package.json", "openclaw.plugin.json", "README.md", "dist/index.js"}.issubset(files)
 buffer = io.BytesIO()
+payloads = {}
 with gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as compressed:
     with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
         for relative in files:
@@ -29,12 +30,30 @@ with gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as compresse
                 raise RuntimeError("Unexpected package path: " + relative)
             data = path.read_bytes().replace(b"\r\n", b"\n")
             data.decode("utf-8")
+            payloads["package/" + relative] = data
             entry = tarfile.TarInfo("package/" + relative)
             entry.size, entry.mode, entry.mtime = len(data), 0o644, 0
             archive.addfile(entry, io.BytesIO(data))
 data = buffer.getvalue()
-digest = hashlib.sha256(data).hexdigest()
 filename = f"agentschatapp-{package['version']}.tgz"
+parser = argparse.ArgumentParser()
+parser.add_argument("--check", action="store_true")
+args = parser.parse_args()
+if args.check:
+    # zlib and zlib-ng can compress identical tar streams differently. Verify
+    # every published file against source, then hash the actual shipped bytes.
+    data = (output / filename).read_bytes()
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+        members = archive.getmembers()
+        if sorted(member.name for member in members) != sorted(payloads):
+            raise SystemExit("Native plugin archive file inventory differs")
+        for member in members:
+            if (not member.isfile() or member.mode != 0o644 or member.uid != 0
+                    or member.gid != 0 or member.mtime != 0):
+                raise SystemExit("Unexpected native plugin archive entry: " + member.name)
+            if archive.extractfile(member).read() != payloads[member.name]:
+                raise SystemExit("Native plugin archive source differs: " + member.name)
+digest = hashlib.sha256(data).hexdigest()
 metadata = {"name": package["name"], "version": package["version"], "filename": filename,
     "sha256": digest, "npmShasum": hashlib.sha1(data).hexdigest(),
     "npmIntegrity": "sha512-" + base64.b64encode(hashlib.sha512(data).digest()).decode(),
@@ -42,9 +61,6 @@ metadata = {"name": package["name"], "version": package["version"], "filename": 
     "nodeEngines": package["engines"]["node"]}
 expected = {filename: data, filename + ".sha256": f"{digest}  {filename}\n".encode(),
     "agentschatapp.json": (json.dumps(metadata, indent=2) + "\n").encode()}
-parser = argparse.ArgumentParser()
-parser.add_argument("--check", action="store_true")
-args = parser.parse_args()
 if args.check:
     for name, content in expected.items():
         if not (output / name).is_file() or (output / name).read_bytes() != content:
