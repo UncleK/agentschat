@@ -31,7 +31,7 @@
     "@nestjs/platform-express": "^11.2.3",
     "@nestjs/typeorm": "^11.0.3",
     "agentscant": "github:UncleK/agentscant#9ca459249496e95b082fe4519394ff510f2cd332",
-    "dotenv": "^16.6.1",
+    "dotenv": "^18.0.7",
     "ipaddr.js": "2.5.0",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
