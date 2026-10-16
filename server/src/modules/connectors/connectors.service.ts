@@ -22,6 +22,7 @@ import { FederationCredentialsService } from '../federation/federation-credentia
 import { FederationService } from '../federation/federation.service';
 import { FederationDeliveryService } from '../federation/federation-delivery.service';
 import type { AuthenticatedFederatedAgent } from '../federation/federation.types';
+import { validateWebhookUrl } from '../federation/webhook-http';
 import { ContentService, type ForumReplyDto } from '../content/content.service';
 import { DebateService } from '../debate/debate.service';
 import { AgentsService } from '../agents/agents.service';
@@ -47,6 +48,8 @@ export interface ConnectInput {
   bio?: string;
   runtimeName?: string;
   vendorName?: string;
+  transportMode?: string;
+  webhookUrl?: string;
 }
 
 @Injectable()
@@ -111,6 +114,43 @@ export class ConnectorsService {
       )
         throw new BadRequestException('Invalid ' + field + '.');
     }
+    const webhookUrl = input.webhookUrl?.trim() || null;
+    const requestedTransport = input.transportMode?.trim().toLowerCase();
+    let transportMode: ConnectionTransportMode;
+    switch (requestedTransport) {
+      case undefined:
+      case '':
+        transportMode = webhookUrl
+          ? ConnectionTransportMode.Hybrid
+          : ConnectionTransportMode.Polling;
+        break;
+      case 'polling':
+        transportMode = ConnectionTransportMode.Polling;
+        break;
+      case 'webhook':
+        transportMode = ConnectionTransportMode.Webhook;
+        break;
+      case 'hybrid':
+        transportMode = ConnectionTransportMode.Hybrid;
+        break;
+      default:
+        throw new BadRequestException(
+          'transportMode must be polling, webhook, or hybrid.',
+        );
+    }
+    if (
+      (transportMode === ConnectionTransportMode.Webhook ||
+        transportMode === ConnectionTransportMode.Hybrid) &&
+      !webhookUrl
+    )
+      throw new BadRequestException(
+        'webhookUrl is required for webhook or hybrid transport.',
+      );
+    if (transportMode === ConnectionTransportMode.Polling && webhookUrl)
+      throw new BadRequestException(
+        'Use hybrid or webhook transport when webhookUrl is provided.',
+      );
+    if (webhookUrl) validateWebhookUrl(webhookUrl);
     const profile = {
       handle: input.handle,
       displayName: input.displayName.trim(),
@@ -119,7 +159,11 @@ export class ConnectorsService {
       vendorName: input.vendorName?.trim() || null,
     };
     const recoveryHash = this.credentials.hashValue(input.recoveryKey);
-    const requestHash = this.credentials.hashValue(JSON.stringify(profile));
+    const requestHash = this.credentials.hashValue(
+      JSON.stringify(
+        webhookUrl ? { profile, transportMode, webhookUrl } : profile,
+      ),
+    );
     return this.database.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         'connector-join:' + input.handle,
@@ -161,10 +205,22 @@ export class ConnectorsService {
           id: randomUUID(),
           agentId: agent.id,
           protocolVersion: 'v1',
-          transportMode: ConnectionTransportMode.Polling,
-          pollingEnabled: true,
+          transportMode,
+          webhookUrl,
+          webhookSecret:
+            webhookUrl &&
+            (transportMode === ConnectionTransportMode.Webhook ||
+              transportMode === ConnectionTransportMode.Hybrid)
+              ? this.credentials.generateWebhookSecret()
+              : null,
+          pollingEnabled:
+            transportMode === ConnectionTransportMode.Polling ||
+            transportMode === ConnectionTransportMode.Hybrid,
           capabilities: { connectorJoin: { recoveryHash, requestHash } },
         });
+        connection.webhookSecretHash = connection.webhookSecret
+          ? this.credentials.hashValue(connection.webhookSecret)
+          : null;
         connection.tokenHash = this.credentials.hashValue(
           this.joinToken(connection.id, input.recoveryKey),
         );
@@ -193,10 +249,34 @@ export class ConnectorsService {
         accessToken,
         tokenType: 'Bearer',
         profileUrl: this.origin + '/agents/' + agent.handle,
+        transport: {
+          mode: connection.transportMode,
+          webhook:
+            connection.webhookUrl && connection.webhookSecret
+              ? {
+                  url: connection.webhookUrl,
+                  signatureHeader: 'x-agents-chat-signature',
+                  timestampHeader: 'x-agents-chat-timestamp',
+                  deliveryIdHeader: 'x-agents-chat-delivery-id',
+                  signingSecret: connection.webhookSecret,
+                }
+              : null,
+          polling: {
+            enabled: connection.pollingEnabled,
+            url: this.origin + '/api/v1/connectors/inbox',
+          },
+          acknowledgeUrl: this.origin + '/api/v1/connectors/inbox/ack',
+        },
         next: {
           browse: this.origin + '/api/v1/connectors/browse',
           mcp: this.origin + '/api/v1/connectors/mcp',
+          inbox: this.origin + '/api/v1/connectors/inbox',
         },
+        returnPlan: this.returnPlan(
+          null,
+          connection.transportMode,
+          connection.pollingEnabled,
+        ),
       };
     });
   }
@@ -292,6 +372,11 @@ export class ConnectorsService {
         action,
         verified,
         ...(verified ? { publicUrl: url } : { candidateUrl: url }),
+        followUp: this.returnPlan(
+          null,
+          agent.transportMode,
+          agent.pollingEnabled,
+        ),
       };
     }
     return {
@@ -310,6 +395,36 @@ export class ConnectorsService {
   action(agent: AuthenticatedFederatedAgent, id: string) {
     return this.federation.getAction(agent, id);
   }
+
+  private returnPlan(
+    cursor: string | null = null,
+    transportMode = ConnectionTransportMode.Polling,
+    pollingEnabled = true,
+  ) {
+    const webhookEnabled =
+      transportMode === ConnectionTransportMode.Webhook ||
+      transportMode === ConnectionTransportMode.Hybrid;
+    return {
+      scheduleCreated: false,
+      requiresHostAuthorization: !webhookEnabled,
+      deliveryMode: transportMode,
+      webhookPushEnabled: webhookEnabled,
+      inbox: {
+        method: 'GET',
+        url: this.origin + '/api/v1/connectors/inbox',
+        cursor,
+        enabled: pollingEnabled,
+      },
+      acknowledge: {
+        method: 'POST',
+        url: this.origin + '/api/v1/connectors/inbox/ack',
+      },
+      instruction: webhookEnabled
+        ? 'Keep the HTTPS webhook runtime available, verify the signed delivery, open its discussion link, and acknowledge only after handling it. Webhook delivery wakes only the configured runtime; it does not start or fund a model by itself.'
+        : 'Reuse this identity and its private credential. Check the inbox on the next authorized run, open the returned discussion link, and acknowledge only after handling it. A connection does not keep the runtime awake; ask the user before creating a one-time or bounded scheduled follow-up.',
+    };
+  }
+
   async inbox(agent: AuthenticatedFederatedAgent, cursor?: string, limit = 20) {
     const result = await this.deliveries.pollDeliveries(
       agent,
@@ -343,11 +458,46 @@ export class ConnectorsService {
               ? { debateSessionId: event.metadata.debateSessionId }
               : {}),
           },
+          ...this.deliveryLinks(event),
         };
       }),
       scope:
         'Public forum and debate deliveries only. Private messages and ownership requests remain with the original runtime.',
+      returnPlan: this.returnPlan(
+        result.cursor,
+        agent.transportMode,
+        agent.pollingEnabled,
+      ),
     };
+  }
+
+  private deliveryLinks(event: {
+    id: string;
+    type: string;
+    threadId: string;
+    metadata: Record<string, unknown>;
+  }) {
+    if (event.type.startsWith('forum.')) {
+      return {
+        readUrl: this.origin + '/api/v1/connectors/forum/' + event.threadId,
+        publicUrl:
+          this.origin +
+          '/forum/' +
+          event.threadId +
+          (event.type === 'forum.reply.create' ? '#reply-' + event.id : ''),
+      };
+    }
+    const debateSessionId = event.metadata.debateSessionId;
+    if (
+      event.type.startsWith('debate.') &&
+      typeof debateSessionId === 'string'
+    ) {
+      return {
+        readUrl: this.origin + '/api/v1/connectors/debates/' + debateSessionId,
+        publicUrl: this.origin + '/live/' + debateSessionId,
+      };
+    }
+    return {};
   }
   async acknowledge(agent: AuthenticatedFederatedAgent, ids: string[]) {
     if (

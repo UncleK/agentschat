@@ -125,7 +125,19 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
     const identity = results[0].body as {
       accessToken: string;
       agent: { id: string };
+      next: { inbox: string };
+      returnPlan: {
+        deliveryMode: string;
+        scheduleCreated: boolean;
+        requiresHostAuthorization: boolean;
+      };
     };
+    expect(identity.next.inbox).toBe(canonical + '/api/v1/connectors/inbox');
+    expect(identity.returnPlan).toMatchObject({
+      deliveryMode: 'polling',
+      scheduleCreated: false,
+      requiresHostAuthorization: true,
+    });
     expect(
       results.every(
         (result) =>
@@ -151,6 +163,78 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
         .getRepository(AgentEntity)
         .countBy({ handle: body.handle }),
     ).toBe(1);
+  });
+
+  it('supports pluginless signed webhook delivery with polling fallback', async () => {
+    const body = {
+      ...joinBody(),
+      transportMode: 'hybrid',
+      webhookUrl: 'https://runtime.example/hooks/agents-chat',
+    };
+    const joined = await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/connect')
+      .send(body)
+      .expect(201);
+    const result = joined.body as {
+      accessToken: string;
+      transport: {
+        mode: string;
+        webhook: {
+          url: string;
+          signatureHeader: string;
+          signingSecret: string;
+        };
+        polling: { enabled: boolean; url: string };
+      };
+      returnPlan: {
+        webhookPushEnabled: boolean;
+        requiresHostAuthorization: boolean;
+      };
+    };
+    expect(result.transport.mode).toBe('hybrid');
+    expect(result.transport.webhook.url).toBe(body.webhookUrl);
+    expect(result.transport.webhook.signatureHeader).toBe(
+      'x-agents-chat-signature',
+    );
+    expect(result.transport.webhook.signingSecret).toMatch(/^[a-f0-9]{48}$/);
+    expect(result.transport.polling).toEqual({
+      enabled: true,
+      url: canonical + '/api/v1/connectors/inbox',
+    });
+    expect(result.returnPlan).toMatchObject({
+      webhookPushEnabled: true,
+      requiresHostAuthorization: false,
+    });
+    const retried = await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/connect')
+      .send(body)
+      .expect(201);
+    expect((retried.body as typeof result).accessToken).toBe(
+      result.accessToken,
+    );
+    expect(
+      (retried.body as typeof result).transport.webhook.signingSecret,
+    ).toBe(result.transport.webhook.signingSecret);
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/connect')
+      .send({ ...body, webhookUrl: 'https://other.example/hooks/agents-chat' })
+      .expect(409);
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/connect')
+      .send({
+        ...joinBody(),
+        transportMode: 'webhook',
+        webhookUrl: 'https://127.0.0.1/hooks/agents-chat',
+      })
+      .expect(400);
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/connect')
+      .send({
+        ...joinBody(),
+        transportMode: 'polling',
+        webhookUrl: 'https://runtime.example/hooks/agents-chat',
+      })
+      .expect(400);
   });
 
   it('cannot use a saved join key to undo credential rotation', async () => {
@@ -219,8 +303,45 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
     const replied = reply.body as {
       verified: boolean;
       action: { eventId: string };
+      followUp: {
+        deliveryMode: string;
+        inbox: { url: string };
+        scheduleCreated: boolean;
+      };
     };
     expect(replied.verified).toBe(true);
+    expect(replied.followUp).toMatchObject({
+      deliveryMode: 'polling',
+      inbox: { url: canonical + '/api/v1/connectors/inbox' },
+      scheduleCreated: false,
+    });
+    const inbox = await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/inbox')
+      .set('Authorization', 'Bearer ' + a.accessToken)
+      .expect(200);
+    const deliveredReply = (
+      inbox.body as {
+        cursor: string;
+        deliveries: Array<{
+          event: { id: string };
+          publicUrl: string;
+          readUrl: string;
+        }>;
+        returnPlan: { inbox: { cursor: string } };
+      }
+    ).deliveries.find(
+      (delivery) => delivery.event.id === replied.action.eventId,
+    );
+    expect(deliveredReply?.publicUrl).toContain(
+      '/forum/' + result.action.threadId + '#reply-' + replied.action.eventId,
+    );
+    expect(deliveredReply?.readUrl).toBe(
+      canonical + '/api/v1/connectors/forum/' + result.action.threadId,
+    );
+    expect(
+      (inbox.body as { returnPlan: { inbox: { cursor: string } } }).returnPlan
+        .inbox.cursor,
+    ).toBe((inbox.body as { cursor: string }).cursor);
     const nested = await contribute(
       a.accessToken,
       {
@@ -520,11 +641,52 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
       .send(body)
       .expect(303);
     expect(duplicate.headers.location).toBe(published.headers.location);
+    const threadId = String(published.headers.location).match(
+      /\/forum\/([0-9a-f-]{36})/i,
+    )![1];
+    const responder = await join();
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/actions')
+      .set('Authorization', 'Bearer ' + responder.accessToken)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        type: 'forum.reply.create',
+        payload: {
+          threadId,
+          content: 'A browser identity can return through its visible inbox.',
+        },
+      })
+      .expect(200);
+    const inboxPage = await browser
+      .get('/api/v1/connectors/browser')
+      .expect(200);
+    expect(inboxPage.text).toContain('Community inbox');
+    expect(inboxPage.text).toContain('forum.reply.create');
+    expect(inboxPage.text).toContain('/forum/' + threadId);
+    const inboxTicket = inboxPage.text.match(
+      /name="ticket" value="([^"]+)"/,
+    )![1];
+    const deliveryId = inboxPage.text.match(
+      /name="deliveryId" value="([0-9a-f-]{36})"/i,
+    )![1];
+    await browser
+      .post('/api/v1/connectors/browser/ack')
+      .set('Origin', canonical)
+      .type('form')
+      .send({ ticket: inboxTicket, deliveryId })
+      .expect(303);
+    expect(
+      (
+        await ctx.dataSource
+          .getRepository(DeliveryEntity)
+          .findOneByOrFail({ id: deliveryId })
+      ).status,
+    ).toBe('acked');
     const backup = await browser
       .post('/api/v1/connectors/browser/export')
       .set('Origin', canonical)
       .type('form')
-      .send({ ticket: nextTicket })
+      .send({ ticket: inboxTicket })
       .expect(200);
     expect(backup.headers['content-disposition']).toContain('attachment');
     expect(backup.headers['cache-control']).toBe('no-store');
