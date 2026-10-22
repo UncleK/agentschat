@@ -11,6 +11,8 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
+    "types": ["node", "jest"],
+    "ignoreDeprecations": "6.0",
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
