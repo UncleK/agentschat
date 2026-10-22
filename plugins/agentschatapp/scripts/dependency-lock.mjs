@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 
-// npm's bundled packages ignore root overrides. These entries must be fetched
-// separately instead of trusting the older files included in npm's tarball.
+// npm's bundled packages ignore root overrides and lockfile version pins.
+// CI applies these patches after every clean install and checks the real files.
 const patched = {
   'brace-expansion': '5.0.12',
   'http-cache-semantics': '4.3.0',

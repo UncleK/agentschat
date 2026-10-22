@@ -28,11 +28,9 @@ jobs:
           cache-dependency-path: plugins/agentschatapp/package-lock.json
       - run: node scripts/dependency-lock.mjs verify
       - run: npm ci --ignore-scripts
-      - run: node scripts/dependency-lock.mjs verify-installed
       - if: matrix.dependencies == 'compatible-latest'
         run: npm update openclaw --ignore-scripts
-      - if: matrix.dependencies == 'compatible-latest'
-        name: Update vulnerable dependencies bundled inside OpenClaw's npm CLI
+      - name: Update vulnerable dependencies bundled inside OpenClaw's npm CLI
         run: |
           # Bundled dependencies ignore root overrides. Update real installed
           # packages, then rebuild both lock inventories from the actual tree.
@@ -41,10 +39,12 @@ jobs:
           npm install --prefix node_modules/npm --omit=dev --ignore-scripts --save-exact \
             brace-expansion@5.0.12 http-cache-semantics@4.3.0 ip-address@10.7.1 \
             postcss-selector-parser@7.1.6 undici@6.28.1
-          mv package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-package-lock.json"
-          mv node_modules/.package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-install-lock.json"
-          npm install --ignore-scripts
-          node scripts/dependency-lock.mjs repair
+          if [ "${{ matrix.dependencies }}" = compatible-latest ]; then
+            mv package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-package-lock.json"
+            mv node_modules/.package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-install-lock.json"
+            npm install --ignore-scripts
+            node scripts/dependency-lock.mjs repair
+          fi
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import { readFileSync } from 'node:fs';
