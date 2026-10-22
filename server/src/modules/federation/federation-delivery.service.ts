@@ -537,6 +537,7 @@ export class FederationDeliveryService
             await this.markDeliveryAttemptFailure(
               claimed,
               `Webhook returned HTTP ${response.status}.`,
+              connection.pollingEnabled,
             );
             return;
           }
@@ -546,6 +547,9 @@ export class FederationDeliveryService
             webhookBlockedUntil: null,
           });
           // ACK is terminal even when it arrived before the HTTP response.
+          const exhaustedWithoutFallback =
+            !connection.pollingEnabled &&
+            claimed.webhookAttemptCount >= this.retryScheduleMs.length;
           await this.deliveryRepository.update(
             {
               id: claimed.id,
@@ -553,7 +557,15 @@ export class FederationDeliveryService
               attemptCount: claimed.attemptCount,
             },
             {
-              lastError: null,
+              lastError: exhaustedWithoutFallback
+                ? 'Webhook retry budget exhausted before acknowledgement.'
+                : null,
+              ...(exhaustedWithoutFallback
+                ? {
+                    status: DeliveryStatus.DeadLetter,
+                    deadLetteredAt: new Date(),
+                  }
+                : {}),
               nextAttemptAt:
                 claimed.webhookAttemptCount >= this.retryScheduleMs.length
                   ? null
@@ -568,7 +580,11 @@ export class FederationDeliveryService
               ? 'Webhook request timed out.'
               : 'Webhook delivery failed.';
           await this.recordWebhookFailure(connection.id);
-          await this.markDeliveryAttemptFailure(claimed, message);
+          await this.markDeliveryAttemptFailure(
+            claimed,
+            message,
+            connection.pollingEnabled,
+          );
         }
       };
       let next = 0;
@@ -639,10 +655,12 @@ export class FederationDeliveryService
   private async markDeliveryAttemptFailure(
     delivery: DeliveryEntity,
     message: string,
+    pollingEnabled: boolean,
   ): Promise<void> {
     const expired = delivery.replayExpiresAt.getTime() <= Date.now();
     const pushExhausted =
       delivery.webhookAttemptCount >= this.retryScheduleMs.length;
+    const deadLettered = expired || (pushExhausted && !pollingEnabled);
     await this.deliveryRepository.update(
       {
         id: delivery.id,
@@ -651,8 +669,10 @@ export class FederationDeliveryService
       },
       {
         lastError: message,
-        status: expired ? DeliveryStatus.DeadLetter : DeliveryStatus.Retrying,
-        deadLetteredAt: expired ? new Date() : null,
+        status: deadLettered
+          ? DeliveryStatus.DeadLetter
+          : DeliveryStatus.Retrying,
+        deadLetteredAt: deadLettered ? new Date() : null,
         nextAttemptAt:
           expired || pushExhausted
             ? null

@@ -630,6 +630,7 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
       .expect(303);
     const welcome = await browser.get('/api/v1/connectors/browser').expect(200);
     expect(welcome.text).toContain(handle);
+    expect(welcome.text).toContain('0.8 秒 / seconds');
     const nextTicket = welcome.text.match(/name="ticket" value="([^"]+)"/)![1];
     const body = {
       ticket: nextTicket,

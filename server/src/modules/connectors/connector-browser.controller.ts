@@ -115,6 +115,11 @@ export class ConnectorBrowserController {
       this.connectors.inbox(identity.agent),
       this.connectors.policy(identity.agent),
     ]);
+    const retentionSeconds = policy.capabilities.inbox.retentionMs / 1000;
+    const retentionLabel =
+      retentionSeconds >= 3600
+        ? Number((retentionSeconds / 3600).toFixed(2)) + ' 小时 / hours'
+        : retentionSeconds + ' 秒 / seconds';
     const inboxItems = inbox.deliveries
       .map((delivery) => {
         const event = delivery.event as {
@@ -181,7 +186,9 @@ export class ConnectorBrowserController {
             '<p><a href="/community">参与社区共建 / Build this community</a> · <a href="/api/v1/connectors/browser">刷新 / Refresh</a></p>' +
             '<section><h2>社区收件箱 / Community inbox</h2><p>未确认 / Pending: ' +
             inbox.pendingCount +
-            '。通知保留 72 小时，处理后再确认。Notifications remain available for 72 hours; acknowledge after handling.</p>' +
+            '。保留时间 / Retention: ' +
+            retentionLabel +
+            '。处理后再确认 / Acknowledge after handling.</p>' +
             (inboxItems ||
               '<p>当前没有可领取的通知；已领取但未确认的通知稍后重试。No deliveries available now; leased, unacknowledged deliveries become available again.</p>') +
             '</section>' +

@@ -104,121 +104,140 @@ describe('WH-01/WH-02 endpoint isolation with synthetic transport', () => {
       poke.mockRestore();
     }
   });
-  it('WH-02 persists backoff and circuit state and resumes oldest remaining delivery after cooldown', async () => {
-    const service = ctx.app.get(FederationDeliveryService);
-    const pause = jest
-      .spyOn(service, 'poke')
-      .mockImplementation(() => undefined);
-    const send = jest
-      .spyOn(transport, 'postWebhook')
-      .mockResolvedValue({ ok: false, status: 503 });
-    try {
-      const b = auditBody(
-        (
-          await request(ctx.app.getHttpServer())
-            .post('/api/v1/agents/bootstrap/public')
-            .send({
-              handle: `circuit-${randomUUID().slice(0, 8)}`,
-              displayName: 'Synthetic',
-            })
-            .expect(201)
-        ).body,
-      );
-      const c = auditBody(
-        (
-          await request(ctx.app.getHttpServer())
-            .post('/api/v1/agents/claim')
-            .send({
-              claimToken: b.bootstrap.claimToken,
-              transportMode: 'webhook',
-              webhookUrl: 'https://circuit.audit.invalid/events',
-            })
-            .expect(201)
-        ).body,
-      );
-      const threads = ctx.dataSource.getRepository(ThreadEntity);
-      const thread = await threads.save(
-        threads.create({
-          contextType: ThreadContextType.DirectMessage,
-          visibility: ThreadVisibility.Private,
-        }),
-      );
-      const events = ctx.dataSource.getRepository(EventEntity);
-      const event = await events.save(
-        events.create({
-          threadId: thread.id,
-          eventType: 'audit.circuit',
-          actorType: EventActorType.System,
-        }),
-      );
-      const delivery = await service.enqueueEventForRecipient(
-        event,
-        c.agent.id,
-      );
-      const deliveries = ctx.dataSource.getRepository(DeliveryEntity);
-      const connections = ctx.dataSource.getRepository(AgentConnectionEntity);
-      await deliveries.update(delivery.id, {
-        replayExpiresAt: new Date(Date.now() + 60000),
-      });
-      for (let i = 0; i < 3; i++) {
-        await deliveries.update(delivery.id, { nextAttemptAt: new Date(0) });
-        await service['processDueWebhookDeliveries']();
-        const saved = await deliveries.findOneByOrFail({ id: delivery.id });
-        expect(saved.attemptCount).toBe(i + 1);
-        if (i < 2) expect(saved.nextAttemptAt).not.toBeNull();
-        else {
-          expect(saved.status).toBe('retrying');
-          expect(saved.webhookAttemptCount).toBe(3);
-          expect(saved.nextAttemptAt).toBeNull();
-          expect(saved.deadLetteredAt).toBeNull();
+  it.each(['webhook', 'hybrid'])(
+    'WH-02 persists backoff, circuit and recovery for %s connections',
+    async (mode) => {
+      const service = ctx.app.get(FederationDeliveryService);
+      const pause = jest
+        .spyOn(service, 'poke')
+        .mockImplementation(() => undefined);
+      const send = jest
+        .spyOn(transport, 'postWebhook')
+        .mockResolvedValue({ ok: false, status: 503 });
+      try {
+        const b = auditBody(
+          (
+            await request(ctx.app.getHttpServer())
+              .post('/api/v1/agents/bootstrap/public')
+              .send({
+                handle: `circuit-${randomUUID().slice(0, 8)}`,
+                displayName: 'Synthetic',
+              })
+              .expect(201)
+          ).body,
+        );
+        const c = auditBody(
+          (
+            await request(ctx.app.getHttpServer())
+              .post('/api/v1/agents/claim')
+              .send({
+                claimToken: b.bootstrap.claimToken,
+                transportMode: mode,
+                pollingEnabled: mode === 'hybrid',
+                webhookUrl: `https://${mode}.circuit.audit.invalid/events`,
+              })
+              .expect(201)
+          ).body,
+        );
+        const threads = ctx.dataSource.getRepository(ThreadEntity);
+        const thread = await threads.save(
+          threads.create({
+            contextType: ThreadContextType.DirectMessage,
+            visibility: ThreadVisibility.Private,
+          }),
+        );
+        const events = ctx.dataSource.getRepository(EventEntity);
+        const event = await events.save(
+          events.create({
+            threadId: thread.id,
+            eventType: 'audit.circuit',
+            actorType: EventActorType.System,
+          }),
+        );
+        const delivery = await service.enqueueEventForRecipient(
+          event,
+          c.agent.id,
+        );
+        const deliveries = ctx.dataSource.getRepository(DeliveryEntity);
+        const connections = ctx.dataSource.getRepository(AgentConnectionEntity);
+        await deliveries.update(delivery.id, {
+          replayExpiresAt: new Date(Date.now() + 60000),
+        });
+        for (let i = 0; i < 3; i++) {
+          await deliveries.update(delivery.id, { nextAttemptAt: new Date(0) });
+          await service['processDueWebhookDeliveries']();
+          const saved = await deliveries.findOneByOrFail({ id: delivery.id });
+          expect(saved.attemptCount).toBe(i + 1);
+          if (i < 2) expect(saved.nextAttemptAt).not.toBeNull();
+          else {
+            expect(saved.status).toBe(
+              mode === 'hybrid' ? 'retrying' : 'dead_letter',
+            );
+            expect(saved.webhookAttemptCount).toBe(3);
+            expect(saved.nextAttemptAt).toBeNull();
+            if (mode === 'hybrid') expect(saved.deadLetteredAt).toBeNull();
+            else expect(saved.deadLetteredAt).toBeInstanceOf(Date);
+          }
         }
+        const blocked = await connections.findOneByOrFail({
+          agentId: c.agent.id,
+        });
+        expect(blocked.webhookConsecutiveFailures).toBe(3);
+        expect(blocked.webhookBlockedUntil!.getTime()).toBeGreaterThan(
+          Date.now(),
+        );
+        const before = send.mock.calls.filter(([url]) =>
+          url.includes(`${mode}.circuit`),
+        ).length;
+        await service['processDueWebhookDeliveries']();
+        expect(
+          send.mock.calls.filter(([url]) => url.includes(`${mode}.circuit`)),
+        ).toHaveLength(before);
+        // Advance only the synthetic cooldown and retry timestamps.
+        await connections.update(blocked.id, {
+          webhookBlockedUntil: new Date(0),
+        });
+        const nextEvent = await events.save(
+          events.create({
+            threadId: thread.id,
+            eventType: 'audit.circuit.next',
+            actorType: EventActorType.System,
+          }),
+        );
+        const nextDelivery = await service.enqueueEventForRecipient(
+          nextEvent,
+          c.agent.id,
+        );
+        send.mockResolvedValue({ ok: true, status: 200 });
+        await service['processDueWebhookDeliveries']();
+        const recovered = await connections.findOneByOrFail({ id: blocked.id });
+        expect(recovered.webhookConsecutiveFailures).toBe(0);
+        expect(recovered.webhookBlockedUntil).toBeNull();
+        expect(
+          (await deliveries.findOneByOrFail({ id: nextDelivery.id })).eventId,
+        ).toBe(nextEvent.id);
+        expect(
+          (await deliveries.findOneByOrFail({ id: nextDelivery.id })).status,
+        ).toBe('sent');
+        expect(
+          (await deliveries.findOneByOrFail({ id: delivery.id })).status,
+        ).toBe(mode === 'hybrid' ? 'retrying' : 'dead_letter');
+        if (mode === 'hybrid') {
+          const principal = await service[
+            'federationCredentialsService'
+          ].authenticateAgentToken(c.accessToken);
+          const result = await service.pollDeliveries(
+            principal,
+            undefined,
+            1,
+            0,
+          );
+          expect(result.deliveries[0]?.deliveryId).toBe(delivery.id);
+        }
+      } finally {
+        send.mockRestore();
+        pause.mockRestore();
       }
-      const blocked = await connections.findOneByOrFail({
-        agentId: c.agent.id,
-      });
-      expect(blocked.webhookConsecutiveFailures).toBe(3);
-      expect(blocked.webhookBlockedUntil!.getTime()).toBeGreaterThan(
-        Date.now(),
-      );
-      const before = send.mock.calls.filter(([url]) =>
-        url.includes('circuit'),
-      ).length;
-      await service['processDueWebhookDeliveries']();
-      expect(
-        send.mock.calls.filter(([url]) => url.includes('circuit')),
-      ).toHaveLength(before);
-      // Advance only the synthetic cooldown and retry timestamps.
-      await connections.update(blocked.id, {
-        webhookBlockedUntil: new Date(0),
-      });
-      const nextEvent = await events.save(
-        events.create({
-          threadId: thread.id,
-          eventType: 'audit.circuit.next',
-          actorType: EventActorType.System,
-        }),
-      );
-      const nextDelivery = await service.enqueueEventForRecipient(
-        nextEvent,
-        c.agent.id,
-      );
-      send.mockResolvedValue({ ok: true, status: 200 });
-      await service['processDueWebhookDeliveries']();
-      const recovered = await connections.findOneByOrFail({ id: blocked.id });
-      expect(recovered.webhookConsecutiveFailures).toBe(0);
-      expect(recovered.webhookBlockedUntil).toBeNull();
-      expect(
-        (await deliveries.findOneByOrFail({ id: nextDelivery.id })).eventId,
-      ).toBe(nextEvent.id);
-      expect(
-        (await deliveries.findOneByOrFail({ id: nextDelivery.id })).status,
-      ).toBe('sent');
-      expect(
-        (await deliveries.findOneByOrFail({ id: delivery.id })).status,
-      ).toBe('retrying');
-    } finally {
-      send.mockRestore();
-      pause.mockRestore();
-    }
-  });
+    },
+  );
 });
