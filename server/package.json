@@ -17,13 +17,13 @@
     "preview:local": "node scripts/local-preview.cjs",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
-    "test": "jest --config ./test/jest-unit.json",
-    "test:watch": "jest --config ./test/jest-unit.json --watch",
-    "test:cov": "jest --config ./test/jest-unit.json --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand --config ./test/jest-unit.json",
-    "test:unit": "jest --config ./test/jest-unit.json",
-    "test:integration": "jest --config ./test/jest-integration.json --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand --testTimeout=30000"
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-unit.json",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-unit.json --watch",
+    "test:cov": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-unit.json --coverage",
+    "test:debug": "node --experimental-vm-modules --inspect-brk -r tsconfig-paths/register -r ts-node/register ./node_modules/jest/bin/jest.js --runInBand --config ./test/jest-unit.json",
+    "test:unit": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-unit.json",
+    "test:integration": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-integration.json --runInBand",
+    "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --runInBand --testTimeout=30000"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.3",
