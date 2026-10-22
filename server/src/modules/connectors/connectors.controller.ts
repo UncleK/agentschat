@@ -1,6 +1,7 @@
 import {
   All,
   Body,
+  BadRequestException,
   Controller,
   Get,
   Headers,
@@ -8,6 +9,8 @@ import {
   HttpException,
   Logger,
   Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
@@ -72,16 +75,42 @@ export class ConnectorsController {
     });
   }
   @Get('forum/:id')
-  topic(@Param('id') id: string) {
-    return this.connectors.topic(id);
+  topic(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query('afterEventId', new ParseUUIDPipe({ optional: true }))
+    afterEventId?: string,
+  ) {
+    return this.connectors.topic(id, afterEventId);
+  }
+  @Get('discussion')
+  discussion(
+    @Query('kind') kind: string,
+    @Query('id', new ParseUUIDPipe()) id: string,
+    @Query('afterEventId', new ParseUUIDPipe({ optional: true }))
+    afterEventId?: string,
+  ) {
+    if (kind === 'forum') return this.connectors.topic(id, afterEventId);
+    if (kind === 'debate' && !afterEventId) return this.connectors.debate(id);
+    throw new BadRequestException(
+      'kind must be forum or debate; afterEventId is for forum discussions.',
+    );
+  }
+  @Get('agents')
+  directory() {
+    return this.connectors.directory();
   }
   @Get('debates/:id')
-  debate(@Param('id') id: string) {
+  debate(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.connectors.debate(id);
   }
   @Get('policy')
   async policy(@Req() request: Request) {
-    return this.connectors.policy(await this.agent(request, 'community.read'));
+    const access = await this.access(request, 'community.read');
+    return this.connectors.policy(access.agent, access.scopes);
+  }
+  @Get('community')
+  community() {
+    return this.connectors.contributionGuide();
   }
   @Post('actions')
   @HttpCode(200)
@@ -98,17 +127,25 @@ export class ConnectorsController {
     );
   }
   @Get('actions/:id')
-  async action(@Req() request: Request, @Param('id') id: string) {
+  async action(
+    @Req() request: Request,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
     return this.connectors.action(
       await this.agent(request, 'community.read'),
       id,
     );
   }
   @Get('inbox')
-  async inbox(@Req() request: Request, @Query('cursor') cursor?: string) {
+  async inbox(
+    @Req() request: Request,
+    @Query('cursor') cursor?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
     return this.connectors.inbox(
       await this.agent(request, 'community.inbox'),
       cursor,
+      limit,
     );
   }
   @Post('inbox/ack')
@@ -120,12 +157,15 @@ export class ConnectorsController {
     );
   }
   private async agent(request: Request, scope: string) {
+    return (await this.access(request, scope)).agent;
+  }
+  private async access(request: Request, scope: string) {
     const access = await this.mcp.access(request);
     if (!access || !access.scopes.includes(scope))
       throw new UnauthorizedException(
         'Missing agent identity or permission: ' + scope,
       );
-    return access.agent;
+    return access;
   }
 
   @Get('oauth/metadata')

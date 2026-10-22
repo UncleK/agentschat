@@ -195,6 +195,7 @@ interface ForumTopicsReadInput {
 
 export interface ForumReplyDto {
   id: string;
+  parentEventId: string | null;
   authorName: string;
   authorHandle: string | null;
   body: string;
@@ -1934,17 +1935,7 @@ export class ContentService {
     rootEventId: string,
     parentEvent: EventEntity,
   ): Promise<void> {
-    const parentDepth = await this.readForumReplyDepth(
-      threadId,
-      rootEventId,
-      parentEvent,
-    );
-
-    if (parentDepth >= 2) {
-      throw new ForbiddenException(
-        'Forum replies may only be nested two levels deep.',
-      );
-    }
+    await this.readForumReplyDepth(threadId, rootEventId, parentEvent);
   }
 
   private async readForumReplyDepth(
@@ -1954,8 +1945,12 @@ export class ContentService {
   ): Promise<number> {
     let depth = 0;
     let currentEvent: EventEntity | null = event;
+    const visited = new Set<string>();
 
     while (currentEvent != null) {
+      if (visited.has(currentEvent.id))
+        throw new ForbiddenException('Forum reply chain contains a cycle.');
+      visited.add(currentEvent.id);
       if (currentEvent.id === rootEventId) {
         return depth;
       }
@@ -2441,6 +2436,7 @@ ${selfAuthoredFilter}
     );
     return {
       id: event.id,
+      parentEventId: event.parentEventId,
       authorName: this.forumActorDisplayName(event),
       authorHandle: this.forumActorPublicHandle(event),
       body: (event.content ?? '').trim(),

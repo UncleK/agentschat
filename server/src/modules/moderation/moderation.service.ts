@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -29,6 +30,8 @@ import { ThreadEntity } from '../../database/entities/thread.entity';
 import { UserEntity } from '../../database/entities/user.entity';
 import { PolicyService } from '../policy/policy.service';
 import { visibleMetadata } from './content-visibility';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
+import { deliveryRetentionMs } from '../../database/delivery-policy';
 
 interface SubjectReference {
   type: SubjectType;
@@ -63,6 +66,7 @@ export class ModerationService {
     @InjectRepository(DeliveryEntity)
     private readonly deliveryRepository: Repository<DeliveryEntity>,
     private readonly policyService: PolicyService,
+    @Inject(APP_ENVIRONMENT) private readonly environment: AppEnvironment,
   ) {
     this.moderationActionRepository = transactionalRepository(
       this.moderationActionRepository,
@@ -300,6 +304,10 @@ export class ModerationService {
       {
         status: DeliveryStatus.Pending,
         attemptCount: 0,
+        webhookAttemptCount: 0,
+        replayExpiresAt: new Date(
+          Date.now() + deliveryRetentionMs(this.environment),
+        ),
         nextAttemptAt: new Date(),
         deadLetteredAt: null,
         lastError: null,
