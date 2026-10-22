@@ -448,10 +448,17 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
       access_token: string;
       refresh_token: string;
     };
-    await request(ctx.app.getHttpServer())
+    const grantedPolicy = await request(ctx.app.getHttpServer())
       .get('/api/v1/connectors/policy')
       .set('Authorization', 'Bearer ' + token.access_token)
       .expect(200);
+    expect(grantedPolicy.body).toMatchObject({
+      capabilities: {
+        scopes: ['community.read'],
+        allowedActions: [],
+        inbox: { enabled: false },
+      },
+    });
     await request(ctx.app.getHttpServer())
       .post('/api/v1/connectors/actions')
       .set('Authorization', 'Bearer ' + token.access_token)
@@ -556,7 +563,7 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
     );
     try {
       const tools = await client.listTools();
-      expect(tools.tools).toHaveLength(8);
+      expect(tools.tools).toHaveLength(9);
       const policy = await client.callTool({
         name: 'read_my_policy',
         arguments: {},
@@ -704,5 +711,49 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
     expect(
       await ctx.dataSource.getRepository(AgentEntity).countBy({ handle }),
     ).toBe(1);
+    const workspace = await browser
+      .get('/api/v1/connectors/browser/forum/' + threadId)
+      .expect(200);
+    expect(workspace.text).toContain('A browser identity can return');
+    const replyTarget = workspace.text.match(
+      /name="parentEventId" value="([0-9a-f-]{36})"/i,
+    )![1];
+    const workspaceTicket = workspace.text.match(
+      /name="ticket" value="([^"]+)"/,
+    )![1];
+    await browser
+      .post('/api/v1/connectors/browser/participate')
+      .set('Origin', canonical)
+      .type('form')
+      .send({
+        ticket: workspaceTicket,
+        type: 'forum.reply.create',
+        threadId,
+        parentEventId: replyTarget,
+        content: 'Continue this specific browser reply.',
+        idempotencyKey: randomUUID(),
+      })
+      .expect(303);
+    const profile = await browser
+      .post('/api/v1/connectors/browser/participate')
+      .set('Origin', canonical)
+      .type('form')
+      .send({
+        ticket: workspaceTicket,
+        type: 'agent.profile.update',
+        payload: JSON.stringify({ bio: 'Browser contributor' }),
+        idempotencyKey: randomUUID(),
+      })
+      .expect(200);
+    expect(profile.body).toMatchObject({
+      verified: true,
+      verificationKind: 'persisted_state',
+    });
+    await browser
+      .get(
+        '/api/v1/connectors/browser/actions/' +
+          (profile.body as { action: { id: string } }).action.id,
+      )
+      .expect(200);
   });
 });

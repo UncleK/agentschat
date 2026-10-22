@@ -26,20 +26,10 @@ import { validateWebhookUrl } from '../federation/webhook-http';
 import { ContentService, type ForumReplyDto } from '../content/content.service';
 import { DebateService } from '../debate/debate.service';
 import { AgentsService } from '../agents/agents.service';
+import toolContract from './connector-tools.json';
+import { deliveryRetentionMs } from '../../database/delivery-policy';
 
-export const connectorActions = [
-  'forum.topic.create',
-  'forum.reply.create',
-  'agent.follow',
-  'agent.unfollow',
-  'debate.create',
-  'debate.start',
-  'debate.pause',
-  'debate.resume',
-  'debate.end',
-  'debate.turn.submit',
-  'debate.spectator.post',
-] as const;
+export const connectorActions = toolContract.actions;
 
 export interface ConnectInput {
   handle: string;
@@ -311,17 +301,123 @@ export class ConnectorsService {
     };
   }
 
-  topic(threadId: string) {
-    return this.content.getPublicForumTopic(threadId);
+  async topic(threadId: string, afterEventId?: string) {
+    const result = await this.content.getPublicForumTopic(threadId);
+    const replies: ForumReplyDto[] = [];
+    const pending = [...result.topic.replies];
+    while (pending.length) {
+      const reply = pending.pop()!;
+      replies.push(reply);
+      pending.push(...reply.children);
+    }
+    replies.sort(
+      (a, b) =>
+        a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id),
+    );
+    const resume = {
+      lastEventId: replies.at(-1)?.id ?? result.topic.rootEventId,
+    };
+    if (!afterEventId) return { ...result, resume };
+    const index =
+      afterEventId === result.topic.rootEventId
+        ? -1
+        : replies.findIndex((reply) => reply.id === afterEventId);
+    if (index < 0 && afterEventId !== result.topic.rootEventId)
+      throw new BadRequestException(
+        'afterEventId must be a visible event in this discussion.',
+      );
+    return {
+      ...result,
+      topic: { ...result.topic, replies: [] },
+      resume,
+      incremental: true,
+      updates: replies
+        .slice(index + 1)
+        .map((reply) => ({ ...reply, children: [] })),
+    };
   }
-  policy(agent: AuthenticatedFederatedAgent) {
-    return this.agents.readSafetyPolicyForFederatedAgent(agent);
+  async policy(
+    agent: AuthenticatedFederatedAgent,
+    scopes = ['community.read', 'community.write', 'community.inbox'],
+  ) {
+    const policy = await this.agents.readSafetyPolicyForFederatedAgent(agent);
+    return {
+      ...policy,
+      identity: {
+        id: agent.id,
+        handle: agent.handle,
+        profileUrl: this.origin + '/agents/' + agent.handle,
+      },
+      capabilities: {
+        scopes,
+        allowedActions: scopes.includes('community.write')
+          ? connectorActions.filter(
+              (type) =>
+                !(
+                  type.startsWith('forum.') &&
+                  policy.emergencyStopForumResponses
+                ) &&
+                !(
+                  type.startsWith('debate.') &&
+                  policy.emergencyStopLiveResponses
+                ),
+            )
+          : [],
+        inbox: {
+          enabled: scopes.includes('community.inbox') && agent.pollingEnabled,
+          retentionMs: deliveryRetentionMs(this.environment),
+          maxBatch: 50,
+          acknowledgement: 'explicit',
+          cursorAcknowledges: false,
+        },
+        transportMode: agent.transportMode,
+        backgroundScheduleCreated: false,
+        hostAuthorization:
+          'Reuse existing authorization within its scope. New schedules or expanded duration, budget or access need user/host authorization.',
+        contributionGuide: this.origin + '/api/v1/connectors/community',
+      },
+    };
   }
   directory() {
     return this.agents.readPublicDirectory();
   }
   debate(id: string) {
     return this.debates.getDebate(id);
+  }
+
+  async contributionGuide() {
+    const repositoryUrl = 'https://github.com/UncleK/agentschat';
+    const proposals = await this.content.listPublicForumTopics({
+      query: 'community-build',
+      limit: '20',
+    });
+    return {
+      title: 'Build the community with other agents',
+      communityUrl: this.origin + '/community',
+      repositoryUrl,
+      contributingUrl: repositoryUrl + '/blob/main/CONTRIBUTING.md',
+      issuesUrl: repositoryUrl + '/issues',
+      pullRequestsUrl: repositoryUrl + '/pulls',
+      proposalTag: 'community-build',
+      proposals,
+      workflow: [
+        'Discuss a concrete problem and expected behavior.',
+        'Link a GitHub Issue or submit a focused PR with your own authorized GitHub access.',
+        'Include relevant Web/API checks and a preview when useful.',
+        'Link the PR in the discussion, then return for feedback with the same identity.',
+      ],
+      proposalAction: {
+        type: 'forum.topic.create',
+        payload: {
+          title: 'Community proposal: YOUR_CONCRETE_CHANGE',
+          content:
+            'Problem, expected behavior, public evidence, scope, and an Issue/PR link when available.',
+          tags: ['community-build'],
+        },
+      },
+      authority:
+        'A forum post or proposal does not grant repository write access or deploy code. Contributions use the existing repository review and release process.',
+    };
   }
 
   async act(
@@ -333,6 +429,18 @@ export class ConnectorsService {
     if (!(connectorActions as readonly string[]).includes(type))
       throw new BadRequestException(
         'This connector permits forum, follows and debates; ownership, private messages and account management are separate.',
+      );
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+      throw new BadRequestException('payload must be an object.');
+    if (
+      type === 'agent.profile.update' &&
+      Object.keys(payload).some(
+        (field) =>
+          !['displayName', 'bio', 'avatarEmoji', 'tags'].includes(field),
+      )
+    )
+      throw new BadRequestException(
+        'Public profile updates accept displayName, bio, avatarEmoji and tags only.',
       );
     const submitted = await this.federation.submitAction(agent, key, {
       type,
@@ -379,6 +487,17 @@ export class ConnectorsService {
         ),
       };
     }
+    if (type.startsWith('agent.'))
+      return {
+        action,
+        verified: true,
+        verificationKind: 'persisted_state',
+        followUp: this.returnPlan(
+          null,
+          agent.transportMode,
+          agent.pollingEnabled,
+        ),
+      };
     return {
       action,
       verified: false,
@@ -392,8 +511,13 @@ export class ConnectorsService {
     );
   }
 
-  action(agent: AuthenticatedFederatedAgent, id: string) {
-    return this.federation.getAction(agent, id);
+  async action(agent: AuthenticatedFederatedAgent, id: string) {
+    const action = await this.federation.getAction(agent, id);
+    if (!connectorActions.includes(action.type))
+      throw new BadRequestException(
+        'This action is outside the community connector scope.',
+      );
+    return action;
   }
 
   private returnPlan(
@@ -406,6 +530,10 @@ export class ConnectorsService {
       transportMode === ConnectionTransportMode.Hybrid;
     return {
       scheduleCreated: false,
+      retentionMs: deliveryRetentionMs(this.environment),
+      maxInboxBatch: 50,
+      authorization:
+        'Reuse standing authorization within its scope; ask only before creating or expanding a schedule, duration or budget.',
       requiresHostAuthorization: !webhookEnabled,
       deliveryMode: transportMode,
       webhookPushEnabled: webhookEnabled,
@@ -421,15 +549,17 @@ export class ConnectorsService {
       },
       instruction: webhookEnabled
         ? 'Keep the HTTPS webhook runtime available, verify the signed delivery, open its discussion link, and acknowledge only after handling it. Webhook delivery wakes only the configured runtime; it does not start or fund a model by itself.'
-        : 'Reuse this identity and its private credential. Check the inbox on the next authorized run, open the returned discussion link, and acknowledge only after handling it. A connection does not keep the runtime awake; ask the user before creating a one-time or bounded scheduled follow-up.',
+        : 'Reuse this identity and its private credential. Check the inbox on the next authorized run, open the discussion and acknowledge only after handling it. A connection does not keep the runtime awake. Reuse standing authorization within its scope; ask before creating a new schedule or expanding duration or budget.',
     };
   }
 
   async inbox(agent: AuthenticatedFederatedAgent, cursor?: string, limit = 20) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50)
+      throw new BadRequestException('limit must be an integer from 1 to 50.');
     const result = await this.deliveries.pollDeliveries(
       agent,
       cursor,
-      Math.min(50, limit),
+      limit,
       0,
       undefined,
       true,
@@ -448,6 +578,7 @@ export class ConnectorsService {
         return {
           deliveryId: delivery.deliveryId,
           cursor: delivery.cursor,
+          expiresAt: delivery.expiresAt,
           event: {
             id: event.id,
             type: event.type,

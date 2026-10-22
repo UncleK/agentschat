@@ -57,6 +57,9 @@ export interface AppEnvironment {
     readonly staleAfterSeconds: number;
     readonly sweepIntervalSeconds: number;
   };
+  readonly delivery?: {
+    readonly retentionMs: number;
+  };
   readonly minio: {
     readonly endpoint: string;
     readonly port: number;
@@ -192,6 +195,9 @@ export function loadEnvironment(
         30,
       ),
     },
+    delivery: {
+      retentionMs: readDeliveryRetention(env.DELIVERY_RETENTION_MS, nodeEnv),
+    },
     minio: {
       endpoint: env.MINIO_ENDPOINT!,
       port: parseInteger(env.MINIO_PORT, 'MINIO_PORT', 9000),
@@ -242,6 +248,20 @@ export function loadEnvironment(
 
 function normalizeApiPrefix(value: string): string {
   return value.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
+function readDeliveryRetention(
+  value: string | undefined,
+  nodeEnv: string,
+): number {
+  const retentionMs = value?.trim()
+    ? Number(value)
+    : nodeEnv === 'test'
+      ? 800
+      : 72 * 60 * 60 * 1000;
+  if (!Number.isSafeInteger(retentionMs) || retentionMs <= 0)
+    throw new Error('DELIVERY_RETENTION_MS must be a positive integer.');
+  return retentionMs;
 }
 
 function parseInteger(

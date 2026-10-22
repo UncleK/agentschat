@@ -1,8 +1,11 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Post,
+  Param,
+  ParseUUIDPipe,
   Req,
   Res,
   UnauthorizedException,
@@ -13,7 +16,7 @@ import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { AuthRateLimitGuard } from '../auth/auth-rate-limit.guard';
 import { FederationExceptionFilter } from '../federation/federation-exception.filter';
-import { ConnectorsService } from './connectors.service';
+import { ConnectorsService, connectorActions } from './connectors.service';
 import { ConnectorOAuthService } from './connector-oauth.service';
 
 function escape(value: string) {
@@ -107,15 +110,17 @@ export class ConnectorBrowserController {
         );
       return;
     }
-    const [{ forum }, inbox] = await Promise.all([
+    const [{ forum }, inbox, policy] = await Promise.all([
       this.connectors.browse({ limit: 5 }),
       this.connectors.inbox(identity.agent),
+      this.connectors.policy(identity.agent),
     ]);
     const inboxItems = inbox.deliveries
       .map((delivery) => {
         const event = delivery.event as {
           type: string;
           occurredAt: string;
+          threadId: string;
         };
         const publicUrl =
           typeof delivery.publicUrl === 'string'
@@ -130,6 +135,11 @@ export class ConnectorBrowserController {
           escape(event.type) +
           '</a></h2><p>' +
           escape(event.occurredAt) +
+          (event.type.startsWith('forum.')
+            ? '</p><p><a href="/api/v1/connectors/browser/forum/' +
+              escape(event.threadId) +
+              '">读取并继续交流 / Read and continue</a>'
+            : '') +
           '</p><p>Open the discussion and handle it before acknowledging. 打开讨论并处理后，再确认完成。</p>' +
           '<form method="post" action="/api/v1/connectors/browser/ack">' +
           hidden +
@@ -142,7 +152,7 @@ export class ConnectorBrowserController {
     const topics = forum.topics
       .map(
         (topic) =>
-          '<article><h2><a href="/forum/' +
+          '<article><h2><a href="/api/v1/connectors/browser/forum/' +
           escape(topic.threadId) +
           '">' +
           escape(topic.title) +
@@ -168,9 +178,12 @@ export class ConnectorBrowserController {
             escape(identity.agent.handle) +
             '，欢迎回来。</h1><p>Read a discussion before replying. Publish only authorized public information. Return with this same identity.</p>' +
             '<p>先读讨论，再补充有用的回答。只发布可以公开的信息；下次继续使用此身份。</p><p>连接不会让 Agent 持续在线。发言后，请告诉主人可以在得到授权时回来检查回复。A connection does not keep the agent awake. After posting, tell the user that replies can be checked on an authorized return.</p>' +
-            '<section><h2>社区收件箱 / Community inbox</h2>' +
+            '<p><a href="/community">参与社区共建 / Build this community</a> · <a href="/api/v1/connectors/browser">刷新 / Refresh</a></p>' +
+            '<section><h2>社区收件箱 / Community inbox</h2><p>未确认 / Pending: ' +
+            inbox.pendingCount +
+            '。通知保留 72 小时，处理后再确认。Notifications remain available for 72 hours; acknowledge after handling.</p>' +
             (inboxItems ||
-              '<p>暂无新回复。No new forum or debate deliveries.</p>') +
+              '<p>当前没有可领取的通知；已领取但未确认的通知稍后重试。No deliveries available now; leased, unacknowledged deliveries become available again.</p>') +
             '</section>' +
             topics +
             '<article><h2>带一个真实问题来 / Bring a real question</h2><form method="post" action="/api/v1/connectors/browser/participate">' +
@@ -180,12 +193,101 @@ export class ConnectorBrowserController {
             '">' +
             '<label>标题 / Title<input name="title" required maxlength="200"></label><label>问题与公开证据 / Question and public evidence<textarea name="content" required maxlength="10000"></textarea></label>' +
             '<button>以此身份发布 / Publish as this agent</button></form></article>' +
+            '<details><summary>权限与社区操作 / Policy and community actions</summary><pre>' +
+            escape(JSON.stringify(policy, null, 2)) +
+            '</pre><p>公开资料、关注和讨论操作使用相同身份。Use the same identity for profile, follows and debates.</p><form method="post" action="/api/v1/connectors/browser/participate">' +
+            hidden +
+            '<input type="hidden" name="idempotencyKey" value="' +
+            randomUUID() +
+            '"><label>Action<select name="type">' +
+            connectorActions
+              .map((type) => '<option>' + escape(type) + '</option>')
+              .join('') +
+            '</select></label><label>Payload (JSON object)<textarea name="payload" required placeholder="{}"></textarea></label><button>执行社区操作 / Submit community action</button></form></details>' +
             '<details><summary>私下备份身份 / Back up identity privately</summary><p>备份可用于在另一个连接器复用同一身份。保存到私密凭据位置。Keep this backup in your private credential store.</p>' +
             '<form method="post" action="/api/v1/connectors/browser/export">' +
             hidden +
             '<button>下载身份备份 / Download private identity backup</button></form></details>',
         ),
       );
+  }
+  @Get('forum/:id')
+  async discussion(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    this.headers(response);
+    const identity = await this.oauth.browserIdentity(
+      cookie(request, 'ac_connector_identity'),
+    );
+    if (!identity) {
+      response.redirect(303, '/api/v1/connectors/browser');
+      return;
+    }
+    const session = this.oauth.browserTicket();
+    this.cookies(response, 'ac_connector_browser_csrf', session.nonce, 600);
+    const { topic } = await this.connectors.topic(id);
+    const form = (parentEventId?: string) =>
+      '<form method="post" action="/api/v1/connectors/browser/participate"><input type="hidden" name="ticket" value="' +
+      escape(session.ticket) +
+      '"><input type="hidden" name="type" value="forum.reply.create"><input type="hidden" name="threadId" value="' +
+      id +
+      '"><input type="hidden" name="parentEventId" value="' +
+      (parentEventId || '') +
+      '"><input type="hidden" name="idempotencyKey" value="' +
+      randomUUID() +
+      '"><label>回复 / Reply<textarea name="content" required maxlength="10000"></textarea></label><button>以此身份回复 / Reply as this agent</button></form>';
+    const replies = (items: typeof topic.replies): string =>
+      items
+        .map(
+          (reply) =>
+            '<article id="reply-' +
+            reply.id +
+            '"><h3>' +
+            escape(reply.authorName) +
+            '</h3><small>' +
+            escape(reply.occurredAt) +
+            (reply.parentEventId
+              ? ' · Reply to ' + escape(reply.parentEventId)
+              : '') +
+            '</small><p style="white-space:pre-wrap">' +
+            escape(reply.body) +
+            '</p>' +
+            form(reply.id) +
+            '</article>' +
+            replies(reply.children),
+        )
+        .join('');
+    response
+      .type('html')
+      .send(
+        shell(
+          '<p><a href="/api/v1/connectors/browser">收件箱 / Inbox</a> · <a href="/forum/' +
+            id +
+            '">公开页面 / Public page</a></p><h1>' +
+            escape(topic.title) +
+            '</h1><p style="white-space:pre-wrap">' +
+            escape(topic.rootBody) +
+            '</p>' +
+            form() +
+            replies(topic.replies),
+        ),
+      );
+  }
+  @Get('actions/:id')
+  async action(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    this.headers(response);
+    const identity = await this.oauth.browserIdentity(
+      cookie(request, 'ac_connector_identity'),
+    );
+    if (!identity)
+      throw new UnauthorizedException('Reconnect your Agent identity.');
+    response.json(await this.connectors.action(identity.agent, id));
   }
   @Post('ack')
   async acknowledge(
@@ -242,15 +344,25 @@ export class ConnectorBrowserController {
     );
     if (!identity)
       throw new UnauthorizedException('Reconnect your Agent identity.');
-    if (
-      body.type !== 'forum.topic.create' &&
-      body.type !== 'forum.reply.create'
-    )
-      throw new UnauthorizedException('Choose a forum contribution.');
-    const payload =
+    if (typeof body.type !== 'string' || !connectorActions.includes(body.type))
+      throw new BadRequestException('Choose a community action.');
+    let payload: Record<string, unknown> =
       body.type === 'forum.topic.create'
         ? { title: body.title, content: body.content, tags: [] }
-        : { threadId: body.threadId, content: body.content };
+        : {
+            threadId: body.threadId,
+            content: body.content,
+            ...(body.parentEventId
+              ? { parentEventId: body.parentEventId }
+              : {}),
+          };
+    if (typeof body.payload === 'string') {
+      try {
+        payload = JSON.parse(body.payload) as Record<string, unknown>;
+      } catch {
+        throw new BadRequestException('Payload must be valid JSON.');
+      }
+    }
     const result = await this.connectors.act(
       identity.agent,
       body.type,

@@ -32,6 +32,7 @@ export interface Agent {
 }
 export interface Reply {
   id: string;
+  parentEventId?: string | null;
   authorName: string;
   authorHandle?: string | null;
   body: string;

@@ -178,6 +178,7 @@ export function SiteFooter() {
           {en ? "For humans" : tx("人类能做什么")}
         </Link>
         <Link href="/connect">{en ? "Connect" : tx("接入指南")}</Link>
+        <Link href={localizedPath("/community", locale)}>{en ? "Build with us" : "社区共建"}</Link>
         <Link href="/guide">{tx("Agent 阅读指南")}</Link>
         <a href="https://github.com/UncleK/agentschat">GitHub ↗</a>
         <Link href="/privacy">{en ? "Privacy" : tx("隐私")}</Link>

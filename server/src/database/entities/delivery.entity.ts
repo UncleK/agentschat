@@ -70,6 +70,9 @@ export class DeliveryEntity extends BaseTableEntity {
   @Column({ name: 'attempt_count', type: 'integer', default: 0 })
   attemptCount = 0;
 
+  @Column({ name: 'webhook_attempt_count', type: 'integer', default: 0 })
+  webhookAttemptCount = 0;
+
   @Column({ name: 'last_attempt_at', type: 'timestamptz', nullable: true })
   lastAttemptAt: Date | null = null;
 

@@ -13,6 +13,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { setTimeout as delay } from 'node:timers/promises';
 import { In, Not, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
+import { deliveryRetentionMs } from '../../database/delivery-policy';
+import { visibleMetadataSql } from '../moderation/content-visibility';
 import {
   AgentStatus,
   ConnectionTransportMode,
@@ -31,6 +33,9 @@ import { AuthenticatedFederatedAgent } from './federation.types';
 export interface PollResult {
   cursor: string | null;
   deliveries: Array<Record<string, unknown>>;
+  pendingCount?: number;
+  hasMore?: boolean;
+  nextPollAfterSeconds?: number;
 }
 
 @Injectable()
@@ -71,7 +76,7 @@ export class FederationDeliveryService
       environment.nodeEnv === 'test' ? 200 : 10_000;
     this.retryScheduleMs =
       environment.nodeEnv === 'test' ? [0, 100, 200] : [0, 5_000, 30_000];
-    this.replayWindowMs = environment.nodeEnv === 'test' ? 800 : 15 * 60 * 1000;
+    this.replayWindowMs = deliveryRetentionMs(environment);
     this.deliverySweepIntervalMs = environment.nodeEnv === 'test' ? 50 : 1_000;
     this.presenceStaleAfterMs =
       Math.max(1, environment.presence.staleAfterSeconds) * 1_000;
@@ -182,6 +187,7 @@ export class FederationDeliveryService
       );
     });
     try {
+      await this.expireDueDeliveries(agent.id);
       while (!signal?.aborted && !this.isStopped) {
         const deliveries = await this.collectPollableDeliveries(
           agent.id,
@@ -192,11 +198,24 @@ export class FederationDeliveryService
         if (deliveries.length > 0 || Date.now() >= deadline) {
           if (!signal?.aborted)
             await this.recordAgentPollingActivity(agent, true);
+          const pendingCount = communityOnly
+            ? await this.outstandingQuery(agent.id, true)
+                .andWhere('delivery.replayExpiresAt > :now', {
+                  now: new Date(),
+                })
+                .getCount()
+            : undefined;
           return {
             cursor:
               (deliveries.at(-1)?.cursor as string | undefined) ??
               (normalizedCursor === null ? null : String(normalizedCursor)),
             deliveries,
+            pendingCount,
+            hasMore:
+              pendingCount === undefined
+                ? undefined
+                : pendingCount > deliveries.length,
+            nextPollAfterSeconds: 5,
           };
         }
         try {
@@ -378,19 +397,26 @@ export class FederationDeliveryService
     limit: number | undefined,
     communityOnly = false,
   ): Promise<Array<Record<string, unknown>>> {
-    const boundedLimit = Math.max(1, Math.min(limit ?? 1, 1));
-    const deliveries: Array<Record<string, unknown>> = [];
-
-    while (deliveries.length < boundedLimit) {
-      const outstanding = await this.loadEarliestOutstandingDelivery(
-        recipientAgentId,
-        communityOnly,
+    const boundedLimit = limit ?? 1;
+    if (
+      !Number.isInteger(boundedLimit) ||
+      boundedLimit < 1 ||
+      boundedLimit > 50
+    )
+      throw new FederationHttpException(
+        400,
+        'invalid_limit',
+        'limit must be an integer from 1 to 50.',
       );
-
-      if (!outstanding) {
-        break;
-      }
-
+    const deliveries: Array<Record<string, unknown>> = [];
+    const outstandingBatch = await this.outstandingQuery(
+      recipientAgentId,
+      communityOnly,
+    )
+      .andWhere('delivery.replayExpiresAt > :now', { now: new Date() })
+      .take(boundedLimit)
+      .getMany();
+    for (const outstanding of outstandingBatch) {
       if (!(await this.ensureDeliveryIsActive(outstanding))) {
         continue;
       }
@@ -409,7 +435,6 @@ export class FederationDeliveryService
       );
       if (!claimed) continue;
       deliveries.push(await this.serializeDeliveryById(claimed.id));
-      break;
     }
 
     return deliveries;
@@ -431,6 +456,7 @@ export class FederationDeliveryService
     if (this.isStopped || this.isProcessingWebhooks) return;
     this.isProcessingWebhooks = true;
     try {
+      await this.expireDueDeliveries();
       const connections = await this.agentConnectionRepository.find({
         where: {
           transportMode: In([
@@ -455,6 +481,8 @@ export class FederationDeliveryService
 
         const outstanding = await this.loadEarliestOutstandingDelivery(
           connection.agentId,
+          false,
+          true,
         );
 
         if (!outstanding) {
@@ -526,7 +554,10 @@ export class FederationDeliveryService
             },
             {
               lastError: null,
-              nextAttemptAt: this.nextAttemptAt(claimed.attemptCount),
+              nextAttemptAt:
+                claimed.webhookAttemptCount >= this.retryScheduleMs.length
+                  ? null
+                  : this.nextAttemptAt(claimed.webhookAttemptCount),
             },
           );
         } catch (error) {
@@ -583,6 +614,9 @@ export class FederationDeliveryService
   ): Promise<DeliveryEntity | null> {
     const next = {
       attemptCount: delivery.attemptCount + 1,
+      ...(channel === DeliveryChannel.Webhook
+        ? { webhookAttemptCount: delivery.webhookAttemptCount + 1 }
+        : {}),
       deliveryChannel: channel,
       lastAttemptAt: new Date(),
       status:
@@ -606,9 +640,9 @@ export class FederationDeliveryService
     delivery: DeliveryEntity,
     message: string,
   ): Promise<void> {
-    const expired =
-      delivery.attemptCount >= this.retryScheduleMs.length ||
-      delivery.replayExpiresAt.getTime() <= Date.now();
+    const expired = delivery.replayExpiresAt.getTime() <= Date.now();
+    const pushExhausted =
+      delivery.webhookAttemptCount >= this.retryScheduleMs.length;
     await this.deliveryRepository.update(
       {
         id: delivery.id,
@@ -619,9 +653,10 @@ export class FederationDeliveryService
         lastError: message,
         status: expired ? DeliveryStatus.DeadLetter : DeliveryStatus.Retrying,
         deadLetteredAt: expired ? new Date() : null,
-        nextAttemptAt: expired
-          ? null
-          : this.nextAttemptAt(delivery.attemptCount),
+        nextAttemptAt:
+          expired || pushExhausted
+            ? null
+            : this.nextAttemptAt(delivery.webhookAttemptCount),
       },
     );
   }
@@ -636,10 +671,7 @@ export class FederationDeliveryService
       return false;
     }
 
-    if (
-      delivery.replayExpiresAt.getTime() <= Date.now() ||
-      delivery.attemptCount >= this.retryScheduleMs.length
-    ) {
+    if (delivery.replayExpiresAt.getTime() <= Date.now()) {
       await this.deliveryRepository.update(
         {
           id: delivery.id,
@@ -650,6 +682,8 @@ export class FederationDeliveryService
           status: DeliveryStatus.DeadLetter,
           deadLetteredAt: new Date(),
           nextAttemptAt: null,
+          lastError:
+            'Delivery retention window expired before acknowledgement.',
         },
       );
       return false;
@@ -661,29 +695,60 @@ export class FederationDeliveryService
   private async loadEarliestOutstandingDelivery(
     recipientAgentId: string,
     communityOnly = false,
+    forWebhook = false,
   ): Promise<DeliveryEntity | null> {
-    if (communityOnly) {
-      return this.deliveryRepository
-        .createQueryBuilder('delivery')
+    const query = this.outstandingQuery(recipientAgentId, communityOnly);
+    if (forWebhook)
+      query.andWhere('delivery.webhookAttemptCount < :maxAttempts', {
+        maxAttempts: this.retryScheduleMs.length,
+      });
+    return query.take(1).getOne();
+  }
+
+  private outstandingQuery(recipientAgentId: string, communityOnly = false) {
+    const query = this.deliveryRepository
+      .createQueryBuilder('delivery')
+      .where(
+        'delivery.recipientAgentId = :id AND delivery.status IN (:...statuses)',
+        {
+          id: recipientAgentId,
+          statuses: this.activeDeliveryStatuses,
+        },
+      );
+    if (communityOnly)
+      query
         .innerJoin('delivery.event', 'event')
         .innerJoin('event.thread', 'thread')
-        .where(
-          'delivery.recipientAgentId = :id AND delivery.status IN (:...statuses)',
-          { id: recipientAgentId, statuses: this.activeDeliveryStatuses },
-        )
         .andWhere(
           "(event.eventType LIKE 'forum.%' OR event.eventType LIKE 'debate.%')",
         )
         .andWhere('thread.visibility = :visibility', {
           visibility: ThreadVisibility.Public,
         })
-        .orderBy('delivery.sequence', 'ASC')
-        .getOne();
-    }
-    return this.deliveryRepository.findOne({
-      where: { recipientAgentId, status: In(this.activeDeliveryStatuses) },
-      order: { sequence: 'ASC' },
-    });
+        .andWhere(visibleMetadataSql('event.metadata'))
+        .andWhere(visibleMetadataSql('thread.metadata'));
+    return query.orderBy('delivery.sequence', 'ASC');
+  }
+
+  private async expireDueDeliveries(recipientAgentId?: string) {
+    const query = this.deliveryRepository
+      .createQueryBuilder()
+      .update(DeliveryEntity)
+      .set({
+        status: DeliveryStatus.DeadLetter,
+        deadLetteredAt: new Date(),
+        nextAttemptAt: null,
+        lastError: 'Delivery retention window expired before acknowledgement.',
+      })
+      .where('status IN (:...statuses)', {
+        statuses: this.activeDeliveryStatuses,
+      })
+      .andWhere('replay_expires_at <= :now', { now: new Date() });
+    if (recipientAgentId)
+      query.andWhere('recipient_agent_id = :recipientAgentId', {
+        recipientAgentId,
+      });
+    await query.execute();
   }
 
   private async serializeDeliveryById(
@@ -719,6 +784,9 @@ export class FederationDeliveryService
       sequence: delivery.sequence,
       status: delivery.status,
       channel: delivery.deliveryChannel,
+      expiresAt: delivery.replayExpiresAt.toISOString(),
+      attemptCount: delivery.attemptCount,
+      webhookAttemptCount: delivery.webhookAttemptCount,
       event: {
         id: event.id,
         type: this.externalEventType(delivery, event),

@@ -166,7 +166,12 @@ describe('WH-01/WH-02 endpoint isolation with synthetic transport', () => {
         const saved = await deliveries.findOneByOrFail({ id: delivery.id });
         expect(saved.attemptCount).toBe(i + 1);
         if (i < 2) expect(saved.nextAttemptAt).not.toBeNull();
-        else expect(saved.status).toBe('dead_letter');
+        else {
+          expect(saved.status).toBe('retrying');
+          expect(saved.webhookAttemptCount).toBe(3);
+          expect(saved.nextAttemptAt).toBeNull();
+          expect(saved.deadLetteredAt).toBeNull();
+        }
       }
       const blocked = await connections.findOneByOrFail({
         agentId: c.agent.id,
@@ -210,7 +215,7 @@ describe('WH-01/WH-02 endpoint isolation with synthetic transport', () => {
       ).toBe('sent');
       expect(
         (await deliveries.findOneByOrFail({ id: delivery.id })).status,
-      ).toBe('dead_letter');
+      ).toBe('retrying');
     } finally {
       send.mockRestore();
       pause.mockRestore();

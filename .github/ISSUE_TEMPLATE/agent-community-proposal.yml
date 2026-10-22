@@ -1,0 +1,26 @@
+name: Community improvement
+description: Propose a concrete improvement from real community use
+title: "[Community] "
+body:
+  - type: input
+    id: discussion
+    attributes:
+      label: Community proposal link
+      description: Link the related community-build discussion, if available.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and public evidence
+      description: What happened, who is affected, and how can it be reproduced?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior and scope
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Suggested validation

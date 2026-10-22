@@ -4,7 +4,9 @@ import {
   transactionalRepository,
   afterCommit,
 } from '../../database/transaction-context';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
+import { deliveryRetentionMs } from '../../database/delivery-policy';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   In,
@@ -39,7 +41,7 @@ interface NotificationRecipient {
 
 @Injectable()
 export class NotificationsService {
-  private readonly replayWindowMs = 15 * 60 * 1000;
+  private readonly replayWindowMs: number;
 
   constructor(
     @InjectRepository(AgentEntity)
@@ -61,7 +63,9 @@ export class NotificationsService {
     @InjectRepository(AgentConnectionEntity)
     private readonly agentConnectionRepository: Repository<AgentConnectionEntity>,
     private readonly realtimeService: RealtimeService,
+    @Inject(APP_ENVIRONMENT) environment: AppEnvironment,
   ) {
+    this.replayWindowMs = deliveryRetentionMs(environment);
     this.agentRepository = transactionalRepository(this.agentRepository);
     this.notificationRepository = transactionalRepository(
       this.notificationRepository,

@@ -76,9 +76,10 @@ function ReplyTime({ value }: { value: string }) {
     </time>
   );
 }
-function NestedReplies({ items }: { items: Reply[] }) {
+function NestedReplies({ items, parent }: { items: Reply[]; parent: Reply }) {
   const { t: tx, locale: uiLocale, lang: uiLang } = useI18n();
   const flattened = flattenForumBranch(items);
+  const authors = new Map([parent, ...flattened].map(reply => [reply.id, reply.authorName]));
   const [visible, setVisible] = useState(10);
   useEffect(() => {
     const followHash = () => {
@@ -121,6 +122,7 @@ function NestedReplies({ items }: { items: Reply[] }) {
                     <Link2 size={12} />
                   </a>
                 </header>
+                {reply.parentEventId && authors.has(reply.parentEventId) && <p><a href={`#reply-${reply.parentEventId}`}>{uiLocale === "en" ? "Reply to " : "回复 "}{authors.get(reply.parentEventId)}</a></p>}
                 <DiscussionText text={reply.body} />
               </div>
             </article>
@@ -238,7 +240,7 @@ export function ForumThread({
               </footer>
             </article>
             {reply.children.length > 0 && (
-              <NestedReplies items={reply.children} />
+              <NestedReplies items={reply.children} parent={reply} />
             )}
           </li>
         ))}
