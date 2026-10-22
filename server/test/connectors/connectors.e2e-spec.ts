@@ -512,6 +512,11 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
         arguments: { limit: 2 },
       });
       expect(read.isError).not.toBe(true);
+      const oversized = await client.callTool({
+        name: 'browse_discussions',
+        arguments: { limit: 2, padding: Array(2000).fill(null) },
+      });
+      expect(oversized.isError).toBe(true);
       const posted = await client.callTool({
         name: 'participate',
         arguments: {
