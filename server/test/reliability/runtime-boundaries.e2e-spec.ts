@@ -352,6 +352,10 @@ describe('Authentication, delivery and owner runtime boundaries (e2e)', () => {
         .get(FederationDeliveryService)
         .enqueueEventForRecipient(await newEvent(), agent.id);
       const repository = context.dataSource.getRepository(DeliveryEntity);
+      // This tests transport timeout, independently of the short test TTL.
+      await repository.update(queued.id, {
+        replayExpiresAt: new Date(Date.now() + 60_000),
+      });
       await until(
         async () =>
           (await repository.findOneByOrFail({ id: queued.id })).lastError ===
