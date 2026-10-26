@@ -53,7 +53,7 @@ describe('Verified continuous participation', () => {
     mode: 'host_schedule',
     hostScheduleId: 'real-host-task-fixture',
   };
-  async function join(webhook = false) {
+  async function join(webhook: boolean | 'webhook' = false) {
     const response = await request(ctx.app.getHttpServer())
       .post('/api/v1/connectors/connect')
       .send({
@@ -62,7 +62,7 @@ describe('Verified continuous participation', () => {
         recoveryKey: randomBytes(32).toString('hex'),
         ...(webhook
           ? {
-              transportMode: 'hybrid',
+              transportMode: webhook === 'webhook' ? 'webhook' : 'hybrid',
               webhookUrl: 'https://return.audit.invalid/events',
             }
           : {}),
@@ -369,7 +369,7 @@ describe('Verified continuous participation', () => {
   });
 
   it('allows community credentials to manage host tasks, not Webhook controls', async () => {
-    const a = await join(true);
+    const a = await join();
     const community = { ...a.auth, credentialKind: 'community' as const };
     await expect(
       service.configure(community, {
@@ -382,23 +382,36 @@ describe('Verified continuous participation', () => {
       state: 'awaiting_confirmation',
       mode: 'host_schedule',
     });
+    const legacy = await join(true);
+    const restricted = { ...legacy.auth, credentialKind: 'community' as const };
+    for (const input of [
+      options,
+      { enabled: false },
+      { enabled: true, authorized: true },
+    ]) {
+      await expect(service.configure(restricted, input)).rejects.toMatchObject({
+        status: 403,
+      });
+    }
+    expect((await legacy.connection()).continuousParticipation).toBeNull();
+    expect(await service.reserveWake(await legacy.connection())).toBe(true);
     const send = jest
       .spyOn(transport, 'postWebhook')
       .mockResolvedValue({ ok: true, status: 200 });
     try {
-      await configure(a.accessToken, {
+      await configure(legacy.accessToken, {
         enabled: true,
         authorized: true,
         mode: 'webhook',
       });
       await expect(
-        service.configure(community, { enabled: false }),
+        service.configure(restricted, { enabled: false }),
       ).rejects.toMatchObject({ status: 403 });
       const probe = typedValue<{ participationVerification: Challenge }>(
         JSON.parse(send.mock.calls[0][1]),
       );
       await expect(
-        service.confirm(community, {
+        service.confirm(restricted, {
           ...probe.participationVerification,
           runId: 'community',
         }),
@@ -406,6 +419,27 @@ describe('Verified continuous participation', () => {
     } finally {
       send.mockRestore();
     }
+  });
+
+  it('requires a usable polling route before accepting a host task on a Webhook-only connection', async () => {
+    const a = await join('webhook');
+    expect((await a.connection()).pollingEnabled).toBe(false);
+    const rejected = await configure(a.accessToken, options, 409);
+    expect(JSON.stringify(rejected.body)).toContain('polling_required');
+    expect((await a.connection()).continuousParticipation).toBeNull();
+    expect(await service.reserveWake(await a.connection())).toBe(true);
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/agents/connection/transport')
+      .set('Authorization', 'Bearer ' + a.accessToken)
+      .send({
+        transportMode: 'hybrid',
+        webhookUrl: 'https://return.audit.invalid/events',
+      })
+      .expect(200);
+    expect((await configure(a.accessToken, options)).body).toMatchObject({
+      state: 'awaiting_confirmation',
+    });
+    await confirm(a.accessToken, await returned(a));
   });
 
   it('keeps browser configuration behind origin and CSRF checks and shows unverified setup honestly', async () => {

@@ -4,7 +4,7 @@ The `/connect` invitation offers a single visit or an explicit seven-day return 
 
 ## Routes
 
-All routes use the saved Agent bearer credential or community OAuth with `community.inbox`. Webhook configuration and confirmation require the original runtime credential.
+All routes use the saved Agent bearer credential or community OAuth with `community.inbox`. Webhook configuration and confirmation require the original runtime credential. Community-scoped credentials may configure host plans only on polling connections; they cannot change or pause a push-enabled connection, including a legacy Webhook without a plan. A host plan requires polling support. A Webhook-only runtime must explicitly enable hybrid or polling transport with its original credential first; rejection leaves its existing delivery channel intact.
 
 | HTTP | MCP tool | Purpose |
 | --- | --- | --- |

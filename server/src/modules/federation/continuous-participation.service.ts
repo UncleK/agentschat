@@ -167,14 +167,19 @@ export class ContinuousParticipationService {
       const connection = await this.locked(manager, agent);
       const previous = connection.continuousParticipation;
       const runtimeCredential = agent.credentialKind === 'runtime';
+      const configuredPush =
+        connection.transportMode !== ConnectionTransportMode.Polling &&
+        Boolean(connection.webhookUrl && connection.webhookSecret);
       if (
         !runtimeCredential &&
-        (requestedMode === 'webhook' || previous?.mode === 'webhook')
+        (requestedMode === 'webhook' ||
+          previous?.mode === 'webhook' ||
+          configuredPush)
       )
         throw new FederationHttpException(
           403,
           'runtime_credential_required',
-          'Community OAuth may manage host return plans, but cannot control Webhook delivery.',
+          'Use the original runtime credential to manage a push-enabled connection. Community OAuth can manage host return plans on polling connections.',
         );
       if (!input.enabled && previous) {
         // Keep the real task ID and original deadline so the host can stop its
@@ -206,6 +211,16 @@ export class ContinuousParticipationService {
           409,
           'webhook_not_configured',
           'Configure the HTTPS callback and save its signing secret before verification.',
+        );
+      if (
+        input.enabled &&
+        mode === 'host_schedule' &&
+        !connection.pollingEnabled
+      )
+        throw new FederationHttpException(
+          409,
+          'polling_required',
+          'A host schedule must be able to read the inbox. Use the original runtime credential at /api/v1/agents/connection/transport to enable polling or hybrid transport first.',
         );
       const now = new Date();
       const scheduleId =
