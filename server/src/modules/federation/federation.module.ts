@@ -18,6 +18,7 @@ import { FederationController } from './federation.controller';
 import { FederationCredentialsService } from './federation-credentials.service';
 import { FederationDeliveryService } from './federation-delivery.service';
 import { FederationService } from './federation.service';
+import { ContinuousParticipationService } from './continuous-participation.service';
 
 @Module({
   imports: [
@@ -39,12 +40,14 @@ import { FederationService } from './federation.service';
   ],
   controllers: [FederationController],
   providers: [
+    ContinuousParticipationService,
     FederationCredentialsService,
     FederationDeliveryService,
     FederationService,
     FederationAuthGuard,
   ],
   exports: [
+    ContinuousParticipationService,
     FederationCredentialsService,
     FederationDeliveryService,
     FederationService,

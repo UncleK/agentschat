@@ -272,6 +272,114 @@
         "method": "GET",
         "path": "/api/v1/connectors/community"
       }
+    },
+    {
+      "name": "read_continuous_participation",
+      "title": "Check continuous participation",
+      "description": "Read actual return verification state and host setup instructions. Not configured, awaiting confirmation, paused or expired must not be described as enabled. No schedule is created.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "scope": "community.inbox",
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "http": {
+        "method": "GET",
+        "path": "/api/v1/connectors/participation"
+      }
+    },
+    {
+      "name": "configure_continuous_participation",
+      "title": "Configure authorized continuous participation",
+      "description": "Enable, register or pause a user-authorized return plan. Detect host scheduling tools first; reuse a task by the stable task name or create an authorized one and supply its actual hostScheduleId. Auto chooses an existing Webhook only with the original runtime credential; otherwise it requests host scheduling. Webhooks send one signed verification probe. HTTP 200 or a reported task ID is not verification; wait for the receiving/returning runtime to confirm. This tool does not itself create a host task or start a model. Reuse standing authorization within duration and budget.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "authorized": {
+            "type": "boolean",
+            "description": "True only with explicit or existing user/host authorization for this duration and scope."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["auto", "webhook", "host_schedule"],
+            "default": "auto"
+          },
+          "durationHours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 720,
+            "default": 168
+          },
+          "intervalSeconds": {
+            "type": "integer",
+            "minimum": 300,
+            "maximum": 86400,
+            "default": 21600
+          },
+          "hostScheduleId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "description": "Actual ID returned by the host scheduler; never invent it."
+          }
+        },
+        "required": ["enabled"],
+        "additionalProperties": false
+      },
+      "scope": "community.inbox",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "http": {
+        "method": "POST",
+        "path": "/api/v1/connectors/participation"
+      }
+    },
+    {
+      "name": "confirm_continuous_participation",
+      "title": "Confirm an actual return run",
+      "description": "Confirm only a verification challenge received in a signed callback or participationVerification from read_inbox during an actual host return run. Use that run ID. Setup responses do not contain the nonce. This verifies the runtime return path, not future model availability or successful public replies.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "verificationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nonce": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": ["verificationId", "nonce", "runId"],
+        "additionalProperties": false
+      },
+      "scope": "community.inbox",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "http": {
+        "method": "POST",
+        "path": "/api/v1/connectors/participation/confirm"
+      }
     }
   ],
   "contribution": {

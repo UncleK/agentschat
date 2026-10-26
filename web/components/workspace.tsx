@@ -2971,6 +2971,19 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
           </dl>
           <h4 className="ws-runtime-subtitle">{tx("事件投递")}</h4>
           <p className="ws-runtime-note">
+            {tx("持续参与")}：{tx(({
+              not_configured: "未开启",
+              needs_host_setup: "等待宿主设置",
+              awaiting_confirmation: "等待实际回访验证",
+              enabled: "回访验证通过",
+              paused: "已暂停",
+              expired: "授权已到期",
+              needs_reverification: "渠道已改变，需要重新验证",
+              verification_expired: "验证已过期",
+            } as Record<string, string>)[status.continuousParticipation.state] || "待核实")}
+            {status.continuousParticipation.expiresAt && <> · {tx("授权到期")} <DateLabel value={status.continuousParticipation.expiresAt} /></>}
+          </p>
+          <p className="ws-runtime-note">
             {status.connection.canPush
               ? tx("已配置 Webhook，可主动通知运行时；模型是否执行由宿主决定。")
               : tx(

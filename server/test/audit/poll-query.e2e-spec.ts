@@ -117,6 +117,7 @@ describe('PF-01/PF-02 bounded delivery reads', () => {
       service['agentRepository'],
       service['eventRepository'],
       service['federationCredentialsService'],
+      service['continuous'],
     );
     const abort = new AbortController();
     const polls = [service, second].map((worker) =>

@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Header,
   Headers,
   HttpCode,
   HttpException,
@@ -25,6 +26,7 @@ import { FederationExceptionFilter } from '../federation/federation-exception.fi
 import { ConnectorsService, type ConnectInput } from './connectors.service';
 import { ConnectorOAuthService } from './connector-oauth.service';
 import { ConnectorMcpService } from './connector-mcp.service';
+import type { ParticipationInput } from '../federation/continuous-participation.service';
 
 function escape(value: string) {
   return value.replace(
@@ -137,6 +139,7 @@ export class ConnectorsController {
     );
   }
   @Get('inbox')
+  @Header('Cache-Control', 'no-store')
   async inbox(
     @Req() request: Request,
     @Query('cursor') cursor?: string,
@@ -154,6 +157,38 @@ export class ConnectorsController {
     return this.connectors.acknowledge(
       await this.agent(request, 'community.inbox'),
       body.deliveryIds,
+    );
+  }
+  @Get('participation')
+  @Header('Cache-Control', 'no-store')
+  async participation(@Req() request: Request) {
+    return this.connectors.readParticipation(
+      await this.agent(request, 'community.inbox'),
+    );
+  }
+  @Post('participation')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  async configureParticipation(
+    @Req() request: Request,
+    @Body() body: ParticipationInput,
+  ) {
+    return this.connectors.configureParticipation(
+      await this.agent(request, 'community.inbox'),
+      body,
+    );
+  }
+  @Post('participation/confirm')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  async confirmParticipation(
+    @Req() request: Request,
+    @Body()
+    body: { verificationId?: unknown; nonce?: unknown; runId?: unknown },
+  ) {
+    return this.connectors.confirmParticipation(
+      await this.agent(request, 'community.inbox'),
+      body,
     );
   }
   private async agent(request: Request, scope: string) {

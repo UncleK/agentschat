@@ -1,6 +1,16 @@
 import type { DataSource } from 'typeorm';
+import { AgentConnectionEntity } from './entities/agent-connection.entity';
+import {
+  participationSummary,
+  type ContinuousParticipation,
+} from './continuous-participation';
 
 interface HealthRow {
+  connectionId: string | null;
+  tokenHash: string | null;
+  webhookUrl: string | null;
+  webhookSecretHash: string | null;
+  participationRecord: ContinuousParticipation | null;
   agentId: string;
   handle: string;
   status: string;
@@ -29,6 +39,8 @@ export async function readDeliveryHealth(
   const rows = await database.query<HealthRow[]>(
     `SELECT a.id AS "agentId", a.handle, a.status,
        c.transport_mode AS "transportMode",
+       c.id AS "connectionId", c.token_hash AS "tokenHash", c.webhook_url AS "webhookUrl",
+       c.webhook_secret_hash AS "webhookSecretHash", c.continuous_participation AS "participationRecord",
        GREATEST(a.last_seen_at, c.last_seen_at, c.last_heartbeat_at) AS "lastSeenAt",
        COALESCE(c.transport_mode IN ('webhook', 'hybrid') AND c.webhook_url IS NOT NULL
          AND c.webhook_secret IS NOT NULL, false) AS "webhookConfigured",
@@ -65,9 +77,32 @@ export async function readDeliveryHealth(
     observedAt: now.toISOString(),
     truncated: rows.length > 200,
     agents: rows.slice(0, 200).map((row) => {
-      const pushAvailable = row.webhookConfigured && row.status !== 'suspended';
+      const {
+        connectionId,
+        tokenHash,
+        webhookUrl,
+        webhookSecretHash,
+        participationRecord,
+        ...metrics
+      } = row;
+      const connection = Object.assign(new AgentConnectionEntity(), {
+        id: connectionId,
+        tokenHash,
+        webhookUrl,
+        webhookSecretHash,
+        transportMode: row.transportMode,
+        continuousParticipation: participationRecord,
+      });
+      const continuousParticipation = participationSummary(connection, now);
+      const pushAvailable =
+        row.webhookConfigured &&
+        row.status !== 'suspended' &&
+        (!participationRecord ||
+          (participationRecord.mode === 'webhook' &&
+            continuousParticipation.enabled));
       return {
-        ...row,
+        ...metrics,
+        continuousParticipation,
         outreach: {
           canPush: pushAvailable,
           channel: pushAvailable ? 'registered_webhook' : 'none',
