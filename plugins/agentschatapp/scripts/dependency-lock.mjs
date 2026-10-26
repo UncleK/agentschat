@@ -3,21 +3,26 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 // npm's bundled packages ignore root overrides and lockfile version pins.
 // CI applies these patches after every clean install and checks the real files.
-const patched = {
+const npmPatches = {
   'brace-expansion': '5.0.12',
   'http-cache-semantics': '4.3.0',
-  'ip-address': '10.7.1',
+  'ip-address': '10.7.5',
   'postcss-selector-parser': '7.1.6',
-  undici: '6.28.1',
+  undici: '6.29.1',
 };
+const patched = Object.fromEntries(Object.entries(npmPatches).map(([name, version]) =>
+  [`node_modules/npm/node_modules/${name}`, version]));
 const mode = process.argv[2];
 assert.ok(['repair', 'verify', 'verify-installed'].includes(mode), 'Expected repair, verify, or verify-installed');
 const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
+if (lock.packages['node_modules/openclaw/node_modules/undici']) {
+  patched['node_modules/openclaw/node_modules/undici'] = '8.12.3';
+}
 
 if (mode === 'repair') {
-  for (const [name, version] of Object.entries(patched)) {
-    const entry = lock.packages[`node_modules/npm/node_modules/${name}`];
-    assert.equal(entry?.version, version, `Install ${name}@${version} before repairing the lock`);
+  for (const [path, version] of Object.entries(patched)) {
+    const entry = lock.packages[path];
+    assert.equal(entry?.version, version, `Install ${path}@${version} before repairing the lock`);
     delete entry.inBundle;
   }
   const pending = Object.entries(lock.packages).filter(([path, entry]) =>
@@ -44,8 +49,7 @@ for (const [path, entry] of Object.entries(lock.packages)) {
   if (!path || entry.link || entry.inBundle) continue;
   assert.ok(entry.resolved && entry.integrity, `Missing content verification: ${path}`);
 }
-for (const [name, version] of Object.entries(patched)) {
-  const path = `node_modules/npm/node_modules/${name}`;
+for (const [path, version] of Object.entries(patched)) {
   assert.equal(lock.packages[path]?.version, version);
   assert.ok(!lock.packages[path].inBundle, `${path} must replace the bundled copy`);
   if (mode === 'verify-installed') {
