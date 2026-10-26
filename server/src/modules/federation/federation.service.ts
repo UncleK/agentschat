@@ -450,6 +450,132 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async configureTransport(
+    agent: AuthenticatedFederatedAgent,
+    input: { transportMode?: unknown; webhookUrl?: unknown },
+  ) {
+    if (
+      !input ||
+      typeof input !== 'object' ||
+      Object.keys(input).some(
+        (key) => !['transportMode', 'webhookUrl'].includes(key),
+      ) ||
+      !Object.values(ConnectionTransportMode).includes(
+        input.transportMode as ConnectionTransportMode,
+      )
+    ) {
+      throw new FederationHttpException(
+        400,
+        'invalid_transport',
+        'Provide transportMode (polling, webhook or hybrid) and an optional webhookUrl.',
+      );
+    }
+    const transportMode = input.transportMode as ConnectionTransportMode;
+    const pollingEnabled = transportMode !== ConnectionTransportMode.Webhook;
+    const push = transportMode !== ConnectionTransportMode.Polling;
+    if (
+      input.webhookUrl != null &&
+      (typeof input.webhookUrl !== 'string' || input.webhookUrl.length > 2048)
+    ) {
+      throw new FederationHttpException(
+        400,
+        'invalid_webhook_url',
+        'webhookUrl must be a public HTTPS URL.',
+      );
+    }
+    const webhookUrl =
+      typeof input.webhookUrl === 'string'
+        ? input.webhookUrl.trim() || null
+        : null;
+    if (push && !webhookUrl)
+      throw new FederationHttpException(
+        400,
+        'webhook_url_required',
+        'A public HTTPS webhookUrl is required.',
+      );
+    if (!push && webhookUrl)
+      throw new FederationHttpException(
+        400,
+        'invalid_transport',
+        'Omit webhookUrl when switching to polling.',
+      );
+    if (webhookUrl) validateWebhookUrl(webhookUrl);
+    const result = await inTransaction(this.dataSource, async (manager) => {
+      const currentAgent = await manager
+        .getRepository(AgentEntity)
+        .findOneOrFail({
+          where: { id: agent.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+      if (currentAgent.status === AgentStatus.Suspended)
+        throw new FederationHttpException(
+          403,
+          'agent_suspended',
+          'Suspended agents cannot configure delivery.',
+        );
+      const connections = manager.getRepository(AgentConnectionEntity);
+      const connection = await connections.findOne({
+        where: { id: agent.connectionId, agentId: agent.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (
+        !connection ||
+        !agent.credentialHash ||
+        connection.tokenHash !== agent.credentialHash
+      ) {
+        throw new FederationHttpException(
+          401,
+          'invalid_agent_token',
+          'The control credential was revoked.',
+        );
+      }
+      const changed =
+        connection.transportMode !== transportMode ||
+        connection.webhookUrl !== webhookUrl;
+      if (changed) {
+        // Preserve identity/access token and retry idempotency. A changed callback
+        // rotates its signing secret, but never requeues terminal records.
+        const secret = push
+          ? this.federationCredentialsService.generateWebhookSecret()
+          : null;
+        await connections.update(connection.id, {
+          transportMode,
+          pollingEnabled,
+          webhookUrl,
+          webhookSecret: secret,
+          webhookSecretHash: secret
+            ? this.federationCredentialsService.hashValue(secret)
+            : null,
+          webhookConsecutiveFailures: 0,
+          webhookBlockedUntil: null,
+        });
+        await manager.query(
+          "UPDATE deliveries SET agent_connection_id=$2, delivery_channel=$3, next_attempt_at=now(), webhook_attempt_count=0 WHERE recipient_agent_id=$1 AND status IN ('pending','sent','retrying') AND replay_expires_at>now()",
+          [agent.id, connection.id, pollingEnabled ? 'polling' : 'webhook'],
+        );
+        connection.webhookSecret = secret;
+      }
+      return {
+        agentId: agent.id,
+        connectionId: connection.id,
+        transportMode,
+        pollingEnabled,
+        webhook: push
+          ? {
+              url: webhookUrl,
+              signingSecret: connection.webhookSecret,
+              signatureHeader: 'x-agents-chat-signature',
+              timestampHeader: 'x-agents-chat-timestamp',
+              deliveryIdHeader: 'x-agents-chat-delivery-id',
+            }
+          : null,
+        scheduleCreated: false,
+      };
+    });
+    this.federationDeliveryService.poke();
+    return result;
+  }
+
   async submitAction(
     agent: AuthenticatedFederatedAgent,
     idempotencyKeyHeader: string | undefined,

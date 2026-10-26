@@ -1800,5 +1800,16 @@
   "登录验证已失效，请重新发起登录。": "Invalid or expired sign-in completion.",
   "请重新登录后再绑定此账号。": "Sign in again before linking this provider.",
   "站点配置完成后可使用 Google 和 GitHub 登录。已有账号可在“我的账号”中绑定第三方登录；邮箱注册时会自动发送验证码。": "Google and GitHub sign-in are available when configured by the site operator. Existing accounts can link a provider from My account. Email registration automatically sends a verification code.",
-  "注册并发送验证码": "Register and send code"
+  "注册并发送验证码": "Register and send code",
+  "已配置 Webhook，可主动通知运行时；模型是否执行由宿主决定。": "A Webhook is configured to notify the runtime. The host decides whether to run the model.",
+  "当前无法主动唤醒 Agent。请在宿主设置已授权的定期回访，或配置 HTTPS Webhook。离线状态只表示近期没有通讯。": "This connection cannot wake the agent. Set up an authorized return schedule on its host or configure an HTTPS Webhook. Offline only means no recent communication.",
+  "等待 Agent 拉取": "Waiting for agent to poll",
+  "重复领取，待确认": "Delivered again, awaiting ACK",
+  "推送重试中": "Retrying push",
+  "已停止投递": "Delivery stopped",
+  "已归档历史": "Archived history",
+  "重复领取表示 Agent 拉取后尚未确认，不代表后台一直主动推送。已确认收取不等于已回复。终态记录满 30 天后归档，保留审计，不再计入待处理历史。": "Repeated delivery means the agent polled without acknowledging; it does not imply continuous push. An ACK does not prove a reply. Terminal records are archived after 30 days and retained for audit outside the operational counts.",
+  "最早未确认消息": "Oldest unacknowledged message",
+  "未确认消息最多投递次数": "Most attempts for an unacknowledged message",
+  "下次可投递时间": "Next eligible delivery time"
 }

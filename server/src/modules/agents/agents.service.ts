@@ -1,4 +1,8 @@
 import { UserEntity } from '../../database/entities/user.entity';
+import {
+  DELIVERY_HISTORY_ARCHIVE_AFTER_MS,
+  deliveryRetentionMs,
+} from '../../database/delivery-policy';
 import { inTransaction } from '../../database/transaction-context';
 import {
   sanitizeAvatar,
@@ -992,10 +996,33 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
           'retrying',
         )
         .addSelect(
-          "COUNT(*) FILTER (WHERE delivery.status = 'dead_letter')",
+          "COUNT(*) FILTER (WHERE delivery.status = 'dead_letter' AND delivery.archivedAt IS NULL)",
           'deadLetter',
         )
-        .addSelect("COUNT(*) FILTER (WHERE delivery.status = 'acked')", 'acked')
+        .addSelect(
+          "COUNT(*) FILTER (WHERE delivery.status = 'acked' AND delivery.archivedAt IS NULL)",
+          'acked',
+        )
+        .addSelect(
+          'COUNT(*) FILTER (WHERE delivery.archivedAt IS NOT NULL)',
+          'archived',
+        )
+        .addSelect(
+          "COUNT(*) FILTER (WHERE delivery.status = 'retrying' AND delivery.deliveryChannel = 'polling')",
+          'repeatedPolling',
+        )
+        .addSelect(
+          "COUNT(*) FILTER (WHERE delivery.status = 'retrying' AND delivery.deliveryChannel = 'webhook')",
+          'retryingPush',
+        )
+        .addSelect(
+          "MAX(delivery.attemptCount) FILTER (WHERE delivery.status IN ('pending', 'sent', 'retrying'))",
+          'maxOutstandingAttempts',
+        )
+        .addSelect(
+          "MIN(delivery.createdAt) FILTER (WHERE delivery.status IN ('pending', 'sent', 'retrying'))",
+          'oldestOutstandingAt',
+        )
         .addSelect('MAX(delivery.lastAttemptAt)', 'lastAttemptAt')
         .addSelect('MAX(delivery.ackedAt)', 'lastAckedAt')
         .addSelect(
@@ -1009,6 +1036,11 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
           retrying: string;
           deadLetter: string;
           acked: string;
+          archived: string;
+          repeatedPolling: string;
+          retryingPush: string;
+          maxOutstandingAttempts: number | null;
+          oldestOutstandingAt: Date | null;
           lastAttemptAt: Date | null;
           lastAckedAt: Date | null;
           nextAttemptAt: Date | null;
@@ -1023,6 +1055,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         ])
         .where('delivery.recipientAgentId = :agentId', { agentId })
         .andWhere('delivery.lastError IS NOT NULL')
+        .andWhere('delivery.archivedAt IS NULL')
         .orderBy('delivery.lastAttemptAt', 'DESC', 'NULLS LAST')
         .addOrderBy('delivery.createdAt', 'DESC')
         .getOne(),
@@ -1045,6 +1078,10 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       const httpError = /^Webhook returned HTTP (\d{3})\.$/.exec(message);
       if (httpError) return `Webhook returned HTTP ${httpError[1]}.`;
       if (message === 'Webhook request timed out.') return message;
+      if (
+        message === 'Delivery retention window expired before acknowledgement.'
+      )
+        return message;
       return 'Delivery failed. Check the connected runtime and network.';
     };
     return {
@@ -1065,6 +1102,14 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
           connection?.webhookUrl && connection?.webhookSecret,
         ),
         protocolVersion: connection?.protocolVersion ?? null,
+        canPush:
+          agent.status !== AgentStatus.Suspended &&
+          Boolean(
+            connection &&
+            connection.transportMode !== ConnectionTransportMode.Polling &&
+            connection.webhookUrl &&
+            connection.webhookSecret,
+          ),
       },
       deliveries: {
         pending: Number(totals?.pending ?? 0),
@@ -1072,6 +1117,13 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         retrying: Number(totals?.retrying ?? 0),
         deadLetter: Number(totals?.deadLetter ?? 0),
         acked: Number(totals?.acked ?? 0),
+        archived: Number(totals?.archived ?? 0),
+        repeatedPolling: Number(totals?.repeatedPolling ?? 0),
+        retryingPush: Number(totals?.retryingPush ?? 0),
+        maxOutstandingAttempts: totals?.maxOutstandingAttempts ?? 0,
+        oldestOutstandingAt: totals?.oldestOutstandingAt?.toISOString() ?? null,
+        retentionMs: deliveryRetentionMs(this.environment),
+        historyArchiveAfterMs: DELIVERY_HISTORY_ARCHIVE_AFTER_MS,
         lastAttemptAt: totals?.lastAttemptAt?.toISOString() ?? null,
         lastAckedAt: totals?.lastAckedAt?.toISOString() ?? null,
         nextAttemptAt: totals?.nextAttemptAt?.toISOString() ?? null,

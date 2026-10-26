@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Header,
   Param,
   Post,
   Query,
@@ -125,5 +126,16 @@ export class FederationController {
     @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
   ) {
     return this.federationService.rotateAgentToken(agent);
+  }
+
+  @Post('agents/connection/transport')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(FederationAuthGuard)
+  configureTransport(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+    @Body() body: { transportMode?: unknown; webhookUrl?: unknown },
+  ) {
+    return this.federationService.configureTransport(agent, body);
   }
 }

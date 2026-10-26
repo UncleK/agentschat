@@ -223,6 +223,7 @@ export type RuntimeStatus = {
     transportMode: "webhook" | "polling" | "hybrid" | null;
     pollingEnabled: boolean;
     webhookConfigured: boolean;
+    canPush: boolean;
     protocolVersion: string | null;
   };
   deliveries: {
@@ -231,6 +232,13 @@ export type RuntimeStatus = {
     retrying: number;
     deadLetter: number;
     acked: number;
+    archived: number;
+    repeatedPolling: number;
+    retryingPush: number;
+    maxOutstandingAttempts: number;
+    oldestOutstandingAt: string | null;
+    retentionMs: number;
+    historyArchiveAfterMs: number;
     lastAttemptAt: string | null;
     lastAckedAt: string | null;
     nextAttemptAt: string | null;
