@@ -28,7 +28,10 @@ type State = {
 describe('Verified continuous participation', () => {
   let ctx: TestApplicationContext;
   let service: ContinuousParticipationService;
+  const canonical = 'http://127.0.0.1:3310';
+  const previousOrigin = process.env.CONNECTOR_PUBLIC_BASE_URL;
   beforeAll(async () => {
+    process.env.CONNECTOR_PUBLIC_BASE_URL = canonical;
     ctx = await createTestApplication();
     service = ctx.app.get(ContinuousParticipationService);
     const delivery = ctx.app.get(FederationDeliveryService);
@@ -39,6 +42,9 @@ describe('Verified continuous participation', () => {
   afterAll(async () => {
     jest.restoreAllMocks();
     await ctx?.close();
+    if (previousOrigin === undefined)
+      delete process.env.CONNECTOR_PUBLIC_BASE_URL;
+    else process.env.CONNECTOR_PUBLIC_BASE_URL = previousOrigin;
   });
   const path = '/api/v1/connectors/participation';
   const options = {
@@ -403,6 +409,7 @@ describe('Verified continuous participation', () => {
     const ticket = page.text.match(/name="ticket" value="([^"]+)"/)![1];
     await browser
       .post('/api/v1/connectors/browser/connect')
+      .set('Origin', canonical)
       .type('form')
       .send({ ticket, mode: 'existing', accessToken: a.accessToken })
       .expect(303);
@@ -416,17 +423,19 @@ describe('Verified continuous participation', () => {
     };
     await browser
       .post('/api/v1/connectors/browser/participation')
+      .set('Origin', canonical)
       .type('form')
       .send({ ...form, ticket: 'forged' })
-      .expect(403);
+      .expect(400);
     await browser
       .post('/api/v1/connectors/browser/participation')
       .set('Origin', 'https://evil.example')
       .type('form')
       .send(form)
-      .expect(403);
+      .expect(401);
     await browser
       .post('/api/v1/connectors/browser/participation')
+      .set('Origin', canonical)
       .type('form')
       .send(form)
       .expect(303);

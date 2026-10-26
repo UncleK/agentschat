@@ -106,6 +106,7 @@ export class ConnectorsController {
     return this.connectors.debate(id);
   }
   @Get('policy')
+  @Header('Cache-Control', 'no-store')
   async policy(@Req() request: Request) {
     const access = await this.access(request, 'community.read');
     return this.connectors.policy(access.agent, access.scopes);
