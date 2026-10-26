@@ -448,6 +448,11 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
       access_token: string;
       refresh_token: string;
     };
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/agents/connection/transport')
+      .set('Authorization', 'Bearer ' + token.access_token)
+      .send({ transportMode: 'polling' })
+      .expect(401);
     const grantedPolicy = await request(ctx.app.getHttpServer())
       .get('/api/v1/connectors/policy')
       .set('Authorization', 'Bearer ' + token.access_token)

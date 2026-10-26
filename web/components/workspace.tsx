@@ -2970,13 +2970,27 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
             </div>
           </dl>
           <h4 className="ws-runtime-subtitle">{tx("事件投递")}</h4>
+          <p className="ws-runtime-note">
+            {status.connection.canPush
+              ? tx("已配置 Webhook，可主动通知运行时；模型是否执行由宿主决定。")
+              : tx(
+                  "当前无法主动唤醒 Agent。请在宿主设置已授权的定期回访，或配置 HTTPS Webhook。离线状态只表示近期没有通讯。",
+                )}
+          </p>
           <dl className="ws-runtime-counts">
             {[
-              [tx("待发送"), status.deliveries.pending],
+              [
+                status.connection.transportMode === "polling"
+                  ? tx("等待 Agent 拉取")
+                  : tx("待发送"),
+                status.deliveries.pending,
+              ],
               [tx("已发送，待收取确认"), status.deliveries.sent],
-              [tx("重试中"), status.deliveries.retrying],
-              [tx("停止重试，待处理"), status.deliveries.deadLetter],
+              [tx("重复领取，待确认"), status.deliveries.repeatedPolling],
+              [tx("推送重试中"), status.deliveries.retryingPush],
+              [tx("已停止投递"), status.deliveries.deadLetter],
               [tx("已确认收取"), status.deliveries.acked],
+              [tx("已归档历史"), status.deliveries.archived],
             ].map(([label, count]) => (
               <div key={label}>
                 <dt>{label}</dt>
@@ -2986,10 +3000,22 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
           </dl>
           <p className="ws-runtime-note">
             {tx(
-              "“已确认收取”仅表示运行时确认收到，不代表 Agent 已执行或回复。计数覆盖仍保留的投递记录；已确认和停止重试项包含历史记录。",
+              "重复领取表示 Agent 拉取后尚未确认，不代表后台一直主动推送。已确认收取不等于已回复。终态记录满 30 天后归档，保留审计，不再计入待处理历史。",
             )}
           </p>
           <dl className="ws-runtime-facts">
+            <div>
+              <dt>{tx("最早未确认消息")}</dt>
+              <dd>
+                <DateLabel
+                  value={status.deliveries.oldestOutstandingAt || undefined}
+                />
+              </dd>
+            </div>
+            <div>
+              <dt>{tx("未确认消息最多投递次数")}</dt>
+              <dd>{status.deliveries.maxOutstandingAttempts}</dd>
+            </div>
             <div>
               <dt>{tx("最后投递尝试")}</dt>
               <dd>
@@ -3005,7 +3031,7 @@ function AgentRuntimeStatus({ agent }: { agent: Agent }) {
               </dd>
             </div>
             <div>
-              <dt>{tx("下次重试")}</dt>
+              <dt>{tx("下次可投递时间")}</dt>
               <dd>
                 <DateLabel
                   value={status.deliveries.nextAttemptAt || undefined}
@@ -3322,12 +3348,14 @@ function Hub({
                     {tx("验证邮箱")}
                   </button>
                 )}
-                {(!user.authProvider || user.authProvider === "email") && <button
-                  className="ws-text-link"
-                  onClick={() => setResetPassword(true)}
-                >
-                  {tx("重置密码")}
-                </button>}
+                {(!user.authProvider || user.authProvider === "email") && (
+                  <button
+                    className="ws-text-link"
+                    onClick={() => setResetPassword(true)}
+                  >
+                    {tx("重置密码")}
+                  </button>
+                )}
                 <button
                   className="ws-text-link"
                   disabled={action.busy}
@@ -4421,9 +4449,11 @@ function AccountSettings({
                 {tx("验证邮箱")}
               </button>
             )}
-            {(!user.authProvider || user.authProvider === "email") && <Link className="ws-secondary" href="/login?reset=1">
-              {tx("重置密码")}
-            </Link>}
+            {(!user.authProvider || user.authProvider === "email") && (
+              <Link className="ws-secondary" href="/login?reset=1">
+                {tx("重置密码")}
+              </Link>
+            )}
             <button
               className="ws-secondary"
               disabled={action.busy}

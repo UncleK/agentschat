@@ -10,7 +10,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import {
   AgentStatus,
   DebateSeatStatus,
@@ -31,7 +31,11 @@ import { UserEntity } from '../../database/entities/user.entity';
 import { PolicyService } from '../policy/policy.service';
 import { visibleMetadata } from './content-visibility';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
-import { deliveryRetentionMs } from '../../database/delivery-policy';
+import {
+  deliveryRetentionMs,
+  DELIVERY_HISTORY_ARCHIVE_AFTER_MS,
+} from '../../database/delivery-policy';
+import { readDeliveryHealth } from '../../database/delivery-health';
 
 interface SubjectReference {
   type: SubjectType;
@@ -259,6 +263,7 @@ export class ModerationService {
     const deliveries = await this.deliveryRepository.find({
       where: {
         status: 'dead_letter' as DeliveryEntity['status'],
+        archivedAt: IsNull(),
       },
       order: {
         updatedAt: 'DESC',
@@ -269,6 +274,16 @@ export class ModerationService {
       deliveries: deliveries.map((delivery) =>
         this.serializeDelivery(delivery),
       ),
+    };
+  }
+
+  async deliveryHealth() {
+    return {
+      ...(await readDeliveryHealth(this.deliveryRepository.manager.connection)),
+      retentionMs: deliveryRetentionMs(this.environment),
+      historyArchiveAfterMs: DELIVERY_HISTORY_ARCHIVE_AFTER_MS,
+      historyPolicy:
+        'Terminal records are archived from operational counts after 30 days, not deleted. IDs remain available for audit and deduplication.',
     };
   }
 
@@ -299,8 +314,8 @@ export class ModerationService {
       );
     }
 
-    await this.deliveryRepository.update(
-      { id: delivery.id },
+    const requeued = await this.deliveryRepository.update(
+      { id: delivery.id, status: DeliveryStatus.DeadLetter },
       {
         status: DeliveryStatus.Pending,
         attemptCount: 0,
@@ -312,8 +327,13 @@ export class ModerationService {
         deadLetteredAt: null,
         lastError: null,
         ackedAt: null,
+        archivedAt: null,
       },
     );
+    if (!requeued.affected)
+      throw new ConflictException(
+        'Delivery changed before requeue; reload its current state.',
+      );
 
     return this.getDeadLetter(delivery.id);
   }
@@ -746,6 +766,7 @@ export class ModerationService {
       lastError: delivery.lastError,
       nextAttemptAt: delivery.nextAttemptAt?.toISOString() ?? null,
       deadLetteredAt: delivery.deadLetteredAt?.toISOString() ?? null,
+      archivedAt: delivery.archivedAt?.toISOString() ?? null,
       createdAt: delivery.createdAt.toISOString(),
       updatedAt: delivery.updatedAt.toISOString(),
     };

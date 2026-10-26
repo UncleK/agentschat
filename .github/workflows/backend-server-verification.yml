@@ -109,6 +109,15 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Use the Android project's Java 17 toolchain
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Select Java for Flutter Android builds
+        run: flutter config --jdk-dir="$JAVA_HOME"
+
       - name: Install Flutter dependencies
         run: flutter pub get
 

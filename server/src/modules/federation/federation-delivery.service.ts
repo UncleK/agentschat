@@ -13,7 +13,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { setTimeout as delay } from 'node:timers/promises';
 import { In, Not, Repository } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
-import { deliveryRetentionMs } from '../../database/delivery-policy';
+import {
+  deliveryRetentionMs,
+  DELIVERY_HISTORY_ARCHIVE_AFTER_MS,
+} from '../../database/delivery-policy';
 import { visibleMetadataSql } from '../moderation/content-visibility';
 import {
   AgentStatus,
@@ -58,6 +61,7 @@ export class FederationDeliveryService
   private deliverySweepTimer: NodeJS.Timeout | null = null;
   private presenceSweepTimer: NodeJS.Timeout | null = null;
   private isStopped = false;
+  private nextHistoryArchiveAt = 0;
 
   constructor(
     @Inject(APP_ENVIRONMENT)
@@ -345,6 +349,28 @@ export class FederationDeliveryService
     });
   }
 
+  async archiveDeliveryHistory(referenceTime = new Date()): Promise<number> {
+    const rows = await this.deliveryRepository.manager.query<
+      Array<{ id: string }>
+    >(
+      `WITH candidates AS (
+         SELECT id FROM deliveries
+         WHERE archived_at IS NULL AND status IN ('acked', 'dead_letter')
+           AND COALESCE(acked_at, dead_lettered_at, updated_at) < $1
+         ORDER BY COALESCE(acked_at, dead_lettered_at, updated_at), id
+         LIMIT 500 FOR UPDATE SKIP LOCKED
+       ), archived AS (
+         UPDATE deliveries d SET archived_at = $2
+         FROM candidates c WHERE d.id = c.id RETURNING d.id
+       ) SELECT id FROM archived`,
+      [
+        new Date(referenceTime.getTime() - DELIVERY_HISTORY_ARCHIVE_AFTER_MS),
+        referenceTime,
+      ],
+    );
+    return rows.length;
+  }
+
   async sweepStaleAgentPresence(
     referenceTime = new Date(),
   ): Promise<{ offlineAgentIds: string[] }> {
@@ -457,6 +483,16 @@ export class FederationDeliveryService
     this.isProcessingWebhooks = true;
     try {
       await this.expireDueDeliveries();
+      if (Date.now() >= this.nextHistoryArchiveAt) {
+        this.nextHistoryArchiveAt = Date.now() + 60 * 60 * 1000;
+        try {
+          const archived = await this.archiveDeliveryHistory();
+          if (archived === 500) this.nextHistoryArchiveAt = Date.now() + 60_000;
+        } catch {
+          this.nextHistoryArchiveAt = Date.now() + 60_000;
+          this.logger.warn('Delivery history archive failed; it will retry.');
+        }
+      }
       const connections = await this.agentConnectionRepository.find({
         where: {
           transportMode: In([

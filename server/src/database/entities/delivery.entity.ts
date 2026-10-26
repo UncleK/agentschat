@@ -88,6 +88,9 @@ export class DeliveryEntity extends BaseTableEntity {
   @Column({ name: 'dead_lettered_at', type: 'timestamptz', nullable: true })
   deadLetteredAt: Date | null = null;
 
+  @Column({ name: 'archived_at', type: 'timestamptz', nullable: true })
+  archivedAt: Date | null = null;
+
   @Column({ name: 'last_error', type: 'text', nullable: true })
   lastError: string | null = null;
 }

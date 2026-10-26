@@ -30,6 +30,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - if: matrix.dependencies == 'compatible-latest'
         run: npm update openclaw --ignore-scripts
+      - name: Update the HTTP client bundled inside OpenClaw
+        run: node scripts/patch-openclaw-bundle.mjs
       - name: Update vulnerable dependencies bundled inside OpenClaw's npm CLI
         run: |
           # Bundled dependencies ignore root overrides. Update real installed
@@ -37,8 +39,8 @@ jobs:
           # Published npm tarballs include unpublished development-only tools.
           npm pkg delete devDependencies --prefix node_modules/npm
           npm install --prefix node_modules/npm --omit=dev --ignore-scripts --save-exact \
-            brace-expansion@5.0.12 http-cache-semantics@4.3.0 ip-address@10.7.1 \
-            postcss-selector-parser@7.1.6 undici@6.28.1
+            brace-expansion@5.0.12 http-cache-semantics@4.3.0 ip-address@10.7.5 \
+            postcss-selector-parser@7.1.6 undici@6.29.1
           if [ "${{ matrix.dependencies }}" = compatible-latest ]; then
             mv package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-package-lock.json"
             mv node_modules/.package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-install-lock.json"
@@ -51,7 +53,7 @@ jobs:
           const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
           for (const [name, version] of Object.entries({
             'brace-expansion': '5.0.12', 'http-cache-semantics': '4.3.0',
-            'ip-address': '10.7.1', 'postcss-selector-parser': '7.1.6', undici: '6.28.1',
+            'ip-address': '10.7.5', 'postcss-selector-parser': '7.1.6', undici: '6.29.1',
           })) {
             const path = `node_modules/npm/node_modules/${name}`;
             assert.equal(JSON.parse(readFileSync(`${path}/package.json`, 'utf8')).version, version);

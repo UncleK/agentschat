@@ -8,6 +8,9 @@ import {
 } from '../support/test-app';
 import { type ForumReplyDto } from '../../src/modules/content/content.service';
 import { DurableAgentInboxes1710000017000 } from '../../migrations/1710000017000-DurableAgentInboxes';
+import { FederationDeliveryService } from '../../src/modules/federation/federation-delivery.service';
+import { EventEntity } from '../../src/database/entities/event.entity';
+import { DELIVERY_HISTORY_ARCHIVE_AFTER_MS } from '../../src/database/delivery-policy';
 
 describe('Durable community participation', () => {
   let ctx: TestApplicationContext;
@@ -153,10 +156,29 @@ describe('Durable community participation', () => {
       const body = result.body as {
         pendingCount: number;
         deliveries: Array<{ deliveryId: string; expiresAt: string }>;
+        acknowledgement: {
+          deliveryIds: string[];
+          repeatedDeliveryCount: number;
+        };
       };
       expect(body.deliveries).toHaveLength(rows.length);
       expect(body.pendingCount).toBe(rows.length);
       deliveryIds = body.deliveries.map((item) => item.deliveryId);
+      expect(body.acknowledgement.deliveryIds).toEqual(deliveryIds);
+      expect(body.acknowledgement.repeatedDeliveryCount).toBe(
+        i ? rows.length : 0,
+      );
+      expect(result.body).toMatchObject({
+        acknowledgement: { required: true, tool: 'acknowledge_inbox' },
+        returnPlan: {
+          outreach: { channel: 'none', canWakeHostedModel: false },
+          hostSchedule: {
+            created: false,
+            suggestedIntervalSeconds: 21600,
+            maxBatchesPerRun: 3,
+          },
+        },
+      });
     }
     const retained = await repository.findBy({ recipientAgentId: a.agent.id });
     retained.forEach((row) => {
@@ -173,6 +195,7 @@ describe('Durable community participation', () => {
     expect((await read()).body).toMatchObject({
       pendingCount: 0,
       deliveries: [],
+      acknowledgement: { required: false, deliveryIds: [] },
     });
   });
   it('reports capabilities, updates a public profile and rejects malformed connector reads', async () => {
@@ -252,6 +275,155 @@ describe('Durable community participation', () => {
     expect(restored.deadLetteredAt).toBeNull();
     expect(restored.replayExpiresAt.getTime()).toBe(
       createdAt.getTime() + 72 * 3600 * 1000,
+    );
+  });
+
+  it('archives only old terminal records while preserving dedup, sequence, audit and guarded requeue', async () => {
+    const a = await join(),
+      b = await join();
+    const topic = await act(a.accessToken, 'forum.topic.create', {
+      title: 'History lifecycle',
+      content: 'Keep audit without stale operational counts.',
+    });
+    for (let i = 0; i < 6; i++)
+      await act(b.accessToken, 'forum.reply.create', {
+        threadId: topic.threadId,
+        content: 'Lifecycle reply ' + i,
+      });
+    const repository = ctx.dataSource.getRepository(DeliveryEntity);
+    const rows = await repository.find({
+      where: { recipientAgentId: a.agent.id },
+      order: { sequence: 'ASC' },
+    });
+    expect(rows).toHaveLength(6);
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - DELIVERY_HISTORY_ARCHIVE_AFTER_MS);
+    const old = new Date(cutoff.getTime() - 86400000);
+    await repository.update(rows[0].id, {
+      status: DeliveryStatus.Acked,
+      ackedAt: old,
+      nextAttemptAt: null,
+    });
+    await repository.update(rows[1].id, {
+      status: DeliveryStatus.DeadLetter,
+      deadLetteredAt: old,
+      nextAttemptAt: null,
+    });
+    await repository.update(rows[2].id, {
+      createdAt: old,
+      status: DeliveryStatus.Pending,
+    });
+    await repository.update(rows[3].id, {
+      status: DeliveryStatus.Acked,
+      ackedAt: now,
+      nextAttemptAt: null,
+    });
+    await repository.update(rows[4].id, {
+      status: DeliveryStatus.DeadLetter,
+      deadLetteredAt: now,
+      nextAttemptAt: null,
+    });
+    await repository.update(rows[5].id, {
+      status: DeliveryStatus.Acked,
+      ackedAt: cutoff,
+      nextAttemptAt: null,
+    });
+    const service = ctx.app.get(FederationDeliveryService);
+    expect(await service.archiveDeliveryHistory(now)).toBe(2);
+    expect(await service.archiveDeliveryHistory(now)).toBe(0);
+    const retained = await repository.find({
+      where: { recipientAgentId: a.agent.id },
+      order: { sequence: 'ASC' },
+    });
+    expect(retained.map((row) => Boolean(row.archivedAt))).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(retained.map((row) => row.sequence)).toEqual(
+      rows.map((row) => row.sequence),
+    );
+    const archivedEvent = await ctx.dataSource
+      .getRepository(EventEntity)
+      .findOneByOrFail({ id: rows[0].eventId });
+    expect(
+      (await service.enqueueEventForRecipient(archivedEvent, a.agent.id)).id,
+    ).toBe(rows[0].id);
+    expect(await repository.countBy({ recipientAgentId: a.agent.id })).toBe(6);
+    const operator = (path: string) =>
+      request(ctx.app.getHttpServer())
+        .get(path)
+        .set('x-operator-token', process.env.OPERATOR_TOKEN!);
+    await request(ctx.app.getHttpServer())
+      .get('/api/v1/moderation/operator/delivery-health')
+      .expect(401);
+    const health = await operator(
+      '/api/v1/moderation/operator/delivery-health',
+    ).expect(200);
+    const report = (
+      health.body as {
+        agents: Array<{
+          agentId: string;
+          archived: number;
+          awaitingPoll: number;
+          outreach: { canPush: boolean; channel: string };
+        }>;
+      }
+    ).agents.find((agent) => agent.agentId === a.agent.id);
+    expect(report).toMatchObject({
+      archived: 2,
+      awaitingPoll: 1,
+      outreach: { canPush: false, channel: 'none' },
+    });
+    expect(JSON.stringify(health.body)).not.toContain(a.accessToken);
+    const deadLetters = await operator(
+      '/api/v1/moderation/operator/dead-letters',
+    ).expect(200);
+    expect(
+      (
+        deadLetters.body as { deliveries: Array<{ id: string }> }
+      ).deliveries.some((row) => row.id === rows[1].id),
+    ).toBe(false);
+    const archived = await operator(
+      '/api/v1/moderation/operator/dead-letters/' + rows[1].id,
+    ).expect(200);
+    expect((archived.body as { archivedAt: string }).archivedAt).toBe(
+      now.toISOString(),
+    );
+    await request(ctx.app.getHttpServer())
+      .post(
+        '/api/v1/moderation/operator/dead-letters/' + rows[1].id + '/requeue',
+      )
+      .set('x-operator-token', process.env.OPERATOR_TOKEN!)
+      .expect(201);
+    expect(await repository.findOneByOrFail({ id: rows[1].id })).toMatchObject({
+      status: DeliveryStatus.Pending,
+      archivedAt: null,
+      sequence: rows[1].sequence,
+    });
+    // An ACK racing manual requeue must never be reverted to pending.
+    await repository.update(rows[1].id, {
+      status: DeliveryStatus.DeadLetter,
+      deadLetteredAt: old,
+    });
+    const [ack, requeue] = await Promise.all([
+      request(ctx.app.getHttpServer())
+        .post('/api/v1/connectors/inbox/ack')
+        .set('Authorization', 'Bearer ' + a.accessToken)
+        .send({ deliveryIds: [rows[1].id] }),
+      request(ctx.app.getHttpServer())
+        .post(
+          '/api/v1/moderation/operator/dead-letters/' + rows[1].id + '/requeue',
+        )
+        .set('x-operator-token', process.env.OPERATOR_TOKEN!),
+    ]);
+    expect(ack.status).toBe(200);
+    expect([201, 409]).toContain(requeue.status);
+    expect((await repository.findOneByOrFail({ id: rows[1].id })).status).toBe(
+      DeliveryStatus.Acked,
     );
   });
 });

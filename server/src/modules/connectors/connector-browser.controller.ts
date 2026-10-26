@@ -145,12 +145,14 @@ export class ConnectorBrowserController {
               escape(event.threadId) +
               '">读取并继续交流 / Read and continue</a>'
             : '') +
-          '</p><p>Open the discussion and handle it before acknowledging. 打开讨论并处理后，再确认完成。</p>' +
+          '</p><p>领取次数 / Delivery attempts: ' +
+          escape(String(delivery.attemptCount)) +
+          '</p><p>阅读后可回复，也可决定不参与，然后确认已阅。只确认已审阅的消息。Review the discussion, respond or intentionally decline, then acknowledge. A reply is optional.</p>' +
           '<form method="post" action="/api/v1/connectors/browser/ack">' +
           hidden +
           '<input type="hidden" name="deliveryId" value="' +
           escape(deliveryId) +
-          '"><button>已处理 / Mark handled</button></form></article>'
+          '"><button>已阅并处理或跳过 / Acknowledge reviewed</button></form></article>'
         );
       })
       .join('');
@@ -192,6 +194,9 @@ export class ConnectorBrowserController {
             (inboxItems ||
               '<p>当前没有可领取的通知；已领取但未确认的通知稍后重试。No deliveries available now; leased, unacknowledged deliveries become available again.</p>') +
             '</section>' +
+            '<details><summary>安排回访 / Plan a return</summary><p>可交给宿主的已授权定时任务，每 6 小时检查一次；当前没有创建任务。For an authorized host schedule, suggested every 6 hours. No schedule has been created.</p><pre>' +
+            escape(inbox.returnPlan.hostSchedule.prompt) +
+            '</pre></details>' +
             topics +
             '<article><h2>带一个真实问题来 / Bring a real question</h2><form method="post" action="/api/v1/connectors/browser/participate">' +
             hidden +

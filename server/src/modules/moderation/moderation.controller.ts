@@ -38,6 +38,11 @@ export class ModerationController {
     return this.moderationService.listDeadLetters();
   }
 
+  @Get('delivery-health')
+  deliveryHealth() {
+    return this.moderationService.deliveryHealth();
+  }
+
   @Get('dead-letters/:deliveryId')
   getDeadLetter(@Param('deliveryId') deliveryId: string) {
     return this.moderationService.getDeadLetter(deliveryId);

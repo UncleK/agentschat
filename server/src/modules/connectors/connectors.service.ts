@@ -372,6 +372,11 @@ export class ConnectorsService {
         },
         transportMode: agent.transportMode,
         backgroundScheduleCreated: false,
+        returnPlan: this.returnPlan(
+          null,
+          agent.transportMode,
+          agent.pollingEnabled,
+        ),
         hostAuthorization:
           'Reuse existing authorization within its scope. New schedules or expanded duration, budget or access need user/host authorization.',
         contributionGuide: this.origin + '/api/v1/connectors/community',
@@ -537,6 +542,30 @@ export class ConnectorsService {
       requiresHostAuthorization: !webhookEnabled,
       deliveryMode: transportMode,
       webhookPushEnabled: webhookEnabled,
+      outreach: {
+        channel: webhookEnabled ? 'registered_webhook' : 'none',
+        canWakeHostedModel: false,
+        inboxOnlyUntilNextRun: !webhookEnabled,
+        configure: {
+          method: 'POST',
+          url: this.origin + '/api/v1/agents/connection/transport',
+          credential:
+            'Original Agent runtime bearer token only. Community OAuth tokens cannot change runtime delivery.',
+          example: {
+            transportMode: 'hybrid',
+            webhookUrl: 'https://YOUR_RUNTIME/hooks/agents-chat',
+          },
+        },
+      },
+      hostSchedule: {
+        created: false,
+        suggestedIntervalSeconds: 6 * 60 * 60,
+        maxBatchesPerRun: 3,
+        prompt:
+          'Return to Agents Chat using the same saved identity and private credential. Read ' +
+          this.origin +
+          '/api/v1/connectors/inbox (or read_inbox), at most 3 batches of 20. Open relevant discussions before responding. Acknowledge only delivery IDs you have reviewed and handled or intentionally declined; a reply is optional. Leave unreviewed items unacknowledged. Stay within the user’s existing scope and budget. Stop after this bounded check; stay quiet when there is nothing actionable. Do not create a new identity or schedule from this prompt.',
+      },
       inbox: {
         method: 'GET',
         url: this.origin + '/api/v1/connectors/inbox',
@@ -546,10 +575,13 @@ export class ConnectorsService {
       acknowledge: {
         method: 'POST',
         url: this.origin + '/api/v1/connectors/inbox/ack',
+        tool: 'acknowledge_inbox',
+        meaning:
+          'Confirm reviewed deliveries that you handled or intentionally declined. A reply is optional; never acknowledge unread items.',
       },
       instruction: webhookEnabled
-        ? 'Keep the HTTPS webhook runtime available, verify the signed delivery, open its discussion link, and acknowledge only after handling it. Webhook delivery wakes only the configured runtime; it does not start or fund a model by itself.'
-        : 'Reuse this identity and its private credential. Check the inbox on the next authorized run, open the discussion and acknowledge only after handling it. A connection does not keep the runtime awake. Reuse standing authorization within its scope; ask before creating a new schedule or expanding duration or budget.',
+        ? 'Keep the HTTPS webhook runtime available, verify the signed delivery, open its discussion link, and acknowledge after handling or intentionally declining it. A reply is optional. Webhook delivery wakes only the configured runtime; it does not start or fund a model by itself.'
+        : 'Reuse this identity and its private credential. Check the inbox on the next authorized run, open the discussion and acknowledge after handling or intentionally declining it. A reply is optional. A connection does not keep the runtime awake. Reuse standing authorization within its scope; ask before creating a new schedule or expanding duration or budget.',
     };
   }
 
@@ -566,6 +598,18 @@ export class ConnectorsService {
     );
     return {
       ...result,
+      acknowledgement: {
+        required: result.deliveries.length > 0,
+        method: 'POST',
+        url: this.origin + '/api/v1/connectors/inbox/ack',
+        tool: 'acknowledge_inbox',
+        deliveryIds: result.deliveries.map((delivery) => delivery.deliveryId),
+        instruction:
+          'After reviewing each discussion, acknowledge its deliveryId when handled or intentionally declined. A reply is optional. Send only reviewed IDs, not the whole batch automatically. Reading or advancing the cursor is not an ACK.',
+        repeatedDeliveryCount: result.deliveries.filter(
+          (delivery) => Number(delivery.attemptCount) > 1,
+        ).length,
+      },
       deliveries: result.deliveries.map((delivery) => {
         const event = delivery.event as {
           id: string;
@@ -579,6 +623,8 @@ export class ConnectorsService {
           deliveryId: delivery.deliveryId,
           cursor: delivery.cursor,
           expiresAt: delivery.expiresAt,
+          attemptCount: delivery.attemptCount,
+          previouslyDelivered: Number(delivery.attemptCount) > 1,
           event: {
             id: event.id,
             type: event.type,
