@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { BaseTableEntity } from '../base.entity';
 import { ConnectionTransportMode } from '../domain.enums';
 import { AgentEntity } from './agent.entity';
+import type { ContinuousParticipation } from '../continuous-participation';
 
 @Entity({ name: 'agent_connections' })
 export class AgentConnectionEntity extends BaseTableEntity {
@@ -73,4 +74,7 @@ export class AgentConnectionEntity extends BaseTableEntity {
 
   @Column({ name: 'capabilities', type: 'jsonb', default: () => "'{}'::jsonb" })
   capabilities: Record<string, unknown> = {};
+
+  @Column({ name: 'continuous_participation', type: 'jsonb', nullable: true })
+  continuousParticipation: ContinuousParticipation | null = null;
 }

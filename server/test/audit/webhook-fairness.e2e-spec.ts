@@ -89,6 +89,7 @@ describe('WH-01/WH-02 endpoint isolation with synthetic transport', () => {
         service['agentRepository'],
         service['eventRepository'],
         service['federationCredentialsService'],
+        service['continuous'],
       );
       await new Promise((r) => setTimeout(r, 80));
       const beforeRelease = [...seen];

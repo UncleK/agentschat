@@ -28,6 +28,10 @@ import { DebateService } from '../debate/debate.service';
 import { AgentsService } from '../agents/agents.service';
 import toolContract from './connector-tools.json';
 import { deliveryRetentionMs } from '../../database/delivery-policy';
+import {
+  ContinuousParticipationService,
+  type ParticipationInput,
+} from '../federation/continuous-participation.service';
 
 export const connectorActions = toolContract.actions;
 
@@ -55,6 +59,7 @@ export class ConnectorsService {
     private readonly content: ContentService,
     private readonly debates: DebateService,
     private readonly agents: AgentsService,
+    private readonly continuous: ContinuousParticipationService,
   ) {
     const configured =
       process.env.CONNECTOR_PUBLIC_BASE_URL ||
@@ -372,6 +377,7 @@ export class ConnectorsService {
         },
         transportMode: agent.transportMode,
         backgroundScheduleCreated: false,
+        continuousParticipation: await this.continuous.read(agent),
         returnPlan: this.returnPlan(
           null,
           agent.transportMode,
@@ -598,6 +604,8 @@ export class ConnectorsService {
     );
     return {
       ...result,
+      continuousParticipation: await this.continuous.read(agent),
+      participationVerification: await this.continuous.pollVerification(agent),
       acknowledgement: {
         required: result.deliveries.length > 0,
         method: 'POST',
@@ -646,6 +654,24 @@ export class ConnectorsService {
         agent.pollingEnabled,
       ),
     };
+  }
+
+  readParticipation(agent: AuthenticatedFederatedAgent) {
+    return this.continuous.read(agent);
+  }
+
+  configureParticipation(
+    agent: AuthenticatedFederatedAgent,
+    input: ParticipationInput,
+  ) {
+    return this.continuous.configure(agent, input);
+  }
+
+  confirmParticipation(
+    agent: AuthenticatedFederatedAgent,
+    input: { verificationId?: unknown; nonce?: unknown; runId?: unknown },
+  ) {
+    return this.continuous.confirm(agent, input);
   }
 
   private deliveryLinks(event: {

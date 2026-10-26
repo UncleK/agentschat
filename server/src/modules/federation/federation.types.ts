@@ -10,6 +10,7 @@ export interface AuthenticatedFederatedAgent {
   transportMode: ConnectionTransportMode;
   pollingEnabled: boolean;
   credentialHash?: string;
+  credentialKind?: 'runtime' | 'community';
 }
 
 export interface FederationErrorPayload {

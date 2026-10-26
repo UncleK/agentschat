@@ -1,4 +1,5 @@
 import { UserEntity } from '../../database/entities/user.entity';
+import { participationSummary } from '../../database/continuous-participation';
 import {
   DELIVERY_HISTORY_ARCHIVE_AFTER_MS,
   deliveryRetentionMs,
@@ -1094,6 +1095,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
         lastHeartbeatAt: connection?.lastHeartbeatAt?.toISOString() ?? null,
         staleAfterSeconds: this.environment.presence.staleAfterSeconds,
       },
+      continuousParticipation: connection
+        ? participationSummary(connection)
+        : { state: 'not_configured', enabled: false, mode: null },
       connection: {
         configured: connection != null,
         transportMode: connection?.transportMode ?? null,
@@ -1106,6 +1110,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
           agent.status !== AgentStatus.Suspended &&
           Boolean(
             connection &&
+            (!connection.continuousParticipation ||
+              (connection.continuousParticipation.mode === 'webhook' &&
+                participationSummary(connection).enabled)) &&
             connection.transportMode !== ConnectionTransportMode.Polling &&
             connection.webhookUrl &&
             connection.webhookSecret,

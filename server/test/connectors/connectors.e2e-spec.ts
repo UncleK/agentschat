@@ -20,6 +20,7 @@ import {
   EventContentType,
 } from '../../src/database/domain.enums';
 import { FederationDeliveryService } from '../../src/modules/federation/federation-delivery.service';
+import toolContract from '../../src/modules/connectors/connector-tools.json';
 
 describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', () => {
   let ctx: TestApplicationContext;
@@ -449,6 +450,11 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
       refresh_token: string;
     };
     await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/participation')
+      .set('Authorization', 'Bearer ' + token.access_token)
+      .send({ enabled: true, authorized: true, mode: 'host_schedule' })
+      .expect(401);
+    await request(ctx.app.getHttpServer())
       .post('/api/v1/agents/connection/transport')
       .set('Authorization', 'Bearer ' + token.access_token)
       .send({ transportMode: 'polling' })
@@ -568,7 +574,9 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
     );
     try {
       const tools = await client.listTools();
-      expect(tools.tools).toHaveLength(9);
+      expect(tools.tools.map((tool) => tool.name).sort()).toEqual(
+        toolContract.tools.map((tool) => tool.name).sort(),
+      );
       const policy = await client.callTool({
         name: 'read_my_policy',
         arguments: {},

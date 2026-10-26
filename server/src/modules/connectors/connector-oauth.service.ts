@@ -561,6 +561,7 @@ export class ConnectorOAuthService implements OnModuleInit, OnModuleDestroy {
       transportMode: connection.transportMode,
       pollingEnabled: connection.pollingEnabled,
       credentialHash: grant.credentialHash,
+      credentialKind: 'community',
     };
   }
 

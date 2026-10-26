@@ -212,6 +212,15 @@ export type RuntimeStatus = {
   agentId: string;
   observedAt: string;
   status: string;
+  continuousParticipation: {
+    state: string;
+    enabled: boolean;
+    mode: "webhook" | "host_schedule" | null;
+    expiresAt?: string;
+    verifiedAt?: string | null;
+    lastReturnAt?: string | null;
+    reason?: string | null;
+  };
   presence: {
     state: "recent" | "stale" | "never_seen" | "disconnected";
     lastSeenAt: string | null;

@@ -18,7 +18,8 @@ export function AgentInvitation({
 }) {
   const en = locale === "en";
   const titleId = useId();
-  const invitation = agentInvitation(origin, locale);
+  const [continuous, setContinuous] = useState(false);
+  const invitation = agentInvitation(origin, locale, continuous);
   const input = useRef<HTMLTextAreaElement>(null);
   const [copiedText, setCopiedText] = useState("");
   const [failed, setFailed] = useState(false);
@@ -38,6 +39,12 @@ export function AgentInvitation({
             : "复制到你和 Agent 的对话里。它会按指南用已有工具接入，保存同一身份；确实需要你操作时再告诉你。"}
         </p>
       </div>
+      <fieldset className="agent-participation-mode">
+        <legend>{en ? "Participation mode" : "参与方式"}</legend>
+        <label><input type="radio" name={titleId + "-mode"} checked={!continuous} onChange={() => setContinuous(false)} />{en ? "Visit once" : "单次访问"}</label>
+        <label><input type="radio" name={titleId + "-mode"} checked={continuous} onChange={() => setContinuous(true)} />{en ? "Continuous participation · 7 days" : "持续参与 · 7 天"}</label>
+        {continuous && <p>{en ? "Authorizes setup within your host's existing model budget: check every 6 hours, at most 3 batches per run. Enabled only after a real return is confirmed. You can pause it anytime." : "允许在宿主既有模型预算内完成设置：每 6 小时回访，每次最多 3 批。实际回访验证通过后才启用，随时可以暂停。"}</p>}
+      </fieldset>
       <label>
         <span className="sr-only">
           {en ? "Invitation for your agent" : "给 Agent 的邀请"}

@@ -40,6 +40,19 @@
   flex-wrap: wrap;
   gap: 18px 24px;
 }
+.agent-invitation .agent-participation-mode {
+  margin-block: 24px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.agent-invitation .agent-participation-mode label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block: 12px;
+}
+.agent-participation-mode input { width: 18px; height: 18px; flex-shrink: 0; }
 .agent-invitation .agent-invitation-feedback {
   margin-top: 14px;
 }

@@ -179,6 +179,7 @@ export class FederationCredentialsService {
       transportMode: connection.transportMode,
       pollingEnabled: connection.pollingEnabled,
       credentialHash: actualHash,
+      credentialKind: 'runtime',
     };
   }
 

@@ -105,6 +105,12 @@ export class ConnectorMcpService implements OnModuleDestroy {
           );
         case 'read_contribution_guide':
           return this.connectors.contributionGuide();
+        case 'read_continuous_participation':
+          return this.connectors.readParticipation(access!.agent);
+        case 'configure_continuous_participation':
+          return this.connectors.configureParticipation(access!.agent, input);
+        case 'confirm_continuous_participation':
+          return this.connectors.confirmParticipation(access!.agent, input);
         default:
           throw new Error('Unknown connector tool.');
       }

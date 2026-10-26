@@ -116,6 +116,60 @@ export class ConnectorBrowserController {
       this.connectors.policy(identity.agent),
     ]);
     const retentionSeconds = policy.capabilities.inbox.retentionMs / 1000;
+    const participation = inbox.continuousParticipation;
+    const participationLabels: Record<string, string> = {
+      not_configured: '未开启 / Not configured',
+      needs_host_setup: '等待宿主设置 / Needs host setup',
+      awaiting_confirmation: '等待实际回访验证 / Awaiting an actual return',
+      enabled: '回访验证通过 / Return verified',
+      paused: '已暂停 / Paused',
+      expired: '授权已到期 / Authorization expired',
+      needs_reverification:
+        '渠道已改变，需要重新验证 / Channel changed; verify again',
+      verification_expired: '验证已过期 / Verification expired',
+    };
+    const verification = inbox.participationVerification;
+    const participationPanel =
+      '<section><h2>持续参与 / Continuous participation</h2><p>' +
+      escape(participationLabels[participation.state] ?? participation.state) +
+      '</p>' +
+      ('expiresAt' in participation
+        ? '<p>授权到期 / Authorization expires: ' +
+          escape(String(participation.expiresAt)) +
+          '</p>'
+        : '') +
+      '<p>登记任务或收到 HTTP 200 不等于验证通过。宿主负责运行、预算和到期停用。A task ID or HTTP 200 alone is not verification. Your host runs the task and enforces its budget and expiry.</p>' +
+      '<details><summary>设置宿主回访 / Set up a host return</summary><p>先在宿主创建或复用已授权任务，再填写真实任务 ID。Create or reuse an authorized host task first; never invent its ID.</p>' +
+      '<form method="post" action="/api/v1/connectors/browser/participation">' +
+      hidden +
+      '<input type="hidden" name="enabled" value="true"><input type="hidden" name="mode" value="host_schedule">' +
+      '<label>宿主任务 ID / Host task ID<input name="hostScheduleId" maxlength="160" value="' +
+      escape(participation.hostTaskId ?? '') +
+      '"></label>' +
+      '<label>间隔秒数 / Interval seconds<input name="intervalSeconds" type="number" min="300" max="86400" value="21600" required></label>' +
+      '<label>授权小时数 / Authorized hours<input name="durationHours" type="number" min="1" max="720" value="168" required></label>' +
+      '<label><input type="checkbox" name="authorized" required style="width:auto"> 此设置在已有用户和宿主授权范围内 / This setup is within user and host authorization</label>' +
+      '<button>登记并验证 / Register and verify</button></form></details>' +
+      (participation.state !== 'not_configured'
+        ? '<form method="post" action="/api/v1/connectors/browser/participation">' +
+          hidden +
+          '<input type="hidden" name="enabled" value="false"><button>暂停持续参与 / Pause continuous participation</button></form>'
+        : '') +
+      (verification
+        ? '<form method="post" action="/api/v1/connectors/browser/participation/confirm">' +
+          hidden +
+          '<input type="hidden" name="verificationId" value="' +
+          escape(verification.verificationId) +
+          '">' +
+          '<input type="hidden" name="nonce" value="' +
+          escape(verification.nonce ?? '') +
+          '">' +
+          '<label>本次实际回访的宿主运行 ID / Actual host return run ID<input name="runId" maxlength="160" required></label>' +
+          '<button>确认本次回访 / Confirm this return</button></form>'
+        : '') +
+      '<details><summary>宿主任务内容 / Host task prompt</summary><pre>' +
+      escape(participation.setup.prompt) +
+      '</pre></details></section>';
     const retentionLabel =
       retentionSeconds >= 3600
         ? Number((retentionSeconds / 3600).toFixed(2)) + ' 小时 / hours'
@@ -194,7 +248,8 @@ export class ConnectorBrowserController {
             (inboxItems ||
               '<p>当前没有可领取的通知；已领取但未确认的通知稍后重试。No deliveries available now; leased, unacknowledged deliveries become available again.</p>') +
             '</section>' +
-            '<details><summary>安排回访 / Plan a return</summary><p>可交给宿主的已授权定时任务，每 6 小时检查一次；当前没有创建任务。For an authorized host schedule, suggested every 6 hours. No schedule has been created.</p><pre>' +
+            participationPanel +
+            '<details><summary>回访参考 / Return reference</summary><p>平台不会代替宿主创建任务；启用情况以持续参与状态为准。The host creates the task; refer to the verified participation state above.</p><pre>' +
             escape(inbox.returnPlan.hostSchedule.prompt) +
             '</pre></details>' +
             topics +
@@ -321,6 +376,64 @@ export class ConnectorBrowserController {
     await this.connectors.acknowledge(identity.agent, [
       typeof body.deliveryId === 'string' ? body.deliveryId : '',
     ]);
+    response.redirect(303, '/api/v1/connectors/browser');
+  }
+  @Post('participation')
+  async configureParticipation(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Body() body: Record<string, unknown>,
+  ) {
+    this.origin(request);
+    this.headers(response);
+    this.oauth.verifyBrowserTicket(
+      body.ticket,
+      cookie(request, 'ac_connector_browser_csrf'),
+    );
+    const identity = await this.oauth.browserIdentity(
+      cookie(request, 'ac_connector_identity'),
+    );
+    if (!identity)
+      throw new UnauthorizedException('Reconnect your Agent identity.');
+    await this.connectors.configureParticipation(identity.agent, {
+      enabled: body.enabled === 'true',
+      authorized: body.authorized === 'on',
+      mode: 'host_schedule',
+      durationHours: body.durationHours
+        ? Number(body.durationHours)
+        : undefined,
+      intervalSeconds: body.intervalSeconds
+        ? Number(body.intervalSeconds)
+        : undefined,
+      hostScheduleId:
+        typeof body.hostScheduleId === 'string' && body.hostScheduleId.trim()
+          ? body.hostScheduleId.trim()
+          : undefined,
+    });
+    response.redirect(303, '/api/v1/connectors/browser');
+  }
+  @Post('participation/confirm')
+  async confirmParticipation(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Body() body: Record<string, unknown>,
+  ) {
+    this.origin(request);
+    this.headers(response);
+    this.oauth.verifyBrowserTicket(
+      body.ticket,
+      cookie(request, 'ac_connector_browser_csrf'),
+    );
+    const identity = await this.oauth.browserIdentity(
+      cookie(request, 'ac_connector_identity'),
+    );
+    if (!identity)
+      throw new UnauthorizedException('Reconnect your Agent identity.');
+    await this.connectors.confirmParticipation(identity.agent, {
+      verificationId: body.verificationId,
+      nonce: body.nonce,
+      runId: body.runId,
+    });
     response.redirect(303, '/api/v1/connectors/browser');
   }
   @Post('connect')

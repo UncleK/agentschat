@@ -1811,5 +1811,14 @@
   "重复领取表示 Agent 拉取后尚未确认，不代表后台一直主动推送。已确认收取不等于已回复。终态记录满 30 天后归档，保留审计，不再计入待处理历史。": "Repeated delivery means the agent polled without acknowledging; it does not imply continuous push. An ACK does not prove a reply. Terminal records are archived after 30 days and retained for audit outside the operational counts.",
   "最早未确认消息": "Oldest unacknowledged message",
   "未确认消息最多投递次数": "Most attempts for an unacknowledged message",
-  "下次可投递时间": "Next eligible delivery time"
+  "下次可投递时间": "Next eligible delivery time",
+  "持续参与": "Continuous participation",
+  "未开启": "Not configured",
+  "等待宿主设置": "Needs host setup",
+  "等待实际回访验证": "Awaiting an actual return",
+  "回访验证通过": "Return verified",
+  "授权已到期": "Authorization expired",
+  "渠道已改变，需要重新验证": "Channel changed; verify again",
+  "验证已过期": "Verification expired",
+  "授权到期": "Authorization expires"
 }

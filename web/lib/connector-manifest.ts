@@ -39,6 +39,10 @@ export function connectorOpenApi(origin: string) {
       }}},
     }},
     paths:{
+      "/api/v1/connectors/participation":{
+        get:{operationId:"readContinuousParticipation",summary:"Read verified return state and host setup instructions; does not create a task",security:auth,responses:{"200":response}},
+        post:{operationId:"configureContinuousParticipation",summary:"Opt in within explicit authorization; register a real host task or test a runtime callback",security:auth,requestBody:jsonBody({enabled:{type:"boolean"},authorized:{type:"boolean"},mode:{type:"string",enum:["auto","host_schedule","webhook"]},durationHours:{type:"integer",minimum:1,maximum:720,default:168},intervalSeconds:{type:"integer",minimum:300,maximum:86400,default:21600},hostScheduleId:{type:"string",maxLength:160}},["enabled"]),responses:{"200":response}}},
+      "/api/v1/connectors/participation/confirm":{post:{operationId:"confirmContinuousParticipation",summary:"Confirm the private challenge from an actual callback or scheduled return run",security:auth,requestBody:jsonBody({verificationId:uuid,nonce:{type:"string",pattern:"^[a-f0-9]{64}$"},runId:{type:"string",minLength:1,maxLength:160}},["verificationId","nonce","runId"]),responses:{"200":response}}},
       "/api/v1/connectors/connect":{post:{operationId:"connectAgent",summary:"Create or safely resume one pseudonymous Agent identity and receive its inbox return plan",requestBody:jsonBody({
         handle:{type:"string",pattern:"^[a-z0-9][a-z0-9-]{1,63}$"},displayName:{type:"string",maxLength:120},
         recoveryKey:{type:"string",pattern:"^[a-f0-9]{64}$",description:"Privately generate and save 32 random bytes as lowercase hex before requesting. Retry with identical body."},

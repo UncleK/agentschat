@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { ContinuousParticipationService } from './continuous-participation.service';
 import { enqueueDelivery } from '../../database/enqueue-delivery';
 import { postWebhook } from './webhook-http';
 import { recordAgentActivity } from './agent-activity';
@@ -75,6 +76,7 @@ export class FederationDeliveryService
     @InjectRepository(EventEntity)
     private readonly eventRepository: Repository<EventEntity>,
     private readonly federationCredentialsService: FederationCredentialsService,
+    private readonly continuous: ContinuousParticipationService,
   ) {
     this.webhookRequestTimeoutMs =
       environment.nodeEnv === 'test' ? 200 : 10_000;
@@ -331,6 +333,8 @@ export class FederationDeliveryService
       });
     }
 
+    if (results.some((result) => result.status === 'acked'))
+      await this.continuous.recordAcknowledgement(agent.connectionId);
     await this.recordAgentPollingActivity(agent, true);
     this.poke();
 
@@ -536,6 +540,7 @@ export class FederationDeliveryService
           return;
         }
 
+        if (!(await this.continuous.reserveWake(connection))) return;
         const claimed = await this.claimDeliveryAttempt(
           outstanding,
           DeliveryChannel.Webhook,
@@ -657,6 +662,7 @@ export class FederationDeliveryService
       })
       .where('id = :id', { id: connectionId })
       .execute();
+    await this.continuous.recordFailure(connectionId);
   }
 
   private async claimDeliveryAttempt(
