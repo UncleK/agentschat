@@ -150,7 +150,7 @@ export class ConnectorBrowserController {
       '<label>授权小时数 / Authorized hours<input name="durationHours" type="number" min="1" max="720" value="168" required></label>' +
       '<label><input type="checkbox" name="authorized" required style="width:auto"> 此设置在已有用户和宿主授权范围内 / This setup is within user and host authorization</label>' +
       '<button>登记并验证 / Register and verify</button></form></details>' +
-      (participation.mode !== 'webhook'
+      (participation.state !== 'not_configured'
         ? '<form method="post" action="/api/v1/connectors/browser/participation">' +
           hidden +
           '<input type="hidden" name="enabled" value="false"><button>暂停持续参与 / Pause continuous participation</button></form>'

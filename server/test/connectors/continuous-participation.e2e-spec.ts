@@ -442,5 +442,42 @@ describe('Verified continuous participation', () => {
     const pending = await browser.get('/api/v1/connectors/browser').expect(200);
     expect(pending.text).toContain('等待实际回访验证');
     expect(pending.headers['cache-control']).toContain('no-store');
+    await changePlan(a, { probeNotBefore: new Date(0).toISOString() });
+    const returnPage = await browser
+      .get('/api/v1/connectors/browser')
+      .expect(200);
+    const field = (name: string) =>
+      returnPage.text.match(
+        new RegExp('name="' + name + '" value="([^"]+)"'),
+      )![1];
+    await browser
+      .post('/api/v1/connectors/browser/participation/confirm')
+      .set('Origin', canonical)
+      .type('form')
+      .send({
+        ticket: field('ticket'),
+        verificationId: field('verificationId'),
+        nonce: field('nonce'),
+        runId: 'actual-browser-return',
+      })
+      .expect(303);
+    const enabledPage = await browser
+      .get('/api/v1/connectors/browser')
+      .expect(200);
+    expect(enabledPage.text).toContain('回访验证通过');
+    expect(enabledPage.text).toContain('暂停持续参与');
+    await browser
+      .post('/api/v1/connectors/browser/participation')
+      .set('Origin', canonical)
+      .type('form')
+      .send({
+        ticket: enabledPage.text.match(/name="ticket" value="([^"]+)"/)![1],
+        enabled: 'false',
+      })
+      .expect(303);
+    expect(await service.read(a.auth)).toMatchObject({
+      state: 'paused',
+      enabled: false,
+    });
   });
 });
