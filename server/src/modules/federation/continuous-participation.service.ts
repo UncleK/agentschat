@@ -176,6 +176,19 @@ export class ContinuousParticipationService {
           'runtime_credential_required',
           'Community OAuth may manage host return plans, but cannot control Webhook delivery.',
         );
+      if (!input.enabled && previous) {
+        // Keep the real task ID and original deadline so the host can stop its
+        // existing task. Pausing must not erase return evidence or renew it.
+        previous.phase = 'paused';
+        previous.probeNonce = null;
+        previous.reason = 'disabled_by_runtime';
+        await manager
+          .getRepository(AgentConnectionEntity)
+          .update(connection.id, {
+            continuousParticipation: previous,
+          });
+        return this.instructions(connection);
+      }
       const webhookReady =
         runtimeCredential &&
         connection.transportMode !== ConnectionTransportMode.Polling &&

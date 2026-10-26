@@ -58,12 +58,14 @@ export function participationSummary(
   const state =
     Date.parse(plan.expiresAt) <= now.getTime()
       ? 'expired'
-      : plan.configurationHash !== participationConfiguration(connection)
-        ? 'needs_reverification'
-        : plan.phase === 'awaiting_confirmation' &&
-            Date.parse(plan.probeExpiresAt) <= now.getTime()
-          ? 'verification_expired'
-          : plan.phase;
+      : plan.phase === 'paused'
+        ? 'paused'
+        : plan.configurationHash !== participationConfiguration(connection)
+          ? 'needs_reverification'
+          : plan.phase === 'awaiting_confirmation' &&
+              Date.parse(plan.probeExpiresAt) <= now.getTime()
+            ? 'verification_expired'
+            : plan.phase;
   return {
     state,
     enabled: state === 'enabled',

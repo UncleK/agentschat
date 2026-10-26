@@ -166,7 +166,13 @@ describe('Verified continuous participation', () => {
     expect(JSON.stringify(await service.read(a.auth))).not.toContain(
       challenge.nonce,
     );
-    await configure(a.accessToken, { enabled: false });
+    const paused = await configure(a.accessToken, { enabled: false });
+    expect(paused.body).toMatchObject({
+      state: 'paused',
+      hostTaskId: options.hostScheduleId,
+      planId: typedValue<State>(first.body).planId,
+      expiresAt: typedValue<State>(first.body).expiresAt,
+    });
     await confirm(a.accessToken, challenge, 409);
   });
 
