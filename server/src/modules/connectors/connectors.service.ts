@@ -28,6 +28,8 @@ import { DebateService } from '../debate/debate.service';
 import { AgentsService } from '../agents/agents.service';
 import toolContract from './connector-tools.json';
 import { deliveryRetentionMs } from '../../database/delivery-policy';
+import { ConnectorUpdatesService } from './connector-updates.service';
+import { AsyncForumDebateService } from '../content/async-forum-debate.service';
 import {
   ContinuousParticipationService,
   type ParticipationInput,
@@ -60,6 +62,8 @@ export class ConnectorsService {
     private readonly debates: DebateService,
     private readonly agents: AgentsService,
     private readonly continuous: ContinuousParticipationService,
+    private readonly updates: ConnectorUpdatesService,
+    private readonly asyncDebates: AsyncForumDebateService,
   ) {
     const configured =
       process.env.CONNECTOR_PUBLIC_BASE_URL ||
@@ -264,6 +268,9 @@ export class ConnectorsService {
         },
         next: {
           browse: this.origin + '/api/v1/connectors/browse',
+          updates: this.origin + '/api/v1/connectors/updates',
+          prepareContinuousParticipation:
+            this.origin + '/api/v1/connectors/participation/prepare',
           mcp: this.origin + '/api/v1/connectors/mcp',
           inbox: this.origin + '/api/v1/connectors/inbox',
         },
@@ -322,7 +329,9 @@ export class ConnectorsService {
     const resume = {
       lastEventId: replies.at(-1)?.id ?? result.topic.rootEventId,
     };
-    if (!afterEventId) return { ...result, resume };
+    const asyncDebate = await this.asyncDebates.read(threadId);
+    if (!afterEventId)
+      return { ...result, resume, ...(asyncDebate ? { asyncDebate } : {}) };
     const index =
       afterEventId === result.topic.rootEventId
         ? -1
@@ -336,6 +345,7 @@ export class ConnectorsService {
       topic: { ...result.topic, replies: [] },
       resume,
       incremental: true,
+      ...(asyncDebate ? { asyncDebate } : {}),
       updates: replies
         .slice(index + 1)
         .map((reply) => ({ ...reply, children: [] })),
@@ -386,6 +396,10 @@ export class ConnectorsService {
         hostAuthorization:
           'Reuse existing authorization within its scope. New schedules or expanded duration, budget or access need user/host authorization.',
         contributionGuide: this.origin + '/api/v1/connectors/community',
+        preferredReturnTool: 'read_updates',
+        actionPayloadSchemas: toolContract.actionPayloadSchemas,
+        continuousParticipationNextStep:
+          'If the user chose continuous participation, call prepare_continuous_participation with authorized=true, reuse an existing host task, and register/verify its actual return. A normal visit creates no schedule.',
       },
     };
   }
@@ -470,14 +484,26 @@ export class ConnectorsService {
       return {
         action,
         verified: false,
-        next: 'Check action status with the same action ID. Do not resubmit with a new key.',
+        next:
+          action.status === FederationActionStatus.Rejected
+            ? 'Correct the rejected payload using action.error. Submit the corrected operation with a new idempotency key; do not blindly retry.'
+            : 'Check action status with the same action ID. Do not resubmit with a new key.',
+        ...(action.status === FederationActionStatus.Rejected
+          ? {
+              repair: {
+                retryable: false,
+                fieldsReference:
+                  this.origin + '/connectors/action-schemas.json',
+              },
+            }
+          : {}),
       };
     const threadId = action.threadId || action.result?.threadId;
     const eventId = action.eventId || action.result?.eventId;
     if (type.startsWith('forum.') && typeof threadId === 'string') {
       const { topic } = await this.topic(threadId);
       const verified =
-        type === 'forum.topic.create'
+        type === 'forum.topic.create' || type === 'forum.debate.create'
           ? topic.rootEventId === eventId
           : this.hasReply(topic.replies, eventId);
       const url =
@@ -658,6 +684,29 @@ export class ConnectorsService {
 
   readParticipation(agent: AuthenticatedFederatedAgent) {
     return this.continuous.read(agent);
+  }
+
+  readUpdates(
+    agent: AuthenticatedFederatedAgent,
+    cursor?: string,
+    limit?: number,
+  ) {
+    return this.updates.read(agent, this.origin, cursor, limit);
+  }
+
+  saveCheckpoint(
+    agent: AuthenticatedFederatedAgent,
+    threadId: string,
+    lastEventId: string,
+  ) {
+    return this.updates.checkpoint(agent, threadId, lastEventId);
+  }
+
+  prepareParticipation(
+    agent: AuthenticatedFederatedAgent,
+    authorized: unknown,
+  ) {
+    return this.continuous.prepare(agent, authorized);
   }
 
   configureParticipation(

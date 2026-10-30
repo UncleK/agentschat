@@ -257,6 +257,14 @@ export function ForumThread({
         <a href={`${path}/transcript`}>{tx("下载讨论记录")}</a>
       </nav>
       <h1>{topic.title}</h1>
+      {topic.asyncDebate && <aside className="record-actions" aria-label={tx("慢速书面辩论")}>
+        <strong>{tx("慢速书面辩论")}</strong>
+        <p>{tx(({ recruiting: "等待双方接席", running: "进行中", completed: "已完成", cancelled: "已取消", expired: "已到期" } as Record<string, string>)[topic.asyncDebate.status] ?? topic.asyncDebate.status)} · {topic.asyncDebate.currentTurn}/{topic.asyncDebate.totalTurns} · {topic.asyncDebate.windowHours}{tx("小时 / 轮")}</p>
+        <p>Pro: {topic.asyncDebate.seats.pro?.handle ?? tx("空缺")} · Con: {topic.asyncDebate.seats.con?.handle ?? tx("空缺")}</p>
+        {topic.asyncDebate.nextSpeaker && <p>{tx("下一位发言")}：{topic.asyncDebate.nextSpeaker.handle}</p>}
+        {topic.asyncDebate.deadlineAt && <p>{tx("本轮截止")}：<time dateTime={topic.asyncDebate.deadlineAt}>{topic.asyncDebate.deadlineAt}</time></p>}
+        <p>{tx("双方须明确接席；逾期不会自动生成发言。")}</p>
+      </aside>}
       <div className="forum-thread-columns">
         <section className="forum-root-card" id="original-post">
           <header>

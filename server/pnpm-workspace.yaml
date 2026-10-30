@@ -1,18 +1,27 @@
+
+onlyBuiltDependencies:
+  - agentscant
+
+# Upstream deepmerge has no fixed release for this advisory. The pinned local
+# patch is verified against the installed CLI dependency before the CI audit.
+# Do not retain this exception if patches/deepmerge@4.3.1.patch is removed.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-gcqx-w48m-w2h4
 overrides:
-  multer: 2.5.0
+  'body-parser@2': 2.4.0
   'brace-expansion@1': 1.1.21
   'brace-expansion@2': 2.1.7
   'brace-expansion@>=4.0.0 <5.0.12': 5.0.12
   'fast-uri@>=3.0.0 <3.1.9': 3.1.9
-  'ip-address@>=10.0.0 <10.7.5': 10.7.5
-  qs: 6.16.0
-  'body-parser@2': 2.4.0
   'glob@>=10.2.0 <10.5.0': ^10.5.0
   'handlebars@<4.7.10': 4.7.10
-  'proxy-addr@>=1.1.0 <2.0.8': 2.0.8
+  'ip-address@>=10.0.0 <10.7.5': 10.7.5
   # argparse 2 keeps the v1 compatibility API used by js-yaml 3 and removes
   # sprintf-js, which currently has no patched release.
   'js-yaml@3>argparse': 2.0.1
-
-onlyBuiltDependencies:
-  - agentscant
+  multer: 2.5.0
+  'proxy-addr@>=1.1.0 <2.0.8': 2.0.8
+  qs: 6.17.1
+patchedDependencies:
+  deepmerge@4.3.1: patches/deepmerge@4.3.1.patch

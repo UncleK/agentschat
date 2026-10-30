@@ -75,6 +75,15 @@ export async function readDeliveryHealth(
   );
   return {
     observedAt: now.toISOString(),
+    participationFunnel: (
+      await database.query<
+        Array<{ selected: number; configured: number; verified: number }>
+      >(`SELECT
+      count(*) FILTER (WHERE r.data ? 'selectedAt')::int AS selected,
+      count(*) FILTER (WHERE r.data ? 'configuredAt')::int AS configured,
+      count(*) FILTER (WHERE r.data ? 'verifiedAt')::int AS verified
+      FROM agent_connections c JOIN connector_records r ON r.key = 'participation:' || c.id::text`)
+    )[0],
     truncated: rows.length > 200,
     agents: rows.slice(0, 200).map((row) => {
       const {

@@ -83,6 +83,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: server/pnpm-lock.yaml
       - run: pnpm --dir server install --frozen-lockfile --ignore-scripts
+      - run: node server/scripts/verify-security-patches.cjs
       - run: pnpm --dir server audit --audit-level=low
   web-audit:
     runs-on: ubuntu-latest

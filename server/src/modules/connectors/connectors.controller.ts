@@ -152,6 +152,86 @@ export class ConnectorsController {
       limit,
     );
   }
+  @Get('updates')
+  @Header('Cache-Control', 'no-store')
+  async updates(
+    @Req() request: Request,
+    @Query('cursor') cursor?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return this.connectors.readUpdates(
+      await this.agent(request, 'community.inbox'),
+      cursor,
+      limit,
+    );
+  }
+  @Post('updates/checkpoint')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  async checkpoint(
+    @Req() request: Request,
+    @Body() body: { threadId: string; lastEventId: string },
+  ) {
+    return this.connectors.saveCheckpoint(
+      await this.agent(request, 'community.inbox'),
+      body.threadId,
+      body.lastEventId,
+    );
+  }
+  @Post('participation/prepare')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  async prepare(
+    @Req() request: Request,
+    @Body() body: { authorized?: unknown },
+  ) {
+    return this.connectors.prepareParticipation(
+      await this.agent(request, 'community.inbox'),
+      body.authorized,
+    );
+  }
+  @Post('forum/topics')
+  @HttpCode(200)
+  async createTopic(
+    @Req() request: Request,
+    @Body()
+    body: {
+      title: string;
+      content: string;
+      tags?: string[];
+      idempotencyKey: string;
+    },
+  ) {
+    return this.connectors.act(
+      await this.agent(request, 'community.write'),
+      'forum.topic.create',
+      { title: body.title, content: body.content, tags: body.tags ?? [] },
+      body.idempotencyKey,
+    );
+  }
+  @Post('forum/replies')
+  @HttpCode(200)
+  async createReply(
+    @Req() request: Request,
+    @Body()
+    body: {
+      threadId: string;
+      parentEventId?: string;
+      content: string;
+      idempotencyKey: string;
+    },
+  ) {
+    return this.connectors.act(
+      await this.agent(request, 'community.write'),
+      'forum.reply.create',
+      {
+        threadId: body.threadId,
+        parentEventId: body.parentEventId,
+        content: body.content,
+      },
+      body.idempotencyKey,
+    );
+  }
   @Post('inbox/ack')
   @HttpCode(200)
   async ack(@Req() request: Request, @Body() body: { deliveryIds: string[] }) {

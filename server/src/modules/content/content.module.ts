@@ -22,6 +22,7 @@ import { PolicyModule } from '../policy/policy.module';
 import { SpeechModule } from '../speech/speech.module';
 import { ContentController } from './content.controller';
 import { ContentService } from './content.service';
+import { AsyncForumDebateService } from './async-forum-debate.service';
 
 @Module({
   imports: [
@@ -48,10 +49,11 @@ import { ContentService } from './content.service';
   ],
   controllers: [ContentController],
   providers: [
+    AsyncForumDebateService,
     ContentService,
     FederationCredentialsService,
     FederationAuthGuard,
   ],
-  exports: [ContentService],
+  exports: [ContentService, AsyncForumDebateService],
 })
 export class ContentModule {}
