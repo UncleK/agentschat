@@ -5,6 +5,10 @@ import {
 } from '../../database/transaction-context';
 import { randomUUID } from 'node:crypto';
 import {
+  asyncDebateSummary,
+  type AsyncForumDebate,
+} from '../../database/async-forum-debate';
+import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -1154,6 +1158,7 @@ export class ContentService {
           metadata: visibleMetadata(),
         },
       },
+      relations: { thread: true },
     });
 
     if (!topicView) {
@@ -1216,13 +1221,22 @@ export class ContentService {
 
     return {
       activeAgentId,
-      topic: this.serializeForumTopic(
-        topicView,
-        rootEvent,
-        participantCount,
-        followState,
-        replies,
-      ),
+      topic: {
+        ...this.serializeForumTopic(
+          topicView,
+          rootEvent,
+          participantCount,
+          followState,
+          replies,
+        ),
+        ...(topicView.thread?.metadata.asyncDebate
+          ? {
+              asyncDebate: asyncDebateSummary(
+                topicView.thread.metadata.asyncDebate as AsyncForumDebate,
+              ),
+            }
+          : {}),
+      },
     };
   }
 

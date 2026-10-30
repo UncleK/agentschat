@@ -9,6 +9,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { APP_ENVIRONMENT, type AppEnvironment } from '../../config/environment';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { AgentEntity } from '../../database/entities/agent.entity';
+import { ConnectorRecordEntity } from '../../database/entities/connector-record.entity';
 import {
   AgentStatus,
   ConnectionTransportMode,
@@ -107,6 +108,53 @@ export class ContinuousParticipationService {
         agentId: agent.id,
       });
     return this.instructions(connection);
+  }
+
+  async summary(agent: AuthenticatedFederatedAgent) {
+    const connection = await this.database
+      .getRepository(AgentConnectionEntity)
+      .findOneByOrFail({ id: agent.connectionId, agentId: agent.id });
+    return {
+      ...participationSummary(connection),
+      setupTool: 'prepare_continuous_participation',
+      setupPath: '/api/v1/connectors/participation/prepare',
+    };
+  }
+
+  private async milestone(
+    manager: EntityManager,
+    connectionId: string,
+    stage: 'selected' | 'configured' | 'verified',
+  ) {
+    const repository = manager.getRepository(ConnectorRecordEntity);
+    const key = 'participation:' + connectionId;
+    const record = await repository.findOneBy({ key });
+    const field = stage + 'At';
+    if (record?.data[field]) return;
+    await repository.save({
+      key,
+      data: { ...(record?.data ?? {}), [field]: new Date().toISOString() },
+      expiresAt: null,
+    });
+  }
+
+  async prepare(agent: AuthenticatedFederatedAgent, authorized: unknown) {
+    if (authorized !== true)
+      throw new FederationHttpException(
+        400,
+        'authorization_required',
+        'Prepare continuous participation only after the user selected it or granted standing authorization.',
+      );
+    return this.database.transaction(async (manager) => {
+      const connection = await this.locked(manager, agent);
+      await this.milestone(manager, connection.id, 'selected');
+      return {
+        ...this.instructions(connection),
+        selected: true,
+        nextStep:
+          'Reuse a real authorized host task, or configure your existing callback. Then register it with configure_continuous_participation and confirm the actual return. This step creates no task and enables no push.',
+      };
+    });
   }
 
   async configure(
@@ -223,6 +271,8 @@ export class ContinuousParticipationService {
           'A host schedule must be able to read the inbox. Use the original runtime credential at /api/v1/agents/connection/transport to enable polling or hybrid transport first.',
         );
       const now = new Date();
+      if (input.enabled)
+        await this.milestone(manager, connection.id, 'selected');
       const scheduleId =
         typeof input.hostScheduleId === 'string'
           ? input.hostScheduleId.trim()
@@ -301,6 +351,8 @@ export class ContinuousParticipationService {
         reason: input.enabled ? null : 'disabled_by_runtime',
       };
       connection.continuousParticipation = plan;
+      if (input.enabled && ready)
+        await this.milestone(manager, connection.id, 'configured');
       await manager
         .getRepository(AgentConnectionEntity)
         .update(connection.id, { continuousParticipation: plan });
@@ -458,6 +510,7 @@ export class ContinuousParticipationService {
         );
       if (plan.phase !== 'enabled') {
         plan.phase = 'enabled';
+        await this.milestone(manager, connection.id, 'verified');
         plan.verifiedAt = new Date().toISOString();
         plan.lastReturnAt = plan.verifiedAt;
         plan.lastRunId = (input.runId as string).trim();

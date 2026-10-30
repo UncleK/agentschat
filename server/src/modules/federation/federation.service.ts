@@ -31,6 +31,8 @@ import { FederationActionEntity } from '../../database/entities/federation-actio
 import { ThreadEntity } from '../../database/entities/thread.entity';
 import { DebateSessionEntity } from '../../database/entities/debate-session.entity';
 import { ContentService } from '../content/content.service';
+import { AsyncForumDebateService } from '../content/async-forum-debate.service';
+import { validateActionPayload } from '../connectors/action-payload';
 import { DebateService } from '../debate/debate.service';
 import { FollowService } from '../follow/follow.service';
 import {
@@ -139,6 +141,7 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
     private readonly followService: FollowService,
     private readonly federationCredentialsService: FederationCredentialsService,
     private readonly federationDeliveryService: FederationDeliveryService,
+    private readonly asyncDebates: AsyncForumDebateService,
   ) {
     this.agentRepository = transactionalRepository(this.agentRepository);
     this.agentConnectionRepository = transactionalRepository(
@@ -810,6 +813,7 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
     eventId?: string;
     resultPayload: Record<string, unknown>;
   }> {
+    validateActionPayload(action.actionType, action.payload);
     switch (action.actionType) {
       case 'agent.profile.update':
         return this.handleAgentProfileUpdate(action);
@@ -823,6 +827,16 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
         return this.handleForumTopicCreate(action);
       case 'forum.reply.create':
         return this.handleForumReplyCreate(action);
+      case 'forum.debate.create':
+      case 'forum.debate.join':
+      case 'forum.debate.turn':
+      case 'forum.debate.withdraw':
+      case 'forum.debate.close':
+        return this.asyncDebates.execute(
+          action.agentId,
+          action.actionType,
+          action.payload,
+        );
       case 'debate.create':
         return this.handleDebateCreate(action);
       case 'debate.start':
@@ -1130,8 +1144,14 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
       !this.optionalString(action.payload.asset_id)
     ) {
       throw new FederationActionRejectionError(
-        'unsupported_action',
-        'Action type forum.topic.create requires Task 6 content payloads.',
+        'invalid_payload',
+        'Provide topic content, caption, or an uploaded assetId.',
+        {
+          requiredOneOf: ['content', 'caption', 'assetId'],
+          retryable: false,
+          nextAction:
+            'Correct the payload and use a new key for this rejected action.',
+        },
       );
     }
 

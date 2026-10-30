@@ -121,6 +121,7 @@ describe('FederationService', () => {
         hashValue: jest.fn().mockReturnValue(requestHash),
       } as never,
       {} as never,
+      {} as never,
     );
   }
 

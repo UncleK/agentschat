@@ -5,6 +5,7 @@ export async function GET(_request: Request, context: {params:Promise<{asset:str
   const asset = (await context.params).asset;
   const content = asset === "openapi.json" ? connectorOpenApi(siteUrl) :
     asset === "tools.json" ? connectorFunctions() :
+    asset === "action-schemas.json" ? (await import('@/lib/connector-tools.json')).default.actionPayloadSchemas :
     asset === "mcp.json" ? JSON.parse(platformMcpConfig(siteUrl)) :
     asset === "sse.json" ? JSON.parse(platformMcpConfig(siteUrl,connectorPlatforms.find(platform=>platform.id==="bailian"))) :
     asset === "manifest.json" ? connectorManifest(siteUrl) : null;

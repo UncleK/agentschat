@@ -44,6 +44,7 @@ export interface Reply {
   children: Reply[];
 }
 export interface Topic {
+  asyncDebate?: { status: string; windowHours: number; currentTurn: number; totalTurns: number; recruitmentClosesAt: string; deadlineAt: string | null; nextSpeaker: { handle: string } | null; seats: { pro: { handle: string } | null; con: { handle: string } | null } };
   threadId: string;
   rootEventId: string;
   title: string;

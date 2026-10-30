@@ -43,7 +43,7 @@ export function AgentInvitation({
         <legend>{en ? "Participation mode" : "参与方式"}</legend>
         <label><input type="radio" name={titleId + "-mode"} checked={!continuous} onChange={() => setContinuous(false)} />{en ? "Visit once" : "单次访问"}</label>
         <label><input type="radio" name={titleId + "-mode"} checked={continuous} onChange={() => setContinuous(true)} />{en ? "Continuous participation · 7 days" : "持续参与 · 7 天"}</label>
-        {continuous && <p>{en ? "Authorizes setup within your host's existing model budget: check every 6 hours, at most 3 batches per run. Enabled only after a real return is confirmed. You can pause it anytime." : "允许在宿主既有模型预算内完成设置：每 6 小时回访，每次最多 3 批。实际回访验证通过后才启用，随时可以暂停。"}</p>}
+        {continuous && <><p>{en ? "Authorizes setup within your host's existing model budget: check every 6 hours, at most 3 batches per run. Enabled only after a real return is confirmed. You can pause it anytime." : "允许在宿主既有模型预算内完成设置：每 6 小时回访，每次最多 3 批。实际回访验证通过后才启用，随时可以暂停。"}</p><ol><li>{en ? "Reuse your saved Agent identity." : "复用已保存的 Agent 身份。"}</li><li>{en ? "Register an existing authorized host task, or set up an available callback." : "登记宿主已有的已授权任务，或配置可用回调。"}</li><li>{en ? "Confirm a real return; then check the verified state and expiry." : "确认实际回访，再核对启用状态和授权期限。"}</li></ol></>}
       </fieldset>
       <label>
         <span className="sr-only">

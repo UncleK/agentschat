@@ -18,7 +18,10 @@ import {
   deliveryRetentionMs,
   DELIVERY_HISTORY_ARCHIVE_AFTER_MS,
 } from '../../database/delivery-policy';
-import { visibleMetadataSql } from '../moderation/content-visibility';
+import {
+  visibleMetadataSql,
+  visibleForumRootSql,
+} from '../moderation/content-visibility';
 import {
   AgentStatus,
   ConnectionTransportMode,
@@ -153,6 +156,7 @@ export class FederationDeliveryService
     waitSeconds: number | undefined,
     signal?: AbortSignal,
     communityOnly = false,
+    prioritizeCommunity = false,
   ): Promise<PollResult> {
     if (!agent.pollingEnabled) {
       throw new FederationHttpException(
@@ -200,12 +204,16 @@ export class FederationDeliveryService
           normalizedCursor,
           limit,
           communityOnly,
+          prioritizeCommunity,
         );
         if (deliveries.length > 0 || Date.now() >= deadline) {
           if (!signal?.aborted)
             await this.recordAgentPollingActivity(agent, true);
           const pendingCount = communityOnly
             ? await this.outstandingQuery(agent.id, true)
+                .andWhere(
+                  prioritizeCommunity ? visibleForumRootSql('event') : '1=1',
+                )
                 .andWhere('delivery.replayExpiresAt > :now', {
                   now: new Date(),
                 })
@@ -426,6 +434,7 @@ export class FederationDeliveryService
     _cursor: number | null,
     limit: number | undefined,
     communityOnly = false,
+    prioritizeCommunity = false,
   ): Promise<Array<Record<string, unknown>>> {
     const boundedLimit = limit ?? 1;
     if (
@@ -439,13 +448,26 @@ export class FederationDeliveryService
         'limit must be an integer from 1 to 50.',
       );
     const deliveries: Array<Record<string, unknown>> = [];
-    const outstandingBatch = await this.outstandingQuery(
+    const batch = this.outstandingQuery(
       recipientAgentId,
       communityOnly,
-    )
-      .andWhere('delivery.replayExpiresAt > :now', { now: new Date() })
-      .take(boundedLimit)
-      .getMany();
+    ).andWhere('delivery.replayExpiresAt > :now', { now: new Date() });
+    if (communityOnly && prioritizeCommunity) {
+      batch.andWhere(visibleForumRootSql('event'));
+      batch
+        .leftJoin(EventEntity, 'parent', 'parent.id = event.parentEventId')
+        .andWhere(
+          '(delivery.nextAttemptAt IS NULL OR delivery.nextAttemptAt <= :now)',
+        )
+        .addSelect(
+          "CASE WHEN parent.actor_agent_id = :priorityAgent OR event.metadata->>'nextSpeakerAgentId' = CAST(:priorityAgent AS text) THEN 0 ELSE 1 END",
+          'community_priority',
+        )
+        .setParameter('priorityAgent', recipientAgentId)
+        .orderBy('community_priority', 'ASC')
+        .addOrderBy('delivery.sequence', 'ASC');
+    }
+    const outstandingBatch = await batch.limit(boundedLimit).getMany();
     for (const outstanding of outstandingBatch) {
       if (!(await this.ensureDeliveryIsActive(outstanding))) {
         continue;

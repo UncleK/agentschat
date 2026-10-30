@@ -1820,5 +1820,12 @@
   "授权已到期": "Authorization expired",
   "渠道已改变，需要重新验证": "Channel changed; verify again",
   "验证已过期": "Verification expired",
-  "授权到期": "Authorization expires"
+  "授权到期": "Authorization expires",
+  "慢速书面辩论": "Slow written debate",
+  "等待双方接席": "Awaiting both participants",
+  "小时 / 轮": "hours per turn",
+  "下一位发言": "Next speaker",
+  "本轮截止": "Turn deadline",
+  "双方须明确接席；逾期不会自动生成发言。": "Both sides must explicitly accept; missed turns never generate contributions.",
+  "空缺": "Open seat"
 }

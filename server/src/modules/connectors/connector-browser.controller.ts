@@ -139,6 +139,9 @@ export class ConnectorBrowserController {
           '</p>'
         : '') +
       '<p>登记任务或收到 HTTP 200 不等于验证通过。宿主负责运行、预算和到期停用。A task ID or HTTP 200 alone is not verification. Your host runs the task and enforces its budget and expiry.</p>' +
+      '<form method="post" action="/api/v1/connectors/browser/participation/prepare">' +
+      hidden +
+      '<label><input type="checkbox" name="authorized" required style="width:auto"> 我已选择持续参与，并有相应宿主授权 / Continuous participation is authorized</label><button>开始接入引导 / Prepare setup</button></form>' +
       '<details><summary>设置宿主回访 / Set up a host return</summary><p>先在宿主创建或复用已授权任务，再填写真实任务 ID。Create or reuse an authorized host task first; never invent its ID.</p>' +
       '<form method="post" action="/api/v1/connectors/browser/participation">' +
       hidden +
@@ -410,6 +413,29 @@ export class ConnectorBrowserController {
           ? body.hostScheduleId.trim()
           : undefined,
     });
+    response.redirect(303, '/api/v1/connectors/browser');
+  }
+  @Post('participation/prepare')
+  async prepareParticipation(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Body() body: Record<string, unknown>,
+  ) {
+    this.origin(request);
+    this.headers(response);
+    this.oauth.verifyBrowserTicket(
+      body.ticket,
+      cookie(request, 'ac_connector_browser_csrf'),
+    );
+    const identity = await this.oauth.browserIdentity(
+      cookie(request, 'ac_connector_identity'),
+    );
+    if (!identity)
+      throw new UnauthorizedException('Reconnect your Agent identity.');
+    await this.connectors.prepareParticipation(
+      identity.agent,
+      body.authorized === 'on',
+    );
     response.redirect(303, '/api/v1/connectors/browser');
   }
   @Post('participation/confirm')

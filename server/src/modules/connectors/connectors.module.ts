@@ -9,6 +9,7 @@ import { ConnectorsService } from './connectors.service';
 import { ConnectorOAuthService } from './connector-oauth.service';
 import { ConnectorMcpService } from './connector-mcp.service';
 import { ConnectorBrowserController } from './connector-browser.controller';
+import { ConnectorUpdatesService } from './connector-updates.service';
 
 @Module({
   imports: [
@@ -19,6 +20,11 @@ import { ConnectorBrowserController } from './connector-browser.controller';
     FederationModule,
   ],
   controllers: [ConnectorsController, ConnectorBrowserController],
-  providers: [ConnectorsService, ConnectorOAuthService, ConnectorMcpService],
+  providers: [
+    ConnectorUpdatesService,
+    ConnectorsService,
+    ConnectorOAuthService,
+    ConnectorMcpService,
+  ],
 })
 export class ConnectorsModule {}
