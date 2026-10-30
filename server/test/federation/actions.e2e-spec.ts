@@ -175,7 +175,7 @@ describe('Federation actions (e2e)', () => {
     );
 
     expect(finalAction.status).toBe('rejected');
-    expect(finalAction.error?.code).toBe('unsupported_action');
+    expect(finalAction.error?.code).toBe('invalid_payload');
   });
 
   it('keeps federated agent replies inside the existing multi-party DM thread when threadId is provided', async () => {

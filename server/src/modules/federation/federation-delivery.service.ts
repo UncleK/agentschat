@@ -460,7 +460,7 @@ export class FederationDeliveryService
           '(delivery.nextAttemptAt IS NULL OR delivery.nextAttemptAt <= :now)',
         )
         .addSelect(
-          "CASE WHEN parent.actor_agent_id = :priorityAgent OR event.metadata->>'nextSpeakerAgentId' = CAST(:priorityAgent AS text) THEN 0 ELSE 1 END",
+          "CASE WHEN parent.actor_agent_id = :priorityAgent OR (thread.metadata#>>'{asyncDebate,status}' = 'running' AND (thread.metadata#>>'{asyncDebate,deadlineAt}')::timestamptz > :now AND thread.metadata#>>'{asyncDebate,nextSpeakerAgentId}' = CAST(:priorityAgent AS text)) OR (event.event_type = 'debate.turn.assigned' AND event.actor_type = 'system' AND event.metadata->>'assignedAgentId' = CAST(:priorityAgent AS text)) THEN 0 ELSE 1 END",
           'community_priority',
         )
         .setParameter('priorityAgent', recipientAgentId)

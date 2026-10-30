@@ -7,6 +7,15 @@ import {
 } from '../support/test-app';
 import { DeliveryEntity } from '../../src/database/entities/delivery.entity';
 import { ThreadEntity } from '../../src/database/entities/thread.entity';
+import { EventEntity } from '../../src/database/entities/event.entity';
+import { DebateSessionEntity } from '../../src/database/entities/debate-session.entity';
+import {
+  ThreadContextType,
+  ThreadVisibility,
+  EventActorType,
+  EventContentType,
+  SubjectType,
+} from '../../src/database/domain.enums';
 import { AgentConnectionEntity } from '../../src/database/entities/agent-connection.entity';
 import { FederationDeliveryService } from '../../src/modules/federation/federation-delivery.service';
 import { readDeliveryHealth } from '../../src/database/delivery-health';
@@ -22,6 +31,7 @@ type Action = {
 type UpdatePacket = {
   groups: Array<{
     threadId: string;
+    readUrl: string | null;
     checkpoint: string | null;
     messages: Array<{
       eventId: string;
@@ -186,6 +196,11 @@ describe('Agent-focused upgrades', () => {
       status: 'running',
       nextSpeaker: { id: pro.agent.id },
     });
+    expect(
+      (await updates(pro)).groups
+        .flatMap((group) => group.messages)
+        .some((message) => message.reason === 'your_turn'),
+    ).toBe(true);
     expect(Date.parse(state.deadlineAt!) - Date.now()).toBeGreaterThan(
       11 * 3600000,
     );
@@ -391,6 +406,163 @@ describe('Agent-focused upgrades', () => {
     expect((await updates(await join())).freshness.state).toBe(
       'no_new_event_to_test',
     );
+  });
+
+  it('routes live debate notifications to the debate reader and signals omitted media', async () => {
+    const a = await join(),
+      b = await join();
+    const topic = (
+      await act(a, 'forum.topic.create', {
+        title: 'Media completeness',
+        content: 'Question',
+      })
+    ).action;
+    const image = (
+      await act(b, 'forum.reply.create', {
+        threadId: topic.threadId,
+        content: 'Short caption',
+        metadata: { nextSpeakerAgentId: a.agent.id },
+      })
+    ).action;
+    await ctx.dataSource
+      .getRepository(EventEntity)
+      .update(image.eventId, { contentType: EventContentType.Image });
+    const media = (await updates(a)).groups
+      .flatMap((group) => group.messages)
+      .find((message) => message.eventId === image.eventId)!;
+    expect(media).toMatchObject({
+      contentType: 'image',
+      hasMedia: true,
+      truncated: true,
+      requiresFullRead: true,
+      reason: 'direct_reply',
+      media: { omitted: true },
+    });
+    const threads = ctx.dataSource.getRepository(ThreadEntity);
+    const thread = await threads.save(
+      threads.create({
+        contextType: ThreadContextType.DebateSpectator,
+        visibility: ThreadVisibility.Public,
+        title: 'Existing live debate',
+      }),
+    );
+    const sessions = ctx.dataSource.getRepository(DebateSessionEntity);
+    const session = await sessions.save(
+      sessions.create({
+        threadId: thread.id,
+        topic: 'Existing live debate',
+        proStance: 'Pro',
+        conStance: 'Con',
+        hostType: SubjectType.Agent,
+        hostAgentId: b.agent.id,
+      }),
+    );
+    const events = ctx.dataSource.getRepository(EventEntity);
+    const event = await events.save(
+      events.create({
+        threadId: thread.id,
+        eventType: 'debate.turn.assigned',
+        actorType: EventActorType.System,
+        metadata: { debateSessionId: session.id, assignedAgentId: a.agent.id },
+      }),
+    );
+    await ctx.app
+      .get(FederationDeliveryService)
+      .enqueueEventForRecipient(event, a.agent.id);
+    const group = (await updates(a)).groups.find(
+      (item) => item.threadId === thread.id,
+    )!;
+    expect(group.readUrl).toBe(
+      'http://127.0.0.1:3000/api/v1/connectors/debates/' + session.id,
+    );
+    expect(group.messages[0]).toMatchObject({
+      reason: 'your_turn',
+      publicUrl: 'http://127.0.0.1:3000/live/' + session.id,
+    });
+    await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/debates/' + session.id)
+      .expect(200);
+  });
+
+  it('does not leak private or hidden-root messages through previews, checkpoints or freshness markers', async () => {
+    const reader = await join(),
+      writer = await join();
+    const root = (
+      await act(reader, 'forum.topic.create', {
+        title: 'A moderated discussion',
+        content: 'Public root',
+      })
+    ).action;
+    const reply = (
+      await act(writer, 'forum.reply.create', {
+        threadId: root.threadId,
+        content: 'Hidden thread secret',
+      })
+    ).action;
+    await ctx.dataSource
+      .getRepository(EventEntity)
+      .update(root.eventId, { metadata: { moderation: { hidden: true } } });
+    const threads = ctx.dataSource.getRepository(ThreadEntity);
+    const thread = await threads.save(
+      threads.create({
+        contextType: ThreadContextType.DirectMessage,
+        visibility: ThreadVisibility.Private,
+      }),
+    );
+    const events = ctx.dataSource.getRepository(EventEntity);
+    const privateEvent = await events.save(
+      events.create({
+        threadId: thread.id,
+        eventType: 'dm.send',
+        actorType: EventActorType.System,
+        content: 'Private message secret',
+      }),
+    );
+    await ctx.app
+      .get(FederationDeliveryService)
+      .enqueueEventForRecipient(privateEvent, reader.agent.id);
+    const packet = await updates(reader);
+    expect(packet.groups).toEqual([]);
+    expect(JSON.stringify(packet)).not.toContain('secret');
+    expect(packet.freshness).toMatchObject({ latestEligibleSequence: null });
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/updates/checkpoint')
+      .set('Authorization', 'Bearer ' + reader.accessToken)
+      .send({ threadId: root.threadId, lastEventId: reply.eventId })
+      .expect(404);
+  });
+
+  it('allows only one concurrent claimant of a seat', async () => {
+    const moderator = await join(),
+      a = await join(),
+      b = await join();
+    const created = await act(moderator, 'forum.debate.create', {
+      topic: 'Concurrent acceptance',
+      proStance: 'Pro',
+      conStance: 'Con',
+    });
+    const threadId = created.action.threadId;
+    const responses = await Promise.all(
+      [a, b].map((agent) =>
+        request(ctx.app.getHttpServer())
+          .post('/api/v1/connectors/actions')
+          .set('Authorization', 'Bearer ' + agent.accessToken)
+          .set('Idempotency-Key', randomUUID())
+          .send({
+            type: 'forum.debate.join',
+            payload: { threadId, stance: 'pro', acceptTerms: true },
+          })
+          .expect(200),
+      ),
+    );
+    expect(
+      responses
+        .map(
+          (response) =>
+            typedValue<{ action: Action }>(response.body).action.status,
+        )
+        .sort(),
+    ).toEqual(['rejected', 'succeeded']);
   });
 
   it('records actual selection, configured route and verified return as distinct milestones', async () => {

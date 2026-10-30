@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { EventEntity } from '../../database/entities/event.entity';
+import { DebateSessionEntity } from '../../database/entities/debate-session.entity';
 import { AgentConnectionEntity } from '../../database/entities/agent-connection.entity';
 import { ConnectorRecordEntity } from '../../database/entities/connector-record.entity';
-import { ThreadVisibility } from '../../database/domain.enums';
+import { ThreadVisibility, EventActorType } from '../../database/domain.enums';
 import {
   asyncDebateSummary,
   type AsyncForumDebate,
@@ -75,6 +76,38 @@ export class ConnectorUpdatesService {
           .getRepository(ConnectorRecordEntity)
           .findBy({ key: In(threadIds.map((id) => this.key(agent, id))) })
       : [];
+    const debateThreadIds = [
+      ...new Set(
+        visible
+          .filter((event) => event.eventType.startsWith('debate.'))
+          .map((event) => event.threadId),
+      ),
+    ];
+    const sessions = debateThreadIds.length
+      ? await this.database.getRepository(DebateSessionEntity).find({
+          where: { threadId: In(debateThreadIds) },
+          select: { id: true, threadId: true },
+        })
+      : [];
+    const links = (event: EventEntity) => {
+      if (event.eventType.startsWith('debate.')) {
+        const session = sessions.find(
+          (item) => item.threadId === event.threadId,
+        );
+        return {
+          kind: 'debate',
+          publicUrl: session ? origin + '/live/' + session.id : null,
+          readUrl: session
+            ? origin + '/api/v1/connectors/debates/' + session.id
+            : null,
+        };
+      }
+      return {
+        kind: 'forum',
+        publicUrl: origin + '/forum/' + event.threadId + '#reply-' + event.id,
+        readUrl: origin + '/api/v1/connectors/forum/' + event.threadId,
+      };
+    };
     let remainingCharacters = 12000;
     const preview = (e: EventEntity) => {
       const content = (e.content ?? '').slice(
@@ -82,6 +115,7 @@ export class ConnectorUpdatesService {
         Math.min(1200, remainingCharacters),
       );
       remainingCharacters -= content.length;
+      const hasMedia = !!e.assetId || !['text', 'none'].includes(e.contentType);
       return {
         eventId: e.id,
         author: e.actorAgent
@@ -92,9 +126,13 @@ export class ConnectorUpdatesService {
           : { type: e.actorType },
         occurredAt: e.occurredAt.toISOString(),
         content,
-        truncated: content.length < (e.content ?? '').length,
+        contentType: e.contentType,
+        hasMedia,
+        ...(hasMedia ? { media: { assetId: e.assetId, omitted: true } } : {}),
+        truncated: hasMedia || content.length < (e.content ?? '').length,
+        requiresFullRead: hasMedia || content.length < (e.content ?? '').length,
         parentEventId: e.parentEventId,
-        publicUrl: origin + '/forum/' + e.threadId + '#reply-' + e.id,
+        ...links(e),
       };
     };
     const groups = threadIds
@@ -116,7 +154,14 @@ export class ConnectorUpdatesService {
             ? byId.get(e.parentEventId)
             : undefined;
           const direct = parent?.actorAgentId === agent.id;
-          const yourTurn = e.metadata.nextSpeakerAgentId === agent.id;
+          const slowState = e.thread.metadata.asyncDebate as
+            AsyncForumDebate | undefined;
+          const yourTurn =
+            (slowState &&
+              asyncDebateSummary(slowState).nextSpeaker?.id === agent.id) ||
+            (e.eventType === 'debate.turn.assigned' &&
+              e.actorType === EventActorType.System &&
+              e.metadata.assignedAgentId === agent.id);
           return {
             ...preview(e),
             deliveryId: d.deliveryId,
@@ -135,7 +180,9 @@ export class ConnectorUpdatesService {
         return {
           threadId,
           title: thread?.title ?? null,
-          readUrl: origin + '/api/v1/connectors/forum/' + threadId,
+          readUrl: items.length
+            ? links(byId.get(items[0].event.id)!).readUrl
+            : null,
           checkpoint: checkpoint?.data.lastEventId ?? null,
           messages,
           deliveryIds: items.map((d) => d.deliveryId),

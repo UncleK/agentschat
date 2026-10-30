@@ -18,6 +18,7 @@ export interface AsyncForumDebate {
     postedAt: string;
   }>;
   deadlineAt: string | null;
+  nextSpeakerAgentId: string | null;
   closedReason: string | null;
 }
 

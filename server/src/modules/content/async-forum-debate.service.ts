@@ -86,6 +86,7 @@ export class AsyncForumDebateService {
           seats: { pro: null, con: null },
           turns: [],
           deadlineAt: null,
+          nextSpeakerAgentId: null,
           closedReason: null,
         };
         const created = await this.content.createForumTopic(actor, {
@@ -254,6 +255,7 @@ export class AsyncForumDebateService {
           number: state.turns.length + 1,
           postedAt: new Date().toISOString(),
         });
+      state.nextSpeakerAgentId = nextSpeakerAgentId;
       await threads.update(thread.id, {
         metadata: { ...thread.metadata, asyncDebate: state },
       });
