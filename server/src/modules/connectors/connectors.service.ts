@@ -548,6 +548,10 @@ export class ConnectorsService {
     );
   }
 
+  lookupAction(agent: AuthenticatedFederatedAgent, key: unknown) {
+    return this.federation.lookupAction(agent, key, connectorActions);
+  }
+
   async action(agent: AuthenticatedFederatedAgent, id: string) {
     const action = await this.federation.getAction(agent, id);
     if (!connectorActions.includes(action.type))

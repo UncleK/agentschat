@@ -287,6 +287,33 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
     };
     expect(result.verified).toBe(true);
     expect(result.publicUrl).toContain('/forum/');
+    const lookup = (path: string, token: string, savedKey = key) =>
+      request(ctx.app.getHttpServer())
+        .post(path)
+        .set('Authorization', 'Bearer ' + token)
+        .send({ idempotencyKey: savedKey });
+    for (const path of [
+      '/api/v1/actions/lookup',
+      '/api/v1/connectors/actions/lookup',
+    ]) {
+      await lookup(path, a.accessToken)
+        .expect(200)
+        .expect('Cache-Control', 'no-store')
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            state: 'recorded',
+            action: { ...result.action, status: 'succeeded' },
+          });
+          expect(
+            (response.body as { requestHash: string }).requestHash,
+          ).toMatch(/^[a-f0-9]{64}$/);
+        });
+      await lookup(path, b.accessToken).expect(200, { state: 'unknown' });
+      await lookup(path, a.accessToken, randomUUID()).expect(200, {
+        state: 'unknown',
+      });
+      await lookup(path, a.accessToken, ' ').expect(400);
+    }
     const retried = await contribute(a.accessToken, payload);
     expect((retried.body as { action: { id: string } }).action.id).toBe(
       result.action.id,
@@ -535,6 +562,7 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
         arguments: { limit: 2, padding: Array(2000).fill(null) },
       });
       expect(oversized.isError).toBe(true);
+      const idempotencyKey = randomUUID();
       const posted = await client.callTool({
         name: 'participate',
         arguments: {
@@ -545,13 +573,22 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
               'This contribution was submitted by the official MCP client.',
             tags: ['connectors'],
           },
-          idempotencyKey: randomUUID(),
+          idempotencyKey,
         },
       });
       const result = (
-        posted.structuredContent as { result: { verified: boolean } }
+        posted.structuredContent as {
+          result: { verified: boolean; action: { id: string } };
+        }
       ).result;
       expect(result.verified).toBe(true);
+      const recovered = await client.callTool({
+        name: 'lookup_contribution',
+        arguments: { idempotencyKey },
+      });
+      expect(recovered.structuredContent).toMatchObject({
+        result: { state: 'recorded', action: { id: result.action.id } },
+      });
     } finally {
       await client.close();
     }

@@ -221,6 +221,9 @@ export class ConnectorUpdatesService {
         ? String(Math.max(...raw.map((d) => Number(d.cursor))))
         : result.cursor,
       pendingCount: result.pendingCount,
+      heldCount: result.heldCount,
+      nextAvailableAt: result.nextAvailableAt,
+      oldestPendingAt: result.oldestPendingAt,
       hasMore: result.hasMore,
       nextPollAfterSeconds: result.nextPollAfterSeconds,
       groups,
@@ -229,7 +232,9 @@ export class ConnectorUpdatesService {
         latestEligibleEventAt: marker?.latestEventAt ?? null,
         state: groups.length
           ? 'eligible_events_observed'
-          : 'no_new_event_to_test',
+          : (result.pendingCount ?? 0) > 0
+            ? 'pending_deliveries'
+            : 'no_new_event_to_test',
         note: 'A responding endpoint and a quiet inbox do not independently prove upstream freshness.',
       },
       acknowledgement: {

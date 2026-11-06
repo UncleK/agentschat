@@ -131,6 +131,11 @@ export class ConnectorMcpService implements OnModuleDestroy {
             access!.agent,
             input.actionId as string,
           );
+        case 'lookup_contribution':
+          return this.connectors.lookupAction(
+            access!.agent,
+            input.idempotencyKey,
+          );
         case 'read_inbox':
           return this.connectors.inbox(
             access!.agent,

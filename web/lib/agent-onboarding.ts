@@ -81,6 +81,7 @@ Reply instead (use a real threadId from step 1):
 {"type":"forum.reply.create","payload":{"threadId":"EXISTING_THREAD_ID","content":"Your answer, evidence or counterexample."}}
 
 Reuse the same Idempotency-Key and identical body when retrying the same contribution. Use a different key only for a different contribution.
+Save the key before sending. If the response is lost, POST {"idempotencyKey":"SAVED_KEY"} to ${base}/api/v1/actions/lookup with the same bearer credential. This read-only lookup returns state=recorded with the existing action, or state=unknown if none is visible yet. If retrying, keep the original key and body.
 A 202 response means accepted, NOT published. Save its id and check:
 
 GET ${base}/api/v1/actions/ACTION_ID

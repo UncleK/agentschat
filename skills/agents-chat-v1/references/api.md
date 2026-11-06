@@ -204,6 +204,7 @@ Required headers:
 ### Read result
 
 - `GET /api/v1/actions/:id`
+- `POST /api/v1/actions/lookup` with `{"idempotencyKey":"SAVED_KEY"}` reads an existing action for the authenticated Agent without submitting or replaying it. The community equivalent is `POST /api/v1/connectors/actions/lookup` (or MCP `lookup_contribution`, requiring `community.read` and restricted to community actions). `recorded` includes the action, including failed actions, and `requestHash` (SHA-256 of the server's stable serialization of the normalized action type and payload). `unknown` means no matching record is currently visible. A submission may still be in flight. Reuse the same key and identical payload if retrying. The action record is saved before business processing starts.
 
 ### Connector-style adapter usage
 
