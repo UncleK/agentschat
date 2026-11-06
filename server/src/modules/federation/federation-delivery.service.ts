@@ -41,6 +41,9 @@ export interface PollResult {
   cursor: string | null;
   deliveries: Array<Record<string, unknown>>;
   pendingCount?: number;
+  heldCount?: number;
+  nextAvailableAt?: string | null;
+  oldestPendingAt?: string | null;
   hasMore?: boolean;
   nextPollAfterSeconds?: number;
 }
@@ -209,26 +212,16 @@ export class FederationDeliveryService
         if (deliveries.length > 0 || Date.now() >= deadline) {
           if (!signal?.aborted)
             await this.recordAgentPollingActivity(agent, true);
-          const pendingCount = communityOnly
-            ? await this.outstandingQuery(agent.id, true)
-                .andWhere(
-                  prioritizeCommunity ? visibleForumRootSql('event') : '1=1',
-                )
-                .andWhere('delivery.replayExpiresAt > :now', {
-                  now: new Date(),
-                })
-                .getCount()
+          const pending = communityOnly
+            ? await this.communityPendingSnapshot(agent.id, prioritizeCommunity)
             : undefined;
           return {
             cursor:
               (deliveries.at(-1)?.cursor as string | undefined) ??
               (normalizedCursor === null ? null : String(normalizedCursor)),
             deliveries,
-            pendingCount,
-            hasMore:
-              pendingCount === undefined
-                ? undefined
-                : pendingCount > deliveries.length,
+            ...pending,
+            hasMore: pending && pending.pendingCount > deliveries.length,
             nextPollAfterSeconds: 5,
           };
         }
@@ -812,6 +805,34 @@ export class FederationDeliveryService
         .andWhere(visibleMetadataSql('event.metadata'))
         .andWhere(visibleMetadataSql('thread.metadata'));
     return query.orderBy('delivery.sequence', 'ASC');
+  }
+
+  private async communityPendingSnapshot(
+    agentId: string,
+    prioritizeCommunity: boolean,
+  ) {
+    const query = this.outstandingQuery(agentId, true)
+      .andWhere('delivery.replayExpiresAt > :now', { now: new Date() })
+      .orderBy();
+    if (prioritizeCommunity) query.andWhere(visibleForumRootSql('event'));
+    const held = 'FILTER (WHERE delivery.nextAttemptAt > :now)';
+    const counts = await query
+      .select('COUNT(*)', 'pendingCount')
+      .addSelect(`COUNT(*) ${held}`, 'heldCount')
+      .addSelect(`MIN(delivery.nextAttemptAt) ${held}`, 'nextAvailableAt')
+      .addSelect('MIN(delivery.createdAt)', 'oldestPendingAt')
+      .getRawOne<{
+        pendingCount: string;
+        heldCount: string;
+        nextAvailableAt: Date | null;
+        oldestPendingAt: Date | null;
+      }>();
+    return {
+      pendingCount: Number(counts?.pendingCount ?? 0),
+      heldCount: Number(counts?.heldCount ?? 0),
+      nextAvailableAt: counts?.nextAvailableAt?.toISOString() ?? null,
+      oldestPendingAt: counts?.oldestPendingAt?.toISOString() ?? null,
+    };
   }
 
   private async expireDueDeliveries(recipientAgentId?: string) {

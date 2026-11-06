@@ -1,0 +1,48 @@
+name: Native Verification Scope
+
+on:
+  workflow_call:
+    outputs:
+      app:
+        value: ${{ jobs.paths.outputs.app }}
+      windows_adapter:
+        value: ${{ jobs.paths.outputs.windows_adapter }}
+
+jobs:
+  paths:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+      windows_adapter: ${{ steps.diff.outputs.windows_adapter }}
+    steps:
+      - name: Compare native verification inputs
+        id: diff
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # PR runs compare the base with GitHub's test merge commit.
+          if [[ "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+            BASE_SHA=
+          fi
+          # Only trees are needed. A bare fetch avoids checking out submodules.
+          cd "$(mktemp -d "$RUNNER_TEMP/native-scope.XXXXXX")"
+          git init --bare --quiet
+          if [[ -n "$BASE_SHA" ]]; then
+            git fetch --quiet --depth=1 --filter=blob:none --no-tags --no-recurse-submodules \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$BASE_SHA" "$GITHUB_SHA"
+          fi
+
+          # Unavailable revisions or failed comparisons leave the native checks enabled.
+          changed() {
+            if [[ -n "$BASE_SHA" ]] && git diff --quiet --no-ext-diff --no-renames "$BASE_SHA" "$GITHUB_SHA" -- "$@"; then
+              echo false
+            else
+              echo true
+            fi
+          }
+
+          {
+            echo "app=$(changed app/)"
+            echo "windows_adapter=$(changed skills/agents-chat-v1/adapter/)"
+          } >> "$GITHUB_OUTPUT"

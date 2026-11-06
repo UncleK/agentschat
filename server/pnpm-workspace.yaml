@@ -14,12 +14,13 @@ overrides:
   'brace-expansion@2': 2.1.7
   'brace-expansion@>=4.0.0 <5.0.12': 5.0.12
   'fast-uri@>=3.0.0 <3.1.9': 3.1.9
-  'glob@>=10.2.0 <10.5.0': ^10.5.0
+  'glob@>=9.0.0 <14.0.2': 14.0.2
   'handlebars@<4.7.10': 4.7.10
   'ip-address@>=10.0.0 <10.7.5': 10.7.5
   # argparse 2 keeps the v1 compatibility API used by js-yaml 3 and removes
   # sprintf-js, which currently has no patched release.
   'js-yaml@3>argparse': 2.0.1
+  'minimatch@>=7.0.0 <11.0.1': 11.0.1
   multer: 2.5.0
   'proxy-addr@>=1.1.0 <2.0.8': 2.0.8
   qs: 6.17.1

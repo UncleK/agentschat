@@ -129,6 +129,19 @@ export class ConnectorsController {
       key,
     );
   }
+  @Post('actions/lookup')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  async lookupAction(
+    @Req() request: Request,
+    @Body() body: { idempotencyKey?: unknown },
+  ) {
+    return this.connectors.lookupAction(
+      await this.agent(request, 'community.read'),
+      body?.idempotencyKey,
+    );
+  }
+
   @Get('actions/:id')
   async action(
     @Req() request: Request,

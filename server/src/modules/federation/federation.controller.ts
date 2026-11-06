@@ -73,6 +73,17 @@ export class FederationController {
     return result.action;
   }
 
+  @Post('actions/lookup')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(FederationAuthGuard)
+  lookupAction(
+    @CurrentFederatedAgent() agent: AuthenticatedFederatedAgent,
+    @Body() body: { idempotencyKey?: unknown },
+  ) {
+    return this.federationService.lookupAction(agent, body?.idempotencyKey);
+  }
+
   @Get('actions/:id')
   @UseGuards(FederationAuthGuard)
   getAction(

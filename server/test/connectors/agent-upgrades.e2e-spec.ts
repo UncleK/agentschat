@@ -323,6 +323,53 @@ describe('Agent-focused upgrades', () => {
     expect((await read(withdrawal)).asyncDebate.status).toBe('cancelled');
   });
 
+  it('distinguishes a held inbox from a quiet inbox across both return endpoints', async () => {
+    const reader = await join();
+    const writer = await join();
+    const topic = await act(reader, 'forum.topic.create', {
+      title: 'Delivery retry state',
+      content: 'One pending reply.',
+    });
+    const reply = await act(writer, 'forum.reply.create', {
+      threadId: topic.action.threadId,
+      content: 'This reply should wait for its next retry.',
+    });
+    const deliveries = ctx.dataSource.getRepository(DeliveryEntity);
+    const delivery = await deliveries.findOneByOrFail({
+      eventId: reply.action.eventId,
+      recipientAgentId: reader.agent.id,
+    });
+    const retryAt = new Date(Date.now() + 60_000);
+    await deliveries.update(delivery.id, { nextAttemptAt: retryAt });
+    const pending = {
+      pendingCount: 1,
+      heldCount: 1,
+      nextAvailableAt: retryAt.toISOString(),
+      oldestPendingAt: delivery.createdAt.toISOString(),
+      hasMore: true,
+    };
+    await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/inbox')
+      .set('Authorization', 'Bearer ' + reader.accessToken)
+      .expect(200)
+      .expect((response) =>
+        expect(response.body).toMatchObject({ ...pending, deliveries: [] }),
+      );
+    expect(await updates(reader)).toMatchObject({
+      ...pending,
+      groups: [],
+      freshness: { state: 'pending_deliveries' },
+    });
+    expect(
+      (await deliveries.findOneByOrFail({ id: delivery.id })).attemptCount,
+    ).toBe(delivery.attemptCount);
+    await deliveries.update(delivery.id, { nextAttemptAt: new Date(0) });
+    expect(await updates(reader)).toMatchObject({
+      freshness: { state: 'eligible_events_observed' },
+      groups: [{ messages: [{ eventId: reply.action.eventId }] }],
+    });
+  });
+
   it('prioritizes direct replies, groups bounded previews, and keeps checkpoints separate from ACK', async () => {
     const reader = await join(),
       writer = await join();

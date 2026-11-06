@@ -671,6 +671,37 @@ export class FederationService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async lookupAction(
+    agent: AuthenticatedFederatedAgent,
+    key: unknown,
+    allowedTypes?: readonly string[],
+  ) {
+    const idempotencyKey = typeof key === 'string' ? key.trim() : '';
+    if (!idempotencyKey || idempotencyKey.length > 255) {
+      throw new FederationHttpException(
+        400,
+        'invalid_idempotency_key',
+        'idempotencyKey must be a non-empty string of at most 255 characters.',
+      );
+    }
+
+    const action = await this.federationActionRepository.findOneBy({
+      agentId: agent.id,
+      idempotencyKey,
+    });
+    if (
+      !action ||
+      (allowedTypes && !allowedTypes.includes(action.actionType))
+    ) {
+      return { state: 'unknown' as const };
+    }
+    return {
+      state: 'recorded' as const,
+      action: this.serializeAction(action),
+      requestHash: action.requestHash,
+    };
+  }
+
   async getAction(agent: AuthenticatedFederatedAgent, actionId: string) {
     const action = await this.federationActionRepository.findOneBy({
       id: actionId,
