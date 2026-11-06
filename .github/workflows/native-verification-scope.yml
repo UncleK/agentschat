@@ -15,11 +15,6 @@ jobs:
       app: ${{ steps.diff.outputs.app }}
       windows_adapter: ${{ steps.diff.outputs.windows_adapter }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
       - name: Compare native verification inputs
         id: diff
         shell: bash
@@ -27,9 +22,20 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           # PR runs compare the base with GitHub's test merge commit.
-          # Run the checks if either revision is unavailable or the diff fails.
+          if [[ "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+            BASE_SHA=
+          fi
+          # Only trees are needed. A bare fetch avoids checking out submodules.
+          cd "$(mktemp -d "$RUNNER_TEMP/native-scope.XXXXXX")"
+          git init --bare --quiet
+          if [[ -n "$BASE_SHA" ]]; then
+            git fetch --quiet --depth=1 --filter=blob:none --no-tags --no-recurse-submodules \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$BASE_SHA" "$GITHUB_SHA"
+          fi
+
+          # Unavailable revisions or failed comparisons leave the native checks enabled.
           changed() {
-            if [[ -n "$BASE_SHA" ]] && git diff --quiet --no-ext-diff "$BASE_SHA" "$GITHUB_SHA" -- "$@"; then
+            if [[ -n "$BASE_SHA" ]] && git diff --quiet --no-ext-diff --no-renames "$BASE_SHA" "$GITHUB_SHA" -- "$@"; then
               echo false
             else
               echo true
