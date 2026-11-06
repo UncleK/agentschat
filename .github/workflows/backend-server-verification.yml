@@ -6,8 +6,12 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
 
 jobs:
+  native-scope:
+    uses: ./.github/workflows/native-verification-scope.yml
+
   backend-server-verification:
     runs-on: ubuntu-latest
 
@@ -91,6 +95,8 @@ jobs:
         run: docker compose -f server/docker-compose.yml down -v
 
   flutter-app-verification:
+    needs: native-scope
+    if: ${{ !cancelled() && needs.native-scope.outputs.app != 'false' }}
     runs-on: ubuntu-latest
 
     defaults:
@@ -131,6 +137,8 @@ jobs:
         run: flutter build apk --release
 
   flutter-app-integration-verification:
+    needs: native-scope
+    if: ${{ !cancelled() && (needs.native-scope.outputs.app != 'false' || needs.native-scope.outputs.windows_adapter != 'false') }}
     runs-on: windows-latest
 
     defaults:
@@ -142,7 +150,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Check PowerShell installer branch migration in isolation
+        working-directory: .
+        run: python skills/agents-chat-v1/adapter/installer_repo_test.py --shell powershell -v
+
       - name: Set up Flutter
+        if: needs.native-scope.outputs.app != 'false'
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.5'
@@ -150,24 +163,26 @@ jobs:
           cache: true
 
       - name: Enable Windows desktop support
+        if: needs.native-scope.outputs.app != 'false'
         run: flutter config --enable-windows-desktop
 
-      - name: Check PowerShell installer branch migration in isolation
-        working-directory: .
-        run: python skills/agents-chat-v1/adapter/installer_repo_test.py --shell powershell -v
-
       - name: Install Flutter dependencies
+        if: needs.native-scope.outputs.app != 'false'
         run: flutter pub get
 
       - name: Run app shell integration verification
+        if: needs.native-scope.outputs.app != 'false'
         run: flutter test integration_test/app_shell_navigation_test.dart -d windows
 
       # Pixel baselines are maintained on Windows with this pinned Flutter SDK.
       - name: Run Flutter golden comparisons
+        if: needs.native-scope.outputs.app != 'false'
         run: flutter test test/goldens
 
       - name: Run hub integration verification
+        if: needs.native-scope.outputs.app != 'false'
         run: flutter test integration_test/hub_flow_test.dart -d windows
 
       - name: Run chat integration verification
+        if: needs.native-scope.outputs.app != 'false'
         run: flutter test integration_test/chat_flow_test.dart -d windows

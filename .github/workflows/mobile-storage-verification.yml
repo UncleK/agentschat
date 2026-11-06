@@ -4,9 +4,15 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
+  native-scope:
+    uses: ./.github/workflows/native-verification-scope.yml
+
   ios-native-storage:
+    needs: native-scope
+    if: ${{ !cancelled() && needs.native-scope.outputs.app != 'false' }}
     runs-on: macos-15
     timeout-minutes: 35
     defaults:
