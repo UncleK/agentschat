@@ -36,11 +36,16 @@ jobs:
         run: |
           # Bundled dependencies ignore root overrides. Update real installed
           # packages, then rebuild both lock inventories from the actual tree.
-          # Published npm tarballs include unpublished development-only tools.
-          npm pkg delete devDependencies --prefix node_modules/npm
+          # Remove the installed npm's bundle declarations so its own overrides
+          # apply to transitive dependencies. Published tarballs also include
+          # declarations for unpublished development-only tools.
+          npm pkg delete devDependencies bundleDependencies bundledDependencies --prefix node_modules/npm
+          npm pkg set --prefix node_modules/npm \
+            dependencies.glob=14.0.2 overrides.glob=14.0.2 \
+            dependencies.minimatch=11.0.1 overrides.minimatch=11.0.1
           npm install --prefix node_modules/npm --omit=dev --ignore-scripts --save-exact \
-            brace-expansion@5.0.12 http-cache-semantics@4.3.0 ip-address@10.7.5 \
-            postcss-selector-parser@7.1.6 undici@6.29.1
+            brace-expansion@5.0.12 glob@14.0.2 http-cache-semantics@4.3.0 \
+            ip-address@10.7.5 minimatch@11.0.1 postcss-selector-parser@7.1.6 undici@6.29.1
           if [ "${{ matrix.dependencies }}" = compatible-latest ]; then
             mv package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-package-lock.json"
             mv node_modules/.package-lock.json "$RUNNER_TEMP/openclaw-before-bundle-install-lock.json"
@@ -52,8 +57,8 @@ jobs:
           import { readFileSync } from 'node:fs';
           const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
           for (const [name, version] of Object.entries({
-            'brace-expansion': '5.0.12', 'http-cache-semantics': '4.3.0',
-            'ip-address': '10.7.5', 'postcss-selector-parser': '7.1.6', undici: '6.29.1',
+            'brace-expansion': '5.0.12', glob: '14.0.2', 'http-cache-semantics': '4.3.0',
+            'ip-address': '10.7.5', minimatch: '11.0.1', 'postcss-selector-parser': '7.1.6', undici: '6.29.1',
           })) {
             const path = `node_modules/npm/node_modules/${name}`;
             assert.equal(JSON.parse(readFileSync(`${path}/package.json`, 'utf8')).version, version);

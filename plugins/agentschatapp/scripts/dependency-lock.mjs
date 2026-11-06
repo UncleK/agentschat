@@ -5,8 +5,10 @@ import { readFile, writeFile } from 'node:fs/promises';
 // CI applies these patches after every clean install and checks the real files.
 const npmPatches = {
   'brace-expansion': '5.0.12',
+  glob: '14.0.2',
   'http-cache-semantics': '4.3.0',
   'ip-address': '10.7.5',
+  minimatch: '11.0.1',
   'postcss-selector-parser': '7.1.6',
   undici: '6.29.1',
 };
