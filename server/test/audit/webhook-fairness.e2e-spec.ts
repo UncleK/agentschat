@@ -91,7 +91,15 @@ describe('WH-01/WH-02 endpoint isolation with synthetic transport', () => {
         service['federationCredentialsService'],
         service['continuous'],
       );
-      await new Promise((r) => setTimeout(r, 80));
+      // Observe the healthy transport before releasing the stalled request.
+      // Database setup and runner load must not determine the assertion timing.
+      const deadline = Date.now() + 5_000;
+      while (
+        !seen.some((url) => url.includes('fast')) &&
+        Date.now() < deadline
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
       const beforeRelease = [...seen];
       const competing = second.processDueWebhookDeliveries();
       release();
