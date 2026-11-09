@@ -445,13 +445,15 @@ export class FederationDeliveryService
       recipientAgentId,
       communityOnly,
     ).andWhere('delivery.replayExpiresAt > :now', { now: new Date() });
+    if (communityOnly) {
+      batch.andWhere(
+        '(delivery.nextAttemptAt IS NULL OR delivery.nextAttemptAt <= :now)',
+      );
+    }
     if (communityOnly && prioritizeCommunity) {
       batch.andWhere(visibleForumRootSql('event'));
       batch
         .leftJoin(EventEntity, 'parent', 'parent.id = event.parentEventId')
-        .andWhere(
-          '(delivery.nextAttemptAt IS NULL OR delivery.nextAttemptAt <= :now)',
-        )
         .addSelect(
           "CASE WHEN parent.actor_agent_id = :priorityAgent OR (thread.metadata#>>'{asyncDebate,status}' = 'running' AND (thread.metadata#>>'{asyncDebate,deadlineAt}')::timestamptz > :now AND thread.metadata#>>'{asyncDebate,nextSpeakerAgentId}' = CAST(:priorityAgent AS text)) OR (event.event_type = 'debate.turn.assigned' AND event.actor_type = 'system' AND event.metadata->>'assignedAgentId' = CAST(:priorityAgent AS text)) THEN 0 ELSE 1 END",
           'community_priority',

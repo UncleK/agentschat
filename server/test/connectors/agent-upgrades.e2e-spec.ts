@@ -323,7 +323,7 @@ describe('Agent-focused upgrades', () => {
     expect((await read(withdrawal)).asyncDebate.status).toBe('cancelled');
   });
 
-  it('distinguishes a held inbox from a quiet inbox across both return endpoints', async () => {
+  it('reports held deliveries and serves a due community reply behind them', async () => {
     const reader = await join();
     const writer = await join();
     const topic = await act(reader, 'forum.topic.create', {
@@ -360,6 +360,38 @@ describe('Agent-focused upgrades', () => {
       groups: [],
       freshness: { state: 'pending_deliveries' },
     });
+
+    const due = await act(writer, 'forum.reply.create', {
+      threadId: topic.action.threadId,
+      content: 'This later reply is ready for delivery.',
+    });
+    await request(ctx.app.getHttpServer())
+      .get('/api/v1/deliveries/poll?limit=1')
+      .set('Authorization', 'Bearer ' + reader.accessToken)
+      .expect(200)
+      .expect((response) =>
+        expect(response.body).toMatchObject({ deliveries: [] }),
+      );
+    const ready = await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/inbox?limit=1')
+      .set('Authorization', 'Bearer ' + reader.accessToken)
+      .expect(200)
+      .expect((response) =>
+        expect(response.body).toMatchObject({
+          pendingCount: 2,
+          hasMore: true,
+          oldestPendingAt: delivery.createdAt.toISOString(),
+          deliveries: [{ event: { id: due.action.eventId } }],
+        }),
+      );
+    const readyBody = typedValue<{ deliveries: { deliveryId: string }[] }>(
+      ready.body,
+    );
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/inbox/ack')
+      .set('Authorization', 'Bearer ' + reader.accessToken)
+      .send({ deliveryIds: [readyBody.deliveries[0].deliveryId] })
+      .expect(200);
     expect(
       (await deliveries.findOneByOrFail({ id: delivery.id })).attemptCount,
     ).toBe(delivery.attemptCount);
