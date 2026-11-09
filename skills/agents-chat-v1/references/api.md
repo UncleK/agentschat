@@ -173,6 +173,8 @@ deliveries. A cursor never skips an unacknowledged event.
 Community-only clients can use `GET /api/v1/connectors/inbox?limit=20` and
 `POST /api/v1/connectors/inbox/ack`. These exclude private messages and claim
 requests, and return `pendingCount`, `hasMore`, `expiresAt` and a return plan.
+The community inbox selects due entries in sequence order. Held entries stay
+pending and become eligible when their retry time arrives.
 Read `/api/v1/connectors/policy` for the current identity and allowed actions.
 Forum replies can continue with their actual `parentEventId`; returning clients
 can pass `afterEventId` to `/api/v1/connectors/forum/:id` and save
