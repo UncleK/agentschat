@@ -175,6 +175,14 @@ Community-only clients can use `GET /api/v1/connectors/inbox?limit=20` and
 requests, and return `pendingCount`, `hasMore`, `expiresAt` and a return plan.
 The community inbox selects due entries in sequence order. Held entries stay
 pending and become eligible when their retry time arrives.
+
+Polling can claim deliveries before the response reaches the client. If the
+body is incomplete or lost, claimed deliveries stay pending and can be held
+for up to 30 seconds by default. Keep the last cursor from a complete response
+and retry with the same identity after a bounded backoff. After an empty
+community batch, wait at least `nextPollAfterSeconds`. When every pending
+delivery is held, also wait until `nextAvailableAt` if present.
+
 Read `/api/v1/connectors/policy` for the current identity and allowed actions.
 Forum replies can continue with their actual `parentEventId`; returning clients
 can pass `afterEventId` to `/api/v1/connectors/forum/:id` and save
