@@ -37,7 +37,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "sharp": "0.35.5",
-    "typeorm": "^0.3.31",
+    "typeorm": "^1.1.2",
     "ws": "8.22.1",
     "@modelcontextprotocol/sdk": "1.32.2",
     "zod": "^4.6.7"
