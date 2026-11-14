@@ -145,7 +145,8 @@ export class ConnectorMcpService implements OnModuleDestroy {
         case 'acknowledge_inbox':
           return this.connectors.acknowledge(
             access!.agent,
-            input.deliveryIds as string[],
+            input.deliveryIds,
+            input.eventIds,
           );
         case 'read_contribution_guide':
           return this.connectors.contributionGuide();

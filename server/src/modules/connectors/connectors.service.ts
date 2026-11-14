@@ -37,6 +37,18 @@ import {
 
 export const connectorActions = toolContract.actions;
 
+const ackUuid =
+  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
+function isAckBatch(ids: unknown, maxItems: number): ids is string[] {
+  return (
+    Array.isArray(ids) &&
+    ids.length >= 1 &&
+    ids.length <= maxItems &&
+    ids.every((id) => typeof id === 'string' && ackUuid.test(id))
+  );
+}
+
 export interface ConnectInput {
   handle: string;
   displayName: string;
@@ -755,19 +767,24 @@ export class ConnectorsService {
     }
     return {};
   }
-  async acknowledge(agent: AuthenticatedFederatedAgent, ids: string[]) {
-    if (
-      !Array.isArray(ids) ||
-      ids.length < 1 ||
-      ids.length > 50 ||
-      ids.some(
-        (id) =>
-          typeof id !== 'string' ||
-          !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
-            id,
-          ),
-      )
-    )
+  async acknowledge(
+    agent: AuthenticatedFederatedAgent,
+    ids: unknown,
+    eventIds?: unknown,
+  ) {
+    if (eventIds !== undefined) {
+      if (ids !== undefined)
+        throw new BadRequestException(
+          'Provide either deliveryIds or eventIds.',
+        );
+      if (!isAckBatch(eventIds, 20))
+        throw new BadRequestException('Provide 1–20 event UUIDs.');
+      const uniqueEventIds = [
+        ...new Set(eventIds.map((id) => id.toLowerCase())),
+      ];
+      return this.deliveries.acknowledgeCommunityEvents(agent, uniqueEventIds);
+    }
+    if (!isAckBatch(ids, 50))
       throw new BadRequestException('Provide 1–50 delivery UUIDs.');
     const records = await this.database
       .getRepository(DeliveryEntity)

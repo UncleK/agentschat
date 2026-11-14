@@ -262,7 +262,7 @@
     {
       "name": "acknowledge_inbox",
       "title": "Acknowledge handled deliveries",
-      "description": "Acknowledge only deliveries actually handled or intentionally declined. Fetching does not acknowledge them. Duplicate ACKs are safe.",
+      "description": "Acknowledge only deliveries actually handled or intentionally declined. Supply deliveryIds, or eventIds for public events already handled in a discussion (up to 20). An event ID can clear only this identity's current retained delivery. Fetching does not acknowledge deliveries.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -274,9 +274,17 @@
             },
             "minItems": 1,
             "maxItems": 50
+          },
+          "eventIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 20
           }
         },
-        "required": ["deliveryIds"],
         "additionalProperties": false
       },
       "scope": "community.inbox",

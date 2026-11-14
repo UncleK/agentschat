@@ -14,6 +14,7 @@ import { ThreadEntity } from '../../src/database/entities/thread.entity';
 import { EventEntity } from '../../src/database/entities/event.entity';
 import { DeliveryEntity } from '../../src/database/entities/delivery.entity';
 import {
+  DeliveryStatus,
   ThreadContextType,
   ThreadVisibility,
   EventActorType,
@@ -659,6 +660,173 @@ describe('Universal connectors: identity, OAuth, HTTP and both MCP transports', 
       .set('Authorization', 'Bearer ' + a.accessToken)
       .send({ deliveryIds: [delivery.id] })
       .expect(400);
+    await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/inbox/ack')
+      .set('Authorization', 'Bearer ' + a.accessToken)
+      .send({ eventIds: [event.id] })
+      .expect(200, {
+        results: [{ eventId: event.id, cleared: 0, deliveryIds: [] }],
+      });
+    expect(
+      await ctx.dataSource.getRepository(DeliveryEntity).findOneByOrFail({
+        id: delivery.id,
+      }),
+    ).toMatchObject({ status: DeliveryStatus.Pending, attemptCount: 0 });
+  });
+
+  it('acknowledges retained community deliveries by event ID even while held', async () => {
+    const recipient = await join();
+    const author = await join();
+    const ack = (token: string, body: object) =>
+      request(ctx.app.getHttpServer())
+        .post('/api/v1/connectors/inbox/ack')
+        .set('Authorization', 'Bearer ' + token)
+        .send(body);
+    const contribute = async (token: string, type: string, payload: object) => {
+      const posted = await request(ctx.app.getHttpServer())
+        .post('/api/v1/connectors/actions')
+        .set('Authorization', 'Bearer ' + token)
+        .set('Idempotency-Key', randomUUID())
+        .send({ type, payload })
+        .expect(200);
+      return typedValue<{ action: { threadId: string; eventId: string } }>(
+        posted.body,
+      ).action;
+    };
+    const { threadId } = await contribute(
+      recipient.accessToken,
+      'forum.topic.create',
+      {
+        title: 'Direct discussion ACK',
+        content: 'Process replies at the source.',
+      },
+    );
+    const { eventId } = await contribute(
+      author.accessToken,
+      'forum.reply.create',
+      {
+        threadId,
+        content: 'This reply is readable without polling first.',
+      },
+    );
+    const discussion = await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/forum/' + threadId)
+      .expect(200);
+    const { topic } = typedValue<{ topic: { replies: Array<{ id: string }> } }>(
+      discussion.body,
+    );
+    expect(topic.replies.map((reply) => reply.id)).toContain(eventId);
+    const deliveries = ctx.dataSource.getRepository(DeliveryEntity);
+    const ownDelivery = await deliveries.findOneByOrFail({
+      eventId,
+      recipientAgentId: recipient.agent.id,
+    });
+    await deliveries.update(ownDelivery.id, {
+      status: DeliveryStatus.Retrying,
+      nextAttemptAt: new Date(Date.now() + 60_000),
+    });
+    const unmatched = (id: string) => ({
+      eventId: id,
+      cleared: 0,
+      deliveryIds: [],
+    });
+    await ack(author.accessToken, { eventIds: [eventId] }).expect(200, {
+      results: [unmatched(eventId)],
+    });
+    await ack(recipient.accessToken, {
+      eventIds: [eventId, ...Array.from({ length: 20 }, () => randomUUID())],
+    }).expect(400);
+    await ack(recipient.accessToken, {
+      eventIds: [eventId],
+      deliveryIds: [ownDelivery.id],
+    }).expect(400);
+
+    const attempts = await Promise.all([
+      ack(recipient.accessToken, {
+        eventIds: [eventId, eventId.toUpperCase()],
+      }).expect(200),
+      ack(recipient.accessToken, { eventIds: [eventId] }).expect(200),
+    ]);
+    const results = attempts.flatMap(
+      ({ body }) =>
+        typedValue<{
+          results: Array<{
+            eventId: string;
+            cleared: number;
+            deliveryIds: string[];
+          }>;
+        }>(body).results,
+    );
+    expect(results).toHaveLength(2);
+    expect(results).toContainEqual({
+      eventId,
+      cleared: 1,
+      deliveryIds: [ownDelivery.id],
+    });
+    expect(results).toContainEqual(unmatched(eventId));
+    await ack(recipient.accessToken, { deliveryIds: [ownDelivery.id] }).expect(
+      200,
+      {
+        results: [{ deliveryId: ownDelivery.id, status: 'already_acked' }],
+      },
+    );
+    await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/inbox')
+      .set('Authorization', 'Bearer ' + recipient.accessToken)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ pendingCount: 0, deliveries: [] });
+      });
+
+    const { eventId: expiredId } = await contribute(
+      author.accessToken,
+      'forum.reply.create',
+      { threadId, content: 'This delivery has expired.' },
+    );
+    await deliveries.update(
+      { eventId: expiredId, recipientAgentId: recipient.agent.id },
+      { replayExpiresAt: new Date(Date.now() - 1_000) },
+    );
+    const missingId = randomUUID();
+    await ack(recipient.accessToken, {
+      eventIds: [expiredId, missingId],
+    }).expect(200, {
+      results: [unmatched(expiredId), unmatched(missingId)],
+    });
+    const forumEvent = await ctx.dataSource
+      .getRepository(EventEntity)
+      .findOneByOrFail({ id: eventId });
+    const laterDelivery = await ctx.app
+      .get(FederationDeliveryService)
+      .enqueueEventForRecipient(forumEvent, author.agent.id);
+    const client = new Client({
+      name: 'connector-event-ack-test',
+      version: '1',
+    });
+    await client.connect(
+      new StreamableHTTPClientTransport(
+        new URL(base + '/api/v1/connectors/mcp'),
+        {
+          requestInit: {
+            headers: { Authorization: 'Bearer ' + author.accessToken },
+          },
+        },
+      ),
+    );
+    try {
+      const result = await client.callTool({
+        name: 'acknowledge_inbox',
+        arguments: { eventIds: [eventId] },
+      });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toEqual({
+        result: {
+          results: [{ eventId, cleared: 1, deliveryIds: [laterDelivery.id] }],
+        },
+      });
+    } finally {
+      await client.close();
+    }
   });
 
   it('supports a browser-only agent with persistent cookies, public publication, CSRF and private backup', async () => {

@@ -247,10 +247,14 @@ export class ConnectorsController {
   }
   @Post('inbox/ack')
   @HttpCode(200)
-  async ack(@Req() request: Request, @Body() body: { deliveryIds: string[] }) {
+  async ack(
+    @Req() request: Request,
+    @Body() body: { deliveryIds?: unknown; eventIds?: unknown },
+  ) {
     return this.connectors.acknowledge(
       await this.agent(request, 'community.inbox'),
-      body.deliveryIds,
+      body?.deliveryIds,
+      body?.eventIds,
     );
   }
   @Get('participation')

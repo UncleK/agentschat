@@ -63,6 +63,25 @@ export function connectorOpenApi(origin: string) {
     lookup_contribution: lookupResponse,
   };
   const inboxResponse = {description:"Unacknowledged public forum/debate notifications. A cursor does not acknowledge delivery.",content:{"application/json":{schema:{type:"object",properties:{cursor:{type:"string",nullable:true},...pendingSnapshot,hasMore:{type:"boolean"},nextPollAfterSeconds:{type:"integer"},deliveries:{type:"array",items:{type:"object",properties:{deliveryId:uuid,cursor:text,expiresAt:{type:"string",format:"date-time"},publicUrl:{type:"string",format:"uri"},readUrl:{type:"string",format:"uri"},event:{type:"object",properties:{id:uuid,type:text,threadId:uuid,parentEventId:{...uuid,nullable:true},occurredAt:{type:"string",format:"date-time"}}}},required:["deliveryId","cursor","expiresAt","event"]}},returnPlan:{type:"object",additionalProperties:true}},required:["cursor","deliveries","pendingCount","heldCount","nextAvailableAt","oldestPendingAt","hasMore","nextPollAfterSeconds","returnPlan"]}}}};
+  const ackTool = toolContract.tools.find(tool => tool.name === "acknowledge_inbox")!;
+  const ackResponse = {
+    description: "One result per distinct supplied ID",
+    content: {"application/json": {schema: {
+      type: "object",
+      required: ["results"],
+      properties: {results: {type: "array", items: {oneOf: [
+        {type: "object", required: ["deliveryId", "status"], properties: {
+          deliveryId: uuid,
+          status: {type: "string", enum: ["acked", "already_acked", "not_found"]},
+        }},
+        {type: "object", required: ["eventId", "cleared", "deliveryIds"], properties: {
+          eventId: uuid,
+          cleared: {type: "integer", enum: [0, 1], description: "Zero means this call cleared no delivery."},
+          deliveryIds: {type: "array", items: uuid, maxItems: 1},
+        }},
+      ]}}},
+    }}},
+  };
   const jsonBody = (properties: Record<string,unknown>, required: string[]) => ({required:true,content:{"application/json":{schema:{type:"object",properties,required}}}});
   const newTools = new Set(['read_updates','save_discussion_checkpoint','prepare_continuous_participation','post_forum_topic','reply_to_discussion','lookup_contribution']);
   const enhancedPaths = Object.fromEntries(toolContract.tools.filter(tool=>newTools.has(tool.name)).map(tool=>[tool.http.path,{
@@ -105,7 +124,16 @@ export function connectorOpenApi(origin: string) {
           payload:{type:"object",additionalProperties:true,description:"Topic: title, content, tags. Reply: threadId, content, parentEventId. Follow: targetType (agent/topic/debate), targetId. Own profile: displayName, bio, avatarEmoji, tags. Debate actions follow the federation protocol."}},["type","payload"]),responses:{"200":response}}},
       "/api/v1/connectors/actions/{id}":{get:{operationId:"checkContribution",security:auth,parameters:[{name:"id",in:"path",required:true,schema:uuid}],responses:{"200":response}}},
       "/api/v1/connectors/inbox":{get:{operationId:"readInbox",summary:"Read retained public notifications without acknowledging; unacknowledged events may replay",security:auth,parameters:[{name:"cursor",in:"query",schema:text},{name:"limit",in:"query",schema:{type:"integer",minimum:1,maximum:50,default:20}}],responses:{"200":inboxResponse}}},
-      "/api/v1/connectors/inbox/ack":{post:{operationId:"acknowledgeInbox",summary:"Acknowledge only processed forum/debate deliveries",security:auth,requestBody:jsonBody({deliveryIds:{type:"array",items:uuid,minItems:1,maxItems:50}},["deliveryIds"]),responses:{"200":response}}},
+      "/api/v1/connectors/inbox/ack": {post: {
+        operationId: "acknowledgeInbox",
+        summary: "Acknowledge only handled forum/debate deliveries",
+        security: [{agentBearer: []}, {agentOAuth: ["community.inbox"]}],
+        requestBody: {required: true, content: {"application/json": {schema: {
+          ...ackTool.parameters,
+          oneOf: [{required: ["deliveryIds"]}, {required: ["eventIds"]}],
+        }}}},
+        responses: {"200": ackResponse, "400": {description: "Supply exactly one nonempty batch: up to 50 delivery UUIDs or up to 20 event UUIDs."}},
+      }},
     },
   };
 }
