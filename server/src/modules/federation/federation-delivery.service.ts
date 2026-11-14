@@ -319,13 +319,7 @@ export class FederationDeliveryService
           recipientAgentId: agent.id,
           status: Not(DeliveryStatus.Acked),
         },
-        {
-          status: DeliveryStatus.Acked,
-          ackedAt: new Date(),
-          nextAttemptAt: null,
-          lastError: null,
-          deadLetteredAt: null,
-        },
+        this.acknowledgedDelivery(new Date()),
       );
 
       results.push({
@@ -334,14 +328,69 @@ export class FederationDeliveryService
       });
     }
 
-    if (results.some((result) => result.status === 'acked'))
-      await this.continuous.recordAcknowledgement(agent.connectionId);
-    await this.recordAgentPollingActivity(agent, true);
-    this.poke();
+    await this.finishAcknowledgement(
+      agent,
+      results.some((result) => result.status === 'acked'),
+    );
 
     return {
       results,
     };
+  }
+
+  async acknowledgeCommunityEvents(
+    agent: AuthenticatedFederatedAgent,
+    eventIds: string[],
+  ) {
+    const now = new Date();
+    const eligible = this.outstandingQuery(agent.id, true)
+      .andWhere(visibleForumRootSql('event'))
+      .andWhere('delivery.eventId IN (:...eventIds)', { eventIds })
+      .andWhere('delivery.replayExpiresAt > :now', { now })
+      .select('delivery.id')
+      .orderBy();
+    const updated = await this.deliveryRepository
+      .createQueryBuilder()
+      .update()
+      .set(this.acknowledgedDelivery(now))
+      .where(`id IN (${eligible.getQuery()})`)
+      .andWhere('status IN (:...statuses) AND replay_expires_at > :now')
+      .setParameters(eligible.getParameters())
+      .returning(['id', 'eventId'])
+      .execute();
+    const rows = updated.raw as Array<{ id: string; event_id: string }>;
+    const byEvent = new Map(rows.map((row) => [row.event_id, row.id]));
+    await this.finishAcknowledgement(agent, rows.length > 0);
+    return {
+      results: eventIds.map((eventId) => {
+        const deliveryId = byEvent.get(eventId);
+        return {
+          eventId,
+          cleared: deliveryId ? 1 : 0,
+          deliveryIds: deliveryId ? [deliveryId] : [],
+        };
+      }),
+    };
+  }
+
+  private acknowledgedDelivery(at: Date) {
+    return {
+      status: DeliveryStatus.Acked,
+      ackedAt: at,
+      nextAttemptAt: null,
+      lastError: null,
+      deadLetteredAt: null,
+    };
+  }
+
+  private async finishAcknowledgement(
+    agent: AuthenticatedFederatedAgent,
+    cleared: boolean,
+  ) {
+    if (cleared)
+      await this.continuous.recordAcknowledgement(agent.connectionId);
+    await this.recordAgentPollingActivity(agent, true);
+    this.poke();
   }
 
   poke(): void {
