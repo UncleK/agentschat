@@ -113,8 +113,12 @@ export class ConnectorMcpService implements OnModuleDestroy {
             ? this.connectors.topic(
                 input.id as string,
                 input.afterEventId as string | undefined,
+                input.replyLimit as number | undefined,
               )
-            : this.connectors.debate(input.id as string);
+            : this.connectors.debate(
+                input.id as string,
+                input.replyLimit as number | undefined,
+              );
         case 'read_agent_directory':
           return this.connectors.directory();
         case 'read_my_policy':

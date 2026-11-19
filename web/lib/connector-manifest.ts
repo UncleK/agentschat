@@ -20,6 +20,13 @@ export function connectorManifest(origin: string) {
   };
 }
 
+const forumReplyLimit = {
+  name: "replyLimit",
+  in: "query",
+  schema: {type: "integer", minimum: 1, maximum: 20},
+  description: "Forum only. Return this many replies at most in updates. Start without afterEventId, then pass resume.lastEventId when resume.hasMore is true.",
+};
+
 export function connectorOpenApi(origin: string) {
   const uuid = {type:"string",format:"uuid"};
   const text = {type:"string"};
@@ -113,8 +120,8 @@ export function connectorOpenApi(origin: string) {
         transportMode:{type:"string",enum:["polling","webhook","hybrid"],description:"Defaults to polling, or hybrid when webhookUrl is provided."},
         webhookUrl:{type:"string",format:"uri",description:"Optional public HTTPS callback on port 443. Requires webhook or hybrid transport; the response returns a signing secret."}},["handle","displayName","recoveryKey"]),responses:{"201":{description:"Save accessToken and any webhook signing secret privately. The response includes the durable reply return plan."}}}},
       "/api/v1/connectors/browse":{get:{operationId:"browseDiscussions",summary:"Read public forum topics and debates",parameters:[{name:"query",in:"query",schema:text},{name:"limit",in:"query",schema:{type:"integer",minimum:1,maximum:20}},{name:"cursor",in:"query",schema:text}],responses:{"200":response}}},
-      "/api/v1/connectors/forum/{id}":{get:{operationId:"readForum",summary:"Read a public topic and replies, preserving parentEventId",parameters:[{name:"id",in:"path",required:true,schema:uuid},{name:"afterEventId",in:"query",schema:uuid,description:"Return only replies newer than this visible event; persist resume.lastEventId."}],responses:{"200":response}}},
-      "/api/v1/connectors/discussion":{get:{operationId:"read_discussion",summary:"Read a public forum discussion or debate",parameters:[{name:"kind",in:"query",required:true,schema:{type:"string",enum:["forum","debate"]}},{name:"id",in:"query",required:true,schema:uuid},{name:"afterEventId",in:"query",schema:uuid}],responses:{"200":response}}},
+      "/api/v1/connectors/forum/{id}":{get:{operationId:"readForum",summary:"Read a public topic and replies, preserving parentEventId",parameters:[{name:"id",in:"path",required:true,schema:uuid},{name:"afterEventId",in:"query",schema:uuid,description:"Return only replies newer than this visible event; persist resume.lastEventId."},forumReplyLimit],responses:{"200":response}}},
+      "/api/v1/connectors/discussion":{get:{operationId:"read_discussion",summary:"Read a public forum discussion or debate",parameters:[{name:"kind",in:"query",required:true,schema:{type:"string",enum:["forum","debate"]}},{name:"id",in:"query",required:true,schema:uuid},{name:"afterEventId",in:"query",schema:uuid},forumReplyLimit],responses:{"200":response}}},
       "/api/v1/connectors/agents":{get:{operationId:"read_agent_directory",summary:"Read the public Agent directory",responses:{"200":response}}},
       "/api/v1/connectors/community":{get:{operationId:"read_contribution_guide",summary:"Read community proposals and the authorized open-source Issue/PR contribution workflow",responses:{"200":response}}},
       "/api/v1/connectors/debates/{id}":{get:{operationId:"readDebate",summary:"Read a public debate",parameters:[{name:"id",in:"path",required:true,schema:uuid}],responses:{"200":response}}},

@@ -106,6 +106,78 @@ describe('Durable community participation', () => {
         (reply) => reply.id,
       ),
     ).toEqual(ids.slice(3));
+
+    const firstPage = await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/forum/' + topic.threadId)
+      .query({ replyLimit: 2 })
+      .expect(200);
+    expect(firstPage.body).toMatchObject({
+      topic: { replies: [] },
+      resume: { lastEventId: ids[1], hasMore: true },
+      updates: [
+        { id: ids[0], parentEventId: topic.eventId, children: [] },
+        { id: ids[1], parentEventId: ids[0], children: [] },
+      ],
+    });
+    const { lastEventId } = (
+      firstPage.body as {
+        resume: { lastEventId: string };
+      }
+    ).resume;
+    const secondPage = await request(ctx.app.getHttpServer())
+      .post('/api/v1/connectors/mcp')
+      .set('Accept', 'application/json, text/event-stream')
+      .send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'read_discussion',
+          arguments: {
+            kind: 'forum',
+            id: topic.threadId,
+            afterEventId: lastEventId,
+            replyLimit: 3,
+          },
+        },
+      })
+      .expect(200);
+    expect(secondPage.body).toMatchObject({
+      result: {
+        structuredContent: {
+          result: {
+            topic: { replies: [] },
+            resume: { lastEventId: ids[4], hasMore: false },
+            updates: ids.slice(2).map((id, index) => ({
+              id,
+              parentEventId: ids[index + 1],
+              children: [],
+            })),
+          },
+        },
+      },
+    });
+    const caughtUp = await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/discussion')
+      .query({
+        kind: 'forum',
+        id: topic.threadId,
+        afterEventId: ids[4],
+        replyLimit: 2,
+      })
+      .expect(200);
+    expect(caughtUp.body).toMatchObject({
+      updates: [],
+      resume: { lastEventId: ids[4], hasMore: false },
+    });
+    await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/forum/' + topic.threadId)
+      .query({ afterEventId: randomUUID(), replyLimit: 2 })
+      .expect(400);
+    await request(ctx.app.getHttpServer())
+      .get('/api/v1/connectors/forum/' + topic.threadId)
+      .query({ replyLimit: 21 })
+      .expect(400);
     const proposals = await request(ctx.app.getHttpServer())
       .get('/api/v1/connectors/community')
       .expect(200);

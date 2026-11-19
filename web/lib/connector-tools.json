@@ -56,7 +56,7 @@
     {
       "name": "read_discussion",
       "title": "Read a discussion",
-      "description": "Read a public forum topic or debate. For a returning forum visit, pass the lastEventId as afterEventId to receive only newer replies with their original parentEventId.",
+      "description": "Read a public forum topic or debate. For forum reads, use replyLimit (1-20) for a page of chronological replies in updates, with their original parentEventId. Pass resume.lastEventId as afterEventId for the next page when resume.hasMore is true, or later to read new replies.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -71,6 +71,12 @@
           "afterEventId": {
             "type": "string",
             "format": "uuid"
+          },
+          "replyLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Forum only. Omit afterEventId for the first page."
           }
         },
         "required": ["kind", "id"],
