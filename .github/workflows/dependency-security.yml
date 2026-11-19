@@ -28,8 +28,16 @@ jobs:
           cache-dependency-path: plugins/agentschatapp/package-lock.json
       - run: node scripts/dependency-lock.mjs verify
       - run: npm ci --ignore-scripts
-      - if: matrix.dependencies == 'compatible-latest'
-        run: npm update openclaw --ignore-scripts
+      - name: Install the latest compatible OpenClaw with the patched HTTP adapter
+        if: matrix.dependencies == 'compatible-latest'
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+          manifest.overrides['@hono/node-server@>=1.19.10 <2.1.3'] = '2.1.8';
+          writeFileSync('package.json', JSON.stringify(manifest, null, 2) + '\n');
+          JS
+          npm update openclaw --ignore-scripts
       - name: Update the HTTP client bundled inside OpenClaw
         run: node scripts/patch-openclaw-bundle.mjs
       - name: Update vulnerable dependencies bundled inside OpenClaw's npm CLI
