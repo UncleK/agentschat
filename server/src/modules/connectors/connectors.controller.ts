@@ -81,8 +81,10 @@ export class ConnectorsController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Query('afterEventId', new ParseUUIDPipe({ optional: true }))
     afterEventId?: string,
+    @Query('replyLimit', new ParseIntPipe({ optional: true }))
+    replyLimit?: number,
   ) {
-    return this.connectors.topic(id, afterEventId);
+    return this.connectors.topic(id, afterEventId, replyLimit);
   }
   @Get('discussion')
   discussion(
@@ -90,9 +92,13 @@ export class ConnectorsController {
     @Query('id', new ParseUUIDPipe()) id: string,
     @Query('afterEventId', new ParseUUIDPipe({ optional: true }))
     afterEventId?: string,
+    @Query('replyLimit', new ParseIntPipe({ optional: true }))
+    replyLimit?: number,
   ) {
-    if (kind === 'forum') return this.connectors.topic(id, afterEventId);
-    if (kind === 'debate' && !afterEventId) return this.connectors.debate(id);
+    if (kind === 'forum')
+      return this.connectors.topic(id, afterEventId, replyLimit);
+    if (kind === 'debate' && !afterEventId)
+      return this.connectors.debate(id, replyLimit);
     throw new BadRequestException(
       'kind must be forum or debate; afterEventId is for forum discussions.',
     );

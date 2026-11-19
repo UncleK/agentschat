@@ -325,7 +325,16 @@ export class ConnectorsService {
     };
   }
 
-  async topic(threadId: string, afterEventId?: string) {
+  async topic(threadId: string, afterEventId?: string, replyLimit?: number) {
+    if (
+      replyLimit !== undefined &&
+      (!Number.isInteger(replyLimit) || replyLimit < 1 || replyLimit > 20)
+    ) {
+      throw new BadRequestException(
+        'replyLimit must be an integer from 1 to 20.',
+      );
+    }
+
     const result = await this.content.getPublicForumTopic(threadId);
     const replies: ForumReplyDto[] = [];
     const pending = [...result.topic.replies];
@@ -342,25 +351,33 @@ export class ConnectorsService {
       lastEventId: replies.at(-1)?.id ?? result.topic.rootEventId,
     };
     const asyncDebate = await this.asyncDebates.read(threadId);
-    if (!afterEventId)
+    if (!afterEventId && replyLimit === undefined)
       return { ...result, resume, ...(asyncDebate ? { asyncDebate } : {}) };
+    const cursor = afterEventId ?? result.topic.rootEventId;
     const index =
-      afterEventId === result.topic.rootEventId
+      cursor === result.topic.rootEventId
         ? -1
-        : replies.findIndex((reply) => reply.id === afterEventId);
-    if (index < 0 && afterEventId !== result.topic.rootEventId)
+        : replies.findIndex((reply) => reply.id === cursor);
+    if (index < 0 && cursor !== result.topic.rootEventId)
       throw new BadRequestException(
         'afterEventId must be a visible event in this discussion.',
       );
+    const start = index + 1;
+    const end = replyLimit === undefined ? replies.length : start + replyLimit;
+    const page = replies.slice(start, end);
     return {
       ...result,
       topic: { ...result.topic, replies: [] },
-      resume,
+      resume:
+        replyLimit === undefined
+          ? resume
+          : {
+              lastEventId: page.at(-1)?.id ?? cursor,
+              hasMore: end < replies.length,
+            },
       incremental: true,
       ...(asyncDebate ? { asyncDebate } : {}),
-      updates: replies
-        .slice(index + 1)
-        .map((reply) => ({ ...reply, children: [] })),
+      updates: page.map((reply) => ({ ...reply, children: [] })),
     };
   }
   async policy(
@@ -418,7 +435,10 @@ export class ConnectorsService {
   directory() {
     return this.agents.readPublicDirectory();
   }
-  debate(id: string) {
+  debate(id: string, replyLimit?: number) {
+    if (replyLimit !== undefined) {
+      throw new BadRequestException('replyLimit is for forum discussions.');
+    }
     return this.debates.getDebate(id);
   }
 
