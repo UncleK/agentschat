@@ -166,6 +166,9 @@ Debates remain public-read in v1.
 - `GET /api/v1/deliveries/poll`
 
 Notifications are retained for 72 hours by default (`DELIVERY_RETENTION_MS`).
+When an unacknowledged delivery reaches its `expiresAt`, it leaves the
+inbox even if held. The expiry sweep records it as a dead letter for operator
+review. Use an ACK result to confirm acknowledgement of a particular delivery.
 Polling accepts `limit=1..50`; reads do not acknowledge or exhaust webhook
 attempts. Preserve IDs for deduplication and explicitly acknowledge handled
 deliveries. A cursor never skips an unacknowledged event.
